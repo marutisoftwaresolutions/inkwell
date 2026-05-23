@@ -33,61 +33,61 @@ var posts = new[]
         "best-optometry-ehr-software-2026",
         "Best Optometry EHR Software in 2026: 7 Systems Compared",
         "ULTIMATE GUIDE", "EHR & Electronic Records",
-        "0f172a", "1e3a5f", "f59e0b", ShapeStyle.Grid),
+        "0f172a", "1e3a5f", "f59e0b", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "eyefinity-ehr-review",
         "Eyefinity EHR Review 2026: Features, Pricing & Verdict",
         "PRODUCT REVIEW", "EHR & Electronic Records",
-        "1e3b8a", "1e40af", "60a5fa", ShapeStyle.Circles),
+        "1e3b8a", "1e40af", "60a5fa", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "revolution-ehr-review",
         "RevolutionEHR Review 2026: Is It Right for Your Practice?",
         "PRODUCT REVIEW", "EHR & Electronic Records",
-        "3b0764", "5b21b6", "c084fc", ShapeStyle.Circles),
+        "3b0764", "5b21b6", "c084fc", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "compulink-optometry-review",
         "Compulink Optometry Review 2026: Enterprise EHR Strengths & Weaknesses",
         "PRODUCT REVIEW", "EHR & Electronic Records",
-        "1e1b4b", "312e81", "818cf8", ShapeStyle.Dots),
+        "1e1b4b", "312e81", "818cf8", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "crystal-pm-vs-officemate",
         "Crystal PM vs OfficeMate: Which Practice Management System Should You Choose?",
         "HEAD-TO-HEAD", "Practice Management Software",
-        "4a044e", "86198f", "e879f9", ShapeStyle.Versus),
+        "4a044e", "86198f", "e879f9", ShapeStyle.Comparison),
 
     new PostSpec(
         "maximeyes-ehr-review",
         "MaximEyes EHR Review 2026: Features for Multi-Location Practices",
         "PRODUCT REVIEW", "EHR & Electronic Records",
-        "064e3b", "0f766e", "34d399", ShapeStyle.Circles),
+        "064e3b", "0f766e", "34d399", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "imedicware-optometry-review",
         "iMedicWare Optometry EHR Review 2026: Telehealth-Forward Platform",
         "PRODUCT REVIEW", "Teleoptometry & Remote Care",
-        "0c4a6e", "0369a1", "38bdf8", ShapeStyle.Dots),
+        "0c4a6e", "0369a1", "38bdf8", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "cloud-vs-server-optometry-ehr",
         "Cloud-Based vs Server-Based Optometry EHR: Which Wins in 2026?",
         "COMPARISON", "EHR & Electronic Records",
-        "1c1917", "292524", "fb923c", ShapeStyle.Versus),
+        "1c1917", "292524", "fb923c", ShapeStyle.Comparison),
 
     new PostSpec(
         "how-to-switch-optometry-ehr",
         "How to Switch Optometry EHR Software Without Losing Data",
         "HOW-TO GUIDE", "EHR & Electronic Records",
-        "14532d", "166534", "4ade80", ShapeStyle.Steps),
+        "14532d", "166534", "4ade80", ShapeStyle.Checklist),
 
     new PostSpec(
         "optometry-ehr-implementation-checklist",
         "Optometry EHR Implementation Checklist: Your 30-Day Go-Live Plan",
         "CHECKLIST", "Practice Management Software",
-        "134e4a", "115e59", "2dd4bf", ShapeStyle.Steps),
+        "134e4a", "115e59", "2dd4bf", ShapeStyle.Checklist),
 
     new PostSpec(
         "hipaa-compliant-ehr-optometrists-2026",
@@ -195,49 +195,49 @@ var posts = new[]
         "glaucoma-detection-software-ai-tools-optometrists-2026",
         "Glaucoma Detection Software: AI Tools Every Optometrist Should Know in 2026",
         "AI IN CLINIC", "AI & Machine Learning in Optometry",
-        "172554", "1e3a8a", "f43f5e", ShapeStyle.Circles),
+        "172554", "1e3a8a", "f43f5e", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "oct-vs-fundus-photography-optometry",
         "OCT vs Fundus Photography in Optometry: Which Is Right for Your Practice?",
         "CLINICAL TECH", "Digital Imaging & Diagnostics",
-        "0f172a", "334155", "fb923c", ShapeStyle.Versus),
+        "0f172a", "334155", "fb923c", ShapeStyle.Comparison),
 
     new PostSpec(
         "treating-amblyopia-children-software-track-progress-2026",
         "Treating Amblyopia in Children: Software Tools to Track Progress in 2026",
         "PEDIATRICS", "Vision Therapy Technology",
-        "064e3b", "0f766e", "34d399", ShapeStyle.Circles),
+        "064e3b", "0f766e", "34d399", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "ehr-interoperability-optometrists-connecting-medical-systems",
         "EHR Interoperability for Optometrists: Connecting with Medical Systems",
         "INTEGRATIONS", "EHR & Electronic Records",
-        "0f172a", "1e3a5f", "fbbf24", ShapeStyle.Dots),
+        "0f172a", "1e3a5f", "fbbf24", ShapeStyle.TechDashboard),
 
     new PostSpec(
         "optometry-practice-analytics-grow-eye-care-business",
         "Optometry Practice Analytics: Using Data to Grow Your Eye Care Business",
         "ANALYTICS", "Practice Management Software",
-        "312e81", "4338ca", "a78bfa", ShapeStyle.Grid),
+        "312e81", "4338ca", "a78bfa", ShapeStyle.Analytics),
 
     new PostSpec(
         "medical-vs-vision-insurance-billing-optometry-guide",
         "Medical vs Vision Insurance Billing in Optometry: A Complete Guide",
         "INSURANCE GUIDE", "Billing & Revenue Cycle",
-        "064e3b", "0f766e", "fbbf24", ShapeStyle.Versus),
+        "064e3b", "0f766e", "fbbf24", ShapeStyle.Comparison),
 
     new PostSpec(
         "contact-lens-inventory-management-software-optometry",
         "Contact Lens Inventory Management: Best Software for Optometry Practices",
         "CLINIC OPERATION", "Contact Lens Fitting Technology",
-        "0c4a6e", "0284c7", "2dd4bf", ShapeStyle.Grid),
+        "0c4a6e", "0284c7", "2dd4bf", ShapeStyle.Checklist),
 
     new PostSpec(
         "diabetic-eye-exam-ai-screening-tools-optometrists-2026",
         "Diabetic Eye Exam AI Screening Tools for Optometrists in 2026",
         "AI IN CLINIC", "AI & Machine Learning in Optometry",
-        "172554", "1e3a8a", "34d399", ShapeStyle.Steps),
+        "172554", "1e3a8a", "34d399", ShapeStyle.TechDashboard),
 };
 
 // ── Generate ───────────────────────────────────────────────────────────────────
@@ -503,6 +503,187 @@ static void DrawShapes(IImageProcessingContext ctx, ShapeStyle style, Color acce
                 ctx.Fill(s % 2 == 0 ? faint : medium, new RectangleF(sx, sy, 54, H - sy));
             }
             break;
+
+        case ShapeStyle.TechDashboard:
+            {
+                float bx = W - 420, by = 130, bw = 350, bh = 260;
+                ctx.Fill(faint, new RectangleF(bx - 10, by - 10, bw + 20, bh + 20));
+                ctx.Fill(Color.FromRgba(255, 255, 255, 20), new RectangleF(bx, by, bw, bh));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 60), 2f, new RectangleF(bx, by, bw, bh));
+                
+                ctx.Fill(Color.FromRgba(255, 255, 255, 30), new RectangleF(bx, by, bw, 32));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 60), 1f, new RectangleF(bx, by, bw, 32));
+                
+                ctx.Fill(Color.ParseHex("ff5f56"), new EllipsePolygon(bx + 18, by + 16, 5, 5));
+                ctx.Fill(Color.ParseHex("ffbd2e"), new EllipsePolygon(bx + 32, by + 16, 5, 5));
+                ctx.Fill(Color.ParseHex("27c93f"), new EllipsePolygon(bx + 46, by + 16, 5, 5));
+                
+                ctx.Fill(Color.FromRgba(255, 255, 255, 15), new RectangleF(bx, by + 32, 80, bh - 32));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 40), 1f, new RectangleF(bx, by + 32, 80, bh - 32));
+                
+                for (int row = 0; row < 5; row++)
+                {
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 40), new RectangleF(bx + 10, by + 48 + row * 24, 60, 6));
+                }
+                
+                for (int gx = 0; gx < 5; gx++)
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 10), new RectangleF(bx + 96 + gx * 45, by + 48, 1, 120));
+                for (int gy = 0; gy < 4; gy++)
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 10), new RectangleF(bx + 96, by + 48 + gy * 40, 230, 1));
+                
+                var chartPoints = new[]
+                {
+                    new PointF(bx + 96, by + 130),
+                    new PointF(bx + 130, by + 90),
+                    new PointF(bx + 150, by + 140),
+                    new PointF(bx + 180, by + 70),
+                    new PointF(bx + 210, by + 110),
+                    new PointF(bx + 230, by + 60),
+                    new PointF(bx + 260, by + 130),
+                    new PointF(bx + 290, by + 90),
+                    new PointF(bx + 326, by + 120)
+                };
+                for (int idx = 0; idx < chartPoints.Length - 1; idx++)
+                {
+                    ctx.Draw(accent, 3f, new Polygon(new LinearLineSegment(chartPoints[idx], chartPoints[idx + 1])));
+                }
+                
+                ctx.Fill(Color.White, new EllipsePolygon(bx + 230, by + 60, 6, 6));
+                ctx.Draw(accent, 2f, new EllipsePolygon(bx + 230, by + 60, 6, 6));
+                
+                ctx.Fill(Color.FromRgba(255, 255, 255, 25), new RectangleF(bx + 96, by + 185, 68, 50));
+                ctx.Fill(Color.FromRgba(255, 255, 255, 25), new RectangleF(bx + 176, by + 185, 68, 50));
+                ctx.Fill(Color.FromRgba(255, 255, 255, 25), new RectangleF(bx + 256, by + 185, 70, 50));
+                
+                ctx.Fill(accent, new RectangleF(bx + 106, by + 195, 30, 4));
+                ctx.Fill(accent, new RectangleF(bx + 186, by + 195, 30, 4));
+                ctx.Fill(accent, new RectangleF(bx + 266, by + 195, 30, 4));
+            }
+            break;
+
+        case ShapeStyle.Checklist:
+            {
+                float cbx = W - 370, cby = 120, cbw = 260, cbh = 300;
+                ctx.Fill(faint, new RectangleF(cbx - 10, cby - 10, cbw + 20, cbh + 20));
+                ctx.Fill(Color.FromRgba(255, 255, 255, 20), new RectangleF(cbx, cby, cbw, cbh));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 50), 2f, new RectangleF(cbx, cby, cbw, cbh));
+                
+                float clx = cbx + cbw / 2f - 40, cly = cby - 12, clw = 80, clh = 24;
+                ctx.Fill(Color.FromRgba(255, 255, 255, 45), new RectangleF(clx, cly, clw, clh));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 80), 2f, new RectangleF(clx, cly, clw, clh));
+                ctx.Fill(accent, new EllipsePolygon(clx + clw / 2f, cly + clh / 2f, 4, 4));
+                
+                for (int row = 0; row < 4; row++)
+                {
+                    float ry = cby + 48 + row * 62;
+                    ctx.Draw(Color.FromRgba(255, 255, 255, 60), 2f, new RectangleF(cbx + 24, ry, 22, 22));
+                    
+                    if (row < 3)
+                    {
+                        var checkPoints = new[]
+                        {
+                            new PointF(cbx + 28, ry + 11),
+                            new PointF(cbx + 34, ry + 17),
+                            new PointF(cbx + 43, ry + 5)
+                        };
+                        ctx.Draw(accent, 3f, new Polygon(new LinearLineSegment(checkPoints[0], checkPoints[1])));
+                        ctx.Draw(accent, 3f, new Polygon(new LinearLineSegment(checkPoints[1], checkPoints[2])));
+                    }
+                    
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 75), new RectangleF(cbx + 60, ry + 4, 150, 6));
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 45), new RectangleF(cbx + 60, ry + 14, 100, 4));
+                }
+            }
+            break;
+
+        case ShapeStyle.Comparison:
+            {
+                float c1x = W - 390, c1y = 140, cw = 160, ch = 240;
+                float c2x = W - 210, c2y = 190;
+                
+                ctx.Fill(faint, new RectangleF(c1x, c1y, cw, ch));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 50), 2f, new RectangleF(c1x, c1y, cw, ch));
+                ctx.Fill(accent, new RectangleF(c1x + 20, c1y + 24, 60, 8));
+                for (int line = 0; line < 4; line++)
+                {
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 40), new EllipsePolygon(c1x + 25, c1y + 60 + line * 36, 4, 4));
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 60), new RectangleF(c1x + 40, c1y + 57 + line * 36, 90, 6));
+                }
+                
+                ctx.Fill(Color.FromRgba(0, 0, 0, 80), new RectangleF(c2x, c2y, cw, ch));
+                ctx.Draw(accent, 2f, new RectangleF(c2x, c2y, cw, ch));
+                ctx.Fill(Color.White, new RectangleF(c2x + 20, c2y + 24, 60, 8));
+                for (int line = 0; line < 4; line++)
+                {
+                    ctx.Fill(accent, new EllipsePolygon(c2x + 25, c2y + 60 + line * 36, 4, 4));
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 60), new RectangleF(c2x + 40, c2y + 57 + line * 36, 90, 6));
+                }
+                
+                float vsx = W - 225, vsy = 250, vsw = 50, vsh = 50;
+                ctx.Fill(accent, new EllipsePolygon(vsx + vsw / 2f, vsy + vsh / 2f, vsw / 2f, vsh / 2f));
+                ctx.Draw(Color.White, 2f, new EllipsePolygon(vsx + vsw / 2f, vsy + vsh / 2f, vsw / 2f, vsh / 2f));
+                
+                ctx.Draw(Color.Black, 3f, new Polygon(new LinearLineSegment(new PointF(vsx + 18, vsy + 18), new PointF(vsx + 25, vsy + 32))));
+                ctx.Draw(Color.Black, 3f, new Polygon(new LinearLineSegment(new PointF(vsx + 25, vsy + 32), new PointF(vsx + 32, vsy + 18))));
+                var sPoints = new[]
+                {
+                    new PointF(vsx + 35, vsy + 24),
+                    new PointF(vsx + 30, vsy + 25),
+                    new PointF(vsx + 31, vsy + 28),
+                    new PointF(vsx + 34, vsy + 29),
+                    new PointF(vsx + 29, vsy + 32)
+                };
+                for (int idx = 0; idx < sPoints.Length - 1; idx++)
+                    ctx.Draw(Color.Black, 2.5f, new Polygon(new LinearLineSegment(sPoints[idx], sPoints[idx + 1])));
+            }
+            break;
+
+        case ShapeStyle.Analytics:
+            {
+                float gx = W - 410, gy = 130, gw = 350, gh = 260;
+                ctx.Fill(faint, new RectangleF(gx - 10, gy - 10, gw + 20, gh + 20));
+                ctx.Fill(Color.FromRgba(255, 255, 255, 10), new RectangleF(gx, gy, gw, gh));
+                ctx.Draw(Color.FromRgba(255, 255, 255, 45), 2f, new RectangleF(gx, gy, gw, gh));
+                
+                ctx.Fill(Color.FromRgba(255, 255, 255, 90), new RectangleF(gx + 30, gy + 10, 2, gh - 40));
+                ctx.Fill(Color.FromRgba(255, 255, 255, 90), new RectangleF(gx + 30, gy + gh - 30, gw - 50, 2));
+                
+                for (int yVal = 1; yVal < 5; yVal++)
+                {
+                    float yLoc = gy + gh - 30 - yVal * 45;
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 15), new RectangleF(gx + 32, yLoc, gw - 52, 1));
+                }
+                
+                float barW = 34;
+                float[] barHeights = { 80, 140, 180 };
+                for (int bIdx = 0; bIdx < 3; bIdx++)
+                {
+                    float bx = gx + 60 + bIdx * 90;
+                    float by = gy + gh - 30 - barHeights[bIdx];
+                    ctx.Fill(Color.FromRgba(255, 255, 255, 25), new RectangleF(bx, by, barW, barHeights[bIdx]));
+                    ctx.Draw(Color.FromRgba(255, 255, 255, 50), 1f, new RectangleF(bx, by, barW, barHeights[bIdx]));
+                }
+                
+                var trendPoints = new[]
+                {
+                    new PointF(gx + 40, gy + gh - 50),
+                    new PointF(gx + 100, gy + gh - 90),
+                    new PointF(gx + 180, gy + gh - 120),
+                    new PointF(gx + 260, gy + gh - 210),
+                    new PointF(gx + 340, gy + gh - 240)
+                };
+                for (int idx = 0; idx < trendPoints.Length - 1; idx++)
+                {
+                    ctx.Draw(accent, 4f, new Polygon(new LinearLineSegment(trendPoints[idx], trendPoints[idx + 1])));
+                }
+                
+                foreach (var pt in trendPoints)
+                {
+                    ctx.Fill(Color.White, new EllipsePolygon(pt.X, pt.Y, 5, 5));
+                    ctx.Draw(accent, 2f, new EllipsePolygon(pt.X, pt.Y, 5, 5));
+                }
+            }
+            break;
     }
 }
 
@@ -726,4 +907,4 @@ static void GenerateFavicon(string outPath)
 record PostSpec(string Slug, string Title, string Badge, string Category,
                 string BgTop, string BgBottom, string Accent, ShapeStyle Shape);
 
-enum ShapeStyle { Circles, Dots, Grid, Versus, Steps }
+enum ShapeStyle { Circles, Dots, Grid, Versus, Steps, TechDashboard, Checklist, Comparison, Analytics }

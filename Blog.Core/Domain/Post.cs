@@ -12,6 +12,7 @@ public class Post
     public string? Type { get; set; } = "post";
     public string? Visibility { get; set; } = "public";
     public string? FeatureImage { get; set; }
+    public string? FeaturedImageUrl => FeatureImage;
 
     public string? MetaTitle { get; set; }
     public string? MetaDescription { get; set; }
