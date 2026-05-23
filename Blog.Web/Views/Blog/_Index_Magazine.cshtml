@@ -1,14 +1,23 @@
 @using Blog.Core.Interfaces
 @model PagedResult<Blog.Core.Domain.Post>
 @{
+    // Magazine layout owns its own header and footer — suppress the shared layout chrome
+    ViewData["HideLayoutChrome"] = true;
+
     var searchTerm = ViewBag.SearchTerm as string;
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
     var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
-    var popularPosts = ViewBag.PopularPosts as List<Blog.Core.Domain.Post> ?? new List<Blog.Core.Domain.Post>();
 
     var isFirstPage = Model.Page == 1 && !selectedCategories.Any() && !selectedTags.Any() && string.IsNullOrEmpty(searchTerm);
-    var heroPost = (isFirstPage && Model.Items.Count >= 4) ? Model.Items.FirstOrDefault() : null;
-    var gridPosts = heroPost != null ? Model.Items.Skip(1) : Model.Items;
+    var heroPost = (isFirstPage && Model.Items.Count >= 3) ? Model.Items.FirstOrDefault() : null;
+    var secondaryPost = heroPost != null && Model.Items.Count >= 2 ? Model.Items[1] : null;
+    var gridPosts = heroPost != null ? Model.Items.Skip(2).ToList() : Model.Items.ToList();
+    var feedPosts = heroPost != null ? gridPosts.Skip(4).ToList() : gridPosts;
+
+    string GetExcerpt(Blog.Core.Domain.Post p) =>
+        !string.IsNullOrEmpty(p.MetaDescription) ? p.MetaDescription :
+        !string.IsNullOrEmpty(p.Plaintext) ? (p.Plaintext.Length > 200 ? p.Plaintext[..197] + "…" : p.Plaintext) :
+        string.Empty;
 
     string GetToggleUrl(string type, string slug)
     {
@@ -24,118 +33,294 @@
     }
 }
 
-<div class="container xl:max-w-6xl mx-auto px-4 py-8">
-
-    @if (!string.IsNullOrEmpty(searchTerm))
-    {
-        <div class="mb-6 flex items-center gap-3">
-            <span class="text-sm" style="color: var(--muted-foreground);">Results for:</span>
-            <span class="font-bold text-lg">"@searchTerm"</span>
-            <a href="/" class="text-xs px-3 py-1 rounded-full border hover:opacity-80" style="border-color: var(--border);">Clear</a>
-        </div>
-    }
-
-    @* Hero Featured Post *@
-    @if (heroPost != null)
-    {
-        <a href="/@heroPost.Slug" class="group block mb-10">
-            <div class="relative overflow-hidden rounded-2xl aspect-[2/1] md:aspect-[3/1]" style="background: var(--muted);">
-                @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
-                {
-                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                }
-                <div class="absolute inset-0" style="background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);"></div>
-                <div class="absolute bottom-0 left-0 right-0 p-6 md:p-10">
-                    @if (heroPost.Categories.Any())
-                    {
-                        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold mb-3" style="background: var(--primary); color: var(--primary-foreground);">@heroPost.Categories.First().Name</span>
-                    }
-                    <h1 class="text-2xl md:text-4xl font-bold text-white mb-2">@heroPost.Title</h1>
-                    <div class="flex items-center gap-3 text-sm text-white/70">
-                        <span>@(string.IsNullOrEmpty(heroPost.AuthorName) ? "Anonymous" : heroPost.AuthorName)</span>
-                        <span>•</span>
-                        <span>@heroPost.PublishedAt?.ToString("MMM d, yyyy")</span>
-                    </div>
-                </div>
-            </div>
+@* ── Site Header ──────────────────────────────────────────────── *@
+<header class="ink-header ui-region">
+    <div class="ink-header-inner">
+        <a href="/" class="ink-wordmark" style="text-decoration:none;">
+            <svg class="ink-logomark" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+                <rect width="64" height="64" rx="6" fill="var(--fg)" />
+                <text x="32" y="44.5" text-anchor="middle"
+                    font-family="'Source Serif 4',Georgia,serif"
+                    font-style="italic" font-weight="500" font-size="42" fill="var(--bg)">I</text>
+            </svg>
+            <span class="ink-wordmark-text">@(ViewBag.SiteName ?? "Inkwell")</span>
         </a>
-    }
-
-    @* ── FILTER BOX ─────────────────────────────────────────────── *@
-    @if ((ViewBag.Categories != null && ((IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories).Any()) || 
-         (ViewBag.Tags != null && ((IEnumerable<Blog.Core.Domain.Tag>)ViewBag.Tags).Any()))
-    {
-        <div class="mb-10 border rounded-2xl overflow-hidden shadow-sm" style="background: var(--card); border-color: var(--border);">
-            <div class="px-6 py-4 border-b flex justify-between items-center" style="border-color: var(--border); background: var(--muted)/30;">
-                <h3 class="font-bold uppercase tracking-wider text-xs flex items-center gap-2">
-                    <i class="bi bi-funnel"></i> Filter
-                </h3>
-                @if (selectedCategories.Any() || selectedTags.Any()) {
-                    <a href="/" class="text-[10px] font-bold uppercase underline hover:opacity-70 text-red-500">Clear All</a>
-                }
-            </div>
-            
-            <div class="p-6 flex flex-col md:flex-row gap-8">
+        <nav aria-label="Sections">
+            <ul class="ink-nav">
                 @if (ViewBag.Categories != null)
                 {
-                    var cats = (IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories;
-                    if (cats.Any())
+                    foreach (var cat in (IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories)
                     {
-                        <div class="flex-1">
-                            <h4 class="text-xs uppercase font-bold mb-3" style="color: var(--muted-foreground);">Categories</h4>
-                            <div class="flex flex-wrap gap-2">
-                                <a href="/" class="px-4 py-1.5 rounded-full text-sm font-medium border @((!selectedCategories.Any() && !selectedTags.Any()) ? "shadow-sm" : "")" style="background: @((!selectedCategories.Any() && !selectedTags.Any()) ? "var(--primary)" : "var(--card)"); color: @((!selectedCategories.Any() && !selectedTags.Any()) ? "var(--primary-foreground)" : "var(--foreground)"); border-color: var(--border);">All</a>
-                                @foreach (var cat in cats)
-                                {
-                                    bool isOn = selectedCategories.Contains(cat.Slug);
-                                    <a href="@GetToggleUrl("category", cat.Slug)" class="px-4 py-1.5 rounded-full text-sm font-medium border @(isOn ? "shadow-sm" : "")" style="background: @(isOn ? "var(--primary)" : "var(--card)"); color: @(isOn ? "var(--primary-foreground)" : "var(--foreground)"); border-color: var(--border);">@cat.Name</a>
-                                }
-                            </div>
-                        </div>
+                        <li><a href="/?category=@cat.Slug">@cat.Name</a></li>
                     }
                 }
-                
-                @if (ViewBag.Tags != null)
+            </ul>
+        </nav>
+        <div style="display:flex;align-items:center;gap:14px;" class="ui-region">
+            <a href="/search" class="ink-btn ink-btn-ghost" style="font-size:12px;padding:7px 14px;">Search</a>
+            <a href="/newsletter" class="ink-btn" style="font-size:12px;padding:7px 14px;">Subscribe</a>
+        </div>
+    </div>
+</header>
+
+@if (!string.IsNullOrEmpty(searchTerm))
+{
+    @* Search mode — simple list *@
+    <section style="max-width:var(--container);margin:0 auto;padding:var(--sp-16) var(--gutter);">
+        <div class="eyebrow" style="margin-bottom:var(--sp-4);">Search results</div>
+        <h1 style="font-family:var(--serif);font-size:clamp(28px,4vw,44px);font-weight:500;color:var(--fg);margin:0 0 var(--sp-10);letter-spacing:-0.02em;">"@searchTerm"</h1>
+        @if (!Model.Items.Any())
+        {
+            <p style="font-family:var(--serif);font-style:italic;color:var(--fg-body);">No essays match that search. Try a different query.</p>
+        }
+        else
+        {
+            <div style="display:flex;flex-direction:column;gap:0;">
+                @foreach (var post in Model.Items)
                 {
-                    var tags = (IEnumerable<Blog.Core.Domain.Tag>)ViewBag.Tags;
-                    if (tags.Any())
+                    <article style="padding:var(--sp-8) 0;border-bottom:1px solid var(--border);">
+                        @if (post.Categories.Any())
+                        {
+                            <div class="eyebrow" style="margin-bottom:8px;">@post.Categories.First().Name</div>
+                        }
+                        <h2 style="font-family:var(--serif);font-weight:500;font-size:26px;line-height:1.18;letter-spacing:-0.015em;color:var(--fg);margin:0 0 8px;">
+                            <a href="/@post.Slug" style="color:inherit;text-decoration:none;">@post.Title</a>
+                        </h2>
+                        <div class="byline">by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em> · @post.PublishedAt?.ToString("d MMMM yyyy")</div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+else if (!Model.Items.Any())
+{
+    <section style="max-width:var(--container);margin:0 auto;padding:var(--sp-32) var(--gutter);text-align:center;">
+        <p class="lede">The desk is empty. Compose your first essay to begin.</p>
+    </section>
+}
+else
+{
+    @* ── Masthead ──────────────────────────────────────────────── *@
+    @if (isFirstPage)
+    {
+        <section class="ink-masthead">
+            <div class="eyebrow" style="margin-bottom:14px;">
+                @(ViewBag.SiteName ?? "Inkwell") · @DateTime.Now.ToString("MMMM yyyy")
+            </div>
+            <h1 class="display" style="margin:0;max-width:14ch;">
+                @(ViewBag.Tagline ?? "Self-hosted blogging, beautifully crafted.")
+            </h1>
+            <p class="lede" style="margin:var(--sp-6) 0 0;max-width:52ch;">
+                @(ViewBag.SiteDescription ?? "An independent publication for writers who care about the craft.")
+            </p>
+        </section>
+    }
+
+    @* ── Category/Tag filters (compact, Inkwell style) ────────── *@
+    @if ((selectedCategories.Any() || selectedTags.Any()) ||
+         (ViewBag.Categories != null && ((IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories).Any()))
+    {
+        <div style="max-width:var(--container);margin:0 auto;padding:var(--sp-6) var(--gutter) 0;">
+            <div style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;">
+                <span class="eyebrow">Sections</span>
+                <a href="/" class="ink-tag" style="@(!selectedCategories.Any() && !selectedTags.Any() ? "background:var(--ink-black);color:var(--ink-cream);" : "")">All</a>
+                @if (ViewBag.Categories != null)
+                {
+                    foreach (var cat in (IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories)
                     {
-                        <div class="flex-1">
-                            <h4 class="text-xs uppercase font-bold mb-3" style="color: var(--muted-foreground);">Tags</h4>
-                            <div class="flex flex-wrap gap-2">
-                                @foreach (var tag in tags)
-                                {
-                                    bool isSelTag = selectedTags.Contains(tag.Slug);
-                                    <a href="@GetToggleUrl("tags", tag.Slug)" class="px-3 py-1.5 rounded-full text-xs font-semibold border @(isSelTag ? "shadow-sm" : "")" style="background: @(isSelTag ? "var(--foreground)" : "transparent"); color: @(isSelTag ? "var(--background)" : "var(--muted-foreground)"); border-color: var(--border);">#@tag.Name</a>
-                                }
-                            </div>
-                        </div>
+                        var isOn = selectedCategories.Contains(cat.Slug);
+                        <a href="@GetToggleUrl("category", cat.Slug)" class="ink-tag" style="@(isOn ? "background:var(--ink-black);color:var(--ink-cream);" : "")">@cat.Name</a>
                     }
+                }
+                @if (selectedCategories.Any() || selectedTags.Any())
+                {
+                    <a href="/" style="font-family:var(--sans);font-size:12px;color:var(--ink-accent);text-decoration:none;margin-left:8px;">Clear</a>
                 }
             </div>
         </div>
     }
 
-    @if (!Model.Items.Any())
+    @* ── Hero 6/4 split ───────────────────────────────────────── *@
+    @if (heroPost != null)
     {
-        <div class="py-20 text-center">
-            <i class="bi bi-journal-text text-5xl mb-4 block" style="color: var(--muted-foreground);"></i>
-            <h2 class="text-2xl font-bold mb-2">No stories yet</h2>
-            <p style="color: var(--muted-foreground);">The journey begins with a single word.</p>
-        </div>
-    }
-    else
-    {
-        @* Post Grid *@
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @foreach (var post in gridPosts)
+        <section class="ink-hero">
+            @* Left: cover *@
+            @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
             {
-                <partial name="_PostCard" model="post" />
+                <a href="/@heroPost.Slug" class="ink-hero-cover" style="background:var(--surface);">
+                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title"
+                         style="width:100%;height:100%;object-fit:cover;display:block;" />
+                </a>
             }
+            else
+            {
+                <a href="/@heroPost.Slug" class="ink-hero-cover"
+                   style="background:linear-gradient(135deg,var(--ink-sepia) 0%,var(--ink-black-soft) 100%);">
+                    <span class="ink-hero-cover-caption" style="font-size:18px;opacity:.6;">
+                        @(heroPost.Categories.Any() ? "I" : "I")
+                    </span>
+                </a>
+            }
+            @* Right: text *@
+            <div class="ink-hero-body">
+                @if (heroPost.Categories.Any())
+                {
+                    <div class="eyebrow" style="margin-bottom:12px;">@heroPost.Categories.First().Name</div>
+                }
+                <h2 class="ink-hero-title" style="font-size:clamp(32px,3.5vw,44px);">
+                    <a href="/@heroPost.Slug">@heroPost.Title</a>
+                </h2>
+                @{ var heroExcerpt = GetExcerpt(heroPost); }
+                @if (!string.IsNullOrEmpty(heroExcerpt))
+                {
+                    <p class="lede" style="margin:0 0 22px;font-size:18px;">@heroExcerpt</p>
+                }
+                <div class="byline">
+                    by <em>@(string.IsNullOrEmpty(heroPost.AuthorName) ? "The editors" : heroPost.AuthorName)</em>
+                    · @heroPost.PublishedAt?.ToString("d MMMM yyyy")
+                    @{
+                        var heroMinutes = Math.Max(1, (heroPost.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+                    }
+                    · @heroMinutes min read
+                </div>
+            </div>
+        </section>
+
+        <div style="max-width:var(--container);margin:0 auto;padding:0 var(--gutter);">
+            <hr class="ink-rule-soft" style="border-top:1px solid var(--border);margin:0;" />
         </div>
     }
 
-    @* Pagination *@
+    @* ── Secondary featured + 4-up grid ──────────────────────── *@
+    @if (secondaryPost != null)
+    {
+        <section class="ink-secondary-grid">
+            @* Secondary featured *@
+            <aside class="ink-featured-aside">
+                @if (secondaryPost.Categories.Any())
+                {
+                    <div class="eyebrow" style="margin-bottom:12px;">Featured · @secondaryPost.Categories.First().Name</div>
+                }
+                <h3 style="font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.18;letter-spacing:-0.015em;color:var(--fg);margin:0 0 12px;text-wrap:balance;">
+                    <a href="/@secondaryPost.Slug" style="color:inherit;text-decoration:none;">@secondaryPost.Title</a>
+                </h3>
+                @{ var secExcerpt = GetExcerpt(secondaryPost); }
+                @if (!string.IsNullOrEmpty(secExcerpt))
+                {
+                    <p style="font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.5;color:var(--fg-body);margin:0 0 14px;">@secExcerpt</p>
+                }
+                <div class="byline">
+                    by <em>@(string.IsNullOrEmpty(secondaryPost.AuthorName) ? "The editors" : secondaryPost.AuthorName)</em>
+                    · @secondaryPost.PublishedAt?.ToString("d MMMM yyyy")
+                </div>
+            </aside>
+
+            @* 4-up grid *@
+            <div class="ink-grid-4up">
+                @{int gridIdx = 0;}
+                @foreach (var post in gridPosts.Take(4))
+                {
+                    gridIdx++;
+                    var minRead = Math.Max(1, (post.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+                    <article>
+                        @if (!string.IsNullOrEmpty(post.FeatureImage))
+                        {
+                            <a href="/@post.Slug" class="ink-card-cover">
+                                <img src="@post.FeatureImage" alt="@post.Title"
+                                     style="width:100%;height:100%;object-fit:cover;display:block;" />
+                            </a>
+                        }
+                        else
+                        {
+                            <a href="/@post.Slug" class="ink-card-cover"
+                               style="background:linear-gradient(135deg,var(--surface-2) 0%,var(--border) 100%);">
+                            </a>
+                        }
+                        @if (post.Categories.Any())
+                        {
+                            <div class="eyebrow" style="margin-bottom:8px;">@post.Categories.First().Name</div>
+                        }
+                        <h4 class="ink-card-title">
+                            <a href="/@post.Slug">@post.Title</a>
+                        </h4>
+                        <div class="byline">
+                            by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em>
+                            · @post.PublishedAt?.ToString("MMM d")
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+    else if (gridPosts.Any())
+    {
+        @* Fallback grid when no secondary post *@
+        <section style="max-width:var(--container);margin:0 auto;padding:var(--sp-12) var(--gutter);">
+            <div class="ink-grid-4up">
+                @foreach (var post in gridPosts.Take(4))
+                {
+                    <article>
+                        @if (!string.IsNullOrEmpty(post.FeatureImage))
+                        {
+                            <a href="/@post.Slug" class="ink-card-cover">
+                                <img src="@post.FeatureImage" alt="@post.Title"
+                                     style="width:100%;height:100%;object-fit:cover;display:block;" />
+                            </a>
+                        }
+                        @if (post.Categories.Any())
+                        {
+                            <div class="eyebrow" style="margin-bottom:8px;">@post.Categories.First().Name</div>
+                        }
+                        <h4 class="ink-card-title"><a href="/@post.Slug">@post.Title</a></h4>
+                        <div class="byline">
+                            by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em>
+                            · @post.PublishedAt?.ToString("MMM d")
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @* ── Remaining posts (5+) as a feed ──────────────────────── *@
+    @if (feedPosts.Any())
+    {
+        <section style="max-width:var(--container);margin:0 auto;padding:var(--sp-4) var(--gutter) var(--sp-12);">
+            <hr style="border:0;border-top:1px solid var(--ink-black);margin:0 0 var(--sp-8);" />
+            <div class="eyebrow" style="margin-bottom:var(--sp-8);">More essays</div>
+            <div style="display:flex;flex-direction:column;gap:0;">
+                @foreach (var post in feedPosts)
+                {
+                    var minRead = Math.Max(1, (post.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+                    <article style="display:grid;grid-template-columns:1fr auto;gap:32px;align-items:start;padding:var(--sp-6) 0;border-bottom:1px solid var(--border);">
+                        <div>
+                            @if (post.Categories.Any())
+                            {
+                                <div class="eyebrow" style="margin-bottom:8px;">@post.Categories.First().Name</div>
+                            }
+                            <h3 style="font-family:var(--serif);font-weight:500;font-size:22px;line-height:1.22;letter-spacing:-0.012em;color:var(--fg);margin:0 0 8px;text-wrap:balance;">
+                                <a href="/@post.Slug" style="color:inherit;text-decoration:none;">@post.Title</a>
+                            </h3>
+                            <div class="byline">
+                                by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em>
+                                · @post.PublishedAt?.ToString("d MMMM yyyy") · @minRead min read
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(post.FeatureImage))
+                        {
+                            <a href="/@post.Slug" style="text-decoration:none;flex-shrink:0;">
+                                <img src="@post.FeatureImage" alt="@post.Title"
+                                     style="width:120px;height:80px;object-fit:cover;border-radius:var(--r-2);display:block;" />
+                            </a>
+                        }
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @* ── Pagination ────────────────────────────────────────────── *@
     @if (Model.TotalPages > 1)
     {
         var qParts = new List<string>();
@@ -144,20 +329,65 @@
         if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
         var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
 
-        <div class="flex items-center justify-center gap-2 mt-10">
+        <div class="ink-pagination">
             @if (Model.Page > 1)
             {
-                <a href="?page=@(Model.Page - 1)@baseQuery" class="px-4 py-2 rounded-lg border text-sm font-medium hover:opacity-80" style="border-color: var(--border);">
-                    <i class="bi bi-arrow-left me-1"></i>Newer
-                </a>
+                <a href="?page=@(Model.Page - 1)@baseQuery">← Newer</a>
             }
-            <span class="px-4 py-2 text-sm" style="color: var(--muted-foreground);">@Model.Page / @Model.TotalPages</span>
+            <span>@Model.Page of @Model.TotalPages</span>
             @if (Model.Page < Model.TotalPages)
             {
-                <a href="?page=@(Model.Page + 1)@baseQuery" class="px-4 py-2 rounded-lg border text-sm font-medium hover:opacity-80" style="border-color: var(--border);">
-                    Older<i class="bi bi-arrow-right ms-1"></i>
-                </a>
+                <a href="?page=@(Model.Page + 1)@baseQuery">Older →</a>
             }
         </div>
     }
-</div>
+}
+
+@* ── Footer ──────────────────────────────────────────────────── *@
+<footer class="ink-footer ui-region">
+    <div class="ink-footer-inner">
+        <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+                    <rect width="64" height="64" rx="6" fill="var(--fg)" />
+                    <text x="32" y="44.5" text-anchor="middle"
+                        font-family="'Source Serif 4',Georgia,serif"
+                        font-style="italic" font-weight="500" font-size="42" fill="var(--bg)">I</text>
+                </svg>
+                <span class="ink-wordmark-text">@(ViewBag.SiteName ?? "Inkwell")</span>
+            </div>
+            <p class="ink-footer-brand-desc">@(ViewBag.SiteDescription ?? "Self-hosted blogging, beautifully crafted.")</p>
+        </div>
+        @if (ViewBag.Categories != null)
+        {
+            <div class="ink-footer-col">
+                <div class="ink-footer-col-title">Sections</div>
+                <ul>
+                    @foreach (var cat in (IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories)
+                    {
+                        <li><a href="/?category=@cat.Slug">@cat.Name</a></li>
+                    }
+                </ul>
+            </div>
+        }
+        <div class="ink-footer-col">
+            <div class="ink-footer-col-title">The desk</div>
+            <ul>
+                <li><a href="/about">About</a></li>
+                <li><a href="/archive">Archive</a></li>
+                <li><a href="/feed">RSS feed</a></li>
+            </ul>
+        </div>
+        <div class="ink-footer-col">
+            <div class="ink-footer-col-title">Subscribe</div>
+            <ul>
+                <li><a href="/newsletter">The Inkwell Letter</a></li>
+                <li><a href="/feed">RSS feed</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="ink-footer-bottom">
+        <span>© @(ViewBag.SiteName ?? "Inkwell") @DateTime.Now.Year · Self-hosted, open-source.</span>
+        <span style="font-family:var(--serif);font-style:italic;">Made with care.</span>
+    </div>
+</footer>

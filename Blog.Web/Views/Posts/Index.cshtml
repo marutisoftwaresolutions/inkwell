@@ -120,7 +120,7 @@
                                             @{
                                                 var pAuthorImg = !string.IsNullOrEmpty(post.AvatarUrl) 
                                                     ? post.AvatarUrl 
-                                                    : $"https://api.dicebear.com/9.x/initials/webp?seed={System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(post.AuthorName) ? "A" : post.AuthorName)}&backgroundColor=000000";
+                                                    : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(post.AuthorName) ? "A" : post.AuthorName)}";
                                             }
                                             <img src="@pAuthorImg" alt="@post.AuthorName" class="w-full h-full object-cover" loading="lazy" />
                                         </div>

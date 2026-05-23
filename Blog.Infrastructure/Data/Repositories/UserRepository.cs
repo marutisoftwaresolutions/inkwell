@@ -30,11 +30,12 @@ public class UserRepository : IUserRepository
         if (user.Id == Guid.Empty) user.Id = Guid.NewGuid();
         if (user.Uuid == Guid.Empty) user.Uuid = Guid.NewGuid();
         return await conn.ExecuteScalarAsync<Guid>(@"
-            INSERT INTO Users (Id, Uuid, Email, Username, DisplayName, Slug, PasswordHash, Role, Status, CreatedByUserId, Bio, ProfileImage, AvatarUrl, CoverImage, Website, Twitter, Facebook, MetaTitle, MetaDescription, IsActive, LastLogin, CreatedAt, UpdatedAt)
+            INSERT INTO Users (Id, Uuid, Email, Username, DisplayName, Slug, PasswordHash, Role, Status, CreatedByUserId, Bio, ProfileImage, AvatarUrl, CoverImage, Website, Twitter, Facebook, MetaTitle, MetaDescription, IsActive, LastLogin, Credentials, Specialty, LicenseNumber, CreatedAt, UpdatedAt)
             OUTPUT INSERTED.Id
-            VALUES (@Id, @Uuid, @Email, @Username, @DisplayName, @Slug, @PasswordHash, @Role, @Status, @CreatedByUserId, @Bio, @ProfileImage, @AvatarUrl, @CoverImage, @Website, @Twitter, @Facebook, @MetaTitle, @MetaDescription, @IsActive, @LastLogin, @CreatedAt, @UpdatedAt)",
+            VALUES (@Id, @Uuid, @Email, @Username, @DisplayName, @Slug, @PasswordHash, @Role, @Status, @CreatedByUserId, @Bio, @ProfileImage, @AvatarUrl, @CoverImage, @Website, @Twitter, @Facebook, @MetaTitle, @MetaDescription, @IsActive, @LastLogin, @Credentials, @Specialty, @LicenseNumber, @CreatedAt, @UpdatedAt)",
             new { user.Id, user.Uuid, user.Email, user.Username, user.DisplayName, user.Slug, user.PasswordHash, user.Role, user.Status, user.CreatedByUserId,
                   user.Bio, user.ProfileImage, user.AvatarUrl, user.CoverImage, user.Website, user.Twitter, user.Facebook, user.MetaTitle, user.MetaDescription, user.IsActive, user.LastLogin,
+                  user.Credentials, user.Specialty, user.LicenseNumber,
                   CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
     }
 
@@ -45,9 +46,11 @@ public class UserRepository : IUserRepository
             UPDATE Users SET Email=@Email, Username=@Username, DisplayName=@DisplayName, Slug=@Slug,
             PasswordHash=@PasswordHash, Role=@Role, Status=@Status, Bio=@Bio, ProfileImage=@ProfileImage, AvatarUrl=@AvatarUrl, CoverImage=@CoverImage, Website=@Website,
             Twitter=@Twitter, Facebook=@Facebook, MetaTitle=@MetaTitle, MetaDescription=@MetaDescription,
-            IsActive=@IsActive, LastLogin=@LastLogin, UpdatedAt=@UpdatedAt WHERE Id=@Id",
+            IsActive=@IsActive, LastLogin=@LastLogin, Credentials=@Credentials, Specialty=@Specialty, LicenseNumber=@LicenseNumber,
+            UpdatedAt=@UpdatedAt WHERE Id=@Id",
             new { user.Email, user.Username, user.DisplayName, user.Slug, user.PasswordHash, user.Role, user.Status,
                   user.Bio, user.ProfileImage, user.AvatarUrl, user.CoverImage, user.Website, user.Twitter, user.Facebook, user.MetaTitle, user.MetaDescription, user.IsActive, user.LastLogin,
+                  user.Credentials, user.Specialty, user.LicenseNumber,
                   UpdatedAt = DateTime.Now, user.Id });
     }
 

@@ -16,10 +16,12 @@ public class BlogController : Controller
     private readonly ICustomThemeSettingRepository _themeSettings;
     private readonly ITenantContext _tenantContext;
     private readonly IUserRepository _users;
+    private readonly IRedirectRepository _redirects;
 
     public BlogController(IPostRepository posts, IPageRepository pages, ICategoryRepository categories,
         ITagRepository tags, ICommentRepository comments, ISettingRepository settings,
-        ICustomThemeSettingRepository themeSettings, ITenantContext tenantContext, IUserRepository users)
+        ICustomThemeSettingRepository themeSettings, ITenantContext tenantContext, IUserRepository users,
+        IRedirectRepository redirects)
     {
         _posts = posts;
         _pages = pages;
@@ -30,6 +32,7 @@ public class BlogController : Controller
         _themeSettings = themeSettings;
         _tenantContext = tenantContext;
         _users = users;
+        _redirects = redirects;
     }
 
     /// <summary>Gets the owner user ID for data scoping — uses tenant context if resolved, else falls back to primary site owner (first admin).</summary>
@@ -165,7 +168,13 @@ public class BlogController : Controller
 
         var post = await _posts.GetBySlugAsync(slug);
         if (post == null || (post.Status != Blog.Core.Domain.PostStatus.Published && !(post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now)))
+        {
+            // Check the Redirects table — slug may have changed (e.g. year update)
+            var destination = await _redirects.GetDestinationAsync($"/{slug}");
+            if (destination != null)
+                return RedirectPermanent(destination);
             return NotFound();
+        }
 
         await _posts.IncrementViewCountAsync(post.Id);
 
@@ -193,6 +202,7 @@ public class BlogController : Controller
 
         var userSettings = await _settings.GetSettingsAsync(settingsId);
         ViewBag.CommentsEnabled = userSettings.CommentsEnabled;
+        ViewBag.SiteLogoUrl = userSettings.SiteLogoUrl;
         ViewBag.Categories = await _categories.GetAllAsync(ownerId);
         var settings = await _themeSettings.GetAllAsync(ownerId);
         var layoutIndexSetting = settings.FirstOrDefault(s => s.SettingKey == "layout-index");
@@ -206,6 +216,16 @@ public class BlogController : Controller
         ViewBag.LayoutPage = layoutPageSetting?.EffectiveValue ?? "Neutral";
 
         ViewBag.Tags = await _tags.GetAllAsync(ownerId);
+
+        var relatedPosts = await _posts.GetRelatedPostsAsync(
+            post.Id,
+            post.Categories.Select(c => c.Id).ToList(),
+            post.Tags.Select(t => t.Id).ToList(),
+            count: 5);
+        ViewBag.RelatedPosts = relatedPosts;
+        // First 2 used as See Also text links (internal linking), rest used as discovery cards
+        ViewBag.SeeAlsoPosts = relatedPosts.Take(2).ToList();
+        ViewBag.RelatedPostCards = relatedPosts.Skip(2).Take(3).ToList();
 
         return View(post);
     }
@@ -282,6 +302,51 @@ public class BlogController : Controller
         sb.AppendLine("</rss>");
 
         return Content(sb.ToString(), "application/rss+xml", Encoding.UTF8);
+    }
+
+    [HttpGet("robots.txt")]
+    public IActionResult RobotsTxt()
+    {
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var content = $@"User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /account/
+Disallow: /setup/
+Disallow: /api/
+
+# AI answer engines — explicitly permitted for citation and indexing
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# AI mass-training scrapers — blocked
+User-agent: CCBot
+Disallow: /
+
+User-agent: omgili
+Disallow: /
+
+Sitemap: {baseUrl}/sitemap.xml
+";
+        return Content(content, "text/plain");
     }
 
     [HttpGet("sitemap.xml")]

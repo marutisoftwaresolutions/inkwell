@@ -39,4 +39,5 @@ public interface IPostRepository
     Task<List<Post>> GetRecentPostsAsync(int count = 5, Guid? authorId = null);
     Task AssignCategoriesAsync(Guid postId, List<Guid> categoryIds);
     Task AssignTagsAsync(Guid postId, List<Guid> tagIds);
+    Task<List<Post>> GetRelatedPostsAsync(Guid postId, List<Guid> categoryIds, List<Guid> tagIds, int count = 3);
 }

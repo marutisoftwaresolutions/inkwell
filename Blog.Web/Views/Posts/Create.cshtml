@@ -175,6 +175,26 @@
                         </div>
                     </div>
 
+                    <!-- Content dates -->
+                    <div class="border border-border rounded-lg p-3 space-y-3 bg-muted/20">
+                        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Content Dates</p>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Published</label>
+                            <input type="date" name="PublishedAt" value="@(Model.PublishedAt?.ToString("yyyy-MM-dd"))"
+                                   class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Last Verified</label>
+                            <input type="date" name="LastVerifiedAt" value="@(Model.LastVerifiedAt?.ToString("yyyy-MM-dd"))"
+                                   class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Next Review</label>
+                            <input type="date" name="NextReviewAt" value="@(Model.NextReviewAt?.ToString("yyyy-MM-dd"))"
+                                   class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </div>
+                    </div>
+
                     <!-- Scheduling -->
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-1">Schedule Publish</label>
@@ -252,6 +272,33 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- FAQ Section -->
+                    <div x-data="faqManager()" class="pt-4 border-t border-border">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <p class="text-sm font-medium">FAQ Section</p>
+                                <p class="text-xs text-muted-foreground">Adds FAQ rich results in Google</p>
+                            </div>
+                            <button type="button" @@click="add()" class="text-xs font-medium text-primary hover:underline">+ Add FAQ</button>
+                        </div>
+                        <input type="hidden" name="FaqJson" id="faqJsonInput" value="@Model.FaqJson" />
+                        <div class="space-y-2">
+                            <template x-for="(faq, i) in faqs" :key="i">
+                                <div class="p-2.5 border border-border rounded-md space-y-1.5 bg-muted/20">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-muted-foreground font-medium">Q&A #<span x-text="i+1"></span></span>
+                                        <button type="button" @@click="remove(i)" class="text-xs text-destructive hover:underline">Remove</button>
+                                    </div>
+                                    <input type="text" x-model="faq.question" @@input="serialize()" placeholder="Question…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <textarea x-model="faq.answer" @@input="serialize()" placeholder="Answer…" rows="2" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"></textarea>
+                                </div>
+                            </template>
+                            <template x-if="faqs.length === 0">
+                                <p class="text-xs text-muted-foreground text-center py-1">No FAQs added yet.</p>
+                            </template>
                         </div>
                     </div>
 
@@ -355,6 +402,19 @@
                     }
                 }
             }
+        }
+
+        function faqManager() {
+            return {
+                faqs: JSON.parse(document.getElementById('faqJsonInput').value || '[]'),
+                init() { this.serialize(); },
+                add() { this.faqs.push({ question: '', answer: '' }); this.serialize(); },
+                remove(i) { this.faqs.splice(i, 1); this.serialize(); },
+                serialize() {
+                    document.getElementById('faqJsonInput').value =
+                        JSON.stringify(this.faqs.filter(f => f.question || f.answer));
+                }
+            };
         }
 
         var quill = initQuill('#quill-editor', 'postContent');

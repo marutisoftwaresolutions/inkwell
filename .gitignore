@@ -38,3 +38,7 @@ package-lock.json
 # Uploads and temporary media
 Blog.Web/wwwroot/uploads/**/*
 !Blog.Web/wwwroot/uploads/**/.gitkeep
+
+# Generated OG images (auto-created at runtime)
+Blog.Web/wwwroot/og-cache/**/*
+!Blog.Web/wwwroot/og-cache/.gitkeep

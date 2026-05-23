@@ -1,25 +1,39 @@
 /* ============================================================
-   Beacon CMS – Admin CSS
+   Inkwell – Editorial Desk Admin CSS
+   Self-hosted blogging, beautifully crafted.
    ============================================================ */
 
+/* Fonts loaded via /fonts/fonts.css in the layout */
+
 :root {
-  --color-primary: #6366f1;
-  --color-primary-dark: #4f46e5;
-  --color-primary-light: #e0e7ff;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-2: #273549;
-  --color-border: #334155;
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
-  --color-sidebar-w: 240px;
-  --radius: 10px;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --font: 'Inter', system-ui, sans-serif;
-  --transition: 0.2s ease;
+  /* Inkwell palette */
+  --ink-cream:      #FAF7F2;
+  --ink-cream-deep: #F4EFE6;
+  --ink-cream-edge: #E8E1D3;
+  --ink-black:      #1A1A1A;
+  --ink-sepia:      #8B7355;
+  --ink-brown:      #5C5751;
+  --ink-accent:     #8C2A1F;
+
+  /* Semantic admin tokens */
+  --color-primary:       #1A1A1A;
+  --color-primary-dark:  #000000;
+  --color-primary-light: #F4EFE6;
+  --color-success:       #2D6A4F;
+  --color-warning:       #C4632B;
+  --color-danger:        #8C2A1F;
+  --color-bg:            #FAF7F2;
+  --color-surface:       #F4EFE6;
+  --color-surface-2:     #EFE9DC;
+  --color-border:        #E8E1D3;
+  --color-text:          #1A1A1A;
+  --color-text-muted:    #8B7355;
+  --color-sidebar-w:     240px;
+  --radius:              2px;
+  --shadow:              0 1px 0 rgba(26,26,26,.04), 0 8px 28px -12px rgba(26,26,26,.18);
+  --font:                'Geist', 'Inter', system-ui, sans-serif;
+  --font-serif:          'Source Serif 4', Georgia, serif;
+  --transition:          0.12s ease;
 }
 
 *,
@@ -35,6 +49,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ── Admin Shell ─────────────────────────────────────────── */
@@ -100,9 +115,10 @@ body {
 }
 
 .nav-item.active {
-  color: var(--color-primary);
-  background: rgba(99, 102, 241, 0.1);
-  border-left-color: var(--color-primary);
+  color: var(--ink-black);
+  background: var(--color-bg);
+  border-left-color: transparent;
+  font-weight: 500;
 }
 
 .nav-divider {
@@ -342,10 +358,11 @@ body {
 
 .form-control {
   width: 100%;
-  padding: 9px 12px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  padding: 9px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink-black);
+  border-radius: 0;
   color: var(--color-text);
   font-size: 0.9rem;
   font-family: var(--font);
@@ -354,8 +371,17 @@ body {
 
 .form-control:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  border-bottom-color: var(--ink-black);
+  box-shadow: none;
+}
+
+/* Restore full border for selects and textareas where bottom-only looks wrong */
+select.form-control,
+textarea.form-control {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  background: var(--color-surface);
 }
 
 .form-control::placeholder {
@@ -554,23 +580,51 @@ body {
 }
 
 .status-published {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
+  background: transparent;
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .status-draft {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fcd34d;
+  background: transparent;
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .status-scheduled {
-  background: rgba(99, 102, 241, 0.2);
-  color: #a5b4fc;
+  background: transparent;
+  color: var(--ink-sepia);
+  border: 1px solid var(--ink-sepia);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .status-trash {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 /* ── Post List ───────────────────────────────────────────── */
@@ -732,12 +786,14 @@ body {
   width: 100%;
   background: transparent;
   border: none;
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 500;
   color: var(--color-text);
-  font-family: var(--font);
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   padding: 0;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   outline: none;
 }
 
@@ -1154,7 +1210,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%), var(--color-bg);
+  background: var(--color-bg);
   padding: 24px;
 }
 
@@ -1276,7 +1332,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%), var(--color-bg);
+  background: var(--color-bg);
 }
 
 .login-card {

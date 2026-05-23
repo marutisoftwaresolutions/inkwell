@@ -65,6 +65,20 @@
             </div>
 
             <div class="space-y-2">
+                <label asp-for="SiteCoverUrl" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
+                <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteCoverUrl) ? "hidden" : "")" id="SiteCoverPreviewWrapper">
+                    <img id="SiteCoverPreview" src="@Model.SiteCoverUrl" class="w-full h-32 object-cover rounded border" />
+                </div>
+                <div class="flex gap-2">
+                    <input asp-for="SiteCoverUrl" id="SiteCoverInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="https://" />
+                    <button type="button"
+                            onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteCoverInput', previewImg: 'SiteCoverPreview', folder: 'images' } })); document.getElementById('SiteCoverPreviewWrapper').classList.remove('hidden');"
+                            class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                </div>
+                <p class="text-xs text-muted-foreground">Wide hero/banner image displayed at the top of your homepage (recommended: 1500 × 500 px).</p>
+            </div>
+
+            <div class="space-y-2">
                 <label asp-for="PostsPerPage" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
                 <input asp-for="PostsPerPage" type="number" min="1" max="100" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
                 <p class="text-xs text-muted-foreground">Number of posts to display per page (1-100).</p>
@@ -87,6 +101,18 @@
                         <label asp-for="CommentsModeration" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Comment moderation</label>
                         <p class="text-sm text-muted-foreground">Comments must be approved by an admin before they appear.</p>
                     </div>
+                </div>
+            </div>
+
+            <div class="space-y-4 pt-6 border-t border-border">
+                <div>
+                    <h3 class="text-sm font-medium text-foreground">Analytics</h3>
+                    <p class="text-xs text-muted-foreground mt-1">Leave blank to disable tracking.</p>
+                </div>
+                <div class="space-y-2">
+                    <label asp-for="GoogleAnalyticsId" class="text-sm font-medium leading-none"></label>
+                    <input asp-for="GoogleAnalyticsId" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="G-XXXXXXXXXX" />
+                    <p class="text-xs text-muted-foreground">GA4 Measurement ID from Google Analytics → Admin → Data Streams.</p>
                 </div>
             </div>
 

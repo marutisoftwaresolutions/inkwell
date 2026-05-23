@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using System.Text.RegularExpressions;
 
 namespace Blog.Core.Services;
 
@@ -8,13 +9,17 @@ public class PostService
     private readonly IPostRepository _posts;
     private readonly ICategoryRepository _categories;
     private readonly ITagRepository _tags;
+    private readonly IRedirectRepository _redirects;
+
+    private static readonly Regex YearInSlug = new(@"\b(20\d{2})\b", RegexOptions.Compiled);
 
     public PostService(IPostRepository posts, ICategoryRepository categories,
-        ITagRepository tags)
+        ITagRepository tags, IRedirectRepository redirects)
     {
         _posts = posts;
         _categories = categories;
         _tags = tags;
+        _redirects = redirects;
     }
 
     public async Task<(Guid id, string? error)> CreatePostAsync(Post post, List<Guid> categoryIds, List<string> tagNames, Guid userId, string userEmail)
@@ -68,6 +73,35 @@ public class PostService
         post.CreatedAt = existing.CreatedAt;
         post.ViewCount = existing.ViewCount;
         post.CommentCount = existing.CommentCount;
+
+        // Auto-update year in slug when PublishedAt, LastVerifiedAt, or NextReviewAt changes,
+        // and create a redirect from the old slug to the new one.
+        var oldSlug = existing.Slug;
+        var slugYearMatch = YearInSlug.Match(post.Slug);
+        if (slugYearMatch.Success)
+        {
+            // Determine the best year: prefer PublishedAt, fall back to LastVerifiedAt
+            var primaryDate = post.PublishedAt ?? post.LastVerifiedAt;
+            if (primaryDate.HasValue)
+            {
+                var newYear = primaryDate.Value.Year.ToString();
+                var oldYear = slugYearMatch.Value;
+                if (newYear != oldYear)
+                {
+                    var updatedSlug = YearInSlug.Replace(post.Slug, newYear, 1);
+                    // Only switch if the new slug isn't already taken by another post
+                    if (!await _posts.SlugExistsAsync(updatedSlug, post.Id))
+                    {
+                        post.Slug = updatedSlug;
+                        await _redirects.UpsertAsync($"/{oldSlug}", $"/{updatedSlug}");
+                    }
+                }
+            }
+        }
+
+        // If the slug itself changed (manually or via year update), create a redirect
+        if (oldSlug != post.Slug && !YearInSlug.IsMatch(oldSlug))
+            await _redirects.UpsertAsync($"/{oldSlug}", $"/{post.Slug}");
 
         await _posts.UpdateAsync(post);
         await _posts.AssignCategoriesAsync(post.Id, categoryIds);

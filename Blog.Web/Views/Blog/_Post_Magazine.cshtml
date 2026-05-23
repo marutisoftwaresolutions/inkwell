@@ -1,84 +1,185 @@
 @model Blog.Core.Domain.Post
 @{
-    var blogLayout = (string)(ViewBag.BlogLayout ?? "Magazine");
+    var readingMinutes = Math.Max(1, (Model.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+    var primaryCategory = Model.Categories.FirstOrDefault();
 }
 
-<!-- Magazine layout: centered, no sidebar, modern card styling -->
-<article class="max-w-4xl mx-auto px-4 py-8 lg:py-14">
+<article>
+    @* ── Essay header ──────────────────────────────────────────── *@
+    <header style="max-width:var(--measure-prose);margin:0 auto;padding:var(--sp-16) var(--gutter) var(--sp-8);">
 
-    <!-- Breadcrumb -->
-    <nav class="flex items-center gap-2 text-sm mb-8" style="color: var(--muted-foreground);">
-        <a href="/" class="hover:opacity-80">Home</a>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-        @if (Model.Categories.Any())
-        {
-            <a href="/?category=@Model.Categories.First().Slug" class="hover:opacity-80">@Model.Categories.First().Name</a>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        @* Eyebrow: section · breadcrumb *@
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:var(--sp-5);">
+            <a href="/" style="font-family:var(--sans);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:var(--fg-meta);text-decoration:none;">Home</a>
+            @if (primaryCategory != null)
+            {
+                <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">·</span>
+                <a href="/?category=@primaryCategory.Slug"
+                   style="font-family:var(--sans);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:var(--fg-meta);text-decoration:none;">@primaryCategory.Name</a>
+            }
+        </div>
+
+        @* Title *@
+        <h1 class="ink-essay-title">@Model.Title</h1>
+
+        @* Lede / excerpt *@
+        @{
+            var lede = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription :
+                       !string.IsNullOrEmpty(Model.Plaintext) ? (Model.Plaintext.Length > 220 ? Model.Plaintext[..217] + "…" : Model.Plaintext) :
+                       string.Empty;
         }
-        <span class="truncate">@Model.Title</span>
-    </nav>
-
-    <!-- Article Header -->
-    <header class="mb-10 text-center">
-        @if (Model.Categories.Any())
+        @if (!string.IsNullOrEmpty(lede))
         {
-            <div class="flex justify-center gap-2 mb-4">
-                @foreach (var cat in Model.Categories)
-                {
-                    <a href="/?category=@cat.Slug" class="text-xs uppercase font-bold px-3 py-1 rounded-full hover:opacity-80" style="background: var(--primary); color: var(--primary-foreground);">@cat.Name</a>
-                }
-            </div>
+            <p class="ink-essay-lede">@lede</p>
         }
 
-        <h1 class="text-3xl md:text-5xl font-bold mb-6 leading-tight" style="color: var(--foreground);">@Model.Title</h1>
-
-        <div class="flex items-center justify-center gap-4 text-sm" style="color: var(--muted-foreground);">
-            <div class="flex items-center gap-2">
-                @{
-                    var authorImg = !string.IsNullOrEmpty(Model.AvatarUrl)
-                        ? Model.AvatarUrl
-                        : $"https://api.dicebear.com/9.x/initials/webp?seed={System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}&backgroundColor=e5e5e5";
-                }
-                <img src="@authorImg" alt="@Model.AuthorName" class="w-10 h-10 rounded-full object-cover border-2" style="border-color: var(--border);" />
-                <div class="text-left">
-                    <span class="block font-semibold text-sm" style="color: var(--foreground);">@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)</span>
-                    <span class="text-xs">@Model.PublishedAt?.ToString("MMMM d, yyyy") · @Model.ViewCount views</span>
+        @* Byline *@
+        <div class="byline" style="margin-top:var(--sp-6);padding-top:var(--sp-4);border-top:1px solid var(--border);">
+            @{
+                var authorImg = !string.IsNullOrEmpty(Model.AvatarUrl)
+                    ? Model.AvatarUrl
+                    : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
+            }
+            <div style="display:flex;align-items:center;gap:12px;">
+                <img src="@authorImg" alt="@Model.AuthorName"
+                     style="width:36px;height:36px;border-radius:var(--r-1);object-fit:cover;border:1px solid var(--border);" />
+                <div>
+                    <div style="font-family:var(--sans);font-size:13px;font-weight:500;color:var(--fg);line-height:1.2;">
+                        @(string.IsNullOrEmpty(Model.AuthorName) ? "The editors" : Model.AuthorName)@(!string.IsNullOrEmpty(Model.AuthorCredentials) ? $", {Model.AuthorCredentials}" : "")
+                    </div>
+                    @if (!string.IsNullOrEmpty(Model.AuthorSpecialty))
+                    {
+                        <div class="meta" style="margin-top:1px;">@Model.AuthorSpecialty</div>
+                    }
+                    <div class="meta" style="margin-top:2px;">
+                        @Model.PublishedAt?.ToString("d MMMM yyyy") · @readingMinutes min read
+                    </div>
+                    @if (Model.LastVerifiedAt.HasValue || Model.NextReviewAt.HasValue)
+                    {
+                        <div class="meta" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:0 1.25rem;">
+                            @if (Model.LastVerifiedAt.HasValue)
+                            {
+                                <span>Verified: @Model.LastVerifiedAt.Value.ToString("d MMM yyyy")</span>
+                            }
+                            @if (Model.NextReviewAt.HasValue)
+                            {
+                                <span>Review due: @Model.NextReviewAt.Value.ToString("d MMM yyyy")</span>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Featured Image -->
+    @* ── Feature image (full-width bleed then back to prose) ───── *@
     @if (!string.IsNullOrEmpty(Model.FeatureImage))
     {
-        <div class="mb-10 overflow-hidden rounded-2xl shadow-lg">
-            <img src="@Model.FeatureImage" alt="@Model.Title" class="w-full h-auto object-cover" />
+        <div style="max-width:var(--measure-wide);margin:0 auto var(--sp-12);padding:0 var(--gutter);">
+            <img src="@Model.FeatureImage" alt="@Model.Title" class="ink-essay-cover" />
         </div>
     }
 
-    <!-- Post Content -->
-    <div class="post-prose mb-10" style="font-family: var(--font-body); line-height: 1.9; font-size: 1.1rem;">
-        @Html.Raw(Model.Html)
-    </div>
+    @* ── Essay body ────────────────────────────────────────────── *@
+    <div class="ink-essay-wrap" style="padding-top:0;">
+        <div class="ink-essay-body dropcap">
+            @Html.Raw(Model.Html)
+        </div>
 
-    <!-- Tags -->
-    @if (Model.Tags.Any())
-    {
-        <div class="pt-8 border-t" style="border-color: var(--border);">
-            <div class="flex flex-wrap gap-2">
-                @foreach (var tag in Model.Tags)
+        @* ── FAQ accordion ──────────────────────────────────────── *@
+        @if (Model.Faqs.Any())
+        {
+            <div class="ink-faq">
+                <div class="eyebrow" style="margin-bottom:var(--sp-6);">Frequently asked questions</div>
+                @foreach (var faq in Model.Faqs)
                 {
-                    <a href="/?tags=@tag.Slug" class="py-1.5 px-4 text-sm rounded-full border hover:shadow-sm transition-shadow" style="background: var(--card); border-color: var(--border); color: var(--foreground);">#@tag.Name</a>
+                    <div class="ink-faq-item" x-data="{ open: false }" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+                        <button type="button" class="ink-faq-question" @@click="open = !open" itemprop="name">
+                            <span>@faq.Question</span>
+                            <svg :class="open ? 'rotate-180' : ''" style="transition:transform var(--dur-base);flex-shrink:0;color:var(--fg-meta);"
+                                 width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div x-show="open" x-transition class="ink-faq-answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+                            <span itemprop="text">@faq.Answer</span>
+                        </div>
+                    </div>
                 }
             </div>
-        </div>
-    }
+        }
 
-    <!-- Share -->
-    <div class="flex items-center justify-center gap-4 mt-8 pt-8 border-t" style="border-color: var(--border);">
-        <span class="text-sm font-medium" style="color: var(--muted-foreground);">Share this article:</span>
-        <a href="https://twitter.com/intent/tweet?url=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)&text=@Uri.EscapeDataString(Model.Title)" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center border hover:shadow-sm transition-shadow" style="border-color: var(--border);"><i class="bi bi-twitter-x"></i></a>
-        <a href="https://www.facebook.com/sharer/sharer.php?u=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center border hover:shadow-sm transition-shadow" style="border-color: var(--border);"><i class="bi bi-facebook"></i></a>
-        <a href="https://www.linkedin.com/shareArticle?mini=true&url=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)&title=@Uri.EscapeDataString(Model.Title)" target="_blank" class="w-10 h-10 rounded-full flex items-center justify-center border hover:shadow-sm transition-shadow" style="border-color: var(--border);"><i class="bi bi-linkedin"></i></a>
+        @* ── See Also ────────────────────────────────────────────── *@
+        <partial name="_SeeAlso" view-data="ViewData" />
+
+        @* ── Pilcrow divider ────────────────────────────────────── *@
+        <div class="ink-pilcrow" aria-hidden="true">
+            <span class="ink-pilcrow-glyph">¶</span>
+        </div>
+
+        @* ── Tags ────────────────────────────────────────────────── *@
+        @if (Model.Tags.Any())
+        {
+            <div class="ink-tags">
+                @foreach (var tag in Model.Tags)
+                {
+                    <a href="/?tags=@tag.Slug" class="ink-tag">#@tag.Name</a>
+                }
+            </div>
+        }
+
+        @* ── Share ───────────────────────────────────────────────── *@
+        <div class="ink-share">
+            <span>Share this essay</span>
+            <a href="https://twitter.com/intent/tweet?url=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)&text=@Uri.EscapeDataString(Model.Title)"
+               target="_blank" rel="noopener" class="ink-share-link" title="Share on X">
+                <i class="bi bi-twitter-x" style="font-size:14px;"></i>
+            </a>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)"
+               target="_blank" rel="noopener" class="ink-share-link" title="Share on Facebook">
+                <i class="bi bi-facebook" style="font-size:14px;"></i>
+            </a>
+            <a href="https://www.linkedin.com/shareArticle?mini=true&url=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)&title=@Uri.EscapeDataString(Model.Title)"
+               target="_blank" rel="noopener" class="ink-share-link" title="Share on LinkedIn">
+                <i class="bi bi-linkedin" style="font-size:14px;"></i>
+            </a>
+        </div>
+
+        @* ── Related essays ──────────────────────────────────────── *@
+        @{
+            var relatedPosts = ViewBag.RelatedPostCards as List<Blog.Core.Domain.Post>;
+        }
+        @if (relatedPosts != null && relatedPosts.Any())
+        {
+            <div class="ink-related">
+                <div class="eyebrow" style="margin-bottom:var(--sp-6);">More to read</div>
+                <div class="ink-related-grid">
+                    @foreach (var rp in relatedPosts.Take(3))
+                    {
+                        var rpMinutes = Math.Max(1, (rp.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+                        <a href="/@rp.Slug" class="ink-related-card">
+                            @if (!string.IsNullOrEmpty(rp.FeatureImage))
+                            {
+                                <img src="@rp.FeatureImage" alt="@rp.Title" class="ink-related-card-cover" />
+                            }
+                            else
+                            {
+                                <div style="aspect-ratio:4/3;border-radius:var(--r-2);background:linear-gradient(135deg,var(--surface-2),var(--border));border:1px solid var(--border);"></div>
+                            }
+                            <div>
+                                @if (rp.Categories.Any())
+                                {
+                                    <div class="eyebrow" style="margin-bottom:6px;">@rp.Categories.First().Name</div>
+                                }
+                                <div class="ink-related-card-title">@rp.Title</div>
+                                <div class="byline" style="margin-top:4px;">@(string.IsNullOrEmpty(rp.AuthorName) ? "The editors" : rp.AuthorName) · @rpMinutes min read</div>
+                            </div>
+                        </a>
+                    }
+                </div>
+            </div>
+        }
     </div>
 </article>
+
+@* Comments are rendered by Post.cshtml for all layouts *@

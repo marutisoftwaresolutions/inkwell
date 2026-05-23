@@ -77,25 +77,75 @@
                     var isActiveLayout = layout.Id == currentLayout;
                     <form method="post" asp-action="ApplyLayoutPreset" asp-controller="ThemeSettings" asp-route-presetId="@layout.Id">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden hover:shadow-md @(isActiveLayout ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-border hover:border-primary/50")">
-                            <div class="h-14 relative bg-muted flex items-center justify-center">
+                        <button type="submit" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden @(isActiveLayout ? "border-foreground shadow-md" : "border-border hover:border-foreground/40")">
+                            @* Layout schematic thumbnail *@
+                            <div class="h-16 relative bg-muted/60 flex items-center justify-center p-2 overflow-hidden">
                                 @if (layout.Id == "Neutral")
                                 {
-                                    <div class="flex gap-1 items-center">
-                                        <div class="w-4 h-8 border border-dashed border-muted-foreground/30 rounded-sm"></div>
-                                        <div class="flex flex-col gap-0.5">
-                                            <div class="w-10 h-2 bg-muted-foreground/20 rounded-sm"></div>
-                                            <div class="w-8 h-2 bg-muted-foreground/20 rounded-sm"></div>
-                                            <div class="w-10 h-2 bg-muted-foreground/20 rounded-sm"></div>
+                                    @* sidebar left + list items right *@
+                                    <div style="display:flex;gap:4px;width:60px;height:40px;">
+                                        <div style="width:14px;background:rgba(26,26,26,.12);border-radius:2px;border:1px dashed rgba(26,26,26,.25);"></div>
+                                        <div style="flex:1;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
+                                            <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:80%;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;margin-top:2px;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:70%;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;margin-top:2px;"></div>
                                         </div>
                                     </div>
                                 }
-                                else
+                                else if (layout.Id == "Magazine")
                                 {
-                                    <div class="grid grid-cols-3 gap-0.5 px-2">
-                                        <div class="w-4 h-5 bg-primary/30 rounded-sm"></div>
-                                        <div class="w-4 h-5 bg-primary/20 rounded-sm"></div>
-                                        <div class="w-4 h-5 bg-primary/30 rounded-sm"></div>
+                                    @* bold hero + 3 cards below *@
+                                    <div style="width:68px;display:flex;flex-direction:column;gap:3px;">
+                                        <div style="height:16px;background:rgba(26,26,26,.3);border-radius:2px;width:100%;"></div>
+                                        <div style="display:flex;gap:2px;">
+                                            <div style="flex:1;height:12px;background:rgba(26,26,26,.15);border-radius:2px;"></div>
+                                            <div style="flex:1;height:12px;background:rgba(26,26,26,.15);border-radius:2px;"></div>
+                                            <div style="flex:1;height:12px;background:rgba(26,26,26,.15);border-radius:2px;"></div>
+                                        </div>
+                                    </div>
+                                }
+                                else if (layout.Id == "Grid")
+                                {
+                                    @* 3-col card grid *@
+                                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:60px;">
+                                        @for (int i = 0; i < 6; i++) {
+                                            <div style="height:13px;background:rgba(26,26,26,.18);border-radius:2px;"></div>
+                                        }
+                                    </div>
+                                }
+                                else if (layout.Id == "Minimal")
+                                {
+                                    @* narrow centered column, clean lines *@
+                                    <div style="width:44px;display:flex;flex-direction:column;gap:4px;align-items:center;">
+                                        <div style="height:3px;width:70%;background:rgba(26,26,26,.4);border-radius:1px;"></div>
+                                        <div style="height:2px;width:55%;background:rgba(26,26,26,.2);border-radius:1px;"></div>
+                                        <div style="height:1px;width:80%;background:rgba(26,26,26,.15);"></div>
+                                        <div style="height:2px;width:85%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                        <div style="height:2px;width:75%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                    </div>
+                                }
+                                else if (layout.Id == "Classic")
+                                {
+                                    @* wide content + narrow right sidebar *@
+                                    <div style="display:flex;gap:4px;width:62px;height:38px;">
+                                        <div style="flex:2;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
+                                            <div style="height:3px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;width:85%;"></div>
+                                            <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                        </div>
+                                        <div style="width:14px;background:rgba(26,26,26,.1);border-radius:2px;border:1px solid rgba(26,26,26,.15);"></div>
+                                    </div>
+                                }
+                                else if (layout.Id == "Modern")
+                                {
+                                    @* full-width bold rows *@
+                                    <div style="width:64px;display:flex;flex-direction:column;gap:2px;">
+                                        <div style="height:10px;background:rgba(26,26,26,.35);border-radius:1px;width:100%;"></div>
+                                        <div style="height:8px;background:rgba(26,26,26,.18);border-radius:1px;width:100%;"></div>
+                                        <div style="height:8px;background:rgba(26,26,26,.12);border-radius:1px;width:100%;"></div>
                                     </div>
                                 }
                             </div>
@@ -107,7 +157,7 @@
                                     </div>
                                     @if (isActiveLayout)
                                     {
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-primary shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-foreground shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
                                     }
                                 </div>
                             </div>
@@ -117,9 +167,69 @@
             </div>
         </div>
 
-        @* Preset Grid *@
+        @* Inkwell Color Presets *@
+        <div class="p-4 border-b border-border">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Inkwell Color Preset</p>
+            <p class="text-[10px] text-muted-foreground mb-3">Applies to Magazine layout &amp; front-end — Active: <strong>@(Model.Settings.FirstOrDefault(s => s.SettingKey == "inkwell-preset")?.EffectiveValue ?? "cream")</strong></p>
+            @{
+                var currentInkwellPreset = Model.Settings.FirstOrDefault(s => s.SettingKey == "inkwell-preset")?.EffectiveValue ?? "cream";
+                var inkwellPresets = new[]
+                {
+                    new { Id = "cream",       Name = "Cream",       Bg = "#FAF7F2", Fg = "#1A1A1A", Accent = "#8C2A1F", Surface = "#F4EFE6" },
+                    new { Id = "linen",       Name = "Linen",       Bg = "#F2EDDF", Fg = "#1A1A1A", Accent = "#8B7355", Surface = "#ECE5D3" },
+                    new { Id = "manuscript",  Name = "Manuscript",  Bg = "#F6F0E0", Fg = "#3D2F1E", Accent = "#8C2A1F", Surface = "#EFE6CF" },
+                    new { Id = "folio",       Name = "Folio",       Bg = "#F5EBCF", Fg = "#2A2418", Accent = "#8C2A1F", Surface = "#EDDFB7" },
+                    new { Id = "press",       Name = "Press",       Bg = "#F4F2EE", Fg = "#14141A", Accent = "#8C2A1F", Surface = "#ECEAE4" },
+                    new { Id = "letterpress", Name = "Letterpress", Bg = "#FAF6EC", Fg = "#1A1A1A", Accent = "#8C2A1F", Surface = "#F2EBDA" },
+                    new { Id = "foxglove",    Name = "Foxglove",    Bg = "#FCF6EB", Fg = "#2A1F12", Accent = "#C4632B", Surface = "#F6ECD6" },
+                    new { Id = "cobalt",      Name = "Cobalt",      Bg = "#F8F5EE", Fg = "#112045", Accent = "#2A4180", Surface = "#F0ECE0" },
+                    new { Id = "slate",       Name = "Slate",       Bg = "#FAFAF9", Fg = "#18181B", Accent = "#6366F1", Surface = "#F4F4F2" },
+                    new { Id = "sand",        Name = "Sand",        Bg = "#F5F2EC", Fg = "#1C1917", Accent = "#C2410C", Surface = "#EDE8DD" },
+                    new { Id = "plum",        Name = "Plum",        Bg = "#FBFAFB", Fg = "#1F1B24", Accent = "#6B46C1", Surface = "#F5F2F6" },
+                    new { Id = "forest",      Name = "Forest",      Bg = "#F8FAF7", Fg = "#14271C", Accent = "#1F5236", Surface = "#EEF2EB" },
+                    new { Id = "mono",        Name = "Mono",        Bg = "#FFFFFF", Fg = "#000000", Accent = "#525252", Surface = "#F7F7F7" },
+                    new { Id = "ink",         Name = "Ink",         Bg = "#16140F", Fg = "#F4EFE6", Accent = "#E8B27A", Surface = "#1E1B16" },
+                    new { Id = "onyx",        Name = "Onyx",        Bg = "#0A0A0C", Fg = "#FAFAFA", Accent = "#FCD9A8", Surface = "#14141A" },
+                };
+            }
+            <div class="grid grid-cols-3 gap-2">
+                @foreach (var ip in inkwellPresets)
+                {
+                    var isActiveIp = ip.Id == currentInkwellPreset;
+                    <form method="post" asp-action="ApplyInkwellPreset" asp-controller="ThemeSettings" asp-route-presetName="@ip.Id">
+                        @Html.AntiForgeryToken()
+                        <button type="submit"
+                                style="width:100%;border-radius:6px;overflow:hidden;border:2px solid @(isActiveIp ? "#1A1A1A" : "rgba(0,0,0,0.14)");box-shadow:@(isActiveIp ? "0 0 0 2px rgba(26,26,26,0.25)" : "none");transition:border-color .15s,box-shadow .15s;cursor:pointer;padding:0;background:none;">
+                            @* mini mockup *@
+                            <div style="height:44px;background:@ip.Bg;display:flex;align-items:stretch;padding:6px 7px 5px;gap:5px;border-bottom:1px solid rgba(0,0,0,0.08);">
+                                @* sidebar *@
+                                <div style="width:10px;background:@ip.Surface;border-radius:1px;border:1px solid rgba(0,0,0,0.07);flex-shrink:0;"></div>
+                                @* content lines *@
+                                <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:3px;">
+                                    <div style="height:3px;background:@ip.Fg;opacity:0.65;border-radius:1px;"></div>
+                                    <div style="height:2px;background:@ip.Fg;opacity:0.25;border-radius:1px;width:80%;"></div>
+                                    <div style="height:2px;background:@ip.Fg;opacity:0.25;border-radius:1px;width:60%;"></div>
+                                </div>
+                                @* accent dot *@
+                                <div style="width:6px;height:6px;border-radius:50%;background:@ip.Accent;margin-top:2px;flex-shrink:0;"></div>
+                            </div>
+                            @* label row *@
+                            <div style="background:@ip.Surface;padding:3px 7px 4px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(0,0,0,0.06);">
+                                <span style="font-size:9px;font-weight:600;color:@ip.Fg;font-family:'Geist',sans-serif;letter-spacing:0.02em;">@ip.Name</span>
+                                @if (isActiveIp)
+                                {
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="@ip.Accent" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                }
+                            </div>
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+
+        @* Legacy Color Presets (Neutral / Grid / Classic / Minimal / Modern layouts) *@
         <div class="p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Presets</p>
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Color Presets</p>
             <div class="grid grid-cols-2 gap-3">
                 @foreach (var preset in presets)
                 {
@@ -157,7 +267,7 @@
         </div>
 
         @* Fine-Tune Panel (collapsible) *@
-        <div x-show="showFineTune" x-collapse x-cloak class="border-t border-border">
+        <div x-show="showFineTune" style="display:none;" class="border-t border-border">
             <form asp-action="Update" asp-controller="ThemeSettings" method="post" class="p-4 space-y-5">
                 @Html.AntiForgeryToken()
 
@@ -309,7 +419,7 @@
                     const doc = iframe.contentDocument;
                     if (doc) {
                         const link = doc.createElement('link');
-                        link.href = `https://fonts.googleapis.com/css2?family=${fontName}:wght@300;400;500;600;700&display=swap`;
+                        link.href = '/fonts/fonts.css';
                         link.rel = 'stylesheet';
                         doc.head.appendChild(link);
                     }
@@ -364,34 +474,19 @@
                 },
                 
                 async loadFonts() {
-                    if (window.googleFontsList) {
-                        this.fonts = window.googleFontsList;
-                        return;
-                    }
-                    if (!window.fetchingFonts) {
-                        this.loading = true;
-                        window.fetchingFonts = fetch('https://api.fontsource.org/v1/fonts')
-                            .then(res => res.json())
-                            .then(data => {
-                                // Extract just the family names and sort them
-                                window.googleFontsList = data.map(f => ({ family: f.family }));
-                                return window.googleFontsList;
-                            })
-                            .catch(err => {
-                                console.error("Could not load full font list", err);
-                                return this.fonts; // fallback to hardcoded
-                            });
-                    }
-                    
-                    const remoteFonts = await window.fetchingFonts;
-                    this.fonts = remoteFonts;
-                    
-                    // Make sure currently selected font is always prepended to top if not found
+                    // Self-hosted font list — all fonts available in /fonts/fonts.css
+                    window.googleFontsList = [
+                        { family: 'Source Serif 4' }, { family: 'Geist' }, { family: 'Geist Mono' },
+                        { family: 'Inter' }, { family: 'Alexandria' },
+                        { family: 'Roboto' }, { family: 'Open Sans' }, { family: 'Montserrat' },
+                        { family: 'Manrope' }, { family: 'Outfit' }, { family: 'Merriweather' },
+                        { family: 'Playfair Display' }, { family: 'Lora' }, { family: 'Libre Baskerville' },
+                        { family: 'Oswald' }, { family: 'Raleway' }, { family: 'Poppins' }
+                    ];
+                    this.fonts = window.googleFontsList;
                     if (!this.fonts.find(f => f.family === this.selectedFont)) {
                         this.fonts.unshift({ family: this.selectedFont });
                     }
-                    
-                    this.loading = false;
                 },
                 
                 get filteredFonts() {

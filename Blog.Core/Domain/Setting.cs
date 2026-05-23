@@ -14,10 +14,14 @@ public class UserSettings
     public string Theme { get; set; } = "system"; // light, dark, system
     public string SiteLogoUrl { get; set; } = string.Empty;
     public string SiteFaviconUrl { get; set; } = string.Empty;
+    public string SiteCoverUrl { get; set; } = string.Empty;
 
     // Onboarding checklist state
     public bool OnboardingDismissed { get; set; } = false;
     public List<string> OnboardingCompletedTasks { get; set; } = new();
+
+    // Analytics
+    public string GoogleAnalyticsId { get; set; } = string.Empty;
 
     // Social Links
     public string SocialTwitter { get; set; } = string.Empty;

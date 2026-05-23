@@ -114,11 +114,11 @@ public class ApplicationDbSeeder
     {
         var categories = new[]
         {
-            new Category { Name = "Technology", Slug = "technology" },
-            new Category { Name = "Lifestyle", Slug = "lifestyle" },
-            new Category { Name = "Travel", Slug = "travel" },
-            new Category { Name = "Food", Slug = "food" },
-            new Category { Name = "Health & Fitness", Slug = "health-fitness" },
+            new Category { Name = "Practice Management Software", Slug = "practice-management-software" },
+            new Category { Name = "EHR & Electronic Records",     Slug = "ehr-electronic-records" },
+            new Category { Name = "Digital Imaging & Diagnostics",Slug = "digital-imaging-diagnostics" },
+            new Category { Name = "AI & Machine Learning in Optometry", Slug = "ai-machine-learning-optometry" },
+            new Category { Name = "Teleoptometry & Remote Care",  Slug = "teleoptometry-remote-care" },
         };
 
         foreach (var category in categories)
@@ -131,13 +131,13 @@ public class ApplicationDbSeeder
     {
         var tags = new[]
         {
-            new Tag { Name = "Web Development", Slug = "web-development" },
-            new Tag { Name = "C#", Slug = "csharp" },
-            new Tag { Name = ".NET", Slug = "dotnet" },
-            new Tag { Name = "JavaScript", Slug = "javascript" },
-            new Tag { Name = "AI", Slug = "ai" },
-            new Tag { Name = "Cloud Computing", Slug = "cloud-computing" },
-            new Tag { Name = "DevOps", Slug = "devops" },
+            new Tag { Name = "Eyefinity",           Slug = "eyefinity" },
+            new Tag { Name = "RevolutionEHR",       Slug = "revolution-ehr" },
+            new Tag { Name = "AI Diagnostics",      Slug = "ai-diagnostics" },
+            new Tag { Name = "OCT Software",        Slug = "oct-software" },
+            new Tag { Name = "Telemedicine",        Slug = "telemedicine" },
+            new Tag { Name = "HIPAA Compliance",    Slug = "hipaa-compliance" },
+            new Tag { Name = "Virtual Try-On",      Slug = "virtual-try-on" },
         };
 
         foreach (var tag in tags)
@@ -192,9 +192,11 @@ public class ApplicationDbSeeder
     {
         var settings = new UserSettings
         {
-            SiteName = "BLGFRNT",
-            SiteDescription = "A modern blog built with .NET",
-            PostsPerPage = 10
+            SiteName = "Optical Software",
+            SiteDescription = "In-depth reviews, comparisons, and guides for optical software, EHR systems, and technology used in optometry practice.",
+            PostsPerPage = 10,
+            CommentsEnabled = true,
+            CommentsModeration = true
         };
 
         await _settingRepo.SaveSettingsAsync(Guid.Empty, settings);

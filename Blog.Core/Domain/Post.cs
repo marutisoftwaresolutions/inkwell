@@ -27,10 +27,14 @@ public class Post
     public Guid AuthorId { get; set; }
     public string AuthorName { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? AuthorCredentials { get; set; }  // denormalized from Users.Credentials
+    public string? AuthorSpecialty { get; set; }    // denormalized from Users.Specialty
     public PostStatus Status { get; set; } = PostStatus.Draft;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? PublishedAt { get; set; }
+    public DateTime? LastVerifiedAt { get; set; }
+    public DateTime? NextReviewAt { get; set; }
     public DateTime? ScheduledAt { get; set; }
     public int ViewCount { get; set; }
     
@@ -38,6 +42,14 @@ public class Post
     public List<Category> Categories { get; set; } = new();
     public List<Tag> Tags { get; set; } = new();
     public int CommentCount { get; set; }
+
+    public string? FaqJson { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<FaqItem> Faqs =>
+        string.IsNullOrEmpty(FaqJson) ? new() :
+        System.Text.Json.JsonSerializer.Deserialize<List<FaqItem>>(FaqJson,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
 }
 
 public enum PostStatus
@@ -46,3 +58,5 @@ public enum PostStatus
     Published,
     Scheduled,
 }
+
+public record FaqItem(string Question, string Answer);

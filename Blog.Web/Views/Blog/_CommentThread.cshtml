@@ -6,7 +6,7 @@
 
 <div class="flex gap-4 pb-6 border-b border-dashed last:border-b-0" style="border-color: var(--border); @(Model.Depth > 0 ? $"margin-left: {Model.Depth * 2}rem; border-left: 2px solid var(--border); padding-left: 1rem;" : "")">
     <div class="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden">
-        <img src="https://api.dicebear.com/9.x/initials/webp?seed=@System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)&backgroundColor=e5e5e5" alt="@Model.AuthorName" class="w-full h-full object-cover" loading="lazy" />
+        <img src="/avatar/@System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)" alt="@Model.AuthorName" class="w-full h-full object-cover" loading="lazy" />
     </div>
     <div class="flex-1">
         <div class="flex items-baseline justify-between mb-1">

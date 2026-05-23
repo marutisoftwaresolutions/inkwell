@@ -24,6 +24,11 @@ public class User
     public string? MetaTitle { get; set; }
     public string? MetaDescription { get; set; }
 
+    // E-E-A-T: professional credentials displayed on post bylines and in author schema
+    public string? Credentials { get; set; }   // e.g. "OD, FAAO"
+    public string? Specialty { get; set; }     // e.g. "Pediatric Optometry"
+    public string? LicenseNumber { get; set; } // e.g. "CA-OD-12345"
+
     public bool IsActive { get; set; } = true;
     public DateTime? LastLogin { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

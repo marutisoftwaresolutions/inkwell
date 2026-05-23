@@ -1,15 +1,51 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <Compile Remove="wwwroot\uploads\**" />
-    <Content Remove="wwwroot\uploads\**" />
-    <EmbeddedResource Remove="wwwroot\uploads\**" />
-    <None Remove="wwwroot\uploads\**" />
-    <Watch Remove="wwwroot\uploads\**" />
     <Watch Remove="**\*.db" />
     <Watch Remove="**\*.db-shm" />
     <Watch Remove="**\*.db-wal" />
     <Watch Remove="**\*.db-journal" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="wwwroot\uploads\features\best-optometry-ehr-software-2026.jpg" />
+    <Content Include="wwwroot\uploads\features\cloud-vs-server-optometry-ehr.jpg" />
+    <Content Include="wwwroot\uploads\features\compulink-optometry-review.jpg" />
+    <Content Include="wwwroot\uploads\features\crystal-pm-vs-officemate.jpg" />
+    <Content Include="wwwroot\uploads\features\eyefinity-ehr-review.jpg" />
+    <Content Include="wwwroot\uploads\features\how-to-switch-optometry-ehr.jpg" />
+    <Content Include="wwwroot\uploads\features\imedicware-optometry-review.jpg" />
+    <Content Include="wwwroot\uploads\features\maximeyes-ehr-review.jpg" />
+    <Content Include="wwwroot\uploads\features\optometry-ehr-implementation-checklist.jpg" />
+    <Content Include="wwwroot\uploads\features\revolution-ehr-review.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-02\06567fbb489541a2acca8e09dd90e1a0.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-02\1013c54ea3924ac1922410b44bf0e08c.png" />
+    <Content Include="wwwroot\uploads\images\2026-02\422438e9403e470198e5e2f15f20b989.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-02\838282f655724296a87a9cd2f2780318.png" />
+    <Content Include="wwwroot\uploads\images\2026-02\96ed61624c994a8286d166e7e4001861.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-02\dda5e117840948ecaa6371a3af987dc9.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-02\e8b3eff3dfba4657b138763b9d984661.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-03\111e6ebecbc44ab9865bca76a7f33a1a.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-03\aa25c9cf13004a3589aa463f4303eabb.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-03\d421a58a0b114391870c97009a926f0a.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-03\e851349a6a9e4562b17d18723c510225.jpg" />
+    <Content Include="wwwroot\uploads\images\2026-05\902891987b43472088947a9f7eef8a8b.jpg" />
+    <Content Include="wwwroot\uploads\images\site-cover.jpg" />
+    <Content Include="wwwroot\uploads\og\2026-02\8aa6de381a35444fbfb168e33d79c47c.jpg" />
+    <Content Include="wwwroot\uploads\og\2026-02\ca0b3bd2e30344239ccf2442f3376ae6.jpg" />
+    <Content Include="wwwroot\uploads\twitter\2026-02\73774db2331549feb705e0b3eae24944.png" />
+    <Content Include="wwwroot\uploads\twitter\2026-02\a52aae47b4224d019558743112bc8f06.jpg" />
+    <Content Include="wwwroot\uploads\twitter\2026-02\fabea9fd8edb4ca39fce15161809f0d6.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\uploads\avatars\.gitkeep" />
+    <None Include="wwwroot\uploads\images\.gitkeep" />
+    <None Include="wwwroot\uploads\images\2026-02\aafafcb2cf8d445f85f1ae7019382407.svg" />
+    <None Include="wwwroot\uploads\images\2026-03\48b820c4b5054d8490d27707caa8fb9b.webp" />
+    <None Include="wwwroot\uploads\images\2026-03\653778ddace143dba01be09e61e8b510.webp" />
+    <None Include="wwwroot\uploads\og\.gitkeep" />
+    <None Include="wwwroot\uploads\twitter\.gitkeep" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,7 +54,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="MaxMind.GeoIP2" Version="5.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
     <PackageReference Include="SixLabors.ImageSharp.Web" Version="3.2.0" />
   </ItemGroup>
 

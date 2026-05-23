@@ -229,7 +229,7 @@ public class AccountController : Controller
     [HttpPost("profile")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Profile(string displayName, string email, string? bio, string? avatarUrl, IFormFile? avatarFile, bool removeAvatar, string? website, string? newPassword)
+    public async Task<IActionResult> Profile(string displayName, string email, string? bio, string? avatarUrl, IFormFile? avatarFile, bool removeAvatar, string? website, string? newPassword, string? credentials, string? specialty, string? licenseNumber)
     {
         var idString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (idString == null || !Guid.TryParse(idString, out var id)) return RedirectToAction("Login");
@@ -253,6 +253,9 @@ public class AccountController : Controller
         user.Email = email;
         user.Bio = bio;
         user.Website = website;
+        user.Credentials = credentials;
+        user.Specialty = specialty;
+        user.LicenseNumber = licenseNumber;
         user.UpdatedAt = DateTime.UtcNow;
 
         if (removeAvatar)

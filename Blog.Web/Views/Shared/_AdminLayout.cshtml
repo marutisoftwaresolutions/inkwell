@@ -17,14 +17,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] – Admin</title>
     
-    <!-- Fonts: Alexandria -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@100..900&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    @if (!string.IsNullOrWhiteSpace(settings?.GoogleAnalyticsId))
+    {
+        <script async src="https://www.googletagmanager.com/gtag/js?id=@settings.GoogleAnalyticsId"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '@settings.GoogleAnalyticsId');
+        </script>
+    }
+    <!-- Inkwell Fonts (self-hosted) -->
+    <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
+    <!-- Inkwell design tokens -->
+    <link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
+    <!-- Admin stylesheet -->
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <!-- Lucide icons (self-hosted) -->
+    <script src="~/lib/lucide/lucide.min.js"></script>
+
+    <!-- Tailwind CSS (self-hosted) -->
+    <script src="~/lib/tailwindcss/tailwind.js"></script>
+    <script defer src="~/lib/alpinejs/alpine.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -58,7 +72,8 @@
                         'sidebar-border': 'var(--sidebar-border)',
                     },
                     fontFamily: {
-                        sans: ['Alexandria', 'sans-serif'],
+                        sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
+                        serif: ["'Source Serif 4'", 'Georgia', 'serif'],
                     },
                     borderRadius: {
                         DEFAULT: 'var(--radius)',
@@ -69,47 +84,48 @@
     </script>
 
     <style>
+        /* ── Inkwell Editorial Desk palette ─────────────────────────── */
         :root {
-            --background: #f8f5f0;
-            --foreground: #3e2723;
-            --card: #f8f5f0;
-            --card-foreground: #3e2723;
-            --popover: #f8f5f0;
-            --popover-foreground: #3e2723;
-            --primary: #2e7d32;
-            --primary-foreground: #ffffff;
-            --secondary: #e8f5e9;
-            --secondary-foreground: #1b5e20;
-            --muted: #f0e9e0;
-            --muted-foreground: #6d4c41;
-            --accent: #c8e6c9;
-            --accent-foreground: #1b5e20;
-            --destructive: #c62828;
-            --destructive-foreground: #ffffff;
-            --border: #e0d6c9;
-            --input: #e0d6c9;
-            --ring: #2e7d32;
-            --sidebar: #f0e9e0;
-            --sidebar-foreground: #3e2723;
-            --sidebar-primary: #2e7d32;
-            --sidebar-primary-foreground: #ffffff;
-            --sidebar-accent: #c8e6c9;
-            --sidebar-accent-foreground: #1b5e20;
-            --sidebar-border: #e0d6c9;
-            --sidebar-ring: #2e7d32;
-            --radius: 0.5rem;
+            --background:                 #FAF7F2;  /* ink-cream */
+            --foreground:                 #1A1A1A;  /* ink-black */
+            --card:                       #F4EFE6;  /* surface */
+            --card-foreground:            #1A1A1A;
+            --popover:                    #FAF7F2;
+            --popover-foreground:         #1A1A1A;
+            --primary:                    #1A1A1A;  /* ink-black — Compose button bg */
+            --primary-foreground:         #FAF7F2;  /* cream — Compose button text */
+            --secondary:                  #F4EFE6;  /* surface */
+            --secondary-foreground:       #1A1A1A;
+            --muted:                      #EFE9DC;  /* surface-2 */
+            --muted-foreground:           #8B7355;  /* ink-sepia */
+            --accent:                     #E8E1D3;  /* cream-edge — hover bg */
+            --accent-foreground:          #1A1A1A;
+            --destructive:                #8C2A1F;  /* burgundy */
+            --destructive-foreground:     #FAF7F2;
+            --border:                     #E8E1D3;
+            --input:                      #E8E1D3;
+            --ring:                       #1A1A1A;
+            --sidebar:                    #F4EFE6;  /* slightly off-cream sidebar */
+            --sidebar-foreground:         #1A1A1A;
+            --sidebar-primary:            #1A1A1A;  /* active nav bg */
+            --sidebar-primary-foreground: #FAF7F2;
+            --sidebar-accent:             #EFE9DC;  /* hover bg */
+            --sidebar-accent-foreground:  #1A1A1A;
+            --sidebar-border:             #E8E1D3;
+            --sidebar-ring:               #1A1A1A;
+            --radius:                     2px;
         }
 
         body {
             background-color: var(--background);
             color: var(--foreground);
-            font-family: 'Alexandria', sans-serif;
+            font-family: 'Geist', 'Inter', system-ui, sans-serif;
         }
 
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
         ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
     </style>
 </head>
@@ -174,6 +190,11 @@
             <a href="/admin/comments" class="@NavClass("Comments")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 Comments
+            </a>
+
+            <a href="/admin/analytics" class="@NavClass("Analytics")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Analytics
             </a>
 
             <div class="pt-4 mt-4 border-t border-sidebar-border">
@@ -243,7 +264,7 @@
                         }
                         var avatarSrc = !string.IsNullOrEmpty(adminAvatarUrl) 
                             ? adminAvatarUrl 
-                            : $"https://api.dicebear.com/9.x/initials/webp?seed={System.Net.WebUtility.UrlEncode(User.Identity?.Name ?? "A")}&backgroundColor=c8e6c9";
+                            : $"/avatar/{System.Net.WebUtility.UrlEncode(User.Identity?.Name ?? "A")}";
                     }
                     <div class="w-7 h-7 rounded-full overflow-hidden bg-background border border-secondary-foreground/20 shadow-sm flex-shrink-0">
                         <img src="@avatarSrc" alt="Avatar" class="w-full h-full object-cover" loading="lazy" />
@@ -311,10 +332,10 @@
         </div>
     </main>
 
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <!-- Highlight.js for Syntax Highlighting in Editor -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="~/lib/htmx/htmx.min.js"></script>
+    <!-- Highlight.js for Syntax Highlighting in Editor (self-hosted) -->
+    <link rel="stylesheet" href="~/lib/highlightjs/github-dark.min.css">
+    <script src="~/lib/highlightjs/highlight.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

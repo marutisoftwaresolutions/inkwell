@@ -42,9 +42,11 @@ public class SettingsController : Controller
             SiteTagline = globalSettings.SiteDescription,
             SiteLogoUrl = globalSettings.SiteLogoUrl,
             SiteFaviconUrl = globalSettings.SiteFaviconUrl,
+            SiteCoverUrl = globalSettings.SiteCoverUrl,
             PostsPerPage = globalSettings.PostsPerPage,
             CommentsEnabled = globalSettings.CommentsEnabled,
             CommentsModeration = globalSettings.CommentsModeration,
+            GoogleAnalyticsId = globalSettings.GoogleAnalyticsId,
             SocialTwitter = globalSettings.SocialTwitter,
             SocialFacebook = globalSettings.SocialFacebook,
             SocialInstagram = globalSettings.SocialInstagram,
@@ -73,9 +75,11 @@ public class SettingsController : Controller
         globalSettings.SiteDescription = model.SiteTagline;
         globalSettings.SiteLogoUrl = model.SiteLogoUrl ?? string.Empty;
         globalSettings.SiteFaviconUrl = model.SiteFaviconUrl ?? string.Empty;
+        globalSettings.SiteCoverUrl = model.SiteCoverUrl ?? string.Empty;
         globalSettings.PostsPerPage = model.PostsPerPage;
         globalSettings.CommentsEnabled = model.CommentsEnabled;
         globalSettings.CommentsModeration = model.CommentsModeration;
+        globalSettings.GoogleAnalyticsId = model.GoogleAnalyticsId ?? string.Empty;
         globalSettings.SocialTwitter = model.SocialTwitter ?? string.Empty;
         globalSettings.SocialFacebook = model.SocialFacebook ?? string.Empty;
         globalSettings.SocialInstagram = model.SocialInstagram ?? string.Empty;

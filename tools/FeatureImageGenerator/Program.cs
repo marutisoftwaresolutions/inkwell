@@ -258,21 +258,6 @@ var pngMappings = new System.Collections.Generic.Dictionary<string, string>
     { "anti-reflective-lens-coating-track-upsell-optometry-software", "anti_reflective_coating_1779510299776.png" }
 };
 
-var unsplashUrls = new System.Collections.Generic.Dictionary<string, string>
-{
-    { "glaucoma-detection-software-ai-tools-optometrists-2026", "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "oct-vs-fundus-photography-optometry", "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "treating-amblyopia-children-software-track-progress-2026", "https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "ehr-interoperability-optometrists-connecting-medical-systems", "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "optometry-practice-analytics-grow-eye-care-business", "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "medical-vs-vision-insurance-billing-optometry-guide", "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "contact-lens-inventory-management-software-optometry", "https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?auto=format&fit=crop&w=1200&h=630&q=80" },
-    { "diabetic-eye-exam-ai-screening-tools-optometrists-2026", "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=630&q=80" }
-};
-
-using var httpClient = new System.Net.Http.HttpClient();
-httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-
 for (int i = 0; i < posts.Length; i++)
 {
     var p = posts[i];
@@ -305,31 +290,10 @@ for (int i = 0; i < posts.Length; i++)
                 GenerateImage(p, font, outPath);
             }
         }
-        else if (unsplashUrls.TryGetValue(p.Slug, out var url))
-        {
-            try
-            {
-                var imageBytes = httpClient.GetByteArrayAsync(url).GetAwaiter().GetResult();
-                using var ms = new System.IO.MemoryStream(imageBytes);
-                using var image = Image.Load(ms);
-                image.Mutate(x => x.Resize(new ResizeOptions
-                {
-                    Size = new Size(1200, 630),
-                    Mode = ResizeMode.Crop
-                }));
-                image.Save(outPath, new JpegEncoder { Quality = 90 });
-                Console.WriteLine($"  [+] {p.Slug}.jpg (From relevant stock photo)");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  [!] Failed to download {url}: {ex.Message}. Generating fallback card...");
-                GenerateImage(p, font, outPath);
-            }
-        }
         else
         {
             GenerateImage(p, font, outPath);
-            Console.WriteLine($"  [+] {p.Slug}.jpg (Abstract Card Fallback)");
+            Console.WriteLine($"  [+] {p.Slug}.jpg (Programmatic Card)");
         }
     }
 }

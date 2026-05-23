@@ -43,7 +43,7 @@
 
         <div class="mt-auto pt-4 flex items-center justify-between border-t" style="border-color: var(--border);">
             <div class="flex items-center gap-2">
-                <img src="https://api.dicebear.com/9.x/initials/webp?seed=@System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)&backgroundColor=e5e5e5"
+                <img src="/avatar/@System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)"
                      alt="@Model.AuthorName" class="w-7 h-7 rounded-full" />
                 <span class="text-xs font-medium" style="color: var(--foreground);">
                     @(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)

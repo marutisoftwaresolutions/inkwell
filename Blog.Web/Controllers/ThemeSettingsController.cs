@@ -134,6 +134,7 @@ public class ThemeSettingsController : Controller
         new() { SettingGroup = "layout", SettingKey = "layout-postcard", SettingType = "select", DefaultValue = "Neutral", Label = "Post Card Style", Description = "Visual style of individual post cards" },
         new() { SettingGroup = "layout", SettingKey = "layout-post", SettingType = "select", DefaultValue = "Neutral", Label = "Single Post Layout", Description = "Layout structure for individual blog posts" },
         new() { SettingGroup = "layout", SettingKey = "layout-page", SettingType = "select", DefaultValue = "Neutral", Label = "Single Page Layout", Description = "Layout structure for static pages" },
+        new() { SettingGroup = "inkwell", SettingKey = "inkwell-preset", SettingType = "select", DefaultValue = "cream", Label = "Inkwell Preset", Description = "Color preset for Magazine/Inkwell layout (cream, linen, manuscript, etc.)" },
     };
 
     // ══════════════════════════════════════════════════════════════════
@@ -251,6 +252,30 @@ public class ThemeSettingsController : Controller
         await _themeSettings.SaveAllAsync(userId, updates);
 
         TempData["Success"] = $"Layout '{presetId}' applied successfully.";
+        return RedirectToAction("Index");
+    }
+
+    [HttpPost("inkwell-preset/{presetName}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApplyInkwellPreset(string presetName)
+    {
+        var validPresets = new[] { "cream", "linen", "manuscript", "folio", "press", "letterpress", "foxglove", "cobalt", "ink", "onyx", "slate", "sand", "plum", "forest", "mono" };
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var normalised = validPresets.FirstOrDefault(p => p.Equals(presetName, StringComparison.OrdinalIgnoreCase));
+        if (normalised == null)
+        {
+            TempData["Error"] = "Inkwell preset not found.";
+            return RedirectToAction("Index");
+        }
+
+        await _themeSettings.SeedDefaultsAsync(userId, GetDefaultSettings());
+        await _themeSettings.SaveAllAsync(userId, new List<CustomThemeSetting>
+        {
+            new() { SettingKey = "inkwell-preset", SettingValue = normalised }
+        });
+
+        TempData["Success"] = $"Inkwell preset '{normalised}' applied.";
         return RedirectToAction("Index");
     }
 

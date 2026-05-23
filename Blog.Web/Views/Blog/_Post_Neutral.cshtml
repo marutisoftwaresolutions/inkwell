@@ -36,18 +36,47 @@
                         @{
                             var pAuthorImage = !string.IsNullOrEmpty(Model.AvatarUrl)
                                 ? Model.AvatarUrl
-                                : $"https://api.dicebear.com/9.x/initials/webp?seed={System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}&backgroundColor=e5e5e5";
+                                : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
+                            var readingMinutes = Math.Max(1, (Model.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
                         }
                         <img src="@pAuthorImage" alt="@Model.AuthorName" class="w-8 h-8 rounded-full object-cover" />
-                        <span class="font-medium" style="color: var(--foreground);">@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)</span>
+                        <span>
+                            <span class="font-medium" style="color: var(--foreground);">@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)@(!string.IsNullOrEmpty(Model.AuthorCredentials) ? $", {Model.AuthorCredentials}" : "")</span>
+                            @if (!string.IsNullOrEmpty(Model.AuthorSpecialty))
+                            {
+                                <span class="block text-xs" style="color: var(--muted-foreground);">@Model.AuthorSpecialty</span>
+                            }
+                        </span>
                     </div>
                     <span>•</span>
                     <time datetime="@Model.PublishedAt?.ToString("yyyy-MM-dd")">
                         <i class="bi bi-calendar me-1"></i>@Model.PublishedAt?.ToString("MMMM d, yyyy")
                     </time>
                     <span>•</span>
+                    <span><i class="bi bi-clock me-1"></i>@readingMinutes min read</span>
+                    <span>•</span>
                     <span><i class="bi bi-eye me-1"></i>@Model.ViewCount views</span>
                 </div>
+
+                @if (Model.LastVerifiedAt.HasValue || Model.NextReviewAt.HasValue)
+                {
+                    <div class="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-xs" style="color: var(--muted-foreground);">
+                        @if (Model.LastVerifiedAt.HasValue)
+                        {
+                            <span class="flex items-center gap-1">
+                                <i class="bi bi-patch-check"></i>
+                                Last verified: <strong style="color: var(--foreground);">@Model.LastVerifiedAt.Value.ToString("MMMM d, yyyy")</strong>
+                            </span>
+                        }
+                        @if (Model.NextReviewAt.HasValue)
+                        {
+                            <span class="flex items-center gap-1">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Next review: <strong style="color: var(--foreground);">@Model.NextReviewAt.Value.ToString("MMMM d, yyyy")</strong>
+                            </span>
+                        }
+                    </div>
+                }
             </header>
 
             <!-- Featured Image -->
@@ -62,6 +91,31 @@
             <div class="post-prose mb-8" style="font-family: var(--font-body); line-height: 1.8;">
                 @Html.Raw(Model.Html)
             </div>
+
+            <!-- See Also (internal links) -->
+            <partial name="_SeeAlso" view-data="ViewData" />
+
+            <!-- FAQ Accordion -->
+            @if (Model.Faqs.Any())
+            {
+                <div class="pt-6 border-t border-dashed" style="border-color: var(--border);">
+                    <h2 class="text-xl font-medium mb-4">Frequently Asked Questions</h2>
+                    <div class="space-y-2" itemscope itemtype="https://schema.org/FAQPage">
+                        @foreach (var faq in Model.Faqs)
+                        {
+                            <div x-data="{ open: false }" class="border border-dashed rounded-lg overflow-hidden" style="border-color: var(--border);" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+                                <button type="button" @@click="open = !open" class="w-full flex items-center justify-between px-4 py-3 text-left font-medium text-sm hover:opacity-80 transition-opacity" style="background: var(--muted);">
+                                    <span itemprop="name">@faq.Question</span>
+                                    <svg :class="open ? 'rotate-180' : ''" class="shrink-0 transition-transform ml-2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </button>
+                                <div x-show="open" x-transition class="px-4 py-3 text-sm leading-relaxed" style="color: var(--foreground);" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+                                    <span itemprop="text">@faq.Answer</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
 
             <!-- Tags -->
             @if (Model.Tags.Any())
@@ -86,5 +140,36 @@
                 <a href="https://www.facebook.com/sharer/sharer.php?u=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)" target="_blank" class="p-2 hover:opacity-70"><i class="bi bi-facebook"></i></a>
                 <a href="https://www.linkedin.com/shareArticle?mini=true&url=@Uri.EscapeDataString(Context.Request.Scheme + "://" + Context.Request.Host + "/" + Model.Slug)&title=@Uri.EscapeDataString(Model.Title)" target="_blank" class="p-2 hover:opacity-70"><i class="bi bi-linkedin"></i></a>
             </div>
+
+            <!-- Related Posts -->
+            @{
+                var relatedPosts = ViewBag.RelatedPostCards as List<Blog.Core.Domain.Post>;
+            }
+            @if (relatedPosts != null && relatedPosts.Any())
+            {
+                <div class="mt-8 pt-8 border-t border-dashed" style="border-color: var(--border);">
+                    <h3 class="text-lg font-medium mb-5">You May Also Like</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        @foreach (var rp in relatedPosts)
+                        {
+                            var rpMinutes = Math.Max(1, (rp.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+                            <a href="/@rp.Slug" class="group border border-dashed rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col" style="border-color: var(--border); background: var(--card);">
+                                @if (!string.IsNullOrEmpty(rp.FeatureImage))
+                                {
+                                    <img src="@rp.FeatureImage" alt="@rp.Title" class="w-full h-36 object-cover group-hover:opacity-90 transition-opacity" />
+                                }
+                                <div class="p-3 flex flex-col gap-1 flex-1">
+                                    @if (rp.Categories.Any())
+                                    {
+                                        <span class="text-xs uppercase font-bold" style="color: var(--primary);">@rp.Categories.First().Name</span>
+                                    }
+                                    <p class="text-sm font-medium leading-snug line-clamp-2" style="color: var(--foreground);">@rp.Title</p>
+                                    <p class="text-xs mt-auto pt-1" style="color: var(--muted-foreground);">@(string.IsNullOrEmpty(rp.AuthorName) ? "Anonymous" : rp.AuthorName) · @rpMinutes min read</p>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
         </article>
 </div>

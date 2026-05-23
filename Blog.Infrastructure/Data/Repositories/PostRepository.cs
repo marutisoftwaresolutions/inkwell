@@ -37,7 +37,7 @@ public class PostRepository : IPostRepository
         {
             if (filter.Status.Value == PostStatus.Published)
             {
-                where.Add("(p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))");
+                where.Add("(p.Status = 'Published' AND p.PublishedAt <= GETDATE() OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))");
             }
             else
             {
@@ -87,12 +87,12 @@ public class PostRepository : IPostRepository
 
         // SQL Server paging: OFFSET / FETCH NEXT
         var sql = $@"
-            SELECT p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl,
+            SELECT p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl, u.Credentials as AuthorCredentials, u.Specialty as AuthorSpecialty,
                    (SELECT COUNT(*) FROM Comments c WHERE c.PostId = p.Id AND c.Status = 'Approved') as CommentCount
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE {whereClause}
-            ORDER BY p.CreatedAt DESC
+            ORDER BY p.PublishedAt DESC
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var posts = (await conn.QueryAsync<Post>(sql, p)).ToList();
@@ -140,7 +140,7 @@ public class PostRepository : IPostRepository
         using var conn = _ctx.CreateConnection();
         
         var sql = @"
-            SELECT p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl
+            SELECT p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl, u.Credentials as AuthorCredentials, u.Specialty as AuthorSpecialty
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE p.Id = @Id" + (authorId.HasValue ? " AND p.AuthorId = @AuthorId" : "");
@@ -166,7 +166,7 @@ public class PostRepository : IPostRepository
     {
         using var conn = _ctx.CreateConnection();
         var sql = @"
-            SELECT p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl,
+            SELECT p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl, u.Credentials as AuthorCredentials, u.Specialty as AuthorSpecialty,
                    (SELECT COUNT(*) FROM Comments c WHERE c.PostId = p.Id AND c.Status = 'Approved') as CommentCount
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
@@ -199,19 +199,22 @@ public class PostRepository : IPostRepository
             INSERT INTO Posts (Id, Uuid, Title, Slug, Html, Plaintext, Type, Visibility, FeatureImage,
                                MetaTitle, MetaDescription, CanonicalUrl, OgImage, OgTitle, OgDescription,
                                TwitterImage, TwitterTitle, TwitterDescription,
-                               AuthorId, Status, PublishedAt, ScheduledAt, AllowComments, CreatedAt, UpdatedAt)
+                               AuthorId, Status, PublishedAt, LastVerifiedAt, NextReviewAt, ScheduledAt,
+                               AllowComments, FaqJson, CreatedAt, UpdatedAt)
             OUTPUT INSERTED.Id
             VALUES (@Id, @Uuid, @Title, @Slug, @Html, @Plaintext, @Type, @Visibility, @FeatureImage,
                     @MetaTitle, @MetaDescription, @CanonicalUrl, @OgImage, @OgTitle, @OgDescription,
                     @TwitterImage, @TwitterTitle, @TwitterDescription,
-                    @AuthorId, @Status, @PublishedAt, @ScheduledAt, @AllowComments, @CreatedAt, @UpdatedAt)",
+                    @AuthorId, @Status, @PublishedAt, @LastVerifiedAt, @NextReviewAt, @ScheduledAt,
+                    @AllowComments, @FaqJson, @CreatedAt, @UpdatedAt)",
             new
             {
                 post.Id, post.Uuid, post.Title, post.Slug, post.Html, post.Plaintext, post.Type, post.Visibility, post.FeatureImage,
                 post.MetaTitle, post.MetaDescription, post.CanonicalUrl, post.OgImage, post.OgTitle, post.OgDescription,
                 post.TwitterImage, post.TwitterTitle, post.TwitterDescription,
                 post.AuthorId, Status = post.Status.ToString(),
-                post.PublishedAt, post.ScheduledAt, post.AllowComments,
+                post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
+                post.AllowComments, post.FaqJson,
                 CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now
             });
     }
@@ -221,13 +224,14 @@ public class PostRepository : IPostRepository
         using var conn = _ctx.CreateConnection();
         await conn.ExecuteAsync(@"
             UPDATE Posts SET
-                Title = @Title, Slug = @Slug, Html = @Html, Plaintext = @Plaintext, 
+                Title = @Title, Slug = @Slug, Html = @Html, Plaintext = @Plaintext,
                 Type = @Type, Visibility = @Visibility, FeatureImage = @FeatureImage,
                 MetaTitle = @MetaTitle, MetaDescription = @MetaDescription, CanonicalUrl = @CanonicalUrl,
                 OgImage = @OgImage, OgTitle = @OgTitle, OgDescription = @OgDescription,
                 TwitterImage = @TwitterImage, TwitterTitle = @TwitterTitle, TwitterDescription = @TwitterDescription,
-                Status = @Status, PublishedAt = @PublishedAt, ScheduledAt = @ScheduledAt,
-                AllowComments = @AllowComments, UpdatedAt = @UpdatedAt
+                Status = @Status, PublishedAt = @PublishedAt, LastVerifiedAt = @LastVerifiedAt,
+                NextReviewAt = @NextReviewAt, ScheduledAt = @ScheduledAt,
+                AllowComments = @AllowComments, FaqJson = @FaqJson, UpdatedAt = @UpdatedAt
             WHERE Id = @Id AND AuthorId = @AuthorId",
             new
             {
@@ -235,7 +239,8 @@ public class PostRepository : IPostRepository
                 post.MetaTitle, post.MetaDescription, post.CanonicalUrl, post.OgImage, post.OgTitle, post.OgDescription,
                 post.TwitterImage, post.TwitterTitle, post.TwitterDescription,
                 Status = post.Status.ToString(),
-                post.PublishedAt, post.ScheduledAt, post.AllowComments,
+                post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
+                post.AllowComments, post.FaqJson,
                 UpdatedAt = DateTime.Now, post.Id, post.AuthorId
             });
     }
@@ -346,6 +351,42 @@ public class PostRepository : IPostRepository
         }
 
         return posts;
+    }
+
+    public async Task<List<Post>> GetRelatedPostsAsync(Guid postId, List<Guid> categoryIds, List<Guid> tagIds, int count = 3)
+    {
+        using var conn = _ctx.CreateConnection();
+        var p = new DynamicParameters();
+        p.Add("PostId", postId);
+        p.Add("Count", count);
+
+        var conditions = new List<string>();
+        if (categoryIds.Any())
+        {
+            conditions.Add("EXISTS (SELECT 1 FROM PostCategories pc WHERE pc.PostId = p.Id AND pc.CategoryId IN @CategoryIds)");
+            p.Add("CategoryIds", categoryIds);
+        }
+        if (tagIds.Any())
+        {
+            conditions.Add("EXISTS (SELECT 1 FROM PostTags pt WHERE pt.PostId = p.Id AND pt.TagId IN @TagIds)");
+            p.Add("TagIds", tagIds);
+        }
+
+        var whereMatch = conditions.Any()
+            ? $"AND ({string.Join(" OR ", conditions)})"
+            : string.Empty;
+
+        var sql = $@"
+            SELECT TOP(@Count) p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl,
+                u.Credentials as AuthorCredentials, u.Specialty as AuthorSpecialty
+            FROM Posts p
+            LEFT JOIN Users u ON u.Id = p.AuthorId
+            WHERE p.Id != @PostId
+              AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))
+              {whereMatch}
+            ORDER BY p.PublishedAt DESC";
+
+        return (await conn.QueryAsync<Post>(sql, p)).ToList();
     }
 
     public async Task AssignCategoriesAsync(Guid postId, List<Guid> categoryIds)

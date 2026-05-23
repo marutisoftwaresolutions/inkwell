@@ -4,6 +4,7 @@ using Blog.Infrastructure;
 using Blog.Infrastructure.Data;
 using Blog.Web.Middleware;
 using Blog.Web.Services;
+using MaxMind.GeoIP2;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
@@ -26,6 +27,7 @@ builder.Services.AddInfrastructure(connStr);
 // ── Core Services ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IEmailService, SmtpEmailService>();
 
 // ── Multi-Tenancy ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<TenantContext>();
@@ -65,6 +67,17 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddControllersWithViews();
 builder.Services.AddMemoryCache();
+
+// GeoIP — optional; only registered when the .mmdb file is present
+var geoDbPath = builder.Configuration["GeoLite2DbPath"];
+if (!string.IsNullOrEmpty(geoDbPath))
+{
+    var fullGeoPath = Path.IsPathRooted(geoDbPath)
+        ? geoDbPath
+        : Path.Combine(builder.Environment.ContentRootPath, geoDbPath);
+    if (File.Exists(fullGeoPath))
+        builder.Services.AddSingleton(new DatabaseReader(fullGeoPath));
+}
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddImageSharp();
 
@@ -91,7 +104,7 @@ if (Directory.Exists(oldUploads))
 
 var app = builder.Build();
 
-// Run migrations on startup
+// Run migrations and taxonomy seeding on startup
 using (var scope = app.Services.CreateScope())
 {
     try {
@@ -100,10 +113,40 @@ using (var scope = app.Services.CreateScope())
     } catch (Exception ex) {
         app.Logger.LogError(ex, "Migration Error");
     }
+
+    try {
+        var taxonomySeeder = scope.ServiceProvider.GetRequiredService<Blog.Infrastructure.Data.OptometryTaxonomySeeder>();
+        // Self-hosted: owner is Guid.Empty (site-wide). Cloud mode resolved per-tenant at runtime.
+        taxonomySeeder.SeedAsync(Guid.Empty).Wait();
+    } catch (Exception ex) {
+        app.Logger.LogError(ex, "Taxonomy Seeder Error");
+    }
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
-app.UseDeveloperExceptionPage();
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
+// Canonical host redirect — enforce https://www.opticalsoftware.org in production
+var canonicalHost = app.Configuration["CanonicalHost"];
+if (!string.IsNullOrEmpty(canonicalHost) && !app.Environment.IsDevelopment())
+{
+    app.Use(async (ctx, next) =>
+    {
+        var req = ctx.Request;
+        if (req.Scheme != "https" || !req.Host.Value.Equals(canonicalHost, StringComparison.OrdinalIgnoreCase))
+        {
+            var url = $"https://{canonicalHost}{req.PathBase}{req.Path}{req.QueryString}";
+            ctx.Response.StatusCode = 301;
+            ctx.Response.Headers.Location = url;
+            return;
+        }
+        await next();
+    });
+}
+
 app.UseStatusCodePagesWithReExecute("/error/{0}");
 
 app.UseImageSharp(); // Intercepts image requests from wwwroot automatically!
@@ -113,6 +156,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseTenantResolution();
+app.UsePageViewTracking();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // Attribute-routed controllers (admin, API)

@@ -4,13 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] – BLGFRNT</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
 <body class="admin-body">
     @RenderBody()
-    <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2uodhrgzmkvbZci3YKgzsHHN8uf7pf5dDEb" crossorigin="anonymous"></script>
+    <script src="~/lib/htmx/htmx.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

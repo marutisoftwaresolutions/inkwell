@@ -34,3 +34,12 @@ else
 {
     <partial name="_Index_Neutral" model="Model" />
 }
+
+@* Magazine layout owns its own subscribe block inside the footer *@
+@if (blogLayout != "Magazine")
+{
+    <!-- Newsletter Signup -->
+    <div class="container xl:max-w-4xl mx-auto px-4">
+        <partial name="_NewsletterSignup" view-data="ViewData" />
+    </div>
+}

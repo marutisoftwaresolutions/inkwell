@@ -24,8 +24,12 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IRevisionRepository, RevisionRepository>();
         services.AddScoped<ICustomThemeSettingRepository, CustomThemeSettingRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IMemberRepository, MemberRepository>();
+        services.AddScoped<IPageViewRepository, PageViewRepository>();
+        services.AddScoped<IRedirectRepository, RedirectRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
+        services.AddScoped<OptometryTaxonomySeeder>();
 
         // Register Dapper Type Handlers
         Dapper.SqlMapper.AddTypeHandler(new SqlGuidHandler());

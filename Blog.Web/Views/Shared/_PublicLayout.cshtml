@@ -52,40 +52,46 @@
         <link rel="icon" type="image/x-icon" href="@globalSettings.SiteFaviconUrl" />
     }
     @await RenderSectionAsync("MetaTags", required: false)
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    @foreach (var font in fontsToLoad)
+    @if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
     {
-        var fontParam = font.Replace(" ", "+");
-        <link href="https://fonts.googleapis.com/css2?family=@(fontParam):wght@400;500;700;900&display=swap" rel="stylesheet" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=@globalSettings.GoogleAnalyticsId"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '@globalSettings.GoogleAnalyticsId');
+        </script>
     }
 
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <!-- Inkwell Fonts (self-hosted) -->
+    <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
 
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bootstrap Icons (self-hosted) -->
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+
+    <!-- Tailwind CSS (self-hosted) -->
+    <script src="~/lib/tailwindcss/tailwind.js"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['@fontHeading', 'Inter', 'sans-serif'],
-                        body: ['@fontBody', 'Inter', 'sans-serif'],
+                        sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
+                        serif: ["'Source Serif 4'", 'Georgia', 'serif'],
+                        body: ["'Source Serif 4'", 'Georgia', 'serif'],
+                        mono: ["'Geist Mono'", 'monospace'],
                     },
                     colors: {
                         neutral: {
-                            50: 'color-mix(in srgb, var(--background) 95%, var(--foreground) 5%)',
-                            100: 'color-mix(in srgb, var(--muted) 100%, transparent)',
+                            50: 'var(--bg)',
+                            100: 'var(--surface)',
                             200: 'var(--border)',
-                            500: 'var(--muted-foreground)',
-                            700: 'var(--foreground)',
-                            900: 'color-mix(in srgb, var(--foreground) 95%, black 5%)',
+                            500: 'var(--fg-meta)',
+                            700: 'var(--fg-body)',
+                            900: 'var(--fg)',
                         },
-                        primary: 'var(--primary)',
-                        'primary-foreground': 'var(--primary-foreground)',
+                        primary: 'var(--ink-black)',
+                        'primary-foreground': 'var(--ink-cream)',
                     }
                 }
             }
@@ -111,50 +117,86 @@
     {
         <style>
             :root {
-                --background: #ffffff; --foreground: #404040; --primary: #404040; --primary-foreground: #ffffff;
-                --secondary: #f5f5f5; --secondary-foreground: #404040; --muted: #f5f5f5; --muted-foreground: #737373;
-                --accent: #e5e5e5; --accent-foreground: #262626; --card: #ffffff; --card-foreground: #404040;
-                --border: #e5e5e5; --destructive: #dc2626;
-                --font-sans: 'Inter', sans-serif; --font-body: 'Inter', sans-serif; --radius: 0;
+                --background: var(--ink-cream); --foreground: var(--ink-black);
+                --primary: var(--ink-black); --primary-foreground: var(--ink-cream);
+                --secondary: var(--ink-cream-deep); --secondary-foreground: var(--ink-black);
+                --muted: var(--ink-cream-deep); --muted-foreground: var(--ink-sepia);
+                --accent: var(--ink-cream-edge); --accent-foreground: var(--ink-black);
+                --card: var(--ink-cream-deep); --card-foreground: var(--ink-black);
+                --border: var(--ink-cream-edge); --destructive: #8C2A1F;
+                --font-sans: 'Geist', sans-serif; --font-body: 'Source Serif 4', serif; --radius: 2px;
             }
         </style>
     }
 
-    <!-- Theme + Custom Styles -->
+    <!-- Inkwell Design System -->
+    <link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
+    <!-- Legacy neutral styles (filters, pagination, non-Magazine layouts) -->
     <link rel="stylesheet" href="~/css/neutral-blog.css" asp-append-version="true" />
 
-    <!-- Highlight.js for code blocks -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Highlight.js for code blocks (self-hosted) -->
+    <link rel="stylesheet" href="~/lib/highlightjs/github-dark.min.css">
+    <script src="~/lib/highlightjs/highlight.min.js"></script>
     <script>hljs.highlightAll();</script>
 
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    <!-- Lucide icons (self-hosted) -->
+    <script src="~/lib/lucide/lucide.min.js"></script>
+    <!-- Alpine.js (self-hosted) -->
+    <script defer src="~/lib/alpinejs/alpine.min.js"></script>
 
     <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/feed" />
+
+    @{
+        var orgBaseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+        var orgSchema = new System.Text.Json.JsonSerializerOptions { WriteIndented = false };
+        var orgData = new System.Collections.Generic.Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "Organization",
+            ["name"] = siteName,
+            ["url"] = orgBaseUrl,
+            ["description"] = siteDescription
+        };
+        if (!string.IsNullOrEmpty(globalSettings.SiteLogoUrl))
+            orgData["logo"] = new System.Collections.Generic.Dictionary<string, string>
+            {
+                ["@type"] = "ImageObject",
+                ["url"] = globalSettings.SiteLogoUrl
+            };
+        if (!string.IsNullOrEmpty(globalSettings.SocialTwitter))
+            orgData["sameAs"] = new[] { globalSettings.SocialTwitter };
+    }
+    <script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(orgData, orgSchema))</script>
 </head>
 
-<body class="font-sans" style="color: var(--foreground); background: var(--background);">
+@{ var inkwellPreset = GetTheme("inkwell-preset", "cream"); }
+<body class="inkwell-root font-sans" data-preset="@inkwellPreset" style="color: var(--fg-body); background: var(--bg);">
 
-    <!-- Header -->
-    <div class="relative z-50">
-        @await Component.InvokeAsync("Navbar", new { ownerId = brandingId })
-    </div>
+    @if (ViewData["HideLayoutChrome"] == null)
+    {
+        <!-- Header -->
+        <div class="relative z-50">
+            @await Component.InvokeAsync("Navbar", new { ownerId = brandingId })
+        </div>
+    }
 
     <!-- Main Content -->
     <main class="relative">
         @RenderBody()
     </main>
 
-    <!-- Footer -->
-    @await Component.InvokeAsync("Footer", new { ownerId = brandingId })
+    @if (ViewData["HideLayoutChrome"] == null)
+    {
+        <!-- Footer -->
+        @await Component.InvokeAsync("Footer", new { ownerId = brandingId })
+    }
 
     <!-- Scroll to Top -->
     <a href="#" id="backToTop" class="back-top fixed py-2 px-3 border border-dashed end-4 bottom-4" style="background: var(--muted); border-color: var(--border); color: var(--muted-foreground);" aria-label="Scroll To Top">
         <i class="bi bi-arrow-up"></i>
     </a>
 
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="~/lib/htmx/htmx.min.js"></script>
     <script>
         // Scroll to top
         (function () {
