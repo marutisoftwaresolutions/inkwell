@@ -267,47 +267,30 @@ for (int i = 0; i < posts.Length; i++)
     var p = posts[i];
     var outPath = IOPath.Combine(baseDir, $"{p.Slug}.jpg");
 
-    if (i < 10)
+    if (pngMappings.TryGetValue(p.Slug, out var localPngName))
     {
-        var sourcePath = IOPath.Combine(resourcesDir, "17-May-2026", $"{p.Slug}.jpg");
+        var sourcePath = IOPath.Combine(resourcesDir, localPngName);
         if (IOFile.Exists(sourcePath))
         {
-            IOFile.Copy(sourcePath, outPath, true);
-            Console.WriteLine($"  [+] {p.Slug}.jpg (From 17-May-2026 visual assets)");
+            using var image = Image.Load(sourcePath);
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(1200, 630),
+                Mode = ResizeMode.Crop
+            }));
+            image.Save(outPath, new JpegEncoder { Quality = 90 });
+            Console.WriteLine($"  [+] {p.Slug}.jpg (From custom AI illustration)");
         }
         else
         {
+            Console.WriteLine($"  [!] Source PNG not found: {sourcePath}. Generating fallback card...");
             GenerateImage(p, font, outPath);
-            Console.WriteLine($"  [+] {p.Slug}.jpg (Abstract Card - Fallback)");
         }
     }
     else
     {
-        if (pngMappings.TryGetValue(p.Slug, out var localPngName))
-        {
-            var sourcePath = IOPath.Combine(resourcesDir, localPngName);
-            if (IOFile.Exists(sourcePath))
-            {
-                using var image = Image.Load(sourcePath);
-                image.Mutate(x => x.Resize(new ResizeOptions
-                {
-                    Size = new Size(1200, 630),
-                    Mode = ResizeMode.Crop
-                }));
-                image.Save(outPath, new JpegEncoder { Quality = 90 });
-                Console.WriteLine($"  [+] {p.Slug}.jpg (From custom AI illustration)");
-            }
-            else
-            {
-                Console.WriteLine($"  [!] Source PNG not found: {sourcePath}. Generating fallback card...");
-                GenerateImage(p, font, outPath);
-            }
-        }
-        else
-        {
-            GenerateImage(p, font, outPath);
-            Console.WriteLine($"  [+] {p.Slug}.jpg (Programmatic Card)");
-        }
+        GenerateImage(p, font, outPath);
+        Console.WriteLine($"  [+] {p.Slug}.jpg (Programmatic Card)");
     }
 }
 
