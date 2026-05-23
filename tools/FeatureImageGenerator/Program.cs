@@ -16,6 +16,10 @@ var baseDir = IOPath.GetFullPath(
 IODir.CreateDirectory(baseDir);
 Console.WriteLine($"Output → {baseDir}");
 
+var resourcesDir = IOPath.GetFullPath(
+    IOPath.Combine(AppContext.BaseDirectory, "..", "..", "..", "Resources"));
+Console.WriteLine($"Resources → {resourcesDir}");
+
 // ── Font ───────────────────────────────────────────────────────────────────────
 FontFamily font = default;
 foreach (var name in new[] { "Segoe UI", "Arial", "Helvetica", "Liberation Sans", "DejaVu Sans" })
@@ -272,7 +276,7 @@ for (int i = 0; i < posts.Length; i++)
     {
         if (pngMappings.TryGetValue(p.Slug, out var localPngName))
         {
-            var sourcePath = IOPath.Combine(@"C:\Users\Admin\.gemini\antigravity\brain\7478d376-9dcb-49a1-baa8-8e44dcde0cad", localPngName);
+            var sourcePath = IOPath.Combine(resourcesDir, localPngName);
             if (IOFile.Exists(sourcePath))
             {
                 using var image = Image.Load(sourcePath);
