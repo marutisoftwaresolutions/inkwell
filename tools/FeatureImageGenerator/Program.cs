@@ -269,8 +269,17 @@ for (int i = 0; i < posts.Length; i++)
 
     if (i < 10)
     {
-        GenerateImage(p, font, outPath);
-        Console.WriteLine($"  [+] {p.Slug}.jpg (Abstract Card)");
+        var sourcePath = IOPath.Combine(resourcesDir, "17-May-2026", $"{p.Slug}.jpg");
+        if (IOFile.Exists(sourcePath))
+        {
+            IOFile.Copy(sourcePath, outPath, true);
+            Console.WriteLine($"  [+] {p.Slug}.jpg (From 17-May-2026 visual assets)");
+        }
+        else
+        {
+            GenerateImage(p, font, outPath);
+            Console.WriteLine($"  [+] {p.Slug}.jpg (Abstract Card - Fallback)");
+        }
     }
     else
     {
