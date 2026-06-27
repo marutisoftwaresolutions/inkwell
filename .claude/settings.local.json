@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(48\\).toString\\('base64'\\)\\)\")",
+      "Bash(powershell -Command \"[Convert]::ToBase64String\\(\\(1..48 | ForEach-Object { [byte]\\(Get-Random -Max 256\\) }\\)\\)\")",
+      "Bash(sqlcmd -S MARUTI-004 -d blog -U sa -P mssadmin -i \"e:\\\\MSS-Projects\\\\Blog-Engine\\\\DBScripts\\\\2026-05-22_content-batch-1-posts-1-to-9.sql\")",
+      "Bash(sqlcmd -S MARUTI-004 -d blog -U sa -P mssadmin -f 65001 -Q \"SELECT TOP 3 Slug, LEFT\\(Html, 200\\) AS HtmlSample FROM Posts WHERE Status = 'Draft' ORDER BY CreatedAt\")",
+      "Bash(sqlcmd -S MARUTI-004 -d blog -U sa -P mssadmin -f 65001 -Q \"SELECT COUNT\\(*\\) AS StillCorrupted FROM Posts WHERE Html LIKE N'%' + NCHAR\\(226\\)+NCHAR\\(8364\\)+NCHAR\\(8221\\) + N'%' OR Html LIKE N'%' + NCHAR\\(226\\)+NCHAR\\(8364\\)+NCHAR\\(8482\\) + N'%' OR Plaintext LIKE N'%' + NCHAR\\(226\\)+NCHAR\\(8364\\)+NCHAR\\(8221\\) + N'%' OR FaqJson LIKE N'%' + NCHAR\\(226\\)+NCHAR\\(8364\\)+NCHAR\\(8221\\) + N'%'\")",
+      "Bash(sqlcmd -S MARUTI-004 -d blog -U sa -P mssadmin -f 65001 -Q \"SELECT Slug, Status, ScheduledAt, PublishedAt FROM Posts WHERE Status = 'Draft' ORDER BY ScheduledAt\")",
+      "Bash(cp webfetch-1779500211654-dfncsy.bin design2.tar.gz)",
+      "Bash(tar -tzf design2.tar.gz)"
+    ]
+  }
+}
