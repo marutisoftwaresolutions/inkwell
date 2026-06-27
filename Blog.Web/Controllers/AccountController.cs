@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,13 @@ public class AccountController : Controller
 {
     private readonly Blog.Core.Interfaces.IUserRepository _users;
     private readonly Blog.Core.Interfaces.IRoleRepository _roles;
+    private readonly AuditService _audit;
 
-    public AccountController(Blog.Core.Interfaces.IUserRepository users, Blog.Core.Interfaces.IRoleRepository roles)
+    public AccountController(Blog.Core.Interfaces.IUserRepository users, Blog.Core.Interfaces.IRoleRepository roles, AuditService audit)
     {
         _users = users;
         _roles = roles;
+        _audit = audit;
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────
@@ -61,17 +64,22 @@ public class AccountController : Controller
         var user = await _users.GetByEmailAsync(email);
         if (user == null || !VerifyPassword(password, user.PasswordHash))
         {
+            await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", null, email);
             ViewBag.Error = "Invalid email or password.";
             return View();
         }
 
         if (!user.IsActive)
         {
+            await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", user.Id.ToString(), email);
             ViewBag.Error = "Account is disabled.";
             return View();
         }
 
         await SignInUser(user);
+        await _audit.LogAsync(AuditActions.AuthLoggedIn, "Auth",
+            user.Id.ToString(), user.DisplayName ?? user.Email,
+            userIdOverride: user.Id, userNameOverride: user.DisplayName ?? user.Email);
 
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             return Redirect(returnUrl);
@@ -198,6 +206,7 @@ public class AccountController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
+        await _audit.LogAsync(AuditActions.AuthLoggedOut, "Auth");
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Login");
     }

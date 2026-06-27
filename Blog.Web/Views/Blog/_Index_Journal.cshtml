@@ -1,0 +1,139 @@
+@using Blog.Core.Interfaces
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+    var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+    string GetExcerpt(Blog.Core.Domain.Post p) =>
+        !string.IsNullOrEmpty(p.MetaDescription) ? p.MetaDescription :
+        !string.IsNullOrEmpty(p.Plaintext) ? (p.Plaintext.Length > 160 ? p.Plaintext[..157] + "…" : p.Plaintext) :
+        string.Empty;
+    var qParts = new List<string>();
+    if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
+    if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
+    if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+    var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
+
+    // Main column gets most posts; sidebar shows latest 6 as a quick list
+    var mainPosts    = Model.Items.ToList();
+    var sidebarPosts = Model.Items.Take(6).ToList();
+}
+
+@* ── JOURNAL LAYOUT — 2/3 main column + 1/3 sidebar ──────────── *@
+<div style="max-width:var(--container);margin:0 auto;padding:var(--sp-10) var(--gutter);">
+
+    @if (!string.IsNullOrEmpty(searchTerm))
+    {
+        <div style="margin-bottom:var(--sp-8);font-family:var(--sans);font-size:13px;color:var(--fg-muted);">
+            Results for <strong>"@searchTerm"</strong> — <a href="/" style="color:var(--fg-muted);">clear</a>
+        </div>
+    }
+
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:var(--sp-16);align-items:start;">
+
+        @* MAIN — full entries *@
+        <main>
+            @if (!mainPosts.Any())
+            {
+                <p style="font-family:var(--serif);font-size:1.125rem;color:var(--fg-muted);padding:var(--sp-16) 0;text-align:center;">No entries yet.</p>
+            }
+            else
+            {
+                @foreach (var post in mainPosts)
+                {
+                    var excerpt = GetExcerpt(post);
+                    var cat = post.Categories?.FirstOrDefault();
+                    <article style="padding:var(--sp-10) 0;border-bottom:1px solid var(--border);">
+                        @* Date header *@
+                        <div style="display:flex;align-items:center;gap:var(--sp-6);margin-bottom:var(--sp-6);">
+                            <time style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);">
+                                @post.PublishedAt?.ToString("EEEE, MMMM d, yyyy") ?? post.PublishedAt?.ToString("dddd, MMMM d, yyyy")
+                            </time>
+                            @if (cat != null)
+                            {
+                                <span style="display:inline-block;padding:2px 8px;font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);border:1px solid var(--border);border-radius:2px;">@cat.Name</span>
+                            }
+                        </div>
+                        <h2 style="font-family:var(--serif);font-size:clamp(1.25rem,2.5vw,1.625rem);font-weight:700;line-height:1.2;margin:0 0 var(--sp-6);">
+                            <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>
+                        </h2>
+                        @if (!string.IsNullOrEmpty(post.FeatureImage))
+                        {
+                            <a href="/@post.Slug" style="display:block;margin-bottom:var(--sp-6);border-radius:var(--r-1);overflow:hidden;aspect-ratio:16/7;">
+                                <img src="@post.FeatureImage" alt="@post.Title" loading="lazy"
+                                     style="width:100%;height:100%;object-fit:cover;display:block;" />
+                            </a>
+                        }
+                        @if (!string.IsNullOrEmpty(excerpt))
+                        {
+                            <p style="font-family:var(--sans);font-size:0.9375rem;line-height:1.7;color:var(--fg-body);margin:0 0 var(--sp-6);">@excerpt</p>
+                        }
+                        <div style="display:flex;align-items:center;gap:var(--sp-8);">
+                            <a href="/@post.Slug" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--link);text-decoration:none;">Continue reading →</a>
+                            @if (!string.IsNullOrEmpty(post.AuthorName))
+                            {
+                                <span style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">by @post.AuthorName</span>
+                            }
+                        </div>
+                    </article>
+                }
+            }
+
+            @* Pagination *@
+            @if (Model.TotalPages > 1)
+            {
+                <div style="margin-top:var(--sp-16);display:flex;align-items:center;justify-content:space-between;padding-top:var(--sp-8);border-top:1px solid var(--border);">
+                    @if (Model.Page > 1)
+                    {
+                        <a href="?page=@(Model.Page-1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">← Newer</a>
+                    }
+                    else { <span></span> }
+                    <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Model.Page / @Model.TotalPages</span>
+                    @if (Model.Page < Model.TotalPages)
+                    {
+                        <a href="?page=@(Model.Page+1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">Older →</a>
+                    }
+                    else { <span></span> }
+                </div>
+            }
+        </main>
+
+        @* SIDEBAR — recent entries list *@
+        <aside style="position:sticky;top:var(--sp-8);">
+            <div style="border:1px solid var(--border);border-radius:var(--r-2);overflow:hidden;">
+                <div style="padding:var(--sp-6);border-bottom:1px solid var(--border);background:var(--surface);">
+                    <h3 style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg-meta);margin:0;">Recent Entries</h3>
+                </div>
+                <div>
+                    @foreach (var sp in sidebarPosts)
+                    {
+                        <a href="/@sp.Slug" style="display:block;padding:var(--sp-6);border-bottom:1px solid var(--border);text-decoration:none;">
+                            <div style="font-family:var(--serif);font-size:0.875rem;font-weight:600;line-height:1.3;color:var(--fg);margin-bottom:4px;">@sp.Title</div>
+                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@sp.PublishedAt?.ToString("MMM d, yyyy")</time>
+                        </a>
+                    }
+                </div>
+            </div>
+
+            @* Categories widget *@
+            @if (ViewBag.Categories != null)
+            {
+                var cats = (IEnumerable<Blog.Core.Domain.Category>)ViewBag.Categories;
+                if (cats.Any())
+                {
+                    <div style="margin-top:var(--sp-8);border:1px solid var(--border);border-radius:var(--r-2);overflow:hidden;">
+                        <div style="padding:var(--sp-6);border-bottom:1px solid var(--border);background:var(--surface);">
+                            <h3 style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg-meta);margin:0;">Categories</h3>
+                        </div>
+                        <div style="padding:var(--sp-6);display:flex;flex-wrap:wrap;gap:var(--sp-4);">
+                            @foreach (var c in cats)
+                            {
+                                <a href="/?category=@c.Slug" style="font-family:var(--sans);font-size:12px;font-weight:600;color:var(--link);text-decoration:none;">@c.Name</a>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </aside>
+    </div>
+</div>

@@ -52,7 +52,7 @@
                         <div class="meta" style="margin-top:1px;">@Model.AuthorSpecialty</div>
                     }
                     <div class="meta" style="margin-top:2px;">
-                        @Model.PublishedAt?.ToString("d MMMM yyyy") · @readingMinutes min read
+                        @Model.PublishedAt?.ToString("d MMMM yyyy") · @readingMinutes min read · @Model.ViewCount views
                     </div>
                     @if (Model.LastVerifiedAt.HasValue || Model.NextReviewAt.HasValue)
                     {

@@ -12,10 +12,14 @@ public class FooterViewComponent : ViewComponent
         _themeSettings = themeSettings;
     }
 
+    private static readonly HashSet<string> _supportedFooterLayouts =
+        new(StringComparer.OrdinalIgnoreCase) { "Neutral", "Magazine", "Grid", "Minimal", "Classic", "Modern" };
+
     public async Task<IViewComponentResult> InvokeAsync(Guid ownerId)
     {
         var layoutSetting = await _themeSettings.GetByKeyAsync(ownerId, "layout-footer");
-        var layout = layoutSetting?.EffectiveValue ?? "Neutral";
+        var raw = layoutSetting?.EffectiveValue ?? "Neutral";
+        var layout = _supportedFooterLayouts.Contains(raw) ? raw : "Neutral";
 
         ViewBag.OwnerId = ownerId;
         return View(layout);

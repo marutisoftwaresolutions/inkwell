@@ -62,8 +62,10 @@
                         <tr>
                             <th class="px-4 py-3">Title</th>
                             <th class="px-4 py-3">Status</th>
-                            <th class="px-4 py-3">Author</th>
-                            <th class="px-4 py-3">Date</th>
+                            <th class="px-4 py-3 hidden md:table-cell">Author</th>
+                            <th class="px-4 py-3 text-right hidden sm:table-cell">Views</th>
+                            <th class="px-4 py-3 text-right hidden sm:table-cell">Comments</th>
+                            <th class="px-4 py-3 hidden lg:table-cell">Date</th>
                             <th class="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -92,11 +94,7 @@
                                             {
                                                 <span class="font-medium text-foreground block">@post.Title</span>
                                             }
-                                            <div class="text-xs text-muted-foreground flex items-center gap-2">
-                                                <span>@post.ViewCount views</span>
-                                                <span>•</span>
-                                                <span>@post.CommentCount comments</span>
-                                            </div>
+                                            <div class="text-xs text-muted-foreground mt-0.5">/@post.Slug</div>
                                         </div>
                                     </div>
                                 </td>
@@ -109,17 +107,17 @@
                                         }
                                     }
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                                        @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "bg-green-100 text-green-800" : 
+                                        @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "bg-green-100 text-green-800" :
                                           displayStatus == Blog.Core.Domain.PostStatus.Draft ? "bg-yellow-100 text-yellow-800" : "bg-blue-100 text-blue-800")">
                                         @displayStatus
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-muted-foreground">
+                                <td class="px-4 py-3 text-muted-foreground hidden md:table-cell">
                                     <div class="flex items-center gap-2">
                                          <div class="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-xs font-medium text-secondary-foreground overflow-hidden">
                                             @{
-                                                var pAuthorImg = !string.IsNullOrEmpty(post.AvatarUrl) 
-                                                    ? post.AvatarUrl 
+                                                var pAuthorImg = !string.IsNullOrEmpty(post.AvatarUrl)
+                                                    ? post.AvatarUrl
                                                     : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(post.AuthorName) ? "A" : post.AuthorName)}";
                                             }
                                             <img src="@pAuthorImg" alt="@post.AuthorName" class="w-full h-full object-cover" loading="lazy" />
@@ -127,7 +125,19 @@
                                         <span>@(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-muted-foreground">
+                                <td class="px-4 py-3 text-right hidden sm:table-cell">
+                                    <span class="inline-flex items-center gap-1 text-sm font-medium text-foreground">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        @post.ViewCount.ToString("N0")
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right hidden sm:table-cell">
+                                    <span class="inline-flex items-center gap-1 text-sm font-medium @(post.CommentCount > 0 ? "text-foreground" : "text-muted-foreground")">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                        @post.CommentCount
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-muted-foreground hidden lg:table-cell">
                                     <span title="@post.CreatedAt">@post.CreatedAt.ToString("MMM d, yyyy")</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">

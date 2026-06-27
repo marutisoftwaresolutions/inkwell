@@ -1,3 +1,4 @@
+using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Infrastructure.Data;
 using Blog.Infrastructure.Data.Repositories;
@@ -27,12 +28,14 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IMemberRepository, MemberRepository>();
         services.AddScoped<IPageViewRepository, PageViewRepository>();
         services.AddScoped<IRedirectRepository, RedirectRepository>();
+        services.AddScoped<IAuditRepository, AuditRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
         services.AddScoped<OptometryTaxonomySeeder>();
 
         // Register Dapper Type Handlers
         Dapper.SqlMapper.AddTypeHandler(new SqlGuidHandler());
+        Dapper.SqlMapper.AddTypeHandler(new PostStatusTypeHandler());
 
         return services;
     }
@@ -56,7 +59,24 @@ public class SqlGuidHandler : Dapper.SqlMapper.TypeHandler<Guid>
             return new Guid(bytes);
         }
         if (value is string str && Guid.TryParse(str, out var parsedGuid)) return parsedGuid;
-        
+
         return Guid.Empty;
+    }
+}
+
+public class PostStatusTypeHandler : Dapper.SqlMapper.TypeHandler<PostStatus>
+{
+    public override void SetValue(System.Data.IDbDataParameter parameter, PostStatus value)
+    {
+        parameter.Value = value.ToString();
+    }
+
+    public override PostStatus Parse(object value)
+    {
+        if (value is string str && Enum.TryParse<PostStatus>(str, ignoreCase: true, out var result))
+            return result;
+        if (value is int intVal && Enum.IsDefined(typeof(PostStatus), intVal))
+            return (PostStatus)intVal;
+        return PostStatus.Draft;
     }
 }

@@ -1,0 +1,109 @@
+@using Blog.Core.Interfaces
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+    var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+    string GetExcerpt(Blog.Core.Domain.Post p) =>
+        !string.IsNullOrEmpty(p.MetaDescription) ? p.MetaDescription :
+        !string.IsNullOrEmpty(p.Plaintext) ? (p.Plaintext.Length > 160 ? p.Plaintext[..157] + "…" : p.Plaintext) :
+        string.Empty;
+    var qParts = new List<string>();
+    if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
+    if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
+    if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+    var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
+    var siteName = ViewBag.SiteName as string ?? "Newsletter";
+}
+
+@* ── NEWSLETTER LAYOUT — subscribe banner + digest list ─────────── *@
+
+@* Subscribe banner *@
+<div style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:var(--sp-10) var(--gutter);">
+    <div style="max-width:var(--measure-prose);margin:0 auto;text-align:center;">
+        <p style="font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--fg-meta);margin:0 0 var(--sp-4);">Weekly digest</p>
+        <h2 style="font-family:var(--serif);font-size:clamp(1.25rem,3vw,1.875rem);font-weight:700;line-height:1.2;color:var(--fg);margin:0 0 var(--sp-4);">Get @siteName in your inbox</h2>
+        <p style="font-family:var(--sans);font-size:0.9375rem;color:var(--fg-body);margin:0 0 var(--sp-8);">Thoughtful posts delivered every week. No spam, unsubscribe anytime.</p>
+        <form style="display:flex;gap:var(--sp-4);max-width:420px;margin:0 auto;">
+            <input type="email" placeholder="your@email.com" required
+                   style="flex:1;padding:10px 14px;font-family:var(--sans);font-size:0.9375rem;border:1px solid var(--border);border-radius:var(--r-1);background:var(--bg);color:var(--fg);outline:none;" />
+            <button type="submit"
+                    style="padding:10px 20px;font-family:var(--sans);font-size:0.875rem;font-weight:600;color:var(--bg);background:var(--fg);border:none;border-radius:var(--r-1);cursor:pointer;white-space:nowrap;">Subscribe</button>
+        </form>
+    </div>
+</div>
+
+@* Digest list *@
+<div style="max-width:var(--container);margin:0 auto;padding:var(--sp-10) var(--gutter);">
+
+    <p style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg-meta);margin:0 0 var(--sp-8);padding-bottom:var(--sp-6);border-bottom:1px solid var(--border);">
+        Latest issues
+    </p>
+
+    @if (!string.IsNullOrEmpty(searchTerm))
+    {
+        <div style="margin-bottom:var(--sp-8);font-family:var(--sans);font-size:13px;color:var(--fg-muted);">
+            Results for <strong>"@searchTerm"</strong> — <a href="/" style="color:var(--fg-muted);">clear</a>
+        </div>
+    }
+
+    @if (!Model.Items.Any())
+    {
+        <div style="padding:var(--sp-10) 0;text-align:center;">
+            <p style="font-family:var(--sans);font-size:1rem;color:var(--fg-muted);">No issues yet.</p>
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;flex-direction:column;gap:0;">
+            @foreach (var post in Model.Items)
+            {
+                var excerpt = GetExcerpt(post);
+                var cat = post.Categories?.FirstOrDefault();
+                <article style="display:grid;grid-template-columns:auto 1fr auto;gap:var(--sp-6);padding:var(--sp-8) 0;border-bottom:1px solid var(--border);align-items:start;">
+                    @* Issue date *@
+                    <div style="width:72px;flex-shrink:0;text-align:center;padding:var(--sp-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-1);">
+                        <div style="font-family:var(--sans);font-size:18px;font-weight:700;line-height:1;color:var(--fg);">@post.PublishedAt?.ToString("dd")</div>
+                        <div style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);margin-top:2px;">@post.PublishedAt?.ToString("MMM yyyy")</div>
+                    </div>
+                    @* Content *@
+                    <div style="min-width:0;">
+                        @if (cat != null)
+                        {
+                            <span style="display:inline-block;font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);margin-bottom:var(--sp-4);">@cat.Name</span>
+                        }
+                        <h3 style="font-family:var(--serif);font-size:1.0625rem;font-weight:700;line-height:1.3;margin:0 0 var(--sp-4);">
+                            <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>
+                        </h3>
+                        @if (!string.IsNullOrEmpty(excerpt))
+                        {
+                            <p style="font-family:var(--sans);font-size:0.875rem;line-height:1.6;color:var(--fg-body);margin:0;">@excerpt</p>
+                        }
+                    </div>
+                    @* CTA *@
+                    <div style="flex-shrink:0;padding-top:2px;">
+                        <a href="/@post.Slug" style="display:inline-block;padding:6px 14px;font-family:var(--sans);font-size:12px;font-weight:600;color:var(--fg);border:1px solid var(--border);border-radius:var(--r-1);text-decoration:none;white-space:nowrap;">Read →</a>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+
+    @* Pagination *@
+    @if (Model.TotalPages > 1)
+    {
+        <div style="max-width:var(--container);margin:var(--sp-16) auto 0;padding:0 var(--gutter);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:var(--sp-8);">
+            @if (Model.Page > 1)
+            {
+                <a href="?page=@(Model.Page-1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">← Newer</a>
+            }
+            else { <span></span> }
+            <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Model.Page / @Model.TotalPages</span>
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a href="?page=@(Model.Page+1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">Older →</a>
+            }
+            else { <span></span> }
+        </div>
+    }
+</div>

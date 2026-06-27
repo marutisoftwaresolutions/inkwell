@@ -1,0 +1,189 @@
+@using Blog.Core.Domain
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Audit Trail";
+
+    var items      = (IReadOnlyList<AuditLog>)ViewBag.Items;
+    var total      = (int)ViewBag.Total;
+    var page       = (int)ViewBag.Page;
+    var pageSize   = (int)ViewBag.PageSize;
+    var totalPages = (int)ViewBag.TotalPages;
+
+    string? filterEntityType = ViewBag.FilterEntityType;
+    string? filterAction     = ViewBag.FilterAction;
+    string? filterUserId     = ViewBag.FilterUserId;
+    string? filterFrom       = ViewBag.FilterFrom;
+    string? filterTo         = ViewBag.FilterTo;
+
+    var entityTypes = (string[])ViewBag.EntityTypes;
+    var allUsers    = (List<(Guid Id, string Name)>)ViewBag.AllUsers;
+
+    string Qs(int p) =>
+        $"?page={p}" +
+        (filterEntityType != null ? $"&entityType={Uri.EscapeDataString(filterEntityType)}" : "") +
+        (filterAction     != null ? $"&action={Uri.EscapeDataString(filterAction)}"         : "") +
+        (filterUserId     != null ? $"&userId={Uri.EscapeDataString(filterUserId)}"         : "") +
+        (filterFrom       != null ? $"&from={Uri.EscapeDataString(filterFrom)}"             : "") +
+        (filterTo         != null ? $"&to={Uri.EscapeDataString(filterTo)}"                 : "");
+
+    string BadgeColor(string action) => action switch
+    {
+        var a when a.Contains("Deleted")   => "bg-red-100 text-red-700",
+        var a when a.Contains("Created")   => "bg-green-100 text-green-700",
+        var a when a.Contains("Published") => "bg-blue-100 text-blue-700",
+        var a when a.Contains("LoggedIn")  => "bg-indigo-100 text-indigo-700",
+        var a when a.Contains("Failed")    => "bg-orange-100 text-orange-700",
+        var a when a.Contains("LoggedOut") => "bg-gray-100 text-gray-600",
+        _ => "bg-muted text-muted-foreground"
+    };
+}
+
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div>
+        <h2 class="text-lg font-semibold text-foreground">Audit Trail</h2>
+        <p class="text-xs text-muted-foreground mt-0.5">@total.ToString("N0") total entries — Admin-only, read-only</p>
+    </div>
+    <a href="/admin/audit/export/csv@Qs(1)"
+       class="h-8 px-3 rounded bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-700">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+    </a>
+</div>
+
+@* Filter bar *@
+<form method="get" class="flex flex-wrap gap-2 mb-5">
+    <input type="hidden" name="page" value="1" />
+
+    <select name="entityType"
+            class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+        <option value="">All types</option>
+        @foreach (var et in entityTypes)
+        {
+            <option value="@et" selected="@(filterEntityType == et)">@et</option>
+        }
+    </select>
+
+    <input type="text" name="action" value="@filterAction" placeholder="Action (e.g. Post.Published)"
+           class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-48" />
+
+    <select name="userId"
+            class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+        <option value="">All users</option>
+        @foreach (var u in allUsers)
+        {
+            <option value="@u.Id" selected="@(filterUserId == u.Id.ToString())">@u.Name</option>
+        }
+    </select>
+
+    <input type="date" name="from" value="@filterFrom"
+           class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+    <span class="flex items-center text-xs text-muted-foreground">to</span>
+    <input type="date" name="to" value="@filterTo"
+           class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+
+    <button type="submit"
+            class="h-8 px-3 rounded bg-primary text-primary-foreground text-xs font-medium">Filter</button>
+    <a href="/admin/audit"
+       class="h-8 px-3 rounded border border-border bg-background text-xs text-muted-foreground flex items-center">Clear</a>
+</form>
+
+@* Table *@
+<div class="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+    @if (items.Count == 0)
+    {
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-muted-foreground mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p class="text-sm text-muted-foreground">No audit entries match the current filters.</p>
+        </div>
+    }
+    else
+    {
+        <table class="w-full text-xs">
+            <thead class="border-b border-border bg-muted/40">
+                <tr>
+                    <th class="px-4 py-2.5 text-left font-semibold text-muted-foreground whitespace-nowrap">Time (UTC)</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">User</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Action</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Entity</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Name / ID</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">IP</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border" x-data>
+                @foreach (var row in items)
+                {
+                    var rowId = $"row-{row.Id}";
+                    var hasDetail = row.OldValues != null || row.NewValues != null;
+                    <tr class="hover:bg-muted/30 transition-colors @(hasDetail ? "cursor-pointer" : "")"
+                        @if (hasDetail) { <text>@@click="$refs.@rowId.classList.toggle('hidden')"</text> }>
+                        <td class="px-4 py-2.5 text-muted-foreground whitespace-nowrap font-mono">
+                            @row.CreatedAt.ToString("MM-dd HH:mm:ss")
+                        </td>
+                        <td class="px-4 py-2.5 font-medium text-foreground">@row.UserName</td>
+                        <td class="px-4 py-2.5">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold @BadgeColor(row.Action)">
+                                @row.Action
+                            </span>
+                        </td>
+                        <td class="px-4 py-2.5 text-muted-foreground">@row.EntityType</td>
+                        <td class="px-4 py-2.5 text-foreground truncate max-w-[200px]" title="@row.EntityName">
+                            @(row.EntityName ?? row.EntityId ?? "—")
+                        </td>
+                        <td class="px-4 py-2.5 text-muted-foreground font-mono">@(row.IpAddress ?? "—")</td>
+                    </tr>
+                    @if (hasDetail)
+                    {
+                        <tr x-ref="@rowId" class="hidden bg-muted/20">
+                            <td colspan="6" class="px-4 py-3">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    @if (row.OldValues != null)
+                                    {
+                                        <div>
+                                            <p class="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Before</p>
+                                            <pre class="text-[10px] bg-background border border-border rounded p-2 overflow-auto max-h-32 text-foreground">@row.OldValues</pre>
+                                        </div>
+                                    }
+                                    @if (row.NewValues != null)
+                                    {
+                                        <div>
+                                            <p class="text-[10px] font-semibold text-muted-foreground uppercase mb-1">After</p>
+                                            <pre class="text-[10px] bg-background border border-border rounded p-2 overflow-auto max-h-32 text-foreground">@row.NewValues</pre>
+                                        </div>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@* Pagination *@
+@if (totalPages > 1)
+{
+    <div class="flex items-center justify-between mt-4">
+        <p class="text-xs text-muted-foreground">
+            Showing @((page - 1) * pageSize + 1)–@(Math.Min(page * pageSize, total)) of @total.ToString("N0")
+        </p>
+        <div class="flex gap-1">
+            @if (page > 1)
+            {
+                <a href="@Qs(page - 1)"
+                   class="h-8 px-3 rounded border border-border text-xs flex items-center hover:bg-muted">← Prev</a>
+            }
+            @for (int p2 = Math.Max(1, page - 2); p2 <= Math.Min(totalPages, page + 2); p2++)
+            {
+                var active = p2 == page;
+                <a href="@Qs(p2)"
+                   class="h-8 w-8 rounded border text-xs flex items-center justify-center @(active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")">@p2</a>
+            }
+            @if (page < totalPages)
+            {
+                <a href="@Qs(page + 1)"
+                   class="h-8 px-3 rounded border border-border text-xs flex items-center hover:bg-muted">Next →</a>
+            }
+        </div>
+    </div>
+}

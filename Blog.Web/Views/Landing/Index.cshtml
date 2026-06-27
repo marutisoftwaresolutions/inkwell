@@ -1,0 +1,1170 @@
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkwell — Self-hosted blogging, beautifully crafted.</title>
+<meta name="description" content="An open-source publishing platform for independent writers who want full ownership of their words — and a literary magazine for a website.">
+<link rel="icon" type="image/svg+xml" href="~/assets/logomark.svg">
+
+<!-- Inkwell Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Inkwell design tokens (all CSS vars + presets) -->
+<link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true">
+
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { overflow-x: hidden; }
+  .root { min-height: 100vh; position: relative; }
+  .container { max-width: var(--container); margin: 0 auto; padding: 0 var(--gutter); }
+
+  /* ── Atoms ────────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--sans); font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
+    color: var(--fg-meta);
+  }
+  .eyebrow .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-accent); margin-right: 8px; vertical-align: 1px; animation: pulse 2.4s ease-in-out infinite; }
+  @@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+  .pilcrow { display: flex; align-items: center; gap: 18px; color: var(--fg-meta); margin: var(--sp-16) 0; }
+  .pilcrow .rule { flex: 1; height: 1px; background: var(--border); }
+  .pilcrow .glyph { font-family: var(--serif); font-size: 22px; color: var(--ink-sepia); }
+
+  .nav-link {
+    font-family: var(--sans); font-size: 12px; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--fg-meta); text-decoration: none; padding: 4px 0;
+    border-bottom: 1px solid transparent;
+    transition: color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .nav-link:hover { color: var(--fg); border-bottom-color: var(--ink-black); }
+
+  .btn {
+    font-family: var(--sans); font-weight: 500; font-size: 13px;
+    padding: 11px 18px; border-radius: 2px; cursor: pointer; line-height: 1;
+    border: 1px solid var(--fg); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast);
+    will-change: transform;
+  }
+  .inkwell-root a.btn-primary,
+  .inkwell-root button.btn-primary { background: var(--fg); color: var(--bg); }
+  .inkwell-root a.btn-primary:hover,
+  .inkwell-root button.btn-primary:hover { background: transparent; color: var(--fg); }
+  .inkwell-root a.btn-secondary,
+  .inkwell-root button.btn-secondary { background: transparent; color: var(--fg); }
+  .inkwell-root a.btn-secondary:hover,
+  .inkwell-root button.btn-secondary:hover { background: var(--fg); color: var(--bg); }
+  .inkwell-root a.btn,
+  .inkwell-root a.nav-link { text-decoration: none; }
+  .btn .arr { display: inline-block; transition: transform var(--dur-fast); }
+  .btn:hover .arr { transform: translateX(3px); }
+
+  /* ── Scroll progress hairline ─────────────────────────────── */
+  .scroll-progress {
+    position: fixed; top: 0; left: 0; height: 2px;
+    background: var(--ink-black); width: 0; z-index: 100;
+    transition: width 60ms linear;
+  }
+
+  /* ── Scroll-reveal ────────────────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+  .reveal.in { opacity: 1; transform: none; }
+  .reveal[data-delay="1"] { transition-delay: 80ms; }
+  .reveal[data-delay="2"] { transition-delay: 160ms; }
+  .reveal[data-delay="3"] { transition-delay: 240ms; }
+  .reveal[data-delay="4"] { transition-delay: 320ms; }
+  .reveal[data-delay="5"] { transition-delay: 400ms; }
+
+  /* ── Sticky header ────────────────────────────────────────── */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px) saturate(1.05);
+    -webkit-backdrop-filter: blur(14px) saturate(1.05);
+    background: color-mix(in oklab, var(--bg) 78%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand .mark { width: 28px; height: 28px; transition: transform var(--dur-base) var(--ease-out); }
+  .brand:hover .mark { transform: rotate(-6deg); }
+  .brand .word { font-family: var(--serif); font-weight: 500; font-size: 22px; letter-spacing: -0.02em; color: var(--fg); }
+  .header-nav { display: flex; gap: 28px; }
+  .header-cta { display: flex; gap: 10px; align-items: center; }
+
+  /* ── Hero ─────────────────────────────────────────────────── */
+  .hero {
+    position: relative; overflow: hidden;
+    padding: 96px 0 var(--sp-20);
+    border-bottom: 1px solid var(--ink-black);
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: url('/assets/texture-flecks.svg');
+    background-size: 240px 240px; opacity: .45; mix-blend-mode: multiply;
+  }
+  .hero::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 1px; background: var(--border); pointer-events: none;
+  }
+  .hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1.4fr 1fr; gap: 64px; align-items: center; }
+  .hero-eyebrow { display: flex; gap: 18px; align-items: center; font-family: var(--sans); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--fg-meta); }
+  .hero-eyebrow .sep { width: 24px; height: 1px; background: var(--ink-sepia); }
+  .hero-eyebrow .ver { font-family: var(--serif); font-style: italic; color: var(--fg); text-transform: none; letter-spacing: -0.01em; }
+  .hero h1 {
+    font-family: var(--serif); font-weight: 500;
+    font-size: clamp(48px, 6vw, 86px); line-height: 1.02;
+    letter-spacing: -0.03em; color: var(--fg);
+    margin: 22px 0 30px; text-wrap: balance;
+  }
+  .hero h1 .word { display: inline-block; overflow: hidden; vertical-align: bottom; }
+  .hero h1 .word > span {
+    display: inline-block; transform: translateY(110%);
+    animation: hero-rise 900ms var(--ease-out) forwards;
+  }
+  .hero h1 .word:nth-child(1) > span { animation-delay: 80ms; }
+  .hero h1 .word:nth-child(2) > span { animation-delay: 160ms; }
+  .hero h1 .word:nth-child(3) > span { animation-delay: 240ms; }
+  .hero h1 .word:nth-child(4) > span { animation-delay: 320ms; }
+  .hero h1 em { font-style: italic; display: block; padding-top: 8px; }
+  .hero h1 em .word:nth-child(1) > span { animation-delay: 520ms; }
+  .hero h1 em .word:nth-child(2) > span { animation-delay: 600ms; }
+  .hero h1 .cursor { display: inline-block; width: 3px; height: 0.78em; background: var(--ink-accent); margin-left: 6px; vertical-align: -8px; animation: blink 950ms steps(1) infinite; }
+  @@keyframes hero-rise { to { transform: translateY(0); } }
+  @@keyframes blink { 50% { opacity: 0; } }
+  .hero .lede {
+    font-family: var(--serif); font-style: italic;
+    font-size: 21px; line-height: 1.5; color: var(--fg-body);
+    max-width: 44ch; margin: 0 0 28px;
+    opacity: 0; animation: fade-in 800ms 700ms var(--ease-out) forwards;
+  }
+  @@keyframes fade-in { to { opacity: 1; } }
+  .hero-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; opacity: 0; animation: fade-in 700ms 900ms var(--ease-out) forwards; }
+  .hero-trust { margin-top: 32px; display: grid; grid-template-columns: repeat(3, auto); gap: 24px; font-family: var(--sans); font-size: 12px; color: var(--fg-meta); letter-spacing: .02em; opacity: 0; animation: fade-in 700ms 1100ms var(--ease-out) forwards; }
+  .hero-trust .item { display: flex; flex-direction: column; gap: 4px; }
+  .hero-trust .item b { color: var(--fg); font-weight: 500; font-family: var(--serif); font-size: 18px; letter-spacing: -0.01em; }
+  .hero-trust .item .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; }
+
+  .audience { display: inline-flex; padding: 3px; border: 1px solid var(--ink-black); border-radius: 2px; background: var(--bg); }
+  .audience button { font-family: var(--sans); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 7px 12px; border: 0; background: transparent; cursor: pointer; color: var(--fg-meta); border-radius: 1px; transition: background var(--dur-fast), color var(--dur-fast); }
+  .audience button.active { background: var(--ink-black); color: var(--bg); }
+
+  .issue-mockup {
+    background: var(--surface); border: 1px solid var(--ink-black);
+    border-radius: 4px; padding: 26px 28px; position: relative;
+    transform: rotate(-0.4deg);
+    opacity: 0; animation: fade-in 800ms 400ms var(--ease-out) forwards;
+  }
+  .issue-mockup::before {
+    content: ""; position: absolute; right: -1px; top: -1px;
+    width: 28px; height: 28px;
+    background: linear-gradient(225deg, var(--bg) 50%, transparent 50%);
+    border-top-right-radius: 4px;
+    border-left: 1px solid var(--ink-black);
+    border-bottom: 1px solid var(--ink-black);
+  }
+  .issue-mockup h3 { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.1; letter-spacing: -0.02em; color: var(--fg); margin: 12px 0 14px; }
+  .issue-mockup p.lede-mini { font-family: var(--serif); font-style: italic; font-size: 15.5px; line-height: 1.55; color: var(--fg-body); margin: 0 0 16px; min-height: 5.4em; }
+  .issue-mockup p.lede-mini .typing-cursor { display: inline-block; width: 2px; height: 1em; background: var(--fg); margin-left: 2px; vertical-align: -2px; animation: blink 850ms steps(1) infinite; }
+  .issue-mockup .byline { font-family: var(--sans); font-size: 12px; color: var(--fg-meta); }
+  .issue-mockup .byline em { font-family: var(--serif); font-style: italic; color: var(--fg); }
+  .issue-mockup hr { border: 0; border-top: 1px solid var(--ink-black); margin: 18px 0; }
+  .issue-mockup .field-row { display: flex; gap: 14px; }
+  .issue-mockup .field-row > div { flex: 1; }
+  .issue-mockup .field-row .ttl { font-family: var(--serif); font-size: 14px; line-height: 1.35; color: var(--fg); }
+  .issue-mockup .footnote { margin-top: 18px; padding-top: 14px; border-top: 1px dotted var(--ink-sepia); font-family: var(--mono); font-size: 11px; color: var(--fg-meta); display: flex; justify-content: space-between; }
+  .issue-mockup .live {
+    position: absolute; top: -10px; left: 22px;
+    background: var(--bg);
+    padding: 3px 10px; border: 1px solid var(--ink-black); border-radius: 2px;
+    font-family: var(--sans); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .issue-mockup .live::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ink-accent); animation: pulse 2s ease-in-out infinite;
+  }
+
+  .ink-cursor {
+    position: absolute; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ink-sepia); pointer-events: none;
+    transform: translate(-50%, -50%); opacity: 0;
+    mix-blend-mode: multiply;
+    transition: opacity 200ms var(--ease-out);
+    z-index: 2;
+  }
+  .hero:hover .ink-cursor { opacity: .35; }
+
+  /* ── Stats strip ──────────────────────────────────────────── */
+  .stats { border-bottom: 1px solid var(--ink-black); background: var(--bg); overflow: hidden; }
+  .stats .row { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stats .stat { padding: 26px 28px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; }
+  .stats .stat:last-child { border-right: 0; }
+  .stats .stat .num { font-family: var(--serif); font-weight: 500; font-size: 42px; letter-spacing: -0.025em; color: var(--fg); line-height: 1; font-feature-settings: "tnum"; }
+  .stats .stat .num .suf { color: var(--ink-sepia); font-style: italic; }
+  .stats .stat .lbl { font-family: var(--sans); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-meta); }
+
+  /* ── Section ──────────────────────────────────────────────── */
+  .section { padding: var(--sp-20) 0; position: relative; }
+  .section.tinted { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .section.dark { background: #16140F; color: #F4EFE6; border-top: 1px solid #2E2A23; border-bottom: 1px solid #2E2A23; }
+  .section.dark h2, .section.dark .eyebrow, .section.dark .lede { color: #F4EFE6; }
+  .section.dark .eyebrow { color: #C4A47A; }
+  .section.dark .lede { color: #D9D2C4; }
+  .section h2 { font-family: var(--serif); font-weight: 500; font-size: clamp(34px, 4.2vw, 56px); line-height: 1.08; letter-spacing: -0.025em; color: var(--fg); margin: 14px 0 16px; text-wrap: balance; }
+  .section h2 em { font-style: italic; }
+  .section .lede { font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--fg-body); margin: 0; max-width: 60ch; line-height: 1.5; }
+  .section-head { margin-bottom: var(--sp-12); }
+  .section-head.split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 56px; align-items: end; }
+
+  /* ── Features ─────────────────────────────────────────────── */
+  .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: var(--sp-12); border-top: 1px solid var(--ink-black); }
+  .feature { padding: var(--sp-8) var(--sp-6) var(--sp-8) 0; border-right: 1px solid var(--border); position: relative; transition: background var(--dur-base); }
+  .feature:last-child { border-right: 0; padding-right: 0; }
+  .feature:nth-child(2) { padding-left: var(--sp-6); padding-right: var(--sp-6); }
+  .feature:nth-child(3) { padding-left: var(--sp-6); }
+  .feature .no { font-family: var(--serif); font-style: italic; font-size: 60px; line-height: 1; color: var(--ink-sepia); opacity: .35; letter-spacing: -0.03em; }
+  .feature h3 { font-family: var(--serif); font-weight: 500; font-size: 26px; letter-spacing: -0.018em; color: var(--fg); margin: 14px 0 10px; }
+  .feature h3 em { font-style: italic; }
+  .feature p { font-family: var(--serif); font-size: 15.5px; line-height: 1.6; color: var(--fg-body); margin: 0 0 14px; }
+  .feature .meta-row { font-family: var(--sans); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-meta); padding-top: 14px; border-top: 1px dotted var(--ink-sepia); }
+
+  /* ── Layouts theatre ──────────────────────────────────────── */
+  .theatre { margin-top: var(--sp-10); display: grid; grid-template-columns: 280px 1fr; gap: 36px; align-items: stretch; border: 1px solid var(--ink-black); border-radius: 4px; overflow: hidden; background: var(--bg); }
+  .theatre-list { background: var(--surface); border-right: 1px solid var(--border); padding: 8px 0; display: flex; flex-direction: column; max-height: 560px; overflow-y: auto; }
+  .theatre-list .group { font-family: var(--sans); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-meta); padding: 16px 22px 10px; }
+  .theatre-list button { text-align: left; background: transparent; border: 0; padding: 12px 22px; font-family: var(--serif); font-size: 17px; color: var(--fg); cursor: pointer; border-left: 2px solid transparent; display: flex; justify-content: space-between; align-items: baseline; transition: background var(--dur-fast), border-color var(--dur-fast); }
+  .theatre-list button .id { font-family: var(--sans); font-style: normal; font-size: 10px; color: var(--fg-meta); letter-spacing: 0.12em; }
+  .theatre-list button:hover { background: var(--bg); }
+  .theatre-list button.active { background: var(--bg); border-left-color: var(--ink-accent); }
+  .theatre-list button.active::after { content: " →"; color: var(--ink-accent); }
+  .theatre-list button[data-new="1"]::before {
+    content: "NEW";
+    font-family: var(--sans); font-size: 8px; font-weight: 500;
+    letter-spacing: 0.16em; color: var(--bg);
+    background: var(--ink-accent); padding: 2px 5px;
+    border-radius: 2px; margin-right: 8px; vertical-align: 1px;
+  }
+  .theatre-stage { position: relative; padding: 28px; min-height: 560px; display: flex; flex-direction: column; gap: 18px; }
+  .theatre-header { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; }
+  .theatre-header h3 { font-family: var(--serif); font-weight: 500; font-size: 28px; letter-spacing: -0.02em; color: var(--fg); margin: 0; }
+  .theatre-header h3 em { font-style: italic; }
+  .theatre-header .blurb { font-family: var(--serif); font-style: italic; font-size: 14.5px; color: var(--fg-body); max-width: 32ch; text-align: right; }
+  .theatre-meta { display: flex; gap: 20px; font-family: var(--sans); font-size: 11px; letter-spacing: 0.06em; color: var(--fg-meta); }
+  .theatre-meta b { color: var(--fg); font-weight: 500; font-family: var(--serif); font-style: italic; font-size: 13px; }
+  .theatre-preview { flex: 1; border: 1px solid var(--border); background: var(--surface); border-radius: 2px; overflow: hidden; position: relative; transition: background var(--dur-base); }
+  .theatre-preview .layout-canvas { position: absolute; inset: 0; padding: 22px; display: flex; flex-direction: column; gap: 10px; transition: opacity 280ms var(--ease-out); }
+  .theatre-preview .layout-canvas.out { opacity: 0; }
+
+  /* ── Presets showcase ─────────────────────────────────────── */
+  .presets-board { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: stretch; margin-top: var(--sp-10); }
+  .presets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-content: start; }
+  .swatch { cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+  .swatch .tile { width: 100%; aspect-ratio: 5/4; border: 1px solid rgba(0,0,0,.08); border-radius: 2px; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 12px; position: relative; transition: transform var(--dur-fast), border-color var(--dur-fast); }
+  .swatch:hover .tile, .swatch.active .tile { border-color: var(--ink-black); transform: translateY(-2px); }
+  .swatch.active .tile { box-shadow: inset 0 0 0 1px var(--ink-black); }
+  .swatch .accent-dot { position: absolute; right: 10px; top: 10px; width: 8px; height: 8px; border-radius: 50%; }
+  .swatch .mark-i { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 26px; line-height: 1; letter-spacing: -0.02em; }
+  .swatch .hex { font-family: var(--sans); font-size: 9px; opacity: .55; }
+  .swatch .label { font-family: var(--sans); font-size: 11px; color: var(--fg-meta); letter-spacing: .04em; display: flex; justify-content: space-between; }
+  .swatch .label .fam { font-family: var(--sans); font-size: 9px; color: var(--fg-meta); text-transform: uppercase; letter-spacing: .12em; opacity: .65; }
+  .preset-live { border: 1px solid var(--ink-black); border-radius: 4px; padding: 28px 32px; min-height: 360px; transition: background var(--dur-base), color var(--dur-base); display: flex; flex-direction: column; gap: 14px; position: relative; overflow: hidden; }
+  .preset-live .eb { font-family: var(--sans); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; opacity: .65; transition: color var(--dur-base); }
+  .preset-live .ttl { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.08; letter-spacing: -0.02em; transition: color var(--dur-base); }
+  .preset-live .ttl em { font-style: italic; }
+  .preset-live .ld { font-family: var(--serif); font-style: italic; font-size: 15px; line-height: 1.55; opacity: .8; transition: color var(--dur-base); }
+  .preset-live .rule { height: 1px; margin: 6px 0; transition: background var(--dur-base); }
+  .preset-live .meta { font-family: var(--sans); font-size: 11px; opacity: .65; display: flex; justify-content: space-between; transition: color var(--dur-base); }
+  .preset-live .accent-tag { display: inline-block; padding: 3px 8px; font-family: var(--sans); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; transition: background var(--dur-base), color var(--dur-base); border-radius: 2px; }
+  .preset-live .credit { position: absolute; bottom: 16px; right: 20px; font-family: var(--mono); font-size: 10px; opacity: .45; transition: color var(--dur-base); }
+
+  /* ── Premium themes ───────────────────────────────────────── */
+  .themes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: var(--sp-8); }
+  .theme-card { background: var(--bg); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; display: flex; flex-direction: column; transition: border-color var(--dur-fast), transform var(--dur-base) var(--ease-out); will-change: transform; }
+  .theme-card:hover { border-color: var(--ink-black); transform: translateY(-4px); }
+  .theme-cover { position: relative; aspect-ratio: 4/3; border-bottom: 1px solid var(--border); overflow: hidden; background: var(--surface); }
+  .theme-cover .inner { position: absolute; inset: 0; transition: transform 500ms var(--ease-out); }
+  .theme-card:hover .theme-cover .inner { transform: scale(1.04); }
+  .theme-meta { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .theme-meta .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .theme-name { font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.015em; color: var(--fg); }
+  .theme-price { font-family: var(--sans); font-size: 13px; color: var(--fg-meta); letter-spacing: 0.02em; white-space: nowrap; }
+  .theme-price b { font-family: var(--serif); font-weight: 500; font-size: 17px; color: var(--fg); letter-spacing: 0; }
+  .theme-blurb { font-family: var(--serif); font-style: italic; font-size: 14.5px; color: var(--fg-body); line-height: 1.5; margin: 4px 0 10px; }
+  .theme-byline { font-family: var(--sans); font-size: 11px; color: var(--fg-meta); letter-spacing: 0.04em; padding-top: 10px; border-top: 1px dotted var(--ink-sepia); display: flex; justify-content: space-between; align-items: center; }
+  .theme-byline em { font-family: var(--serif); font-style: italic; color: var(--fg); }
+  .theme-stamp { position: absolute; top: 14px; left: 14px; font-family: var(--sans); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg); background: var(--bg); padding: 4px 8px; border: 1px solid var(--ink-black); border-radius: 2px; }
+  .theme-stamp.featured { background: var(--ink-black); color: var(--bg); border-color: var(--ink-black); }
+  .cover-quarterly { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .cover-quarterly .top { display: flex; justify-content: space-between; font-family: var(--sans); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-sepia); }
+  .cover-quarterly .midrule { height: 1px; background: var(--ink-black); margin: 2px 0 6px; }
+  .cover-quarterly .ttl { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 26px; line-height: 1.05; color: var(--fg); letter-spacing: -0.02em; }
+  .cover-quarterly .sub { font-family: var(--serif); font-size: 11px; color: var(--fg-body); line-height: 1.4; margin-top: auto; }
+  .cover-quarterly .sub::before { content: "❦"; color: var(--ink-sepia); margin-right: 6px; }
+  .cover-salon { background: #16140F; color: #F4EFE6; padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover-salon .eb { font-family: var(--sans); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #C4A47A; }
+  .cover-salon .ttl { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1; color: #F4EFE6; letter-spacing: -0.02em; }
+  .cover-salon .ttl em { font-style: italic; color: #C4A47A; }
+  .cover-salon .dots { display: flex; gap: 4px; }
+  .cover-salon .dots span { width: 6px; height: 6px; border-radius: 50%; background: #C4A47A; opacity: .8; }
+  .cover-atelier { background: #F5EBCF; padding: 16px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; }
+  .cover-atelier > div { background: #2A2418; }
+  .cover-atelier > div:nth-child(1) { background: #8B6F3F; }
+  .cover-atelier > div:nth-child(3) { background: #C4632B; }
+  .cover-atelier .label { grid-column: 1 / -1; background: transparent !important; font-family: var(--serif); font-style: italic; font-size: 13px; color: #2A2418; letter-spacing: -0.01em; align-self: end; padding-top: 4px; }
+  .cover-broadsheet { background: #FAF7F2; padding: 12px 14px; display: flex; flex-direction: column; }
+  .cover-broadsheet .masthead { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 22px; color: #1A1A1A; letter-spacing: -0.02em; border-bottom: 2px solid #1A1A1A; padding-bottom: 4px; margin-bottom: 8px; text-align: center; }
+  .cover-broadsheet .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; flex: 1; }
+  .cover-broadsheet .cols > div { display: flex; flex-direction: column; gap: 3px; }
+  .cover-broadsheet .cols .h { font-family: var(--serif); font-weight: 500; font-size: 10px; color: #1A1A1A; line-height: 1.1; }
+  .cover-broadsheet .cols .l { height: 2px; background: #1A1A1A; opacity: .25; }
+  .cover-foxglove { background: #FCF6EB; padding: 18px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; text-align: center; }
+  .cover-foxglove .num { font-family: var(--serif); font-style: italic; font-size: 14px; color: #C4632B; }
+  .cover-foxglove .ttl { font-family: var(--serif); font-weight: 500; font-size: 24px; color: #2A1F12; line-height: 1.08; letter-spacing: -0.015em; max-width: 18ch; }
+  .cover-foxglove .ttl em { color: #C4632B; font-style: italic; }
+  .cover-foxglove .sep { width: 28px; height: 1px; background: #C4632B; margin: 2px 0; }
+  .cover-cobalt { background: #F8F5EE; padding: 16px 18px; display: flex; flex-direction: column; }
+  .cover-cobalt .crest { width: 32px; height: 32px; border: 1.5px solid #112045; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 20px; color: #112045; margin-bottom: 10px; }
+  .cover-cobalt .ttl { font-family: var(--serif); font-weight: 500; font-size: 22px; line-height: 1.08; color: #112045; letter-spacing: -0.015em; margin-bottom: auto; }
+  .cover-cobalt .meta { font-family: var(--sans); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #112045; opacity: .7; padding-top: 8px; border-top: 1px solid #112045; }
+
+  /* New theme covers (matching the new Layouts) */
+  .cover-beacon { background: #FAF6EC; padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; gap: 2px; position: relative; }
+  .cover-beacon .eb { position: absolute; top: 10px; left: 16px; font-family: var(--sans); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: #8C2A1F; }
+  .cover-beacon .num { position: absolute; top: 10px; right: 16px; font-family: var(--mono); font-size: 9px; color: #1A1A1A; }
+  .cover-beacon .l { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 0.92; letter-spacing: -0.035em; color: #1A1A1A; }
+  .cover-beacon .l.it { font-style: italic; color: #8C2A1F; margin-left: 28px; }
+  .cover-beacon .foot { position: absolute; bottom: 10px; left: 16px; right: 16px; display: flex; justify-content: space-between; font-family: var(--sans); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B7355; border-top: 1px solid #1A1A1A; padding-top: 4px; }
+
+  .cover-cartographer { background: #F8F5EE; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .cover-cartographer .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .cover-cartographer .top .t { font-family: var(--serif); font-style: italic; font-size: 13px; color: #112045; }
+  .cover-cartographer .top .n { font-family: var(--mono); font-size: 9px; color: #112045; opacity: .7; }
+  .cover-cartographer .grid { display: grid; grid-template-columns: 12px repeat(4, 1fr); grid-template-rows: 10px repeat(3, 1fr); gap: 3px; flex: 1; }
+  .cover-cartographer .grid .hl { font-family: var(--mono); font-size: 8px; color: #112045; text-align: center; opacity: .7; }
+  .cover-cartographer .grid .rl { font-family: var(--mono); font-size: 8px; color: #112045; opacity: .7; align-self: center; }
+  .cover-cartographer .grid .cell { border: 1px solid #112045; }
+  .cover-cartographer .grid .cell.f { background: #112045; opacity: .18; }
+  .cover-cartographer .grid .cell.hot { background: #112045; }
+
+  .cover-lexicon { background: #F6F0E0; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .cover-lexicon .ttl { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 22px; color: #3D2F1E; letter-spacing: -0.015em; }
+  .cover-lexicon .az { display: flex; gap: 2px; padding: 4px 0; border-top: 1px solid #3D2F1E; border-bottom: 1px solid #3D2F1E; }
+  .cover-lexicon .az span { flex: 1; font-family: var(--mono); font-size: 8px; text-align: center; color: #8B7355; }
+  .cover-lexicon .az span.act { color: #8C2A1F; font-weight: 600; }
+  .cover-lexicon .entries { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .cover-lexicon .entries .row { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px dotted #8B7355; padding-bottom: 3px; }
+  .cover-lexicon .entries .row .t { font-family: var(--serif); font-size: 11px; color: #3D2F1E; }
+  .cover-lexicon .entries .row .c { font-family: var(--mono); font-size: 8px; color: #8B7355; }
+  .cover-lexicon .entries .row .l { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 14px; color: #8C2A1F; margin-right: 6px; }
+  .theme-stamp.new { background: var(--ink-accent); color: var(--bg); border-color: var(--ink-accent); }
+
+  /* ── Marquee ──────────────────────────────────────────────── */
+  .marquee { position: relative; padding: var(--sp-10) 0; border-top: 1px solid var(--ink-black); border-bottom: 1px solid var(--ink-black); overflow: hidden; background: var(--bg); }
+  .marquee .eyebrow-strip { position: absolute; top: var(--sp-6); left: 50%; transform: translateX(-50%); background: var(--bg); padding: 0 18px; z-index: 1; }
+  .marquee-track { display: flex; gap: 56px; padding: var(--sp-8) 0 var(--sp-4); animation: scroll-x 60s linear infinite; }
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+  @@keyframes scroll-x { to { transform: translateX(-50%); } }
+  .quote-card { flex: 0 0 auto; min-width: 420px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; padding: 0 28px; border-left: 1px solid var(--border); }
+  .quote-card .q { font-family: var(--serif); font-size: 19px; line-height: 1.5; color: var(--fg); letter-spacing: -0.005em; }
+  .quote-card .q::before { content: "\201C"; font-family: var(--serif); font-size: 30px; color: var(--ink-sepia); margin-right: 2px; vertical-align: -8px; }
+  .quote-card .q em { font-style: italic; }
+  .quote-card .who { font-family: var(--sans); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-meta); }
+  .quote-card .who em { font-family: var(--serif); font-style: italic; color: var(--fg); text-transform: none; letter-spacing: 0; font-size: 13px; }
+
+  /* ── Services ─────────────────────────────────────────────── */
+  .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: var(--sp-8); border-top: 1px solid var(--ink-black); border-bottom: 1px solid var(--ink-black); }
+  .service { padding: var(--sp-8) var(--sp-6); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; transition: background var(--dur-base); }
+  .service:hover { background: var(--surface); }
+  .service:last-child { border-right: 0; }
+  .service .roman { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-sepia); letter-spacing: 0.04em; }
+  .service h3 { font-family: var(--serif); font-weight: 500; font-size: 28px; letter-spacing: -0.018em; line-height: 1.08; color: var(--fg); margin: 0; }
+  .service h3 em { font-style: italic; }
+  .service p { font-family: var(--serif); font-size: 15.5px; line-height: 1.55; color: var(--fg-body); margin: 0; }
+  .service ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .service ul li { font-family: var(--sans); font-size: 13px; color: var(--fg-body); padding-left: 18px; position: relative; line-height: 1.5; }
+  .service ul li::before { content: "·"; position: absolute; left: 6px; top: -2px; font-family: var(--serif); font-size: 18px; color: var(--ink-sepia); }
+  .service .price-row { margin-top: auto; padding-top: 14px; border-top: 1px dotted var(--ink-sepia); display: flex; justify-content: space-between; align-items: baseline; }
+  .service .price-row .from { font-family: var(--sans); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-meta); }
+  .service .price-row .amt { font-family: var(--serif); font-weight: 500; font-size: 26px; color: var(--fg); letter-spacing: -0.01em; }
+  .service .price-row .amt em { font-style: italic; color: var(--ink-sepia); font-size: 14px; font-weight: 400; margin-left: 4px; }
+  .service .cta-row { margin-top: 12px; }
+  .service .cta-row a { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--ink-black); padding-bottom: 2px; letter-spacing: 0.02em; transition: color var(--dur-fast), border-color var(--dur-fast); }
+  .service .cta-row a:hover { color: var(--ink-accent); border-bottom-color: var(--ink-accent); }
+  .services-foot { margin-top: var(--sp-6); font-family: var(--serif); font-style: italic; font-size: 14.5px; color: var(--fg-body); text-align: center; }
+  .services-foot a { color: var(--fg); border-bottom: 1px solid var(--ink-black); text-decoration: none; padding-bottom: 1px; }
+
+  /* ── Pull quote ───────────────────────────────────────────── */
+  .quote { padding: var(--sp-20) 0; text-align: center; }
+  .quote .glyph { font-family: var(--serif); font-style: italic; font-size: 28px; color: var(--ink-sepia); margin-bottom: 18px; }
+  .quote blockquote { font-family: var(--serif); font-weight: 500; font-size: clamp(28px, 3.6vw, 48px); line-height: 1.22; letter-spacing: -0.018em; color: var(--fg); margin: 0 auto; max-width: 30ch; text-wrap: balance; }
+  .quote blockquote em { font-style: italic; }
+  .quote cite { display: block; font-family: var(--sans); font-size: 13px; color: var(--fg-meta); margin-top: 26px; font-style: normal; letter-spacing: 0.02em; }
+
+  /* ── Install (dark) ───────────────────────────────────────── */
+  .install { background: #16140F; color: #F4EFE6; padding: var(--sp-20) 0; position: relative; overflow: hidden; }
+  .install::after { content: ""; position: absolute; inset: 0; background-image: url('/assets/texture-flecks.svg'); background-size: 240px 240px; opacity: .15; pointer-events: none; mix-blend-mode: screen; }
+  .install .grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; position: relative; z-index: 1; }
+  .install h2 { font-family: var(--serif); font-weight: 500; font-size: 44px; line-height: 1.06; letter-spacing: -0.025em; color: #F4EFE6; margin: 14px 0 18px; }
+  .install h2 em { font-style: italic; }
+  .install p { font-family: var(--serif); font-style: italic; font-size: 17.5px; color: #D9D2C4; margin: 0 0 26px; line-height: 1.55; max-width: 44ch; }
+  .install .eyebrow { color: #C4A47A; }
+  .install .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .install .btn-light { background: #FAF7F2; color: #1A1A1A; border-color: #FAF7F2; }
+  .install .btn-light:hover { background: transparent; color: #FAF7F2; }
+  .install .btn-ghost { background: transparent; color: #FAF7F2; border-color: #FAF7F2; }
+  .install .btn-ghost:hover { background: #FAF7F2; color: #1A1A1A; }
+  .install .trust { margin-top: 22px; display: flex; gap: 28px; flex-wrap: wrap; font-family: var(--sans); font-size: 12px; color: #8B7355; letter-spacing: .02em; }
+  .install .trust b { color: #D9D2C4; font-weight: 500; }
+  .terminal { background: #1E1B16; border: 1px solid #2E2A23; border-radius: 6px; overflow: hidden; font-family: var(--mono); color: #D9D2C4; }
+  .terminal .chrome { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #2E2A23; background: #18150F; }
+  .terminal .chrome .dots { display: flex; gap: 6px; }
+  .terminal .chrome .dots span { width: 10px; height: 10px; border-radius: 50%; background: #3A332A; }
+  .terminal .chrome .label { font-family: var(--mono); font-size: 11px; color: #8B7355; letter-spacing: 0.04em; }
+  .terminal .body { padding: 18px 20px 22px; font-size: 13px; line-height: 1.75; min-height: 240px; white-space: pre; }
+  .terminal .ln { display: block; }
+  .terminal .c { color: #8B7355; }
+  .terminal .k { color: #C4A47A; }
+  .terminal .s { color: #E8DCC1; }
+  .terminal .ok { color: #9AB979; }
+  .terminal .blink { display: inline-block; width: 8px; height: 14px; background: #C4A47A; vertical-align: -2px; animation: blink 900ms steps(1) infinite; }
+
+  /* ── Final CTA ────────────────────────────────────────────── */
+  .cta { padding: var(--sp-20) 0 var(--sp-24); text-align: center; position: relative; overflow: hidden; }
+  .cta::before { content: "✒"; position: absolute; top: 30%; left: 8%; font-family: var(--serif); font-size: 80px; color: var(--ink-sepia); opacity: .08; transform: rotate(-12deg); }
+  .cta::after { content: "¶"; position: absolute; bottom: 18%; right: 10%; font-family: var(--serif); font-size: 100px; color: var(--ink-sepia); opacity: .08; transform: rotate(8deg); }
+  .cta h2 { font-family: var(--serif); font-weight: 500; font-size: clamp(44px, 5.4vw, 72px); line-height: 1.04; letter-spacing: -0.028em; color: var(--fg); margin: 16px auto 18px; max-width: 18ch; text-wrap: balance; position: relative; z-index: 1; }
+  .cta h2 em { font-style: italic; }
+  .cta .lede { margin: 0 auto 32px; max-width: 48ch; position: relative; z-index: 1; }
+  .cta-actions { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; position: relative; z-index: 1; }
+
+  /* ── Footer ───────────────────────────────────────────────── */
+  footer { border-top: 1px solid var(--border); padding: var(--sp-12) 0 var(--sp-10); }
+  footer .cols { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; margin-bottom: var(--sp-10); }
+  footer .col h4 { font-family: var(--sans); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: var(--fg-meta); margin: 0 0 14px; }
+  footer .col a { display: block; font-family: var(--sans); font-size: 13px; color: var(--fg-body); text-decoration: none; padding: 4px 0; transition: color var(--dur-fast); }
+  footer .col a:hover { color: var(--fg); }
+  footer .col p { font-family: var(--serif); font-style: italic; font-size: 14px; line-height: 1.55; color: var(--fg-body); margin: 0; }
+  footer .col .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  footer .strip { display: flex; justify-content: space-between; align-items: center; padding-top: var(--sp-6); border-top: 1px solid var(--border); font-family: var(--sans); font-size: 12px; color: var(--fg-meta); }
+  footer .strip a { color: var(--fg-meta); text-decoration: none; }
+  footer .strip a:hover { color: var(--fg); }
+  footer .strip .links { display: flex; gap: 18px; }
+
+  /* ── Floating preset switcher ─────────────────────────────── */
+  .preset-switcher { position: fixed; right: 20px; bottom: 20px; z-index: 60; background: var(--bg); border: 1px solid var(--ink-black); border-radius: 4px; padding: 12px 14px; box-shadow: var(--shadow-pop); max-width: 380px; }
+  .preset-switcher .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 16px; }
+  .preset-switcher .head .label { font-family: var(--sans); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: var(--fg-meta); }
+  .preset-switcher .head .cur { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--fg); }
+  .preset-switcher .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preset-switcher .chip { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,.2); padding: 0; transition: transform var(--dur-fast), border-color var(--dur-fast); }
+  .preset-switcher .chip:hover { transform: scale(1.08); }
+  .preset-switcher .chip.active { border: 2px solid var(--ink-black); transform: scale(1.08); }
+
+  @@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    .marquee-track { animation: none; }
+  }
+  @@media (max-width: 1000px) {
+    .hero-grid, .install .grid, .presets-board, .section-head.split { grid-template-columns: 1fr; gap: 36px; }
+    .feature-grid, .themes-grid, .services-grid, .stats .row { grid-template-columns: 1fr; }
+    .services-grid > .service, .stats .stat { border-right: 0; border-bottom: 1px solid var(--border); }
+    .theatre { grid-template-columns: 1fr; }
+    .theatre-list { flex-direction: row; overflow-x: auto; max-height: none; }
+    .theatre-list .group { display: none; }
+    footer .cols { grid-template-columns: 1fr 1fr; }
+    .hero-trust { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="root inkwell-root">
+
+  <div class="scroll-progress" id="scrollProgress"></div>
+
+  <!-- ═══════════════════════ Header ═══════════════════════ -->
+  <header class="site-header">
+    <div class="container bar">
+      <a class="brand" href="/">
+        <img class="mark" src="~/assets/logomark.svg" alt="">
+        <span class="word">Inkwell</span>
+      </a>
+      <nav class="header-nav">
+        <a class="nav-link" href="#layouts">Layouts</a>
+        <a class="nav-link" href="#presets">Presets</a>
+        <a class="nav-link" href="#themes">Themes</a>
+        <a class="nav-link" href="#services">Services</a>
+        <a class="nav-link" href="#install">Self-host</a>
+        <a class="nav-link" href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener">Docs</a>
+      </nav>
+      <div class="header-cta">
+        <a class="nav-link" href="/account/login">Sign in</a>
+        <a class="btn btn-primary" href="#install">Self-host <span class="arr">→</span></a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ Hero ═══════════════════════ -->
+  <section class="hero" id="hero">
+    <div class="ink-cursor" id="inkCursor"></div>
+    <div class="container hero-grid">
+      <div>
+        <div class="hero-eyebrow">
+          <span><span class="dot"></span>v1.0 · Released</span>
+          <span class="sep"></span>
+          <span>MIT · .NET 10 · Multi-tenant</span>
+          <span class="sep"></span>
+          <span class="ver">A literary magazine, in software.</span>
+        </div>
+
+        <h1>
+          <span class="word"><span>Self&#8209;hosted</span></span>
+          <span class="word"><span>blogging,</span></span>
+          <em>
+            <span class="word"><span>beautifully</span></span>
+            <span class="word"><span>crafted.</span></span>
+          </em>
+          <span class="cursor" aria-hidden="true"></span>
+        </h1>
+
+        <div class="audience" role="tablist" aria-label="Audience" style="margin-bottom:24px;">
+          <button data-aud="writer" class="active">For writers</button>
+          <button data-aud="agency">For agencies</button>
+          <button data-aud="dev">For developers</button>
+        </div>
+
+        <p class="lede" data-lede>
+          An open-source publishing platform for independent writers who want full ownership of their words — and a literary magazine for a website.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#install">Get Inkwell <span class="arr">→</span></a>
+          <a class="btn btn-secondary" href="#themes">Browse themes</a>
+          <a href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener" class="nav-link" style="margin-left:6px;">★ Star on GitHub</a>
+        </div>
+
+        <div class="hero-trust">
+          <div class="item"><b>20 + 15</b><span class="lbl">Layouts × Presets</span></div>
+          <div class="item"><b>2 min</b><span class="lbl">Time to first essay</span></div>
+          <div class="item"><b>$0</b><span class="lbl">Forever, MIT licensed</span></div>
+        </div>
+      </div>
+
+      <!-- Issue mockup with live typing -->
+      <div class="issue-mockup" aria-hidden="true">
+        <div class="live">Live · just published</div>
+        <div class="eyebrow" style="margin-bottom:10px;">Vol. III · Issue 12 · March 2026</div>
+        <h3>On the second draft</h3>
+        <p class="lede-mini" id="typingLede"><span class="typing-cursor"></span></p>
+        <div class="byline">by <em>Anjali Rao</em> · 12 March 2026 · 8 min read</div>
+        <hr>
+        <div class="field-row">
+          <div>
+            <div class="eyebrow" style="margin-bottom:6px;">Field notes</div>
+            <div class="ttl">A small archive of margin notes</div>
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:6px;">A letter</div>
+            <div class="ttl">On the persistence of paper</div>
+          </div>
+        </div>
+        <div class="footnote">
+          <span>useinkwell.app/sample</span>
+          <span id="liveLayoutLabel">The Magazine · Cream</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Stats ticker ═══════════════════════ -->
+  <section class="stats">
+    <div class="container">
+      <div class="row">
+        <div class="stat"><span class="num" data-count="1247" data-suf="">0</span><span class="lbl">Blogs published with Inkwell</span></div>
+        <div class="stat"><span class="num" data-count="8392" data-suf="">0</span><span class="lbl">Essays written this month</span></div>
+        <div class="stat"><span class="num" data-count="89" data-suf="+">0</span><span class="lbl">Themes in the Press</span></div>
+        <div class="stat"><span class="num" data-count="100" data-suf="%">0</span><span class="lbl">Open source, forever</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Why Inkwell ═══════════════════════ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head reveal">
+        <div class="eyebrow">Why Inkwell</div>
+        <h2 style="max-width: 22ch;">Software for writing, by people who would rather be <em>reading</em>.</h2>
+        <p class="lede">Most blogging platforms are built for marketing teams. Inkwell is built for writers — and for the developers who'd like writers to have something good.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature reveal" data-delay="1">
+          <span class="no">I.</span>
+          <h3>Writing comes <em>first</em></h3>
+          <p>A composer with no chrome — title, italic lede, serif body. Inkwell saves as you write, so the only thing on the page is the words. Markdown, slash-commands, and a real focus mode that hides everything else.</p>
+          <div class="meta-row">The Editorial Desk · the admin you'll actually like</div>
+        </article>
+        <article class="feature reveal" data-delay="2">
+          <span class="no">II.</span>
+          <h3>Yours to <em>host</em></h3>
+          <p>A .NET 10 application you run on your own server. No vendor, no metered usage, no algorithm. Multi-tenant by design — an agency can run a hundred client blogs from a single deploy with isolated domains.</p>
+          <div class="meta-row">SQL Server · PostgreSQL · SQLite · Docker</div>
+        </article>
+        <article class="feature reveal" data-delay="3">
+          <span class="no">III.</span>
+          <h3>Twenty Layouts, <em>fifteen</em> Presets</h3>
+          <p>Eleven modern Layouts and nine editorial ones — each with fifteen colour Presets. Three hundred ready-made combinations. Switch any time, or commission a Layout of your own from the Press.</p>
+          <div class="meta-row">CSS variable swap · sub-second preset change</div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Layouts theatre ═══════════════════════ -->
+  <section class="section tinted" id="layouts">
+    <div class="container">
+      <div class="section-head split reveal">
+        <div>
+          <div class="eyebrow">Twenty Layouts · <span style="color:var(--ink-accent); font-weight:600;">Six new</span> · Click to preview</div>
+          <h2>One platform.<br>Twenty ways to be <em>read</em>.</h2>
+        </div>
+        <p class="lede" style="margin: 0 0 8px;">A Layout is the structure of your public site. Eleven modern, nine editorial — six freshly added. Switch any time, mix with any Preset.</p>
+      </div>
+
+      <div class="theatre reveal">
+        <aside class="theatre-list" id="theatreList">
+          <div class="group">Modern</div>
+          <button data-layout="feed"       class="active">The Feed         <span class="id">M·01</span></button>
+          <button data-layout="grid">      The Grid         <span class="id">M·02</span></button>
+          <button data-layout="reader">    The Reader       <span class="id">M·03</span></button>
+          <button data-layout="showcase">  The Showcase     <span class="id">M·04</span></button>
+          <button data-layout="bento">     The Bento        <span class="id">M·05</span></button>
+          <button data-layout="timeline">  The Timeline     <span class="id">M·06</span></button>
+          <button data-layout="stream">    The Stream       <span class="id">M·07</span></button>
+          <button data-layout="newsletter">The Newsletter   <span class="id">M·08</span></button>
+          <button data-layout="marquee"    data-new="1">The Marquee      <span class="id">M·09</span></button>
+          <button data-layout="atlas"      data-new="1">The Atlas        <span class="id">M·10</span></button>
+          <button data-layout="constellation" data-new="1">The Constellation <span class="id">M·11</span></button>
+          <div class="group">Editorial</div>
+          <button data-layout="magazine">  The Magazine     <span class="id">E·01</span></button>
+          <button data-layout="journal">   The Journal      <span class="id">E·02</span></button>
+          <button data-layout="notebook">  The Notebook     <span class="id">E·03</span></button>
+          <button data-layout="studio">    The Studio       <span class="id">E·04</span></button>
+          <button data-layout="broadsheet">The Broadsheet   <span class="id">E·05</span></button>
+          <button data-layout="almanac">   The Almanac      <span class="id">E·06</span></button>
+          <button data-layout="spread"     data-new="1">The Spread       <span class="id">E·07</span></button>
+          <button data-layout="manifesto"  data-new="1">The Manifesto    <span class="id">E·08</span></button>
+          <button data-layout="compendium" data-new="1">The Compendium   <span class="id">E·09</span></button>
+        </aside>
+
+        <div class="theatre-stage">
+          <div class="theatre-header">
+            <h3 id="theatreTitle">The <em>Feed</em></h3>
+            <div class="blurb" id="theatreBlurb">Reverse-chronological stream of essays, image-led. The default modern Layout — the one most blogs start with.</div>
+          </div>
+          <div class="theatre-meta">
+            <span>Family <b id="theatreFamily">Modern</b></span>
+            <span>Best for <b id="theatreUse">Personal blogs</b></span>
+            <span>Pairs with <b id="theatrePair">Slate · Sand · Press</b></span>
+          </div>
+          <div class="theatre-preview">
+            <div class="layout-canvas" id="layoutCanvas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Presets interactive ═══════════════════════ -->
+  <section class="section" id="presets">
+    <div class="container">
+      <div class="section-head split reveal">
+        <div>
+          <div class="eyebrow">Fifteen Presets · Hover to preview</div>
+          <h2>A colour world<br>for every <em>voice</em>.</h2>
+        </div>
+        <p class="lede">Each Preset is a CSS variable swap. Pick one in the Editorial Desk and it propagates across your entire site instantly — fonts, accents, rules, everything.</p>
+      </div>
+
+      <div class="presets-board reveal">
+        <div class="presets-grid" id="presetsGrid">
+          <div class="swatch" data-preset="slate"       data-fam="Modern"    data-bg="#FAFAFA" data-fg="#14141A" data-accent="#6366F1" data-meta="Slate · Modern">
+            <div class="tile" style="background:#FAFAFA; color:#14141A;"><span class="accent-dot" style="background:#6366F1;"></span><span class="mark-i">I</span><span class="hex">#FAFAFA</span></div>
+            <div class="label"><span>Slate</span><span class="fam">Modern</span></div>
+          </div>
+          <div class="swatch" data-preset="sand"        data-fam="Modern"    data-bg="#F5F2EC" data-fg="#1F1B16" data-accent="#C2410C" data-meta="Sand · Modern">
+            <div class="tile" style="background:#F5F2EC; color:#1F1B16;"><span class="accent-dot" style="background:#C2410C;"></span><span class="mark-i">I</span><span class="hex">#F5F2EC</span></div>
+            <div class="label"><span>Sand</span><span class="fam">Modern</span></div>
+          </div>
+          <div class="swatch" data-preset="plum"        data-fam="Modern"    data-bg="#FBFAFB" data-fg="#1A1320" data-accent="#6B46C1" data-meta="Plum · Modern">
+            <div class="tile" style="background:#FBFAFB; color:#1A1320;"><span class="accent-dot" style="background:#6B46C1;"></span><span class="mark-i">I</span><span class="hex">#FBFAFB</span></div>
+            <div class="label"><span>Plum</span><span class="fam">Modern</span></div>
+          </div>
+          <div class="swatch" data-preset="forest"      data-fam="Modern"    data-bg="#F8FAF7" data-fg="#0F1F18" data-accent="#1F5236" data-meta="Forest · Modern">
+            <div class="tile" style="background:#F8FAF7; color:#0F1F18;"><span class="accent-dot" style="background:#1F5236;"></span><span class="mark-i">I</span><span class="hex">#F8FAF7</span></div>
+            <div class="label"><span>Forest</span><span class="fam">Modern</span></div>
+          </div>
+          <div class="swatch" data-preset="mono"        data-fam="Modern"    data-bg="#FFFFFF" data-fg="#000000" data-accent="#000000" data-meta="Mono · Modern">
+            <div class="tile" style="background:#FFFFFF; color:#000000;"><span class="accent-dot" style="background:#000;"></span><span class="mark-i">I</span><span class="hex">#FFFFFF</span></div>
+            <div class="label"><span>Mono</span><span class="fam">Modern</span></div>
+          </div>
+          <div class="swatch active" data-preset=""     data-fam="Editorial" data-bg="#FAF7F2" data-fg="#1A1A1A" data-accent="#8B7355" data-meta="Cream · Editorial">
+            <div class="tile" style="background:#FAF7F2; color:#1A1A1A;"><span class="accent-dot" style="background:#8B7355;"></span><span class="mark-i">I</span><span class="hex">#FAF7F2</span></div>
+            <div class="label"><span>Cream</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="linen"       data-fam="Editorial" data-bg="#F2EDDF" data-fg="#1A1A1A" data-accent="#7A6647" data-meta="Linen · Editorial">
+            <div class="tile" style="background:#F2EDDF; color:#1A1A1A;"><span class="accent-dot" style="background:#7A6647;"></span><span class="mark-i">I</span><span class="hex">#F2EDDF</span></div>
+            <div class="label"><span>Linen</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="manuscript"  data-fam="Editorial" data-bg="#F6F0E0" data-fg="#3D2F1E" data-accent="#8B7355" data-meta="Manuscript · Editorial">
+            <div class="tile" style="background:#F6F0E0; color:#3D2F1E;"><span class="accent-dot" style="background:#8B7355;"></span><span class="mark-i">I</span><span class="hex">#F6F0E0</span></div>
+            <div class="label"><span>Manuscript</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="folio"       data-fam="Editorial" data-bg="#F5EBCF" data-fg="#2A2418" data-accent="#8B6F3F" data-meta="Folio · Editorial">
+            <div class="tile" style="background:#F5EBCF; color:#2A2418;"><span class="accent-dot" style="background:#8B6F3F;"></span><span class="mark-i">I</span><span class="hex">#F5EBCF</span></div>
+            <div class="label"><span>Folio</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="press"       data-fam="Editorial" data-bg="#F4F2EE" data-fg="#14141A" data-accent="#52525B" data-meta="Press · Editorial">
+            <div class="tile" style="background:#F4F2EE; color:#14141A;"><span class="accent-dot" style="background:#52525B;"></span><span class="mark-i">I</span><span class="hex">#F4F2EE</span></div>
+            <div class="label"><span>Press</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="letterpress" data-fam="Editorial" data-bg="#FAF6EC" data-fg="#1A1A1A" data-accent="#8C2A1F" data-meta="Letterpress · Editorial">
+            <div class="tile" style="background:#FAF6EC; color:#1A1A1A;"><span class="accent-dot" style="background:#8C2A1F;"></span><span class="mark-i">I</span><span class="hex">#FAF6EC</span></div>
+            <div class="label"><span>Letterpress</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="foxglove"    data-fam="Editorial" data-bg="#FCF6EB" data-fg="#2A1F12" data-accent="#C4632B" data-meta="Foxglove · Editorial">
+            <div class="tile" style="background:#FCF6EB; color:#2A1F12;"><span class="accent-dot" style="background:#C4632B;"></span><span class="mark-i">I</span><span class="hex">#FCF6EB</span></div>
+            <div class="label"><span>Foxglove</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="cobalt"      data-fam="Editorial" data-bg="#F8F5EE" data-fg="#112045" data-accent="#112045" data-meta="Cobalt · Editorial">
+            <div class="tile" style="background:#F8F5EE; color:#112045;"><span class="accent-dot" style="background:#112045;"></span><span class="mark-i">I</span><span class="hex">#F8F5EE</span></div>
+            <div class="label"><span>Cobalt</span><span class="fam">Editorial</span></div>
+          </div>
+          <div class="swatch" data-preset="ink"         data-fam="Editorial" data-bg="#16140F" data-fg="#F4EFE6" data-accent="#C4A47A" data-meta="Ink · Dark">
+            <div class="tile" style="background:#16140F; color:#F4EFE6;"><span class="accent-dot" style="background:#C4A47A;"></span><span class="mark-i">I</span><span class="hex">#16140F</span></div>
+            <div class="label"><span>Ink</span><span class="fam">Dark</span></div>
+          </div>
+          <div class="swatch" data-preset="onyx"        data-fam="Editorial" data-bg="#0A0A0C" data-fg="#FAFAFA" data-accent="#A1A1AA" data-meta="Onyx · Dark">
+            <div class="tile" style="background:#0A0A0C; color:#FAFAFA;"><span class="accent-dot" style="background:#A1A1AA;"></span><span class="mark-i">I</span><span class="hex">#0A0A0C</span></div>
+            <div class="label"><span>Onyx</span><span class="fam">Dark</span></div>
+          </div>
+        </div>
+
+        <div class="preset-live" id="presetLive" style="background:#FAF7F2; color:#1A1A1A;">
+          <div class="eb" style="color:#8B7355;">A sample · in the chosen Preset</div>
+          <div class="ttl" style="color:#1A1A1A;">On the second <em>draft</em>.</div>
+          <div class="ld" style="color:#5C5751;">The first is a private negotiation with the page. The second is where the writer meets the reader — and where Inkwell, at its quietest, helps most.</div>
+          <div class="rule" style="background:#8B7355;"></div>
+          <div class="meta" style="color:#8B7355;">
+            <span><span class="accent-tag" style="background:#8B7355; color:#FAF7F2;">FROM THE DESK</span></span>
+            <span>12 March 2026</span>
+          </div>
+          <div class="credit" style="color:#8B7355;" id="presetLiveCredit">Cream · Editorial</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Premium themes ═══════════════════════ -->
+  <section class="section tinted" id="themes">
+    <div class="container">
+      <div class="section-head split reveal">
+        <div>
+          <div class="eyebrow">Premium themes · From the Press</div>
+          <h2>Layouts, <em>refined</em>.</h2>
+          <p class="lede">Curated Layouts built on Inkwell, designed by editorial typographers. One-time licence, lifetime updates, full source — install in two minutes from the Editorial Desk.</p>
+        </div>
+        <div style="text-align:right;">
+          <a class="btn btn-secondary" href="#">Browse the press <span class="arr">→</span></a>
+        </div>
+      </div>
+
+      <div class="themes-grid">
+        <article class="theme-card reveal" data-delay="1">
+          <div class="theme-cover">
+            <span class="theme-stamp featured">Issue 01 · Featured</span>
+            <div class="inner cover-quarterly">
+              <div class="top"><span>The Quarterly</span><span>№ I</span></div>
+              <div class="midrule"></div>
+              <div class="ttl">A literary quarterly,<br>in software form.</div>
+              <div class="sub">Issue masthead, contributor index, ribbon footer.</div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Quarterly</span><span class="theme-price"><b>$48</b> one-time</span></div>
+            <div class="theme-blurb">Masthead, contributor index, and a ribboned footer. For essayists publishing in seasons.</div>
+            <div class="theme-byline"><span>by <em>Mira Aldridge</em> · Layout: Magazine</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="2">
+          <div class="theme-cover">
+            <span class="theme-stamp">New</span>
+            <div class="inner cover-salon">
+              <div class="eb">The Salon · Vol. 02</div>
+              <div class="ttl">An evening,<br><em>in long form.</em></div>
+              <div class="dots"><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Salon</span><span class="theme-price"><b>$64</b> one-time</span></div>
+            <div class="theme-blurb">Dark Ink preset, gold accents, intimate single-column reading. The candlelit version of Inkwell.</div>
+            <div class="theme-byline"><span>by <em>Theo Vaughan</em> · Layout: Journal</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="3">
+          <div class="theme-cover">
+            <div class="inner cover-atelier">
+              <div></div><div></div><div></div><div></div>
+              <div class="label">The Atelier · a studio Layout</div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Atelier</span><span class="theme-price"><b>$56</b> one-time</span></div>
+            <div class="theme-blurb">Cover-driven mosaic. For studios, photographers, and visual essayists who publish in series.</div>
+            <div class="theme-byline"><span>by <em>Studio Foglio</em> · Layout: Studio</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="1">
+          <div class="theme-cover">
+            <div class="inner cover-broadsheet">
+              <div class="masthead">The Broadsheet</div>
+              <div class="cols">
+                <div><div class="h">Of news,<br>quietly read</div><div class="l"></div><div class="l"></div><div class="l"></div></div>
+                <div><div class="h">A column,<br>on craft</div><div class="l"></div><div class="l"></div><div class="l"></div></div>
+                <div><div class="h">Notes from<br>the desk</div><div class="l"></div><div class="l"></div><div class="l"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Press</span><span class="theme-price"><b>$72</b> one-time</span></div>
+            <div class="theme-blurb">Multi-column broadsheet with a true masthead. For newsletters that miss being newspapers.</div>
+            <div class="theme-byline"><span>by <em>Hawthorn &amp; Co.</em> · Layout: Broadsheet</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="2">
+          <div class="theme-cover">
+            <div class="inner cover-foxglove">
+              <div class="num">N° 07</div>
+              <div class="sep"></div>
+              <div class="ttl">A field guide,<br><em>to slow reading.</em></div>
+              <div class="sep"></div>
+              <div class="num">Foxglove Preset</div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">Foxglove</span><span class="theme-price"><b>$42</b> one-time</span></div>
+            <div class="theme-blurb">Warm amber-accented Reader Layout. For travel, garden, and field-notes blogs.</div>
+            <div class="theme-byline"><span>by <em>Lin Park</em> · Layout: Reader</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="3">
+          <div class="theme-cover">
+            <div class="inner cover-cobalt">
+              <div class="crest">I</div>
+              <div class="ttl">The Common-<br>place Book</div>
+              <div class="meta">Cobalt · Notebook Layout</div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">Commonplace</span><span class="theme-price"><b>$52</b> one-time</span></div>
+            <div class="theme-blurb">Marginalia, citations, NYT-print blue. A scholar's Inkwell, ready for footnotes.</div>
+            <div class="theme-byline"><span>by <em>Cobalt &amp; Quill</em> · Layout: Notebook</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="1">
+          <div class="theme-cover">
+            <span class="theme-stamp new">New · Marquee</span>
+            <div class="inner cover-beacon">
+              <div class="eb">§ BEACON · NO. III</div>
+              <div class="num">2026 —</div>
+              <div class="l">A quiet</div>
+              <div class="l it">revolt,</div>
+              <div class="l">in long form.</div>
+              <div class="foot"><span>useinkwell.app</span><span>Marquee</span></div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Beacon</span><span class="theme-price"><b>$58</b> one-time</span></div>
+            <div class="theme-blurb">Poster-scale type, single-feature homepage. For movements, studios, and writers whose headline is the argument.</div>
+            <div class="theme-byline"><span>by <em>Aldous Type Co.</em> · Layout: Marquee</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="2">
+          <div class="theme-cover">
+            <span class="theme-stamp new">New · Atlas</span>
+            <div class="inner cover-cartographer">
+              <div class="top"><span class="t">The Cartographer</span><span class="n">A1—D3</span></div>
+              <div class="grid">
+                <div></div>
+                <div class="hl">A</div><div class="hl">B</div><div class="hl">C</div><div class="hl">D</div>
+                <div class="rl">1</div><div class="cell f"></div><div class="cell"></div><div class="cell f"></div><div class="cell"></div>
+                <div class="rl">2</div><div class="cell"></div><div class="cell hot"></div><div class="cell"></div><div class="cell f"></div>
+                <div class="rl">3</div><div class="cell f"></div><div class="cell"></div><div class="cell f"></div><div class="cell"></div>
+              </div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Cartographer</span><span class="theme-price"><b>$68</b> one-time</span></div>
+            <div class="theme-blurb">Coordinate-gridded archive on the Atlas Layout. For topic-led writing — every essay sits at a known address.</div>
+            <div class="theme-byline"><span>by <em>Ordnance Studio</em> · Layout: Atlas</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+        <article class="theme-card reveal" data-delay="3">
+          <div class="theme-cover">
+            <span class="theme-stamp new">New · Compendium</span>
+            <div class="inner cover-lexicon">
+              <div class="ttl">A Lexicon,<br>for the long form.</div>
+              <div class="az">
+                <span>A</span><span>B</span><span class="act">C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span><span>P</span><span>Q</span><span>R</span><span>S</span><span>T</span><span>U</span><span>V</span><span>W</span><span>X</span><span>Y</span><span>Z</span>
+              </div>
+              <div class="entries">
+                <div class="row"><span><span class="l">C</span>Craft, on</span><span class="c">12</span></div>
+                <div class="row"><span style="margin-left:18px;">Critic, the role of</span><span class="c">4</span></div>
+                <div class="row"><span><span class="l">D</span>Draft, the second</span><span class="c">9</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="theme-meta">
+            <div class="row"><span class="theme-name">The Lexicon</span><span class="theme-price"><b>$46</b> one-time</span></div>
+            <div class="theme-blurb">A–Z reference Layout on the Manuscript preset. For archives that want to be looked-up, not scrolled.</div>
+            <div class="theme-byline"><span>by <em>Cassell &amp; Reed</em> · Layout: Compendium</span><span>★ Pro</span></div>
+          </div>
+        </article>
+
+      </div>
+
+      <p style="font-family:var(--serif); font-style:italic; font-size:14.5px; color:var(--fg-body); text-align:center; margin: var(--sp-8) 0 0;">
+        Every premium theme ships with full source and a perpetual licence. Updates included for the lifetime of Inkwell major versions.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Marquee · Letters from readers ═══════════════════════ -->
+  <section class="marquee">
+    <div class="eyebrow-strip"><span class="eyebrow">Letters · from the field</span></div>
+    <div class="marquee-track" id="marqueeTrack"></div>
+  </section>
+
+  <!-- ═══════════════════════ Services ═══════════════════════ -->
+  <section class="section" id="services">
+    <div class="container">
+      <div class="section-head split reveal">
+        <div>
+          <div class="eyebrow">From the Desk · Professional services</div>
+          <h2>The platform is free.<br>The craft is <em>ours</em>.</h2>
+          <p class="lede">Inkwell stays open-source, forever. When you need a hand — to install it, dress it, or keep it running — the team that built it is available, at a flat editorial rate.</p>
+        </div>
+        <div style="text-align:right;">
+          <a class="btn btn-secondary" href="mailto:info@opticalsoftware.org">Write to the desk <span class="arr">→</span></a>
+        </div>
+      </div>
+
+      <div class="services-grid">
+        <article class="service reveal" data-delay="1">
+          <span class="roman">I.</span>
+          <h3>Installation &amp; <em>migration</em></h3>
+          <p>We provision the server, configure the database, point your domain, and migrate your old posts — from Ghost, Substack, WordPress, or a folder of Markdown.</p>
+          <ul>
+            <li>Server provisioning &amp; SSL</li>
+            <li>SMTP, S3, and analytics wiring</li>
+            <li>Up to 500 posts migrated</li>
+            <li>One Preset, configured to your brand</li>
+          </ul>
+          <div class="price-row">
+            <span class="from">Flat rate</span>
+            <span class="amt">$1,200</span>
+          </div>
+          <div class="cta-row"><a href="mailto:info@opticalsoftware.org">Book installation →</a></div>
+        </article>
+
+        <article class="service reveal" data-delay="2">
+          <span class="roman">II.</span>
+          <h3>Custom <em>Layout</em></h3>
+          <p>A Layout designed for your publication, by our editorial designers. Two rounds of revisions, full source ownership, optional listing in the Press marketplace.</p>
+          <ul>
+            <li>Discovery interview &amp; references</li>
+            <li>Two design rounds, two builds</li>
+            <li>Full Razor source &amp; CSS</li>
+            <li>Eight-week delivery</li>
+          </ul>
+          <div class="price-row">
+            <span class="from">From</span>
+            <span class="amt">$4,800</span>
+          </div>
+          <div class="cta-row"><a href="mailto:info@opticalsoftware.org">Commission a Layout →</a></div>
+        </article>
+
+        <article class="service reveal" data-delay="3">
+          <span class="roman">III.</span>
+          <h3>The Ongoing <em>Letter</em></h3>
+          <p>A monthly retainer for agencies and publications running Inkwell at scale. Updates applied, performance monitored, and a real person on email within a working day.</p>
+          <ul>
+            <li>Monthly updates &amp; patches</li>
+            <li>Uptime &amp; performance monitoring</li>
+            <li>Priority email, 1 business day</li>
+            <li>Quarterly editorial review</li>
+          </ul>
+          <div class="price-row">
+            <span class="from">Per month</span>
+            <span class="amt">$480 <em>/ mo</em></span>
+          </div>
+          <div class="cta-row"><a href="mailto:info@opticalsoftware.org">Start a retainer →</a></div>
+        </article>
+      </div>
+
+      <p class="services-foot">
+        Working on something else — a private theme, an integration, a multi-tenant rollout? <a href="mailto:info@opticalsoftware.org">Write to the desk.</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Pull quote ═══════════════════════ -->
+  <section class="quote">
+    <div class="container reveal">
+      <div class="glyph">¶</div>
+      <blockquote>
+        "The internet should reward writing that takes its time. Inkwell is software that <em>takes its time</em>."
+      </blockquote>
+      <cite>— A draft of a forthcoming review, on Inkwell</cite>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Install · animated terminal ═══════════════════════ -->
+  <section class="install" id="install">
+    <div class="container grid">
+      <div>
+        <div class="eyebrow">Self-host in a single command</div>
+        <h2>It's your blog. <em>You should own it.</em></h2>
+        <p>Inkwell is a .NET 10 application licensed under MIT. Clone the repo, set a connection string, run. Migrations apply themselves; the first registered user becomes the admin.</p>
+        <div class="actions">
+          <a class="btn btn-light" href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener">Read the docs</a>
+          <a class="btn btn-ghost" href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener">★ View on GitHub</a>
+        </div>
+        <div class="trust">
+          <span><b>MIT</b> licensed</span>
+          <span><b>SQL Server</b> · PostgreSQL · SQLite</span>
+          <span><b>Docker</b> &amp; bare-metal supported</span>
+        </div>
+      </div>
+      <div class="terminal" id="terminal">
+        <div class="chrome">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="label">inkwell — bash — 80×24</div>
+          <div class="label">localhost:5000</div>
+        </div>
+        <pre class="body" id="terminalBody"><span class="blink"></span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Final CTA ═══════════════════════ -->
+  <section class="cta">
+    <div class="container">
+      <div class="eyebrow reveal">Start writing</div>
+      <h2 class="reveal" data-delay="1">A quiet place to publish, on the web you <em>remember</em>.</h2>
+      <p class="lede reveal" data-delay="2">Open-source. Self-hosted. Yours forever — with paid themes and editorial services for when you'd like a hand.</p>
+      <div class="cta-actions reveal" data-delay="3">
+        <a class="btn btn-primary magnetic" href="#install">Get Inkwell <span class="arr">→</span></a>
+        <a class="btn btn-secondary magnetic" href="#themes">Browse the press</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ Footer ═══════════════════════ -->
+  <footer>
+    <div class="container">
+      <div class="cols">
+        <div class="col">
+          <div class="brand-row">
+            <img src="~/assets/logomark.svg" width="24" height="24" alt="">
+            <span style="font-family:var(--serif); font-weight:500; font-size:20px; color:var(--fg); letter-spacing:-0.015em;">Inkwell</span>
+          </div>
+          <p>Self-hosted blogging, beautifully crafted. An open-source publishing platform on .NET 10, with optional editorial services for when you'd rather not run a server.</p>
+        </div>
+        <div class="col">
+          <h4>Product</h4>
+          <a href="#layouts">Layouts</a>
+          <a href="#presets">Presets</a>
+          <a href="#themes">Themes</a>
+          <a href="/admin/dashboard">Editorial Desk</a>
+          <a href="#">The Inkwell Letter</a>
+        </div>
+        <div class="col">
+          <h4>Services</h4>
+          <a href="#services">Installation</a>
+          <a href="#services">Custom Layout</a>
+          <a href="#services">Ongoing Letter</a>
+          <a href="mailto:info@opticalsoftware.org">Contact the desk</a>
+        </div>
+        <div class="col">
+          <h4>Develop</h4>
+          <a href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener">Docs</a>
+          <a href="https://github.com/marutisoftwaresolutions/inkwell" target="_blank" rel="noopener">Razor components</a>
+          <a href="https://github.com/marutisoftwaresolutions/inkwell/releases" target="_blank" rel="noopener">Changelog</a>
+        </div>
+        <div class="col">
+          <h4>The press</h4>
+          <a href="mailto:info@opticalsoftware.org">Become a theme author</a>
+          <a href="~/assets/logo-horizontal.svg">Brand assets</a>
+          <a href="#">Press kit</a>
+          <a href="#">About</a>
+        </div>
+      </div>
+      <div class="strip">
+        <div>© Inkwell 2026 · MIT licensed · Built with .NET 10</div>
+        <div class="links">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Status</a>
+          <a href="/feed">RSS</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Floating preset switcher -->
+  <aside class="preset-switcher" aria-label="Preset switcher">
+    <div class="head">
+      <span class="label">Try a preset</span>
+      <span class="cur" id="presetCur">Cream</span>
+    </div>
+    <div class="chips" id="presetChips">
+      <button class="chip active" title="Cream"       data-preset=""           style="background:#FAF7F2;"></button>
+      <button class="chip" title="Linen"              data-preset="linen"      style="background:#F2EDDF;"></button>
+      <button class="chip" title="Manuscript"         data-preset="manuscript" style="background:#F6F0E0;"></button>
+      <button class="chip" title="Folio"              data-preset="folio"      style="background:#F5EBCF;"></button>
+      <button class="chip" title="Press"              data-preset="press"      style="background:#F4F2EE;"></button>
+      <button class="chip" title="Letterpress"        data-preset="letterpress" style="background:#FAF6EC; box-shadow:inset 0 0 0 2px #8C2A1F;"></button>
+      <button class="chip" title="Foxglove"           data-preset="foxglove"   style="background:#FCF6EB; box-shadow:inset 0 0 0 2px #C4632B;"></button>
+      <button class="chip" title="Cobalt"             data-preset="cobalt"     style="background:#F8F5EE; box-shadow:inset 0 0 0 2px #112045;"></button>
+      <button class="chip" title="Slate"              data-preset="slate"      style="background:#FAFAFA; box-shadow:inset 0 0 0 2px #6366F1;"></button>
+      <button class="chip" title="Sand"               data-preset="sand"       style="background:#F5F2EC; box-shadow:inset 0 0 0 2px #C2410C;"></button>
+      <button class="chip" title="Forest"             data-preset="forest"     style="background:#F8FAF7; box-shadow:inset 0 0 0 2px #1F5236;"></button>
+      <button class="chip" title="Mono"               data-preset="mono"       style="background:#FFFFFF; box-shadow:inset 0 0 0 2px #000;"></button>
+      <button class="chip" title="Ink (dark)"         data-preset="ink"        style="background:#16140F;"></button>
+      <button class="chip" title="Onyx (dark)"        data-preset="onyx"       style="background:#0A0A0C;"></button>
+    </div>
+  </aside>
+
+</div>
+
+<script src="~/js/landing.js"></script>
+</body>
+</html>

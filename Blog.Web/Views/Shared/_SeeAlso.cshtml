@@ -1,0 +1,18 @@
+@{
+    var posts = ViewBag.SeeAlsoPosts as List<Blog.Core.Domain.Post>;
+}
+@if (posts != null && posts.Any())
+{
+    <aside class="my-8 px-5 py-4 rounded-xl border-l-4 flex flex-col gap-2" style="background: var(--muted); border-left-color: var(--primary);">
+        <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color: var(--primary);">See Also</p>
+        <ul class="space-y-1.5">
+            @foreach (var p in posts)
+            {
+                <li class="flex items-start gap-2">
+                    <svg class="mt-1 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--primary);"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    <a href="/@p.Slug" class="text-sm font-medium hover:opacity-70 transition-opacity" style="color: var(--foreground);">@p.Title</a>
+                </li>
+            }
+        </ul>
+    </aside>
+}

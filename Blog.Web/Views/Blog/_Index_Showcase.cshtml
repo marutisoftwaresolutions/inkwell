@@ -1,0 +1,132 @@
+@using Blog.Core.Interfaces
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+    var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+    string GetExcerpt(Blog.Core.Domain.Post p) =>
+        !string.IsNullOrEmpty(p.MetaDescription) ? p.MetaDescription :
+        !string.IsNullOrEmpty(p.Plaintext) ? (p.Plaintext.Length > 160 ? p.Plaintext[..157] + "…" : p.Plaintext) :
+        string.Empty;
+    var qParts = new List<string>();
+    if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
+    if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
+    if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+    var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
+
+    var heroPost   = Model.Items.Count > 0 ? Model.Items[0] : null;
+    var trioStart  = Model.Items.Count > 1 ? Model.Items.Skip(1).Take(3).ToList() : new List<Blog.Core.Domain.Post>();
+    var restPosts  = Model.Items.Count > 4 ? Model.Items.Skip(4).ToList() : new List<Blog.Core.Domain.Post>();
+}
+
+@* ── SHOWCASE LAYOUT — hero + trio ────────────────────────────── *@
+<div style="max-width:var(--container);margin:0 auto;padding:var(--sp-10) var(--gutter);">
+
+    @if (!string.IsNullOrEmpty(searchTerm))
+    {
+        <div style="margin-bottom:var(--sp-8);font-family:var(--sans);font-size:13px;color:var(--fg-muted);">
+            Results for <strong>"@searchTerm"</strong> — <a href="/" style="color:var(--fg-muted);">clear</a>
+        </div>
+    }
+
+    @if (!Model.Items.Any())
+    {
+        <div style="padding:var(--sp-16) 0;text-align:center;">
+            <p style="font-family:var(--serif);font-size:1.25rem;color:var(--fg-muted);">No posts found.</p>
+        </div>
+    }
+    else
+    {
+        @* HERO — 60vh image+overlay *@
+        @if (heroPost != null)
+        {
+            <a href="/@heroPost.Slug" style="display:block;text-decoration:none;position:relative;height:60vh;min-height:340px;overflow:hidden;border-radius:var(--r-2);margin-bottom:var(--sp-8);">
+                @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
+                {
+                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title" loading="eager"
+                         style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" />
+                }
+                else
+                {
+                    <div style="position:absolute;inset:0;background:var(--surface-2);"></div>
+                }
+                @* gradient overlay *@
+                <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,.25) 50%,transparent 100%);"></div>
+                @* text *@
+                <div style="position:absolute;bottom:0;left:0;right:0;padding:var(--sp-10);">
+                    @{var heroCategory = heroPost.Categories?.FirstOrDefault();}
+                    @if (heroCategory != null)
+                    {
+                        <span style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,.8);margin-bottom:var(--sp-4);">@heroCategory.Name</span>
+                    }
+                    <h1 style="font-family:var(--serif);font-size:clamp(1.5rem,4vw,2.75rem);font-weight:700;line-height:1.15;color:#fff;margin:0 0 var(--sp-4);max-width:36ch;">@heroPost.Title</h1>
+                    <span style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.7);">@heroPost.PublishedAt?.ToString("MMM d, yyyy")</span>
+                </div>
+            </a>
+        }
+
+        @* TRIO row *@
+        @if (trioStart.Any())
+        {
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--sp-6);margin-bottom:var(--sp-8);">
+                @foreach (var post in trioStart)
+                {
+                    var excerpt = GetExcerpt(post);
+                    <article style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2);overflow:hidden;">
+                        @if (!string.IsNullOrEmpty(post.FeatureImage))
+                        {
+                            <a href="/@post.Slug" style="display:block;height:160px;overflow:hidden;">
+                                <img src="@post.FeatureImage" alt="@post.Title" loading="lazy"
+                                     style="width:100%;height:100%;object-fit:cover;display:block;" />
+                            </a>
+                        }
+                        <div style="padding:var(--sp-6);">
+                            <h3 style="font-family:var(--serif);font-size:1.0625rem;font-weight:700;line-height:1.3;margin:0 0 var(--sp-4);">
+                                <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>
+                            </h3>
+                            @if (!string.IsNullOrEmpty(excerpt))
+                            {
+                                <p style="font-family:var(--sans);font-size:0.875rem;line-height:1.6;color:var(--fg-body);margin:0 0 var(--sp-4);">@excerpt</p>
+                            }
+                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@post.PublishedAt?.ToString("MMM d, yyyy")</time>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+
+        @* Remaining posts — simple list *@
+        @if (restPosts.Any())
+        {
+            <div style="display:flex;flex-direction:column;gap:0;border-top:1px solid var(--border);">
+                @foreach (var post in restPosts)
+                {
+                    <article style="display:flex;justify-content:space-between;align-items:baseline;padding:var(--sp-6) 0;border-bottom:1px solid var(--border);">
+                        <h4 style="font-family:var(--serif);font-size:1rem;font-weight:600;margin:0;">
+                            <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>
+                        </h4>
+                        <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);flex-shrink:0;margin-left:var(--sp-6);">@post.PublishedAt?.ToString("MMM d, yyyy")</time>
+                    </article>
+                }
+            </div>
+        }
+    }
+
+    @* Pagination *@
+    @if (Model.TotalPages > 1)
+    {
+        <div style="max-width:var(--container);margin:var(--sp-16) auto 0;padding:0 var(--gutter);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:var(--sp-8);">
+            @if (Model.Page > 1)
+            {
+                <a href="?page=@(Model.Page-1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">← Newer</a>
+            }
+            else { <span></span> }
+            <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Model.Page / @Model.TotalPages</span>
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a href="?page=@(Model.Page+1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">Older →</a>
+            }
+            else { <span></span> }
+        </div>
+    }
+</div>

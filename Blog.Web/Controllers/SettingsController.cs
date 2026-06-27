@@ -1,5 +1,7 @@
+using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Web.Models;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -13,12 +15,14 @@ public class SettingsController : Controller
     private readonly ISettingRepository _settings;
     private readonly ITenantContext _tenantContext;
     private readonly IUserRepository _users;
+    private readonly AuditService _audit;
 
-    public SettingsController(ISettingRepository settings, ITenantContext tenantContext, IUserRepository users)
+    public SettingsController(ISettingRepository settings, ITenantContext tenantContext, IUserRepository users, AuditService audit)
     {
         _settings = settings;
         _tenantContext = tenantContext;
         _users = users;
+        _audit = audit;
     }
 
     private async Task<Guid> GetSettingsUserIdAsync()
@@ -88,6 +92,7 @@ public class SettingsController : Controller
         globalSettings.SocialGithub = model.SocialGithub ?? string.Empty;
 
         await _settings.SaveSettingsAsync(targetId, globalSettings);
+        await _audit.LogAsync(AuditActions.SettingsUpdated, "Settings", targetId.ToString(), "Site Settings");
 
         TempData["Success"] = "Settings updated successfully.";
         return RedirectToAction("Index");

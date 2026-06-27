@@ -1,0 +1,57 @@
+@model Blog.Web.Models.NavbarViewModel
+
+<!-- Navbar Feed Variant -->
+<nav class="navbar-feed w-full border-b" style="border-color: var(--border); background: var(--surface);">
+	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+		<div class="flex items-center justify-between h-16">
+			<!-- Logo/Brand -->
+			<div class="flex-shrink-0">
+				@if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
+				{
+					<img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-8 w-auto" />
+				}
+				else
+				{
+					<a href="/" class="font-bold text-lg">@Model.SiteName</a>
+				}
+			</div>
+
+			<!-- Navigation Links -->
+			<div class="hidden md:flex items-center space-x-4">
+				<a href="/" class="text-sm hover:opacity-75 transition">Home</a>
+
+				@if (Model.Categories?.Count > 0)
+				{
+					<div class="group relative">
+						<button class="text-sm hover:opacity-75 transition">Categories</button>
+						<div class="absolute hidden group-hover:block left-0 mt-2 w-48 bg-white border rounded shadow-lg" style="background: var(--surface); border-color: var(--border);">
+							@foreach (var category in Model.Categories)
+							{
+								<a href="/category/@category.Slug" class="block px-4 py-2 text-sm hover:bg-gray-100 first:rounded-t last:rounded-b" style="background: var(--surface); border-color: var(--border);">
+									@category.Name
+								</a>
+							}
+						</div>
+					</div>
+				}
+
+				@if (Model.Pages?.Count > 0)
+				{
+					@foreach (var pageView in Model.Pages)
+					{
+						<a href="/pages/@pageView.Slug" class="text-sm hover:opacity-75 transition">@pageView.Title</a>
+					}
+				}
+			</div>
+
+			<!-- Mobile Menu Button -->
+			<div class="md:hidden">
+				<button class="inline-flex items-center justify-center p-2 rounded-md hover:opacity-75 transition">
+					<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+					</svg>
+				</button>
+			</div>
+		</div>
+	</div>
+</nav>

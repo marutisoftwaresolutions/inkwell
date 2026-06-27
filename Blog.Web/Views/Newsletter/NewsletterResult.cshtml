@@ -1,0 +1,24 @@
+@model Blog.Web.Controllers.NewsletterResultViewModel
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = Model.Success ? "Subscription Confirmed" : "Newsletter";
+}
+
+<div class="min-h-[60vh] flex items-center justify-center px-4">
+    <div class="text-center max-w-md">
+        @if (Model.Success)
+        {
+            <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style="background: var(--muted);">
+                <i class="bi bi-check-lg text-2xl" style="color: var(--primary);"></i>
+            </div>
+        }
+        else
+        {
+            <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style="background: var(--muted);">
+                <i class="bi bi-exclamation-lg text-2xl" style="color: var(--muted-foreground);"></i>
+            </div>
+        }
+        <p class="text-lg mb-6" style="color: var(--foreground);">@Model.Message</p>
+        <a href="/" class="px-6 py-2.5 rounded-md text-sm font-medium hover:opacity-90 transition-opacity" style="background: var(--primary); color: var(--primary-foreground);">Back to Blog</a>
+    </div>
+</div>

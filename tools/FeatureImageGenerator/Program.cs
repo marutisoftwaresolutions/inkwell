@@ -267,7 +267,15 @@ for (int i = 0; i < posts.Length; i++)
     var p = posts[i];
     var outPath = IOPath.Combine(baseDir, $"{p.Slug}.jpg");
 
-    if (pngMappings.TryGetValue(p.Slug, out var localPngName))
+    // 1. Check for legacy 17-May-2026 overrides first
+    var legacyPath = IOPath.Combine(resourcesDir, "17-May-2026", $"{p.Slug}.jpg");
+    if (IOFile.Exists(legacyPath))
+    {
+        IOFile.Copy(legacyPath, outPath, true);
+        Console.WriteLine($"  [+] {p.Slug}.jpg (From 17-May-2026 visual assets)");
+    }
+    // 2. Check for custom AI illustrations mapping
+    else if (pngMappings.TryGetValue(p.Slug, out var localPngName))
     {
         var sourcePath = IOPath.Combine(resourcesDir, localPngName);
         if (IOFile.Exists(sourcePath))
@@ -287,6 +295,7 @@ for (int i = 0; i < posts.Length; i++)
             GenerateImage(p, font, outPath);
         }
     }
+    // 3. Programmatic card fallback
     else
     {
         GenerateImage(p, font, outPath);
@@ -405,12 +414,12 @@ static void GenerateImage(PostSpec p, FontFamily fontFamily, string outPath)
         // Badge pill
         var badgeText = p.Badge;
         var bMeasure  = TextMeasurer.MeasureSize(badgeText, new TextOptions(badgeFont));
-        float bx = 52, by = 44, bw = bMeasure.Width + 30, bh = 36;
+        float bx = 90, by = 44, bw = bMeasure.Width + 30, bh = 36;
         ctx.Fill(accent, new RectangleF(bx, by, bw, bh));
         ctx.DrawText(new RichTextOptions(badgeFont) { Origin = new PointF(bx + 15, by + 7) }, badgeText, Color.Black);
 
         // Category
-        ctx.DrawText(new RichTextOptions(categoryFont) { Origin = new PointF(52, by + bh + 16) },
+        ctx.DrawText(new RichTextOptions(categoryFont) { Origin = new PointF(90, by + bh + 16) },
             p.Category.ToUpperInvariant(), whiteDim);
 
         // Title
@@ -418,8 +427,8 @@ static void GenerateImage(PostSpec p, FontFamily fontFamily, string outPath)
         var title  = p.Title.Length > 100 ? p.Title[..97] + "…" : p.Title;
         ctx.DrawText(new RichTextOptions(titleFont)
         {
-            Origin = new PointF(52, titleY),
-            WrappingLength = W - 110,
+            Origin = new PointF(90, titleY),
+            WrappingLength = W - 180,
             LineSpacing = 1.15f,
         }, title, white);
 
@@ -428,7 +437,7 @@ static void GenerateImage(PostSpec p, FontFamily fontFamily, string outPath)
         ctx.Fill(accent, new RectangleF(10, H - 68, W - 10, 2));
 
         // Site domain
-        ctx.DrawText(new RichTextOptions(siteFont) { Origin = new PointF(52, H - 48) },
+        ctx.DrawText(new RichTextOptions(siteFont) { Origin = new PointF(90, H - 48) },
             "opticalsoftware.org", whiteMid);
 
         // Small accent dots — bottom right

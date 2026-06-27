@@ -1,6 +1,7 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Infrastructure.Data; // For SlugHelper
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,16 +13,17 @@ namespace Blog.Web.Controllers;
 [Route("admin/[controller]")]
 public class PagesController : Controller
 {
-    // ... (rest as before)
     private readonly IPageRepository _pages;
     private readonly IMediaRepository _media;
     private readonly IUserRepository _users;
+    private readonly AuditService _audit;
 
-    public PagesController(IPageRepository pages, IMediaRepository media, IUserRepository users)
+    public PagesController(IPageRepository pages, IMediaRepository media, IUserRepository users, AuditService audit)
     {
         _pages = pages;
         _media = media;
         _users = users;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -75,6 +77,8 @@ public class PagesController : Controller
             page.PublishedAt = page.IsPublished ? DateTime.UtcNow : null;
             
             var id = await _pages.CreateAsync(page);
+            await _audit.LogAsync(page.IsPublished ? AuditActions.PageCreated : AuditActions.PageCreated,
+                "Page", id.ToString(), page.Title);
             TempData["Success"] = page.IsPublished ? "Page published!" : "Draft saved.";
             return RedirectToAction("Edit", new { id });
         }
@@ -140,6 +144,7 @@ public class PagesController : Controller
             }
 
             await _pages.UpdateAsync(existing);
+            await _audit.LogAsync(AuditActions.PageUpdated, "Page", id.ToString(), existing.Title);
             TempData["Success"] = "Page updated.";
             return RedirectToAction("Edit", new { id });
         }
@@ -158,6 +163,7 @@ public class PagesController : Controller
         bool isAdmin = User.IsInRole("Admin");
 
         await _pages.DeleteAsync(id, isAdmin ? null : userId);
+        await _audit.LogAsync(AuditActions.PageDeleted, "Page", id.ToString());
         TempData["Success"] = "Page permanently deleted.";
         return RedirectToAction("Index");
     }

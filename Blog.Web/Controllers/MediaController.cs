@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -14,6 +15,7 @@ public class MediaController : Controller
     private readonly IMediaRepository _media;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<MediaController> _logger;
+    private readonly AuditService _audit;
     private static readonly HashSet<string> AllowedMimes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg","image/png","image/gif","image/webp","image/svg+xml",
@@ -23,11 +25,12 @@ public class MediaController : Controller
         "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     };
 
-    public MediaController(IMediaRepository media, IWebHostEnvironment env, ILogger<MediaController> logger)
+    public MediaController(IMediaRepository media, IWebHostEnvironment env, ILogger<MediaController> logger, AuditService audit)
     {
         _media = media;
         _env = env;
         _logger = logger;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -105,6 +108,7 @@ public class MediaController : Controller
             var id = await _media.CreateAsync(media);
             media.Id = id;
 
+            await _audit.LogAsync(AuditActions.MediaUploaded, "Media", media.Id.ToString(), file.FileName);
             return Ok(new { id = media.Id, url = media.Url, fileName = media.FileName });
         }
         catch (Exception ex)
@@ -150,6 +154,7 @@ public class MediaController : Controller
             
             await _media.DeleteAsync(id, userId);
             _logger.LogInformation("Deleted DB record for media ID: {Id}", id);
+            await _audit.LogAsync(AuditActions.MediaDeleted, "Media", id.ToString(), item.FileName);
         }
         TempData["Success"] = "File deleted.";
         return RedirectToAction("Index");

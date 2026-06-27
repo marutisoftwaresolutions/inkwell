@@ -1,0 +1,112 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
+@{
+    var siteName = (string)(ViewData["SiteName"] ?? ViewBag.SiteName ?? "the blog");
+    var reCaptchaSiteKey = _rcfg["ReCaptcha:SiteKey"];
+}
+<section class="my-10 rounded-2xl px-6 py-10 text-center border border-dashed" style="background: var(--muted); border-color: var(--border);">
+    @if (TempData["NewsletterMessage"] != null)
+    {
+        <p class="text-sm font-medium mb-0" style="color: var(--foreground);">@TempData["NewsletterMessage"]</p>
+    }
+    else
+    {
+        <div id="nl-body">
+            <div class="mb-1">
+                <i class="bi bi-envelope-paper text-3xl" style="color: var(--primary);"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2" style="color: var(--foreground);">Stay in the loop</h3>
+            <p class="text-sm mb-6" style="color: var(--muted-foreground);">Get new articles on optometry and eye care delivered to your inbox. No spam, unsubscribe any time.</p>
+
+            <p id="nl-msg" class="text-sm mb-4" style="display:none;"></p>
+
+            <form id="newsletter-form" method="post" action="/newsletter/subscribe" class="flex flex-col gap-3 max-w-md mx-auto" novalidate>
+                @Html.AntiForgeryToken()
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" name="name" placeholder="Your name (optional)"
+                           class="flex-none sm:w-32 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
+                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
+                    <input type="email" name="email" placeholder="your@email.com" required
+                           class="flex-1 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
+                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
+                    <button id="nl-btn" type="submit"
+                            class="px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                            style="background: var(--primary); color: var(--primary-foreground);">
+                        Subscribe
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(reCaptchaSiteKey))
+                {
+                    <div class="flex justify-center">
+                        <div class="g-recaptcha" data-sitekey="@reCaptchaSiteKey"></div>
+                    </div>
+                }
+            </form>
+            <p class="text-xs mt-4" style="color: var(--muted-foreground);">We'll send a confirmation email. No spam ever.</p>
+        </div>
+    }
+</section>
+
+<script>
+(function () {
+    var form = document.getElementById('newsletter-form');
+    if (!form) return;
+
+    var btn = document.getElementById('nl-btn');
+    var msg = document.getElementById('nl-msg');
+    var body = document.getElementById('nl-body');
+
+    function showMsg(text, isError) {
+        msg.textContent = text;
+        msg.style.color = isError ? 'var(--destructive, #dc2626)' : 'var(--primary, #333)';
+        msg.style.display = 'block';
+    }
+
+    function setLoading(on) {
+        btn.disabled = on;
+        btn.textContent = on ? 'Sending…' : 'Subscribe';
+        btn.style.opacity = on ? '0.7' : '';
+    }
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        var emailVal = form.querySelector('[name=email]').value.trim();
+        if (!emailVal || !emailVal.includes('@@')) {
+            showMsg('Please enter a valid email address.', true);
+            return;
+        }
+
+        setLoading(true);
+        msg.style.display = 'none';
+
+        try {
+            var res = await fetch('/newsletter/subscribe', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(form)
+            });
+
+            var data = await res.json();
+
+            if (data.success) {
+                body.innerHTML =
+                    '<div style="font-size:2rem;margin-bottom:8px;">&#10003;</div>' +
+                    '<p class="text-sm font-medium" style="color:var(--foreground)">' +
+                    escHtml(data.message) + '</p>';
+            } else {
+                showMsg(data.message, true);
+                setLoading(false);
+                if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+            }
+        } catch (_) {
+            showMsg('Something went wrong. Please try again.', true);
+            setLoading(false);
+            if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
+        }
+    });
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+}());
+</script>

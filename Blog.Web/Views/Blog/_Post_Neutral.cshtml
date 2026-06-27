@@ -83,7 +83,7 @@
             @if (!string.IsNullOrEmpty(Model.FeatureImage))
             {
                 <div class="mb-8 overflow-hidden">
-                    <img src="@Model.FeatureImage" alt="@Model.Title" class="w-full h-auto object-cover" />
+                    <img src="@Model.FeatureImage" alt="@Model.Title" class="w-full h-auto object-cover" asp-append-version="true" />
                 </div>
             }
 
@@ -156,7 +156,7 @@
                             <a href="/@rp.Slug" class="group border border-dashed rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col" style="border-color: var(--border); background: var(--card);">
                                 @if (!string.IsNullOrEmpty(rp.FeatureImage))
                                 {
-                                    <img src="@rp.FeatureImage" alt="@rp.Title" class="w-full h-36 object-cover group-hover:opacity-90 transition-opacity" />
+                                    <img src="@rp.FeatureImage" alt="@rp.Title" class="w-full h-36 object-cover group-hover:opacity-90 transition-opacity" asp-append-version="true" />
                                 }
                                 <div class="p-3 flex flex-col gap-1 flex-1">
                                     @if (rp.Categories.Any())

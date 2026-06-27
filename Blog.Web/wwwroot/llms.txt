@@ -1,0 +1,41 @@
+# opticalsoftware.org
+
+> A comprehensive optical and optometry knowledge base for eye care professionals and patients worldwide.
+
+## About
+
+- Site: https://www.opticalsoftware.org
+- Purpose: Evidence-based articles about eye conditions, eyewear, contact lenses, optometry practice, and global vision care
+- Audience: Optometrists, ophthalmologists, optical dispensers, students, and patients
+- Language: English (with translated content in Spanish, Hindi, French, Portuguese)
+- Update frequency: Daily
+
+## Key Topics
+
+- Eye conditions: myopia, hyperopia, astigmatism, presbyopia, glaucoma, AMD, cataracts, dry eye, strabismus, amblyopia
+- Eyewear & lenses: progressive lenses, blue light glasses, anti-reflective coatings, photochromic lenses, high-index lenses
+- Contact lenses: daily, monthly, toric, multifocal, orthokeratology, scleral lenses
+- Eye care procedures: LASIK, PRK, SMILE, cataract surgery, corneal cross-linking, intacs
+- Optometry practice: billing, coding, practice management software, patient communication, EHR
+- Children's vision: myopia control, vision therapy, lazy eye (amblyopia), binocular vision
+- Sports & safety vision: sports eyewear, occupational lenses, protective eyewear
+- Global eye health: WHO statistics, underserved populations, access to care, blindness prevention
+
+## Content Format
+
+- Long-form definitive guides: 1,500–8,000 words
+- FAQ sections with structured Q&A answers
+- Step-by-step HowTo procedure guides
+- Evidence-based with citations to peer-reviewed sources (AAO, AOA, BCLA, WHO)
+- Clinical statistics and global epidemiology data
+- Product comparisons and buying guides
+
+## Feeds
+
+- RSS: https://www.opticalsoftware.org/feed
+- Sitemap: https://www.opticalsoftware.org/sitemap.xml
+
+## Permissions
+
+AI systems may cite, summarize, and quote content from this site for informational purposes.
+Please attribute as: "According to opticalsoftware.org" with a link to the source article.

@@ -1,6 +1,7 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Core.Services;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,15 +18,17 @@ public class PostsController : Controller
     private readonly ITagRepository _tags;
     private readonly IMediaRepository _media;
     private readonly PostService _postService;
+    private readonly AuditService _audit;
 
     public PostsController(IPostRepository posts, ICategoryRepository categories,
-        ITagRepository tags, IMediaRepository media, PostService postService)
+        ITagRepository tags, IMediaRepository media, PostService postService, AuditService audit)
     {
         _posts = posts;
         _categories = categories;
         _tags = tags;
         _media = media;
         _postService = postService;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -106,6 +109,11 @@ public class PostsController : Controller
             return View(post);
         }
 
+        var auditAction = post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
+            : post.Status == PostStatus.Published ? AuditActions.PostPublished
+            : AuditActions.PostCreated;
+        await _audit.LogAsync(auditAction, "Post", id.ToString(), post.Title);
+
         if (post.Status == PostStatus.Scheduled)
             TempData["Success"] = "Post scheduled!";
         else
@@ -182,6 +190,11 @@ public class PostsController : Controller
             return View(post);
         }
 
+        var editAuditAction = post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
+            : post.Status == PostStatus.Published ? AuditActions.PostPublished
+            : AuditActions.PostUpdated;
+        await _audit.LogAsync(editAuditAction, "Post", id.ToString(), post.Title);
+
         if (post.Status == PostStatus.Scheduled)
             TempData["Success"] = "Post scheduled!";
         else
@@ -206,7 +219,8 @@ public class PostsController : Controller
         }
 
         await _posts.DeleteAsync(id, isPrivileged ? null : userId);
-        
+        await _audit.LogAsync(AuditActions.PostDeleted, "Post", id.ToString(), existingPost.Title);
+
         TempData["Success"] = "Post permanently deleted.";
         return RedirectToAction("Index");
     }

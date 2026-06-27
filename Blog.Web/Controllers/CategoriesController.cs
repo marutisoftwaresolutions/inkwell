@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +12,12 @@ namespace Blog.Web.Controllers;
 public class CategoriesController : Controller
 {
     private readonly ICategoryRepository _categories;
+    private readonly AuditService _audit;
 
-    public CategoriesController(ICategoryRepository categories)
+    public CategoriesController(ICategoryRepository categories, AuditService audit)
     {
         _categories = categories;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -55,6 +58,7 @@ public class CategoriesController : Controller
         };
 
         await _categories.CreateAsync(category);
+        await _audit.LogAsync(AuditActions.CategoryCreated, "Category", null, name);
         TempData["Success"] = "Category created.";
         return RedirectToAction("Index");
     }
@@ -65,6 +69,7 @@ public class CategoriesController : Controller
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         await _categories.DeleteAsync(id, userId);
+        await _audit.LogAsync(AuditActions.CategoryDeleted, "Category", id.ToString());
         TempData["Success"] = "Category deleted.";
         return RedirectToAction("Index");
     }

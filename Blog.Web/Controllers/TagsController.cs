@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +12,12 @@ namespace Blog.Web.Controllers;
 public class TagsController : Controller
 {
     private readonly ITagRepository _tags;
+    private readonly AuditService _audit;
 
-    public TagsController(ITagRepository tags)
+    public TagsController(ITagRepository tags, AuditService audit)
     {
         _tags = tags;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -56,6 +59,7 @@ public class TagsController : Controller
         };
 
         await _tags.CreateAsync(tag);
+        await _audit.LogAsync(AuditActions.TagCreated, "Tag", null, name);
         TempData["Success"] = "Tag created.";
         return RedirectToAction("Index");
     }
@@ -66,6 +70,7 @@ public class TagsController : Controller
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         await _tags.DeleteAsync(id, userId);
+        await _audit.LogAsync(AuditActions.TagDeleted, "Tag", id.ToString());
         TempData["Success"] = "Tag deleted.";
         return RedirectToAction("Index");
     }

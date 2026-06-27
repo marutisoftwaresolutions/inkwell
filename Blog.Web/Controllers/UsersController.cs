@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,11 +15,13 @@ public class UsersController : Controller
 {
     private readonly IUserRepository _users;
     private readonly IRoleRepository _roles;
+    private readonly AuditService _audit;
 
-    public UsersController(IUserRepository users, IRoleRepository roles)
+    public UsersController(IUserRepository users, IRoleRepository roles, AuditService audit)
     {
         _users = users;
         _roles = roles;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -95,6 +98,8 @@ public class UsersController : Controller
                 await _roles.AssignRoleToUserAsync(id, dbRole.Id);
             }
 
+            await _audit.LogAsync(AuditActions.UserInvited, "User", null, $"{displayName} ({email})",
+                newValues: $"{{\"role\":\"{roleName}\"}}");
             TempData["Success"] = $"{displayName} has been added as {roleName}. They can log in with {email}.";
         }
         catch (Microsoft.Data.SqlClient.SqlException ex)
@@ -128,8 +133,13 @@ public class UsersController : Controller
 
         await _roles.AssignRoleToUserAsync(userId, role.Id);
 
+        var oldRole = user.Role;
         user.Role = roleName;
         await _users.UpdateAsync(user);
+        await _audit.LogAsync(AuditActions.UserRoleChanged, "User", userId.ToString(),
+            user.DisplayName ?? user.Email,
+            oldValues: $"{{\"role\":\"{oldRole}\"}}",
+            newValues: $"{{\"role\":\"{roleName}\"}}");
 
         TempData["Success"] = $"Role for {user.DisplayName ?? user.Email} updated to {roleName}.";
         TempData["Warning"] = "If the user is currently logged in, they must log out and back in for new permissions to apply.";
@@ -145,6 +155,9 @@ public class UsersController : Controller
 
         user.IsActive = !user.IsActive;
         await _users.UpdateAsync(user);
+        await _audit.LogAsync(AuditActions.UserToggled, "User", userId.ToString(),
+            user.DisplayName ?? user.Email,
+            newValues: $"{{\"isActive\":{user.IsActive.ToString().ToLower()}}}");
 
         TempData["Success"] = $"{user.DisplayName ?? user.Email} is now {(user.IsActive ? "active" : "disabled")}.";
         return RedirectToAction("Index");
@@ -185,6 +198,8 @@ public class UsersController : Controller
         }
 
         await _users.DeleteAsync(userId);
+        await _audit.LogAsync(AuditActions.UserDeleted, "User", userId.ToString(),
+            targetUser.DisplayName ?? targetUser.Email);
         TempData["Success"] = $"{targetUser.DisplayName ?? targetUser.Email} has been deleted.";
         return RedirectToAction("Index");
     }

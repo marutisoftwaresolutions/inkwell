@@ -3,11 +3,12 @@
 <article class="group flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
          style="background: var(--card); border-color: var(--border);">
 
-    <a href="/@Model.Slug" class="relative overflow-hidden aspect-[16/10] block" style="background: var(--muted);">
+    <a href="/@Model.Slug" class="relative overflow-hidden aspect-[120/63] block" style="background: var(--muted);">
         @if (!string.IsNullOrEmpty(Model.FeatureImage))
         {
             <img src="@Model.FeatureImage" alt="@Model.Title"
                  class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                 asp-append-version="true"
                  loading="lazy" />
         }
         else

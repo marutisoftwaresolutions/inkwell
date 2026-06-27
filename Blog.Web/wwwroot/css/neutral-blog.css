@@ -129,6 +129,101 @@ article.grid img {
     line-height: 1.7;
 }
 
+/* ── Universal blog table: .blog-table injected via JS, covers all themes ──
+   CSS variables fall through both namespaces:
+     Tailwind/shadcn: --primary, --primary-foreground, --border, --muted, --foreground
+     Inkwell:         --link, --bg, --border, --surface, --fg-body             ── */
+.blog-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 1.75rem 0;
+    border-radius: 6px;
+    border: 1px solid var(--border, #e2e8f0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.blog-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 0;
+}
+.blog-table thead {
+    background: var(--primary, var(--link, #1e293b));
+    color: var(--primary-foreground, #fff);
+}
+.blog-table th {
+    padding: 0.7rem 1rem;
+    font-weight: 700;
+    font-size: 0.73rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: left;
+    border-right: 1px solid rgba(255, 255, 255, 0.14);
+    white-space: nowrap;
+    color: inherit;
+}
+.blog-table th:last-child {
+    border-right: none;
+}
+.blog-table td {
+    padding: 0.6rem 1rem;
+    border-top: 1px solid var(--border, #e2e8f0);
+    vertical-align: top;
+    color: var(--foreground, var(--fg-body, var(--fg, inherit)));
+}
+.blog-table tbody tr:nth-child(even) {
+    background: var(--muted, var(--surface, rgba(0, 0, 0, 0.025)));
+}
+.blog-table tbody tr:hover {
+    background: var(--muted, var(--surface, rgba(0, 0, 0, 0.04)));
+    transition: background 0.12s;
+}
+.blog-table td strong {
+    color: var(--primary, var(--link, inherit));
+    font-weight: 600;
+}
+
+/* ── Fallback: bare tables not yet processed by JS ── */
+.post-prose table:not(.blog-table),
+.ink-essay-body table:not(.blog-table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.75rem 0;
+    font-size: 0.875rem;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.post-prose table:not(.blog-table) thead,
+.ink-essay-body table:not(.blog-table) thead {
+    background: var(--primary, var(--link, #1e293b));
+    color: var(--primary-foreground, #fff);
+}
+.post-prose table:not(.blog-table) th,
+.ink-essay-body table:not(.blog-table) th {
+    padding: 0.65rem 0.9rem;
+    font-weight: 700;
+    font-size: 0.73rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: left;
+    border-right: 1px solid rgba(255, 255, 255, 0.14);
+    white-space: nowrap;
+    color: inherit;
+}
+.post-prose table:not(.blog-table) td,
+.ink-essay-body table:not(.blog-table) td {
+    padding: 0.6rem 0.9rem;
+    border-top: 1px solid var(--border, #e2e8f0);
+    vertical-align: top;
+    color: var(--foreground, var(--fg-body, var(--fg, inherit)));
+}
+.post-prose table:not(.blog-table) tbody tr:nth-child(even),
+.ink-essay-body table:not(.blog-table) tbody tr:nth-child(even) {
+    background: var(--muted, var(--surface, rgba(0, 0, 0, 0.025)));
+}
+
 /* ── Component Builder Styles (for post content) ── */
 .comp-hero {
     background: linear-gradient(135deg, var(--primary, #333), color-mix(in srgb, var(--primary, #333) 70%, black));

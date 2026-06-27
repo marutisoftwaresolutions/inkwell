@@ -1,4 +1,5 @@
 @model Blog.Core.Domain.Post
+@inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
 @{
     Layout = "_PublicLayout";
     ViewData["Title"] = !string.IsNullOrEmpty(Model.MetaTitle) ? Model.MetaTitle : Model.Title;
@@ -7,6 +8,7 @@
     ViewData["SiteLogoUrl"] = ViewBag.SiteLogoUrl ?? "";
 
     var blogLayout = (string)(ViewBag.LayoutPost ?? "Neutral");
+    var reCaptchaSiteKey = _rcfg["ReCaptcha:SiteKey"];
 }
 
 @section MetaTags {
@@ -47,6 +49,145 @@ else
 {
     <partial name="_Post_Neutral" model="Model" />
 }
+
+<script>
+(function () {
+  // Works for both Magazine (.ink-essay-body) and Neutral (.post-prose)
+  var body = document.querySelector('.ink-essay-body, .post-prose');
+  if (!body) return;
+
+  // ── Table enhancement: inject .blog-table class + scrollable wrapper ──
+  // Runs after Tailwind Play CDN settles, guaranteeing styles apply on all themes.
+  body.querySelectorAll('table:not(.blog-table)').forEach(function (t) {
+    t.classList.add('blog-table');
+    var wrap = document.createElement('div');
+    wrap.className = 'blog-table-wrap';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
+
+  var headings = Array.from(body.querySelectorAll('h2, h3, h4'));
+  if (headings.length < 2) return;
+
+  // Ensure every heading has a unique id for anchor links
+  var used = {};
+  headings.forEach(function (h, i) {
+    if (!h.id) {
+      var base = (h.textContent.trim()
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/^-+|-+$/g, '')) || ('h' + i);
+      var slug = base, n = 1;
+      while (used[slug]) { slug = base + '-' + (n++); }
+      h.id = slug;
+    }
+    used[h.id] = 1;
+  });
+
+  // Build a nested <ol class="ink-toc-list"> from flat heading array
+  function buildList(items) {
+    var root = document.createElement('ol');
+    root.className = 'ink-toc-list';
+    var stack = [{ level: 2, list: root }];
+
+    items.forEach(function (h) {
+      var level = parseInt(h.tagName[1], 10);
+      var top = stack[stack.length - 1];
+
+      if (level > top.level) {
+        // Nest inside last <li>, creating it if the list is empty
+        var lastLi = top.list.lastElementChild;
+        if (!lastLi) {
+          lastLi = document.createElement('li');
+          lastLi.className = 'ink-toc-item';
+          top.list.appendChild(lastLi);
+        }
+        var sub = document.createElement('ol');
+        sub.className = 'ink-toc-list';
+        lastLi.appendChild(sub);
+        stack.push({ level: level, list: sub });
+      } else if (level < top.level) {
+        while (stack.length > 1 && stack[stack.length - 1].level > level) {
+          stack.pop();
+        }
+      }
+
+      var li = document.createElement('li');
+      li.className = 'ink-toc-item';
+      var a = document.createElement('a');
+      a.className = 'ink-toc-link';
+      a.href = '#' + h.id;
+      a.textContent = h.textContent.trim();
+      li.appendChild(a);
+      stack[stack.length - 1].list.appendChild(li);
+    });
+
+    return root;
+  }
+
+  // Assemble the <nav>
+  var toc = document.createElement('nav');
+  toc.id = 'ink-toc';
+  toc.className = 'ink-toc';
+  toc.setAttribute('aria-label', 'Table of contents');
+  toc.innerHTML =
+    '<div class="ink-toc-progress" aria-hidden="true">' +
+      '<div class="ink-toc-progress-bar" id="ink-toc-bar"></div>' +
+    '</div>' +
+    '<div class="ink-toc-header" role="button" tabindex="0" aria-expanded="true" aria-controls="ink-toc-body">' +
+      '<span class="ink-toc-title">Contents</span>' +
+      '<button class="ink-toc-toggle" tabindex="-1" aria-hidden="true">' +
+        '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="1.5 4 6.5 9.5 11.5 4"/>' +
+        '</svg>' +
+      '</button>' +
+    '</div>' +
+    '<div class="ink-toc-body" id="ink-toc-body"></div>';
+
+  toc.querySelector('#ink-toc-body').appendChild(buildList(headings));
+
+  // Inject immediately before the post body
+  body.parentNode.insertBefore(toc, body);
+
+  // Collapse / expand on header click
+  var header = toc.querySelector('.ink-toc-header');
+  header.addEventListener('click', function () {
+    var collapsed = toc.classList.toggle('is-collapsed');
+    header.setAttribute('aria-expanded', String(!collapsed));
+  });
+  header.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.click(); }
+  });
+
+  // Highlight active section as the reader scrolls
+  var activeLink = null;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        if (activeLink) activeLink.classList.remove('is-active');
+        activeLink = toc.querySelector('.ink-toc-link[href="#' + entry.target.id + '"]');
+        if (activeLink) activeLink.classList.add('is-active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px', threshold: 0 });
+  headings.forEach(function (h) { io.observe(h); });
+
+  // Reading progress bar (tracks scroll through the article)
+  var bar = document.getElementById('ink-toc-bar');
+  if (bar) {
+    var article = body.closest('article') || body.parentElement;
+    function updateProgress() {
+      var top = article.getBoundingClientRect().top + window.scrollY;
+      var total = article.offsetHeight - window.innerHeight;
+      var pct = total > 0 ? Math.min(100, Math.max(0, (window.scrollY - top) / total * 100)) : 0;
+      bar.style.width = pct + '%';
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+  }
+}());
+</script>
 
 <!-- Newsletter Signup -->
 <div class="max-w-4xl mx-auto px-4">
@@ -99,6 +240,12 @@ else
                                   style="resize:vertical;border:1px solid var(--ink-black);padding:var(--sp-3);border-radius:var(--r-1);font-family:var(--serif);font-size:var(--fs-body);line-height:var(--lh-prose);"
                                   placeholder="Write your thoughts…"></textarea>
                     </div>
+                    @if (!string.IsNullOrEmpty(reCaptchaSiteKey))
+                    {
+                        <div>
+                            <div class="g-recaptcha" data-sitekey="@reCaptchaSiteKey"></div>
+                        </div>
+                    }
                     <div>
                         <button type="submit" class="ink-btn">Post letter</button>
                     </div>
@@ -145,6 +292,12 @@ else
                             <label class="block text-sm font-medium mb-1" style="color: var(--foreground);">Comment *</label>
                             <textarea name="content" rows="4" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required></textarea>
                         </div>
+                        @if (!string.IsNullOrEmpty(reCaptchaSiteKey))
+                        {
+                            <div class="mb-2">
+                                <div class="g-recaptcha" data-sitekey="@reCaptchaSiteKey"></div>
+                            </div>
+                        }
                         <button type="submit" class="px-6 py-2.5 font-medium text-sm rounded-md hover:opacity-90 transition-opacity" style="background: var(--primary); color: var(--primary-foreground);">Post Comment</button>
                     </form>
                 </div>

@@ -1,0 +1,102 @@
+@model Blog.Core.Domain.Post
+@using System.Text.Json
+@{
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var postUrl = $"{baseUrl}/{Model.Slug}";
+    var siteName = (string)(ViewData["SiteName"] ?? "");
+    var siteLogoUrl = (string)(ViewData["SiteLogoUrl"] ?? "");
+    var description = !string.IsNullOrEmpty(Model.MetaDescription)
+        ? Model.MetaDescription
+        : (Model.Plaintext?.Length > 160 ? Model.Plaintext[..157] + "..." : Model.Plaintext ?? "");
+    var imageUrl = !string.IsNullOrEmpty(Model.OgImage) ? Model.OgImage
+                 : !string.IsNullOrEmpty(Model.FeatureImage) ? Model.FeatureImage
+                 : null;
+    var wordCount = Model.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
+
+    // ── Article / BlogPosting schema ─────────────────────────────────────────
+    var authorName = string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName;
+    var author = new Dictionary<string, object> { ["@type"] = "Person", ["name"] = authorName };
+    if (!string.IsNullOrEmpty(Model.AuthorSpecialty)) author["jobTitle"] = Model.AuthorSpecialty;
+    if (!string.IsNullOrEmpty(Model.AuthorCredentials))
+        author["hasCredential"] = new Dictionary<string, string>
+        {
+            ["@type"] = "EducationalOccupationalCredential",
+            ["credentialCategory"] = "degree",
+            ["name"] = Model.AuthorCredentials
+        };
+    var publisher = new Dictionary<string, object>
+    {
+        ["@type"] = "Organization",
+        ["name"] = siteName,
+        ["logo"] = new Dictionary<string, string> { ["@type"] = "ImageObject", ["url"] = siteLogoUrl }
+    };
+    var article = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "BlogPosting",
+        ["@id"] = postUrl,
+        ["headline"] = Model.Title,
+        ["description"] = description,
+        ["datePublished"] = Model.PublishedAt?.ToString("O") ?? Model.CreatedAt.ToString("O"),
+        ["dateModified"] = Model.UpdatedAt.ToString("O"),
+        ["wordCount"] = wordCount,
+        ["mainEntityOfPage"] = new Dictionary<string, string> { ["@type"] = "WebPage", ["@id"] = postUrl },
+        ["author"] = author,
+        ["publisher"] = publisher,
+        ["inLanguage"] = "en-US"
+    };
+    if (imageUrl is not null) article["image"] = imageUrl;
+    if (Model.Categories.Any()) article["articleSection"] = Model.Categories.First().Name;
+    if (Model.Tags.Any()) article["keywords"] = string.Join(", ", Model.Tags.Select(t => t.Name));
+
+    // ── BreadcrumbList schema ────────────────────────────────────────────────
+    var items = new List<Dictionary<string, object>>
+    {
+        new() { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "Home", ["item"] = baseUrl }
+    };
+    int pos = 2;
+    if (Model.Categories.Any())
+    {
+        var cat = Model.Categories.First();
+        items.Add(new() { ["@type"] = "ListItem", ["position"] = pos++, ["name"] = cat.Name, ["item"] = $"{baseUrl}/category/{cat.Slug}" });
+    }
+    items.Add(new() { ["@type"] = "ListItem", ["position"] = pos, ["name"] = Model.Title, ["item"] = postUrl });
+
+    var breadcrumb = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "BreadcrumbList",
+        ["itemListElement"] = items
+    };
+
+    // ── FAQPage schema ───────────────────────────────────────────────────────
+    Dictionary<string, object>? faqPage = null;
+    if (Model.Faqs.Any())
+    {
+        var questions = Model.Faqs.Select(f => new Dictionary<string, object>
+        {
+            ["@type"] = "Question",
+            ["name"] = f.Question,
+            ["acceptedAnswer"] = new Dictionary<string, string>
+            {
+                ["@type"] = "Answer",
+                ["text"] = f.Answer
+            }
+        }).ToList<object>();
+
+        faqPage = new Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "FAQPage",
+            ["mainEntity"] = questions
+        };
+    }
+
+    var opts = new JsonSerializerOptions { WriteIndented = false };
+}
+<script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(article, opts))</script>
+<script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(breadcrumb, opts))</script>
+@if (faqPage is not null)
+{
+    <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(faqPage, opts))</script>
+}

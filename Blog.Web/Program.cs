@@ -4,7 +4,6 @@ using Blog.Infrastructure;
 using Blog.Infrastructure.Data;
 using Blog.Web.Middleware;
 using Blog.Web.Services;
-using MaxMind.GeoIP2;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
@@ -27,7 +26,10 @@ builder.Services.AddInfrastructure(connStr);
 // ── Core Services ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AuditService>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Blog.Core.Interfaces.IEmailService, SmtpEmailService>();
+builder.Services.AddHttpClient<ReCaptchaService>();
 
 // ── Multi-Tenancy ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<TenantContext>();
@@ -67,17 +69,6 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddControllersWithViews();
 builder.Services.AddMemoryCache();
-
-// GeoIP — optional; only registered when the .mmdb file is present
-var geoDbPath = builder.Configuration["GeoLite2DbPath"];
-if (!string.IsNullOrEmpty(geoDbPath))
-{
-    var fullGeoPath = Path.IsPathRooted(geoDbPath)
-        ? geoDbPath
-        : Path.Combine(builder.Environment.ContentRootPath, geoDbPath);
-    if (File.Exists(fullGeoPath))
-        builder.Services.AddSingleton(new DatabaseReader(fullGeoPath));
-}
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddImageSharp();
 

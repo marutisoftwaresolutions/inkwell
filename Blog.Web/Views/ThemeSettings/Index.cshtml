@@ -61,110 +61,274 @@
         @* Layout Selector *@
         <div class="p-4 border-b border-border">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Blog Layout</p>
-            <div class="grid grid-cols-2 gap-3">
-                @{
-                    var layouts = new[] {
-                        new { Id = "Neutral", Name = "Neutral", Desc = "Minimal, dashed borders, sidebar" },
-                        new { Id = "Magazine", Name = "Magazine", Desc = "Bold cards, hero, no sidebar" },
-                        new { Id = "Grid", Name = "Grid View", Desc = "Modern grid, clean look" },
-                        new { Id = "Minimal", Name = "Minimalist", Desc = "Focus on typography" },
-                        new { Id = "Classic", Name = "Classic Blog", Desc = "Right sidebar, standard layout" },
-                        new { Id = "Modern", Name = "Professional", Desc = "Sharp edges, solid colours, corporate" }
-                    };
-                }
-                @foreach (var layout in layouts)
-                {
-                    var isActiveLayout = layout.Id == currentLayout;
-                    <form method="post" asp-action="ApplyLayoutPreset" asp-controller="ThemeSettings" asp-route-presetId="@layout.Id">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden @(isActiveLayout ? "border-foreground shadow-md" : "border-border hover:border-foreground/40")">
-                            @* Layout schematic thumbnail *@
-                            <div class="h-16 relative bg-muted/60 flex items-center justify-center p-2 overflow-hidden">
-                                @if (layout.Id == "Neutral")
-                                {
-                                    @* sidebar left + list items right *@
-                                    <div style="display:flex;gap:4px;width:60px;height:40px;">
-                                        <div style="width:14px;background:rgba(26,26,26,.12);border-radius:2px;border:1px dashed rgba(26,26,26,.25);"></div>
-                                        <div style="flex:1;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
-                                            <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:80%;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;margin-top:2px;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:70%;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;margin-top:2px;"></div>
-                                        </div>
-                                    </div>
-                                }
-                                else if (layout.Id == "Magazine")
-                                {
-                                    @* bold hero + 3 cards below *@
-                                    <div style="width:68px;display:flex;flex-direction:column;gap:3px;">
-                                        <div style="height:16px;background:rgba(26,26,26,.3);border-radius:2px;width:100%;"></div>
-                                        <div style="display:flex;gap:2px;">
-                                            <div style="flex:1;height:12px;background:rgba(26,26,26,.15);border-radius:2px;"></div>
-                                            <div style="flex:1;height:12px;background:rgba(26,26,26,.15);border-radius:2px;"></div>
-                                            <div style="flex:1;height:12px;background:rgba(26,26,26,.15);border-radius:2px;"></div>
-                                        </div>
-                                    </div>
-                                }
-                                else if (layout.Id == "Grid")
-                                {
-                                    @* 3-col card grid *@
-                                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:60px;">
-                                        @for (int i = 0; i < 6; i++) {
-                                            <div style="height:13px;background:rgba(26,26,26,.18);border-radius:2px;"></div>
+            @{
+                var layouts = new[] {
+                    // Modern family
+                    new { Id = "Feed",       Name = "The Feed",       Desc = "Reverse-chrono stream, image-led",         Family = "Modern" },
+                    new { Id = "Grid",       Name = "The Grid",       Desc = "Card grid, visual cadence",                Family = "Modern" },
+                    new { Id = "Reader",     Name = "The Reader",     Desc = "Single column, pure typography",           Family = "Modern" },
+                    new { Id = "Showcase",   Name = "The Showcase",   Desc = "Hero feature + supporting trio",           Family = "Modern" },
+                    new { Id = "Bento",      Name = "The Bento",      Desc = "Mosaic of mixed-size cards",               Family = "Modern" },
+                    new { Id = "Timeline",   Name = "The Timeline",   Desc = "Vertical timeline, journal-friendly",      Family = "Modern" },
+                    new { Id = "Stream",     Name = "The Stream",     Desc = "Microblog, threaded notes",                Family = "Modern" },
+                    new { Id = "Newsletter", Name = "The Newsletter", Desc = "Subscribe-first, digest layout",           Family = "Modern" },
+                    // Editorial family
+                    new { Id = "Magazine",   Name = "The Magazine",   Desc = "Issue masthead, hero, multi-author",       Family = "Editorial" },
+                    new { Id = "Journal",    Name = "The Journal",    Desc = "Column + sidebar of recent letters",       Family = "Editorial" },
+                    new { Id = "Notebook",   Name = "The Notebook",   Desc = "Marginalia, citations, scholarly",         Family = "Editorial" },
+                    new { Id = "Studio",     Name = "The Studio",     Desc = "Cover-heavy masonry, photo essays",        Family = "Editorial" },
+                    new { Id = "Broadsheet", Name = "The Broadsheet", Desc = "Multi-column newspaper, dense type",       Family = "Editorial" },
+                    new { Id = "Almanac",    Name = "The Almanac",    Desc = "Archive index, chronological ledger",      Family = "Editorial" },
+                    // Classic family
+                    new { Id = "Neutral",    Name = "Neutral",        Desc = "Clean default, no frills",                 Family = "Classic" },
+                    new { Id = "Classic",    Name = "Classic",        Desc = "Traditional blog list view",               Family = "Classic" },
+                    new { Id = "Minimal",    Name = "Minimal",        Desc = "Stripped back, content first",             Family = "Classic" },
+                    new { Id = "Modern",     Name = "Modern",         Desc = "Bold cards with accent colours",           Family = "Classic" },
+                };
+                var familyGroups = layouts.GroupBy(l => l.Family).OrderBy(g => g.Key == "Modern" ? 0 : g.Key == "Editorial" ? 1 : 2).ToList();
+            }
+            @foreach (var familyGroup in familyGroups)
+            {
+                <div class="mb-4">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 px-0.5">@familyGroup.Key</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach (var layout in familyGroup)
+                        {
+                            var isActiveLayout = layout.Id == currentLayout;
+                            <form method="post" asp-action="ApplyLayoutPreset" asp-controller="ThemeSettings" asp-route-presetId="@layout.Id">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden @(isActiveLayout ? "border-foreground shadow-md" : "border-border hover:border-foreground/40")">
+                                    @* Layout schematic thumbnail *@
+                                    <div class="h-14 relative bg-muted/60 flex items-center justify-center p-2 overflow-hidden">
+                                        @if (layout.Id == "Feed")
+                                        {
+                                            @* left 75% col + right date col, 3 rows *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:4px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="display:flex;gap:3px;align-items:center;">
+                                                        <div style="flex:3;height:7px;background:rgba(26,26,26,.22);border-radius:1px;"></div>
+                                                        <div style="flex:1;height:5px;background:rgba(26,26,26,.12);border-radius:1px;"></div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Grid")
+                                        {
+                                            @* 3×2 rectangle grid *@
+                                            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:60px;">
+                                                @for (int i = 0; i < 6; i++) {
+                                                    <div style="height:13px;background:rgba(26,26,26,.18);border-radius:2px;"></div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Reader")
+                                        {
+                                            @* single narrow centered column *@
+                                            <div style="width:40px;display:flex;flex-direction:column;gap:4px;align-items:center;">
+                                                <div style="height:3px;width:90%;background:rgba(26,26,26,.4);border-radius:1px;"></div>
+                                                <div style="height:2px;width:80%;background:rgba(26,26,26,.2);border-radius:1px;"></div>
+                                                <div style="height:2px;width:95%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                <div style="height:2px;width:85%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                <div style="height:2px;width:90%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Showcase")
+                                        {
+                                            @* tall hero + 3 equal cards *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
+                                                <div style="height:18px;background:rgba(26,26,26,.28);border-radius:2px;"></div>
+                                                <div style="display:flex;gap:2px;">
+                                                    <div style="flex:1;height:10px;background:rgba(26,26,26,.14);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:10px;background:rgba(26,26,26,.14);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:10px;background:rgba(26,26,26,.14);border-radius:1px;"></div>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Bento")
+                                        {
+                                            @* mosaic: 1 wide+tall, 2 medium, 3 small *@
+                                            <div style="width:64px;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:18px 10px;gap:2px;">
+                                                <div style="grid-column:1/4;grid-row:1;background:rgba(26,26,26,.3);border-radius:1px;"></div>
+                                                <div style="grid-column:1/3;grid-row:2;background:rgba(26,26,26,.18);border-radius:1px;"></div>
+                                                <div style="grid-column:3;grid-row:2;background:rgba(26,26,26,.12);border-radius:1px;"></div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Timeline")
+                                        {
+                                            @* vertical line + entries *@
+                                            <div style="display:flex;gap:5px;width:60px;height:40px;">
+                                                <div style="width:1px;background:rgba(26,26,26,.25);flex-shrink:0;margin:0 4px;"></div>
+                                                <div style="flex:1;display:flex;flex-direction:column;gap:5px;justify-content:center;">
+                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.2);border-radius:1px;width:80%;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.2);border-radius:1px;width:70%;"></div>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Stream")
+                                        {
+                                            @* short text bubbles *@
+                                            <div style="width:60px;display:flex;flex-direction:column;gap:4px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="display:flex;gap:3px;align-items:center;">
+                                                        <div style="width:7px;height:7px;border-radius:50%;background:rgba(26,26,26,.25);flex-shrink:0;"></div>
+                                                        <div style="flex:1;height:6px;background:rgba(26,26,26,.15);border-radius:8px;"></div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Newsletter")
+                                        {
+                                            @* subscribe banner + 3 list rows *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
+                                                <div style="height:10px;background:rgba(26,26,26,.28);border-radius:1px;width:100%;"></div>
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="height:6px;background:rgba(26,26,26,.12);border-radius:1px;width:100%;"></div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Magazine")
+                                        {
+                                            @* masthead + hero + 3 small *@
+                                            <div style="width:68px;display:flex;flex-direction:column;gap:2px;">
+                                                <div style="height:4px;background:rgba(26,26,26,.4);border-radius:1px;width:100%;"></div>
+                                                <div style="height:14px;background:rgba(26,26,26,.25);border-radius:1px;width:100%;"></div>
+                                                <div style="display:flex;gap:2px;">
+                                                    <div style="flex:1;height:9px;background:rgba(26,26,26,.13);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:9px;background:rgba(26,26,26,.13);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:9px;background:rgba(26,26,26,.13);border-radius:1px;"></div>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Journal")
+                                        {
+                                            @* 2/3 content + 1/3 sidebar *@
+                                            <div style="display:flex;gap:4px;width:64px;height:38px;">
+                                                <div style="flex:2;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
+                                                    <div style="height:3px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;width:85%;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                </div>
+                                                <div style="width:14px;background:rgba(26,26,26,.1);border-radius:2px;border:1px solid rgba(26,26,26,.15);"></div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Notebook")
+                                        {
+                                            @* Notebook: two columns with marginalia marks *@
+                                            <div style="display:flex;gap:4px;width:60px;height:40px;">
+                                                <div style="width:14px;background:rgba(26,26,26,.12);border-radius:2px;border:1px dashed rgba(26,26,26,.25);"></div>
+                                                <div style="flex:1;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
+                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:80%;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;margin-top:2px;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:70%;"></div>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Studio")
+                                        {
+                                            @* Studio: image cover tiles *@
+                                            <div style="width:64px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:16px 10px;gap:2px;">
+                                                <div style="grid-column:1/3;background:rgba(26,26,26,.28);border-radius:1px;"></div>
+                                                <div style="background:rgba(26,26,26,.16);border-radius:1px;"></div>
+                                                <div style="background:rgba(26,26,26,.12);border-radius:1px;"></div>
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Broadsheet")
+                                        {
+                                            @* Broadsheet: 3 vertical columns *@
+                                            <div style="display:flex;gap:3px;width:62px;height:38px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding-top:2px;">
+                                                        <div style="height:2px;background:rgba(26,26,26,.3);border-radius:1px;"></div>
+                                                        <div style="height:1.5px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                        <div style="height:1.5px;background:rgba(26,26,26,.15);border-radius:1px;width:80%;"></div>
+                                                        <div style="height:1.5px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Almanac")
+                                        {
+                                            @* Almanac: date + dotted rule + title rows *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:4px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="display:flex;align-items:center;gap:3px;">
+                                                        <div style="width:10px;height:2px;background:rgba(26,26,26,.35);border-radius:1px;flex-shrink:0;"></div>
+                                                        <div style="flex:1;height:1px;background:rgba(26,26,26,.2);border-style:dotted;"></div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Neutral")
+                                        {
+                                            @* Neutral: simple stacked list, full-width title rows *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:5px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="height:2px;background:rgba(26,26,26,.25);border-radius:1px;width:100%;"></div>
+                                                    <div style="height:2px;background:rgba(26,26,26,.12);border-radius:1px;width:75%;"></div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Classic")
+                                        {
+                                            @* Classic: image-left + text-right rows *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:4px;">
+                                                @for (int i = 0; i < 2; i++) {
+                                                    <div style="display:flex;gap:3px;align-items:center;">
+                                                        <div style="width:18px;height:14px;background:rgba(26,26,26,.22);border-radius:2px;flex-shrink:0;"></div>
+                                                        <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                                                            <div style="height:2px;background:rgba(26,26,26,.3);border-radius:1px;"></div>
+                                                            <div style="height:2px;background:rgba(26,26,26,.14);border-radius:1px;width:80%;"></div>
+                                                            <div style="height:2px;background:rgba(26,26,26,.14);border-radius:1px;width:60%;"></div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Minimal")
+                                        {
+                                            @* Minimal: hairline separator, title only rows *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:0;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="padding:3px 0;border-bottom:1px solid rgba(26,26,26,.15);">
+                                                        <div style="height:2px;background:rgba(26,26,26,.28);border-radius:1px;width:90%;"></div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Modern")
+                                        {
+                                            @* Modern: 2-col bold card grid with accent bar *@
+                                            <div style="width:64px;display:grid;grid-template-columns:1fr 1fr;gap:3px;">
+                                                @for (int i = 0; i < 4; i++) {
+                                                    <div style="height:16px;background:rgba(26,26,26,.18);border-radius:2px;position:relative;overflow:hidden;">
+                                                        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(26,26,26,.35);"></div>
+                                                    </div>
+                                                }
+                                            </div>
                                         }
                                     </div>
-                                }
-                                else if (layout.Id == "Minimal")
-                                {
-                                    @* narrow centered column, clean lines *@
-                                    <div style="width:44px;display:flex;flex-direction:column;gap:4px;align-items:center;">
-                                        <div style="height:3px;width:70%;background:rgba(26,26,26,.4);border-radius:1px;"></div>
-                                        <div style="height:2px;width:55%;background:rgba(26,26,26,.2);border-radius:1px;"></div>
-                                        <div style="height:1px;width:80%;background:rgba(26,26,26,.15);"></div>
-                                        <div style="height:2px;width:85%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                        <div style="height:2px;width:75%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                    </div>
-                                }
-                                else if (layout.Id == "Classic")
-                                {
-                                    @* wide content + narrow right sidebar *@
-                                    <div style="display:flex;gap:4px;width:62px;height:38px;">
-                                        <div style="flex:2;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
-                                            <div style="height:3px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;width:85%;"></div>
-                                            <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                    <div class="px-2.5 py-2 bg-card border-t border-border">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="text-xs font-semibold block">@layout.Name</span>
+                                                <span class="text-[10px] text-muted-foreground">@layout.Desc</span>
+                                            </div>
+                                            @if (isActiveLayout)
+                                            {
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-foreground shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                            }
                                         </div>
-                                        <div style="width:14px;background:rgba(26,26,26,.1);border-radius:2px;border:1px solid rgba(26,26,26,.15);"></div>
                                     </div>
-                                }
-                                else if (layout.Id == "Modern")
-                                {
-                                    @* full-width bold rows *@
-                                    <div style="width:64px;display:flex;flex-direction:column;gap:2px;">
-                                        <div style="height:10px;background:rgba(26,26,26,.35);border-radius:1px;width:100%;"></div>
-                                        <div style="height:8px;background:rgba(26,26,26,.18);border-radius:1px;width:100%;"></div>
-                                        <div style="height:8px;background:rgba(26,26,26,.12);border-radius:1px;width:100%;"></div>
-                                    </div>
-                                }
-                            </div>
-                            <div class="px-2.5 py-2 bg-card border-t border-border">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <span class="text-xs font-semibold block">@layout.Name</span>
-                                        <span class="text-[10px] text-muted-foreground">@layout.Desc</span>
-                                    </div>
-                                    @if (isActiveLayout)
-                                    {
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-foreground shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                    }
-                                </div>
-                            </div>
-                        </button>
-                    </form>
-                }
-            </div>
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            }
         </div>
 
         @* Inkwell Color Presets *@

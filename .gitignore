@@ -42,3 +42,34 @@ Blog.Web/wwwroot/uploads/**/*
 # Generated OG images (auto-created at runtime)
 Blog.Web/wwwroot/og-cache/**/*
 !Blog.Web/wwwroot/og-cache/.gitkeep
+
+# DBScripts — data/content files (site-specific, not schema migrations)
+DBScripts/*content*.sql
+DBScripts/*content-calendar*.sql
+DBScripts/*set-feature-images*.sql
+DBScripts/*update-feature-images*.sql
+DBScripts/*feature-images*.sql
+DBScripts/*feature-image*.sql
+DBScripts/*fix-mojibake*.sql
+DBScripts/*publish-content*.sql
+DBScripts/*reset-*.sql
+DBScripts/*ehr-articles*.sql
+DBScripts/*optosoft-india*.sql
+DBScripts/branding-settings-update.sql
+DBScripts/update-2025-to-2026.sql
+
+# Site-specific planning docs (not engine code)
+CONTENT_PLAN.md
+
+# Credentials and local secrets — NEVER commit these
+Blog.Web/local-admin-login-credentials.txt
+*credentials*.txt
+*-credentials.txt
+
+# Claude Code local settings (may contain server credentials in allow rules)
+.claude/settings.json
+.claude/settings.local.json
+.claude/worktrees/
+
+# Publish profiles (server-specific deployment config)
+Blog.Web/Properties/PublishProfiles/

@@ -1,0 +1,127 @@
+@using Blog.Core.Interfaces
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+    var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+    string GetExcerpt(Blog.Core.Domain.Post p) =>
+        !string.IsNullOrEmpty(p.MetaDescription) ? p.MetaDescription :
+        !string.IsNullOrEmpty(p.Plaintext) ? (p.Plaintext.Length > 140 ? p.Plaintext[..137] + "…" : p.Plaintext) :
+        string.Empty;
+    var qParts = new List<string>();
+    if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
+    if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
+    if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+    var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
+
+    var posts = Model.Items.ToList();
+    // Lead story spans all 3 cols; remaining posts fill 3-col grid
+    var leadPost = posts.FirstOrDefault();
+    var columnPosts = posts.Skip(1).ToList();
+}
+
+@* ── BROADSHEET LAYOUT — multi-column newspaper, dense typography ── *@
+<div style="max-width:var(--container);margin:0 auto;padding:var(--sp-10) var(--gutter);">
+
+    @* Masthead rule *@
+    <div style="border-top:3px solid var(--fg);border-bottom:1px solid var(--border);padding:var(--sp-4) 0;margin-bottom:var(--sp-8);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg-meta);">@DateTime.Now.ToString("dddd, MMMM d, yyyy")</span>
+        @if (!string.IsNullOrEmpty(searchTerm))
+        {
+            <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">Search: "@searchTerm" — <a href="/" style="color:var(--fg-meta);">clear</a></span>
+        }
+    </div>
+
+    @if (!posts.Any())
+    {
+        <p style="font-family:var(--serif);font-size:1.125rem;color:var(--fg-meta);padding:var(--sp-16) 0;text-align:center;">No stories today.</p>
+    }
+    else
+    {
+        @* LEAD STORY — full-width headline *@
+        @if (leadPost != null)
+        {
+            var leadCat = leadPost.Categories?.FirstOrDefault();
+            var leadExcerpt = GetExcerpt(leadPost);
+            <div style="border-bottom:2px solid var(--fg);padding-bottom:var(--sp-8);margin-bottom:var(--sp-8);display:grid;grid-template-columns:1fr@(string.IsNullOrEmpty(leadPost.FeatureImage) ? "" : " 1fr");gap:var(--sp-8);align-items:start;">
+                <div>
+                    @if (leadCat != null)
+                    {
+                        <span style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--link);margin-bottom:var(--sp-4);">@leadCat.Name</span>
+                    }
+                    <h1 style="font-family:var(--serif);font-size:clamp(1.75rem,4vw,2.75rem);font-weight:700;line-height:1.1;margin:0 0 var(--sp-4);">
+                        <a href="/@leadPost.Slug" style="color:var(--fg);text-decoration:none;">@leadPost.Title</a>
+                    </h1>
+                    @if (!string.IsNullOrEmpty(leadExcerpt))
+                    {
+                        <p style="font-family:var(--serif);font-size:1.0625rem;line-height:1.65;color:var(--fg-body);margin:0 0 var(--sp-6);border-left:3px solid var(--border);padding-left:var(--sp-6);">@leadExcerpt</p>
+                    }
+                    <div style="display:flex;gap:var(--sp-6);font-family:var(--sans);font-size:12px;color:var(--fg-meta);">
+                        @if (!string.IsNullOrEmpty(leadPost.AuthorName))
+                        {
+                            <span>By @leadPost.AuthorName</span>
+                        }
+                        <time>@leadPost.PublishedAt?.ToString("MMMM d, yyyy")</time>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(leadPost.FeatureImage))
+                {
+                    <a href="/@leadPost.Slug" style="display:block;border-radius:var(--r-1);overflow:hidden;aspect-ratio:4/3;">
+                        <img src="@leadPost.FeatureImage" alt="@leadPost.Title" loading="eager"
+                             style="width:100%;height:100%;object-fit:cover;display:block;" />
+                    </a>
+                }
+            </div>
+        }
+
+        @* THREE-COLUMN GRID — compact newspaper columns *@
+        @if (columnPosts.Any())
+        {
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--border);">
+                @foreach (var p in columnPosts)
+                {
+                    var cat = p.Categories?.FirstOrDefault();
+                    var excerpt = GetExcerpt(p);
+                    <article style="padding:var(--sp-6);border-right:1px solid var(--border);border-bottom:1px solid var(--border);">
+                        @if (cat != null)
+                        {
+                            <a href="/?category=@cat.Slug" style="display:block;font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:3px;">@cat.Name</a>
+                        }
+                        <h3 style="font-family:var(--serif);font-size:1rem;font-weight:700;line-height:1.25;margin:0 0 var(--sp-3);">
+                            <a href="/@p.Slug" style="color:var(--fg);text-decoration:none;">@p.Title</a>
+                        </h3>
+                        @if (!string.IsNullOrEmpty(excerpt))
+                        {
+                            <p style="font-family:var(--serif);font-size:0.875rem;line-height:1.6;color:var(--fg-body);margin:0 0 var(--sp-4);">@excerpt</p>
+                        }
+                        <div style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">
+                            @if (!string.IsNullOrEmpty(p.AuthorName))
+                            {
+                                <span>@p.AuthorName · </span>
+                            }
+                            <time>@p.PublishedAt?.ToString("MMM d")</time>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    }
+
+    @* Pagination *@
+    @if (Model.TotalPages > 1)
+    {
+        <div style="margin-top:var(--sp-10);display:flex;align-items:center;justify-content:space-between;border-top:2px solid var(--fg);padding-top:var(--sp-6);">
+            @if (Model.Page > 1)
+            {
+                <a href="?page=@(Model.Page-1)@baseQuery" style="font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--fg);text-decoration:none;">← Previous Edition</a>
+            }
+            else { <span></span> }
+            <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">Page @Model.Page of @Model.TotalPages</span>
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a href="?page=@(Model.Page+1)@baseQuery" style="font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--fg);text-decoration:none;">Next Edition →</a>
+            }
+            else { <span></span> }
+        </div>
+    }
+</div>

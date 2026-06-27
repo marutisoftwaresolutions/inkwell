@@ -30,13 +30,61 @@ else if (blogLayout == "Modern")
 {
     <partial name="_Index_Modern" model="Model" />
 }
+else if (blogLayout == "Feed")
+{
+    <partial name="_Index_Feed" model="Model" />
+}
+else if (blogLayout == "Reader")
+{
+    <partial name="_Index_Reader" model="Model" />
+}
+else if (blogLayout == "Showcase")
+{
+    <partial name="_Index_Showcase" model="Model" />
+}
+else if (blogLayout == "Bento")
+{
+    <partial name="_Index_Bento" model="Model" />
+}
+else if (blogLayout == "Timeline")
+{
+    <partial name="_Index_Timeline" model="Model" />
+}
+else if (blogLayout == "Stream")
+{
+    <partial name="_Index_Stream" model="Model" />
+}
+else if (blogLayout == "Newsletter")
+{
+    <partial name="_Index_Newsletter" model="Model" />
+}
+else if (blogLayout == "Journal")
+{
+    <partial name="_Index_Journal" model="Model" />
+}
+else if (blogLayout == "Notebook")
+{
+    <partial name="_Index_Notebook" model="Model" />
+}
+else if (blogLayout == "Studio")
+{
+    <partial name="_Index_Studio" model="Model" />
+}
+else if (blogLayout == "Broadsheet")
+{
+    <partial name="_Index_Broadsheet" model="Model" />
+}
+else if (blogLayout == "Almanac")
+{
+    <partial name="_Index_Almanac" model="Model" />
+}
 else
 {
     <partial name="_Index_Neutral" model="Model" />
 }
 
-@* Magazine layout owns its own subscribe block inside the footer *@
-@if (blogLayout != "Magazine")
+@* Magazine and Newsletter layouts own their own subscribe block *@
+@if (blogLayout != "Magazine" && blogLayout != "Newsletter")
 {
     <!-- Newsletter Signup -->
     <div class="container xl:max-w-4xl mx-auto px-4">

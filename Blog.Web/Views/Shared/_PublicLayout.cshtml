@@ -2,215 +2,232 @@
 @inject Blog.Core.Interfaces.ISettingRepository SettingsRepo
 @inject Blog.Core.Interfaces.ITenantContext TenantContext
 @inject Blog.Core.Interfaces.IUserRepository UserRepo
+@inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
 @using System.Security.Claims
 @{
-    Guid contentId = Guid.Empty;
-    if (TenantContext.IsCloudMode)
-    {
-        if (TenantContext.IsResolved)
-        {
-            contentId = TenantContext.UserId;
-        }
-        else if (Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id))
-        {
-            contentId = id;
-        }
-    }
-    
-    if (contentId == Guid.Empty)
-    {
-        var admin = await UserRepo.GetFirstAdminAsync();
-        contentId = admin?.Id ?? Guid.Empty;
-    }
-    
-    Guid brandingId = contentId;
+	Guid contentId = Guid.Empty;
+	if (TenantContext.IsCloudMode)
+	{
+		if (TenantContext.IsResolved)
+		{
+			contentId = TenantContext.UserId;
+		}
+		else if (Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id))
+		{
+			contentId = id;
+		}
+	}
 
-    var themeSettings = await ThemeSettingsRepo.GetAllAsync(brandingId);
-    var themeDict = themeSettings.ToDictionary(s => s.SettingKey, s => s.EffectiveValue);
+	if (contentId == Guid.Empty)
+	{
+		var admin = await UserRepo.GetFirstAdminAsync();
+		contentId = admin?.Id ?? Guid.Empty;
+	}
 
-    string GetTheme(string key, string fallback) => themeDict.TryGetValue(key, out var v) ? v : fallback;
+	Guid brandingId = contentId;
 
-    var fontHeading = GetTheme("font-heading", "Inter");
-    var fontBody = GetTheme("font-body", "Inter");
-    var fontsToLoad = new HashSet<string> { fontHeading, fontBody, "Inter" };
+	var themeSettings = await ThemeSettingsRepo.GetAllAsync(brandingId);
+	var themeDict = themeSettings.ToDictionary(s => s.SettingKey, s => s.EffectiveValue);
 
-    var userSettings = await SettingsRepo.GetSettingsAsync(brandingId);
-    var siteName = userSettings.SiteName;
-    var siteDescription = userSettings.SiteDescription;
-    
-    var globalSettings = await SettingsRepo.GetSettingsAsync(brandingId);
+	string GetTheme(string key, string fallback) => themeDict.TryGetValue(key, out var v) ? v : fallback;
+
+	var fontHeading = GetTheme("font-heading", "Inter");
+	var fontBody = GetTheme("font-body", "Inter");
+	var fontsToLoad = new HashSet<string> { fontHeading, fontBody, "Inter" };
+
+	var userSettings = await SettingsRepo.GetSettingsAsync(brandingId);
+	var siteName = userSettings.SiteName;
+	var siteDescription = userSettings.SiteDescription;
+
+	var globalSettings = await SettingsRepo.GetSettingsAsync(brandingId);
 }
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"]</title>
-    <meta name="description" content="@ViewData["Description"]" />
-    @if (!string.IsNullOrEmpty(globalSettings.SiteFaviconUrl))
-    {
-        <link rel="icon" type="image/x-icon" href="@globalSettings.SiteFaviconUrl" />
-    }
-    @await RenderSectionAsync("MetaTags", required: false)
-    @if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
-    {
-        <script async src="https://www.googletagmanager.com/gtag/js?id=@globalSettings.GoogleAnalyticsId"></script>
-        <script>
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '@globalSettings.GoogleAnalyticsId');
-        </script>
-    }
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>@ViewData["Title"]</title>
+	<meta name="description" content="@ViewData["Description"]" />
+	@if (!string.IsNullOrEmpty(globalSettings.SiteFaviconUrl))
+	{
+		<link rel="icon" type="image/x-icon" href="@globalSettings.SiteFaviconUrl" />
+	}
+	@await RenderSectionAsync("MetaTags", required: false)
+	@if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
+	{
+		<script async src="https://www.googletagmanager.com/gtag/js?id=@globalSettings.GoogleAnalyticsId"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', '@globalSettings.GoogleAnalyticsId');
+		</script>
+	}
 
-    <!-- Inkwell Fonts (self-hosted) -->
-    <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
+	<!-- Inkwell Fonts (self-hosted) -->
+	<link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
 
-    <!-- Bootstrap Icons (self-hosted) -->
-    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+	<!-- Bootstrap Icons (self-hosted) -->
+	<link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
 
-    <!-- Tailwind CSS (self-hosted) -->
-    <script src="~/lib/tailwindcss/tailwind.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
-                        serif: ["'Source Serif 4'", 'Georgia', 'serif'],
-                        body: ["'Source Serif 4'", 'Georgia', 'serif'],
-                        mono: ["'Geist Mono'", 'monospace'],
-                    },
-                    colors: {
-                        neutral: {
-                            50: 'var(--bg)',
-                            100: 'var(--surface)',
-                            200: 'var(--border)',
-                            500: 'var(--fg-meta)',
-                            700: 'var(--fg-body)',
-                            900: 'var(--fg)',
-                        },
-                        primary: 'var(--ink-black)',
-                        'primary-foreground': 'var(--ink-cream)',
-                    }
-                }
-            }
-        }
-    </script>
+	<!-- Tailwind CSS (self-hosted) -->
+	<script src="~/lib/tailwindcss/tailwind.js"></script>
+	<script>
+		tailwind.config = {
+		theme: {
+		extend: {
+		fontFamily: {
+		sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
+		serif: ["'Source Serif 4'", 'Georgia', 'serif'],
+		body: ["'Source Serif 4'", 'Georgia', 'serif'],
+		mono: ["'Geist Mono'", 'monospace'],
+		},
+		colors: {
+		neutral: {
+		50: 'var(--bg)',
+		100: 'var(--surface)',
+		200: 'var(--border)',
+		500: 'var(--fg-meta)',
+		700: 'var(--fg-body)',
+		900: 'var(--fg)',
+		},
+		primary: 'var(--ink-black)',
+		'primary-foreground': 'var(--ink-cream)',
+		}
+		}
+		}
+		}
+	</script>
 
-    <!-- Theme CSS Variables -->
-    @if (themeSettings.Any())
-    {
-        <style>
-            :root {
-                @foreach (var s in themeSettings.Where(s => s.SettingGroup == "colors"))
-                {
-                    @:--@(s.SettingKey): @(s.EffectiveValue);
-                }
-                --font-sans: '@fontHeading', sans-serif;
-                --font-body: '@fontBody', sans-serif;
-                --radius: @(GetTheme("border-radius", "0.5rem"));
-            }
-        </style>
-    }
-    else
-    {
-        <style>
-            :root {
-                --background: var(--ink-cream); --foreground: var(--ink-black);
-                --primary: var(--ink-black); --primary-foreground: var(--ink-cream);
-                --secondary: var(--ink-cream-deep); --secondary-foreground: var(--ink-black);
-                --muted: var(--ink-cream-deep); --muted-foreground: var(--ink-sepia);
-                --accent: var(--ink-cream-edge); --accent-foreground: var(--ink-black);
-                --card: var(--ink-cream-deep); --card-foreground: var(--ink-black);
-                --border: var(--ink-cream-edge); --destructive: #8C2A1F;
-                --font-sans: 'Geist', sans-serif; --font-body: 'Source Serif 4', serif; --radius: 2px;
-            }
-        </style>
-    }
+	<!-- Theme CSS Variables -->
+	@if (themeSettings.Any())
+	{
+		<style>
+			:root {
+			@foreach (var
+			s in themeSettings.Where(s => s.SettingGroup == "colors"))
+			{
+				@:-- @(s.SettingKey) : @(s.EffectiveValue);
+			}
+			--font-sans: '@fontHeading', sans-serif;
+			--font-body: '@fontBody', sans-serif;
+			--radius: @(GetTheme("border-radius", "0.5rem"));
+			}
+		</style>
+	}
+	else
+	{
+		<style>
+			:root {
+			--background: var(--ink-cream);
+			--foreground: var(--ink-black);
+			--primary: var(--ink-black);
+			--primary-foreground: var(--ink-cream);
+			--secondary: var(--ink-cream-deep);
+			--secondary-foreground: var(--ink-black);
+			--muted: var(--ink-cream-deep);
+			--muted-foreground: var(--ink-sepia);
+			--accent: var(--ink-cream-edge);
+			--accent-foreground: var(--ink-black);
+			--card: var(--ink-cream-deep);
+			--card-foreground: var(--ink-black);
+			--border: var(--ink-cream-edge);
+			--destructive: #8C2A1F;
+			--font-sans: 'Geist', sans-serif;
+			--font-body: 'Source Serif 4', serif;
+			--radius: 2px;
+			}
+		</style>
+	}
 
-    <!-- Inkwell Design System -->
-    <link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
-    <!-- Legacy neutral styles (filters, pagination, non-Magazine layouts) -->
-    <link rel="stylesheet" href="~/css/neutral-blog.css" asp-append-version="true" />
+	<!-- Inkwell Design System -->
+	<link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
+	<!-- Legacy neutral styles (filters, pagination, non-Magazine layouts) -->
+	<link rel="stylesheet" href="~/css/neutral-blog.css" asp-append-version="true" />
 
-    <!-- Highlight.js for code blocks (self-hosted) -->
-    <link rel="stylesheet" href="~/lib/highlightjs/github-dark.min.css">
-    <script src="~/lib/highlightjs/highlight.min.js"></script>
-    <script>hljs.highlightAll();</script>
+	<!-- Highlight.js for code blocks (self-hosted) -->
+	<link rel="stylesheet" href="~/lib/highlightjs/github-dark.min.css">
+	<script src="~/lib/highlightjs/highlight.min.js"></script>
+	<script>hljs.highlightAll();</script>
 
-    <!-- Lucide icons (self-hosted) -->
-    <script src="~/lib/lucide/lucide.min.js"></script>
-    <!-- Alpine.js (self-hosted) -->
-    <script defer src="~/lib/alpinejs/alpine.min.js"></script>
+	<!-- Lucide icons (self-hosted) -->
+	<script src="~/lib/lucide/lucide.min.js"></script>
+	<!-- Alpine.js (self-hosted) -->
+	<script defer src="~/lib/alpinejs/alpine.min.js"></script>
 
-    <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/feed" />
+	<link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/feed" />
 
-    @{
-        var orgBaseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
-        var orgSchema = new System.Text.Json.JsonSerializerOptions { WriteIndented = false };
-        var orgData = new System.Collections.Generic.Dictionary<string, object>
-        {
-            ["@context"] = "https://schema.org",
-            ["@type"] = "Organization",
-            ["name"] = siteName,
-            ["url"] = orgBaseUrl,
-            ["description"] = siteDescription
-        };
-        if (!string.IsNullOrEmpty(globalSettings.SiteLogoUrl))
-            orgData["logo"] = new System.Collections.Generic.Dictionary<string, string>
-            {
-                ["@type"] = "ImageObject",
-                ["url"] = globalSettings.SiteLogoUrl
-            };
-        if (!string.IsNullOrEmpty(globalSettings.SocialTwitter))
-            orgData["sameAs"] = new[] { globalSettings.SocialTwitter };
-    }
-    <script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(orgData, orgSchema))</script>
+	@{
+		var orgBaseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+		var orgSchema = new System.Text.Json.JsonSerializerOptions { WriteIndented = false };
+		var orgData = new System.Collections.Generic.Dictionary<string, object>
+		{
+			["@context"] = "https://schema.org",
+			["@type"] = "Organization",
+			["name"] = siteName,
+			["url"] = orgBaseUrl,
+			["description"] = siteDescription
+		};
+		if (!string.IsNullOrEmpty(globalSettings.SiteLogoUrl))
+			orgData["logo"] = new System.Collections.Generic.Dictionary<string, string>
+			{
+				["@type"] = "ImageObject",
+				["url"] = globalSettings.SiteLogoUrl
+			};
+		if (!string.IsNullOrEmpty(globalSettings.SocialTwitter))
+			orgData["sameAs"] = new[] { globalSettings.SocialTwitter };
+	}
+	<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(orgData, orgSchema))</script>
 </head>
 
-@{ var inkwellPreset = GetTheme("inkwell-preset", "cream"); }
+@{
+	var inkwellPreset = GetTheme("inkwell-preset", "cream");
+}
 <body class="inkwell-root font-sans" data-preset="@inkwellPreset" style="color: var(--fg-body); background: var(--bg);">
 
-    @if (ViewData["HideLayoutChrome"] == null)
-    {
-        <!-- Header -->
-        <div class="relative z-50">
-            @await Component.InvokeAsync("Navbar", new { ownerId = brandingId })
-        </div>
-    }
+	@if (ViewData["HideLayoutChrome"] == null)
+	{
+		<!-- Header -->
+		<div class="relative z-50">
+			@await Component.InvokeAsync("Navbar", new { ownerId = brandingId })
+		</div>
+	}
 
-    <!-- Main Content -->
-    <main class="relative">
-        @RenderBody()
-    </main>
+	<!-- Main Content -->
+	<main class="relative">
+		@RenderBody()
+	</main>
 
-    @if (ViewData["HideLayoutChrome"] == null)
-    {
-        <!-- Footer -->
-        @await Component.InvokeAsync("Footer", new { ownerId = brandingId })
-    }
+	@if (ViewData["HideLayoutChrome"] == null)
+	{
+		<!-- Footer -->
+		@await Component.InvokeAsync("Footer", new { ownerId = brandingId })
+	}
 
-    <!-- Scroll to Top -->
-    <a href="#" id="backToTop" class="back-top fixed py-2 px-3 border border-dashed end-4 bottom-4" style="background: var(--muted); border-color: var(--border); color: var(--muted-foreground);" aria-label="Scroll To Top">
-        <i class="bi bi-arrow-up"></i>
-    </a>
+	<!-- Scroll to Top -->
+	<a href="#" id="backToTop" class="back-top fixed py-2 px-3 border border-dashed end-4 bottom-4" style="background: var(--muted); border-color: var(--border); color: var(--muted-foreground);" aria-label="Scroll To Top">
+		<i class="bi bi-arrow-up"></i>
+	</a>
 
-    <script src="~/lib/htmx/htmx.min.js"></script>
-    <script>
-        // Scroll to top
-        (function () {
-            var btn = document.getElementById('backToTop');
-            if (!btn) return;
-            window.addEventListener('scroll', function () {
-                btn.classList.toggle('show', window.scrollY > 300);
-            });
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-        })();
-    </script>
-    @await RenderSectionAsync("Scripts", required: false)
+	<script src="~/lib/htmx/htmx.min.js"></script>
+	<script>
+		// Scroll to top
+		(function () {
+		var btn = document.getElementById('backToTop');
+		if (!btn) return;
+		window.addEventListener('scroll', function () {
+		btn.classList.toggle('show', window.scrollY > 300);
+		});
+		btn.addEventListener('click', function (e) {
+		e.preventDefault();
+		window.scrollTo({ top: 0, behavior: 'smooth' });
+		});
+		})();
+	</script>
+	@if (!string.IsNullOrEmpty(_rcfg["ReCaptcha:SiteKey"]))
+	{
+		<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+	}
+	@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

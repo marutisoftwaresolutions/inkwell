@@ -92,7 +92,7 @@ public class PostRepository : IPostRepository
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE {whereClause}
-            ORDER BY p.PublishedAt DESC
+            ORDER BY COALESCE(p.PublishedAt, p.UpdatedAt, p.CreatedAt) DESC
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var posts = (await conn.QueryAsync<Post>(sql, p)).ToList();

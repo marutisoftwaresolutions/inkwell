@@ -8,16 +8,111 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="wwwroot\uploads\features\best-optometry-ehr-software-2026.jpg" />
-    <Content Include="wwwroot\uploads\features\cloud-vs-server-optometry-ehr.jpg" />
-    <Content Include="wwwroot\uploads\features\compulink-optometry-review.jpg" />
-    <Content Include="wwwroot\uploads\features\crystal-pm-vs-officemate.jpg" />
-    <Content Include="wwwroot\uploads\features\eyefinity-ehr-review.jpg" />
-    <Content Include="wwwroot\uploads\features\how-to-switch-optometry-ehr.jpg" />
-    <Content Include="wwwroot\uploads\features\imedicware-optometry-review.jpg" />
-    <Content Include="wwwroot\uploads\features\maximeyes-ehr-review.jpg" />
-    <Content Include="wwwroot\uploads\features\optometry-ehr-implementation-checklist.jpg" />
-    <Content Include="wwwroot\uploads\features\revolution-ehr-review.jpg" />
+    <Content Include="wwwroot\uploads\features\ai-powered-optometry-machine-learning-eye-care-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\anti-reflective-lens-coating-track-upsell-optometry-software.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\best-contact-lens-fitting-software-optometrists-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\best-digital-retinal-cameras-optometry-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\best-optometry-ehr-software-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\best-optometry-practice-management-software-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\cloud-vs-server-optometry-ehr.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\compulink-optometry-review.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\contact-lens-inventory-management-software-optometry.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\contact-lens-practice-builder-software-grow-revenue.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\crystal-pm-vs-officemate.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\diabetic-eye-exam-ai-screening-tools-optometrists-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\ehr-interoperability-optometrists-connecting-medical-systems.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\eyefinity-ehr-review.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\frame-lens-inventory-management-software-optical-dispensaries.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\glaucoma-detection-software-ai-tools-optometrists-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\hipaa-compliant-ehr-optometrists-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\how-to-switch-optometry-ehr.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\icd-10-cpt-codes-optometry-2026-reference-guide.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\imedicware-optometry-review.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\maximeyes-ehr-review.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\medical-vs-vision-insurance-billing-optometry-guide.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\oct-vs-fundus-photography-optometry.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\officemate-ehr-review-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\optical-pos-systems-eye-care-stores-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\optical-retail-software-increase-frame-sales.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\optometry-billing-software-reduce-claim-denials-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\optometry-ehr-implementation-checklist.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\optometry-practice-analytics-grow-eye-care-business.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\patient-communication-tools-optometry-recalls-reminders.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\revolution-ehr-review.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\teleoptometry-platforms-compared-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\teleoptometry-reimbursement-guide-state-by-state.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\treating-amblyopia-children-software-track-progress-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\vision-therapy-software-management-tools-ods-2026.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
     <Content Include="wwwroot\uploads\images\2026-02\06567fbb489541a2acca8e09dd90e1a0.jpg" />
     <Content Include="wwwroot\uploads\images\2026-02\1013c54ea3924ac1922410b44bf0e08c.png" />
     <Content Include="wwwroot\uploads\images\2026-02\422438e9403e470198e5e2f15f20b989.jpg" />
@@ -40,6 +135,12 @@
 
   <ItemGroup>
     <None Include="wwwroot\uploads\avatars\.gitkeep" />
+    <Content Include="wwwroot\uploads\features\optosoft-vs-global-optical-software-2026.svg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\uploads\features\optosoft-vs-indian-optical-software-2026.svg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
     <None Include="wwwroot\uploads\images\.gitkeep" />
     <None Include="wwwroot\uploads\images\2026-02\aafafcb2cf8d445f85f1ae7019382407.svg" />
     <None Include="wwwroot\uploads\images\2026-03\48b820c4b5054d8490d27707caa8fb9b.webp" />
@@ -55,7 +156,6 @@
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.2" />
-    <PackageReference Include="MaxMind.GeoIP2" Version="5.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
     <PackageReference Include="SixLabors.ImageSharp.Web" Version="3.2.0" />

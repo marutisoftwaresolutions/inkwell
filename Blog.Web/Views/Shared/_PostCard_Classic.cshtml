@@ -3,11 +3,11 @@
 <!-- Post item -->
 <article class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 py-8 border-b border-solid shadow-sm rounded last:border-b-0" style="border-color: var(--border);">
     <!-- Thumbnail -->
-    <div class="aspect-[2/1] md:aspect-[3/2] overflow-hidden w-full" style="background: var(--muted);">
+    <div class="aspect-[120/63] overflow-hidden w-full" style="background: var(--muted);">
         <a href="/@Model.Slug">
             @if (!string.IsNullOrEmpty(Model.FeatureImage))
             {
-                <img class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="@Model.FeatureImage" alt="@Model.Title" loading="lazy" />
+                <img class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="@Model.FeatureImage" alt="@Model.Title" asp-append-version="true" loading="lazy" />
             }
             else
             {

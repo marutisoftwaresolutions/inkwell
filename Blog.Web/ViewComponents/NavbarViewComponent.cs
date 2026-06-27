@@ -38,9 +38,12 @@ public class NavbarViewComponent : ViewComponent
             Categories = categories
         };
 
-        // Select layout variant
+        // Select layout variant — only render views that actually exist
+        var supportedNavbarLayouts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "Neutral", "Magazine", "Grid", "Minimal", "Classic", "Modern", "Feed" };
         var layoutSetting = await _themeSettings.GetByKeyAsync(ownerId, "layout-navbar");
-        var layout = layoutSetting?.EffectiveValue ?? "Neutral";
+        var raw = layoutSetting?.EffectiveValue ?? "Neutral";
+        var layout = supportedNavbarLayouts.Contains(raw) ? raw : "Neutral";
 
         return View(layout, model);
     }

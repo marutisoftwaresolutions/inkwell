@@ -1,4 +1,5 @@
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Text;
@@ -17,11 +18,12 @@ public class BlogController : Controller
     private readonly ITenantContext _tenantContext;
     private readonly IUserRepository _users;
     private readonly IRedirectRepository _redirects;
+    private readonly ReCaptchaService _recaptcha;
 
     public BlogController(IPostRepository posts, IPageRepository pages, ICategoryRepository categories,
         ITagRepository tags, ICommentRepository comments, ISettingRepository settings,
         ICustomThemeSettingRepository themeSettings, ITenantContext tenantContext, IUserRepository users,
-        IRedirectRepository redirects)
+        IRedirectRepository redirects, ReCaptchaService recaptcha)
     {
         _posts = posts;
         _pages = pages;
@@ -33,6 +35,7 @@ public class BlogController : Controller
         _tenantContext = tenantContext;
         _users = users;
         _redirects = redirects;
+        _recaptcha = recaptcha;
     }
 
     /// <summary>Gets the owner user ID for data scoping — uses tenant context if resolved, else falls back to primary site owner (first admin).</summary>
@@ -157,6 +160,9 @@ public class BlogController : Controller
         return View("Index", posts);
     }
 
+    [HttpGet("posts/{slug}")]
+    public IActionResult PostRedirect(string slug) => RedirectPermanent($"/{slug}");
+
     [HttpGet("{slug}")]
     public async Task<IActionResult> Post(string slug)
     {
@@ -176,7 +182,12 @@ public class BlogController : Controller
             return NotFound();
         }
 
-        await _posts.IncrementViewCountAsync(post.Id);
+        // Only count views from anonymous visitors — skip admin/editor sessions
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            await _posts.IncrementViewCountAsync(post.Id);
+            post.ViewCount += 1; // reflect increment so the view shows the current count
+        }
 
         // Build nested comment tree
         var flatComments = await _comments.GetApprovedForPostAsync(post.Id);
@@ -240,6 +251,13 @@ public class BlogController : Controller
         if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(authorEmail) || string.IsNullOrWhiteSpace(content))
         {
             TempData["CommentError"] = "All fields are required.";
+            return RedirectToAction("Post", new { slug });
+        }
+
+        var captchaToken = Request.Form["g-recaptcha-response"].ToString();
+        if (!await _recaptcha.ValidateAsync(captchaToken))
+        {
+            TempData["CommentError"] = "reCAPTCHA verification failed. Please try again.";
             return RedirectToAction("Post", new { slug });
         }
 

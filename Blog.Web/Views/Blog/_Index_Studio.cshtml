@@ -1,0 +1,114 @@
+@using Blog.Core.Interfaces
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+    var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+    var qParts = new List<string>();
+    if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
+    if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
+    if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+    var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
+
+    var posts = Model.Items.ToList();
+    // First post is the hero cover; rest fill a masonry-style photo grid
+    var heroPost = posts.FirstOrDefault();
+    var gridPosts = posts.Skip(1).ToList();
+}
+
+@* ── STUDIO LAYOUT — cover-heavy masonry, photo-essay style ── *@
+
+@if (!string.IsNullOrEmpty(searchTerm))
+{
+    <div style="max-width:var(--container);margin:0 auto;padding:var(--sp-8) var(--gutter) 0;font-family:var(--sans);font-size:13px;color:var(--fg-meta);">
+        Results for <strong>"@searchTerm"</strong> — <a href="/" style="color:var(--fg-meta);">clear</a>
+    </div>
+}
+
+@if (!posts.Any())
+{
+    <div style="max-width:var(--container);margin:0 auto;padding:var(--sp-16) var(--gutter);text-align:center;">
+        <p style="font-family:var(--serif);font-size:1.25rem;color:var(--fg-meta);">No posts yet.</p>
+    </div>
+}
+else
+{
+    @* HERO COVER — full-width with overlay title *@
+    @if (heroPost != null)
+    {
+        <a href="/@heroPost.Slug" style="display:block;position:relative;width:100%;aspect-ratio:21/9;overflow:hidden;text-decoration:none;margin-bottom:var(--sp-4);">
+            @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
+            {
+                <img src="@heroPost.FeatureImage" alt="@heroPost.Title" loading="eager"
+                     style="width:100%;height:100%;object-fit:cover;display:block;" />
+                <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72) 0%,transparent 55%);"></div>
+            }
+            else
+            {
+                <div style="width:100%;height:100%;background:var(--surface);"></div>
+            }
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:var(--sp-10) var(--gutter);">
+                @{var herocat = heroPost.Categories?.FirstOrDefault();}
+                @if (herocat != null)
+                {
+                    <span style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-bottom:var(--sp-4);">@herocat.Name</span>
+                }
+                <h1 style="font-family:var(--serif);font-size:clamp(1.75rem,4vw,3rem);font-weight:700;line-height:1.15;color:#fff;margin:0;">@heroPost.Title</h1>
+                @if (!string.IsNullOrEmpty(heroPost.AuthorName))
+                {
+                    <p style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.65);margin:var(--sp-4) 0 0;">by @heroPost.AuthorName · @heroPost.PublishedAt?.ToString("MMM d, yyyy")</p>
+                }
+            </div>
+        </a>
+    }
+
+    @* PHOTO GRID — alternating sizes: 2-col row, then 3-col row *@
+    @if (gridPosts.Any())
+    {
+        <div style="max-width:var(--container);margin:0 auto;padding:0 var(--gutter);">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-4);">
+                @for (int i = 0; i < gridPosts.Count; i++)
+                {
+                    var p = gridPosts[i];
+                    var cat = p.Categories?.FirstOrDefault();
+                    // Every 5th item (0-indexed 0,5,10...) spans 2 columns
+                    var spanTwo = (i % 5 == 0);
+                    <a href="/@p.Slug"
+                       style="@(spanTwo ? "grid-column:span 2;" : "grid-column:span 1;")display:block;position:relative;overflow:hidden;border-radius:var(--r-2);aspect-ratio:4/3;text-decoration:none;background:var(--surface);">
+                        @if (!string.IsNullOrEmpty(p.FeatureImage))
+                        {
+                            <img src="@p.FeatureImage" alt="@p.Title" loading="lazy"
+                                 style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.4s ease;" />
+                            <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.6) 0%,transparent 50%);"></div>
+                        }
+                        <div style="position:absolute;bottom:0;left:0;right:0;padding:var(--sp-5);">
+                            @if (cat != null)
+                            {
+                                <span style="display:block;font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:3px;">@cat.Name</span>
+                            }
+                            <span style="font-family:var(--serif);font-size:@(spanTwo ? "1.1rem" : "0.9rem");font-weight:700;line-height:1.25;color:#fff;">@p.Title</span>
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    }
+}
+
+@* Pagination *@
+@if (Model.TotalPages > 1)
+{
+    <div style="max-width:var(--container);margin:var(--sp-16) auto 0;padding:0 var(--gutter);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:var(--sp-8);">
+        @if (Model.Page > 1)
+        {
+            <a href="?page=@(Model.Page-1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">← Newer</a>
+        }
+        else { <span></span> }
+        <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Model.Page / @Model.TotalPages</span>
+        @if (Model.Page < Model.TotalPages)
+        {
+            <a href="?page=@(Model.Page+1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg);text-decoration:none;">Older →</a>
+        }
+        else { <span></span> }
+    </div>
+}

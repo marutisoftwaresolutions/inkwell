@@ -1,6 +1,7 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Web.Models;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -12,10 +13,12 @@ namespace Blog.Web.Controllers;
 public class ThemeSettingsController : Controller
 {
     private readonly ICustomThemeSettingRepository _themeSettings;
+    private readonly AuditService _audit;
 
-    public ThemeSettingsController(ICustomThemeSettingRepository themeSettings)
+    public ThemeSettingsController(ICustomThemeSettingRepository themeSettings, AuditService audit)
     {
         _themeSettings = themeSettings;
+        _audit = audit;
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -167,6 +170,7 @@ public class ThemeSettingsController : Controller
             .ToList();
 
         await _themeSettings.SaveAllAsync(userId, updates);
+        await _audit.LogAsync(AuditActions.ThemeUpdated, "Theme");
 
         TempData["Success"] = "Theme settings updated successfully.";
         return RedirectToAction("Index");
@@ -211,6 +215,7 @@ public class ThemeSettingsController : Controller
         };
 
         await _themeSettings.SaveAllAsync(userId, updates);
+        await _audit.LogAsync(AuditActions.ThemePresetApplied, "Theme", null, preset.Name);
 
         TempData["Success"] = $"Theme '{preset.Name}' applied successfully.";
         return RedirectToAction("Index");
@@ -221,7 +226,9 @@ public class ThemeSettingsController : Controller
     public async Task<IActionResult> ApplyLayoutPreset(string presetId)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var validLayouts = new[] { "Neutral", "Magazine", "Minimal", "Grid", "Classic", "Modern" };
+        var validLayouts = new[] { "Neutral", "Magazine", "Grid", "Minimal", "Classic", "Modern",
+            "Feed", "Reader", "Showcase", "Bento", "Timeline", "Stream", "Newsletter", "Journal",
+            "Notebook", "Studio", "Broadsheet", "Almanac" };
 
         // LowercaseUrls routing option lowercases route values — normalise back to PascalCase
         var normalised = validLayouts.FirstOrDefault(l =>
@@ -238,10 +245,22 @@ public class ThemeSettingsController : Controller
         // Seed if not yet created
         await _themeSettings.SeedDefaultsAsync(userId, GetDefaultSettings());
 
+        // Footer/Navbar views only exist for the original 6 layouts — map new layouts to the nearest supported variant
+        var footerNavbarMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Feed",       "Neutral"  }, { "Reader",     "Minimal"  }, { "Showcase",   "Modern"   },
+            { "Bento",      "Grid"     }, { "Timeline",   "Neutral"  }, { "Stream",     "Neutral"  },
+            { "Newsletter", "Minimal"  }, { "Journal",    "Classic"  }, { "Notebook",   "Classic"  },
+            { "Studio",     "Magazine" }, { "Broadsheet", "Classic"  }, { "Almanac",    "Neutral"  },
+        };
+        var footerLayout = footerNavbarMap.TryGetValue(presetId, out var fl) ? fl : presetId;
+        // Navbar has an extra Feed view; others fall back same as footer
+        var navbarLayout = presetId == "Feed" ? "Feed" : footerLayout;
+
         var updates = new List<CustomThemeSetting>
         {
-            new() { SettingKey = "layout-navbar", SettingValue = presetId },
-            new() { SettingKey = "layout-footer", SettingValue = presetId },
+            new() { SettingKey = "layout-navbar", SettingValue = navbarLayout },
+            new() { SettingKey = "layout-footer", SettingValue = footerLayout },
             new() { SettingKey = "layout-index", SettingValue = presetId },
             new() { SettingKey = "layout-postcard", SettingValue = presetId },
             new() { SettingKey = "layout-post", SettingValue = presetId },
@@ -250,6 +269,7 @@ public class ThemeSettingsController : Controller
         };
 
         await _themeSettings.SaveAllAsync(userId, updates);
+        await _audit.LogAsync(AuditActions.ThemeLayoutApplied, "Theme", null, presetId);
 
         TempData["Success"] = $"Layout '{presetId}' applied successfully.";
         return RedirectToAction("Index");
@@ -290,6 +310,7 @@ public class ThemeSettingsController : Controller
             .ToList();
 
         await _themeSettings.SaveAllAsync(userId, resets);
+        await _audit.LogAsync(AuditActions.ThemeUpdated, "Theme", null, "Reset to defaults");
 
         TempData["Success"] = "Theme reset to defaults.";
         return RedirectToAction("Index");
