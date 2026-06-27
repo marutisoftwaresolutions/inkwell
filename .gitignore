@@ -58,8 +58,10 @@ DBScripts/*optosoft-india*.sql
 DBScripts/branding-settings-update.sql
 DBScripts/update-2025-to-2026.sql
 
-# Site-specific planning docs (not engine code)
+# Site-specific planning docs and loose data scripts (not engine code)
 CONTENT_PLAN.md
+branding-settings-update.sql
+feature-images-update.sql
 
 # Credentials and local secrets — NEVER commit these
 Blog.Web/local-admin-login-credentials.txt

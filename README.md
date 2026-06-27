@@ -1,43 +1,50 @@
 # Inkwell
 
-<<<<<<< HEAD
-A modern, open-source blog engine built with .NET 10 and C#. Designed for performance, simplicity, and editorial clarity, Blogfront empowers creators to manage their content without fighting complex configuration.
-=======
-**A free, open-source, self-hosted blogging platform built on .NET.**
+**A free, open-source, self-hosted blogging platform built on .NET.**  
 Multi-tenant by default, themeable, and crafted for writers who care about
 typography, content ownership, and a calm editorial experience.
 
-🌐 https://www.useinkwell.app · 📄 MIT licensed · 🔒 No telemetry, no cloud account
+🌐 [useinkwell.app](https://www.useinkwell.app) · 📄 MIT licensed · 🔒 No telemetry, no cloud account
+
+---
 
 ## Why Inkwell
-- **Self-hosted & private** — your content, your server, your data. GDPR-compliant by
-  architecture (no third-party calls, you are the sole data controller).
-- **Multi-tenant** — one install serves many blogs, each with its own Layout + Preset.
-- **.NET 8+** — single ASP.NET Core binary. No Node, no PHP, no plugin marketplace.
-- **Themeable** — four Layouts (Magazine, Journal, Notebook, Studio) × four Presets
-  (Cream, Ink, Linen, Paper), plus a clean custom-theme API.
-- **The Desk** — keyboard-first Markdown editor with live preview, autosave, footnotes.
-- **Your database** — PostgreSQL (recommended), SQLite, or SQL Server. Dockerfile included.
->>>>>>> eccb46da103c268c0a030d90cc24a91470d0a086
 
-## Quick start
-\`\`\`bash
+- **Self-hosted & private** — your content, your server, your data. No third-party calls; you are the sole data controller.
+- **Multi-tenant** — one install serves many blogs, each with its own layout and color preset.
+- **.NET 10** — single ASP.NET Core binary. No Node, no PHP, no plugin marketplace.
+- **Themeable** — 10 Inkwell color presets × multiple layouts (Magazine, Grid, Minimal, Neutral, Classic, Modern), plus a clean custom-theme API.
+- **Analytics built-in** — page view tracking, UTM attribution, geo-location, and traffic source breakdown. No Google Analytics required.
+- **Audit Trail** — immutable, admin-only log of every write action across the platform.
+- **Your database** — SQL Server or SQL Server LocalDB. Schema auto-applies on startup via `MigrationService`.
+
+---
+
+## Quick Start
+
+```bash
 git clone https://github.com/marutisoftwaresolutions/inkwell
 cd inkwell
-dotnet run
-\`\`\`
-Full docs: https://www.useinkwell.app/docs
+cp Blog.Web/appsettings.example.json Blog.Web/appsettings.json
+# Edit appsettings.json — set your connection string
+dotnet run --project Blog.Web
+```
 
-<<<<<<< HEAD
+Navigate to `/account/register` to claim the Admin account on first launch.
+
+Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
+
+---
+
 ## Features
 
 - **Clean & Fast** — Lightweight MVC architecture with Dapper for zero-ORM SQL performance.
 - **Role-Based Access Control** — Granular permission system with Admin, Editor, and Author roles.
 - **Rich Content Creation** — Draft, schedule, auto-save, and publish posts with a full WYSIWYG editor.
-- **Theme & Layout System** — 10 Inkwell presets, Magazine/Grid/Minimal/Neutral layouts, and live CSS variable customization.
+- **Theme & Layout System** — 10 Inkwell presets, 6+ layouts, and live CSS variable customization from the admin panel.
 - **Analytics Dashboard** — Built-in page view tracking with UTM, referrer, geo-location (country/region), and visit source classification.
-- **Audit Trail** — Immutable, admin-only log of every write action across the platform.
-- **Newsletter & Subscribers** — Send newsletters, manage subscribers, import/export CSV.
+- **Audit Trail** — Immutable, admin-only log of every write action. Filterable and CSV-exportable.
+- **Newsletter & Subscribers** — Compose and send newsletters, manage subscribers, import/export CSV.
 - **Redirects Manager** — Source/destination redirect rules with hit-count tracking.
 - **Members** — Member directory with label-based segmentation.
 - **Media Library** — Secure upload, organized by year/month, paginated API for in-editor browsing.
@@ -53,14 +60,14 @@ Full docs: https://www.useinkwell.app/docs
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- SQL Server 2019 or later
+- SQL Server 2019+ or SQL Server LocalDB
 
 ### Installation
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/MarutiSoftwareSolution/blog.git
-   cd blog
+   git clone https://github.com/marutisoftwaresolutions/inkwell
+   cd inkwell
    ```
 
 2. **Restore dependencies:**
@@ -79,7 +86,7 @@ Full docs: https://www.useinkwell.app/docs
    ```json
    {
      "ConnectionStrings": {
-       "DefaultConnection": "Server=.;Database=BlogEngine;Trusted_Connection=True;"
+       "DefaultConnection": "Server=.;Database=inkwell;Trusted_Connection=True;"
      }
    }
    ```
@@ -95,14 +102,14 @@ Full docs: https://www.useinkwell.app/docs
 
    All schema scripts live in `DBScripts/` and are idempotent (safe to re-run):
    ```powershell
-   sqlcmd -S <server> -d <db> -U <user> -P <pass> -f 65001 -i "DBScripts\<script>.sql"
+   sqlcmd -S <server> -d <db> -U <user> -P <pass> -f 65001 -i "DBScripts\init.sql"
    ```
 
-   > **Important:** Always include `-f 65001` (UTF-8 code page) when running scripts with `sqlcmd` to prevent character encoding corruption in NVARCHAR columns.
+   > Always include `-f 65001` (UTF-8 code page) to prevent character encoding corruption in NVARCHAR columns.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
 Blog.Core/            Domain models, interfaces, AuditActions constants
@@ -110,8 +117,6 @@ Blog.Infrastructure/  Dapper repositories, MigrationService, seeders
 Blog.Web/             ASP.NET Core 10 MVC — controllers, views, middleware, services
 DBScripts/            Idempotent, dated SQL scripts (YYYY-MM-DD_description.sql)
 ```
-
-### Key architectural decisions
 
 | Concern | Approach |
 |---|---|
@@ -125,64 +130,6 @@ DBScripts/            Idempotent, dated SQL scripts (YYYY-MM-DD_description.sql)
 
 ---
 
-## Core Flows
-
-### 1. Authentication & Security
-
-- **First Run**: No users → redirected to `/account/register`. First registrant becomes Admin and seeds RBAC.
-- **Passwords**: PBKDF2 + SHA-256, 100,000 iterations, 16-byte random salt per user.
-- **Sessions**: Secure HTTP-only cookie, 7-day sliding expiry, with granular permission claims.
-- **Audit**: Login, logout, and login failures are all recorded in the Audit Trail.
-
-### 2. Post Creation & Publishing
-
-- Navigate to `/admin/posts/create` for the full editor.
-- **Auto-save** via HTMX hits `/admin/posts/autosave/{id}` continuously in the background.
-- Posts can be saved as **Draft**, **Published**, or **Scheduled** (auto-publishes at `ScheduledAt`).
-- Users without `posts.publish` permission have submissions silently demoted to draft.
-- Categories, tags, and FAQ blocks (JSON-LD schema) are all supported.
-- Medical/optometry content: `LastVerifiedAt` and `NextReviewAt` fields support clinical review workflows.
-
-### 3. Media Management
-
-- Permitted MIME types enforced on upload; 10 MB size limit.
-- Files stored in `/uploads/images/YYYY-MM/` with randomized names.
-- In-editor browsing via paginated JSON API at `/admin/media/api`.
-- OG images auto-generated at `/og-image/{slug}` for every post.
-
-### 4. Theme & Layout Customization
-
-- **Inkwell Design System**: 10 curated color presets (Warm Cream, Ocean Breeze, Midnight Blue, etc.).
-- **Layout engine**: Magazine, Grid, Minimal, Neutral, Classic, and Modern layouts for index, navbar, and footer — independently configurable.
-- All settings stored in `CustomThemeSettings`; the public frontend reads them via CSS variables (`--bg`, `--fg`, `--surface`, etc.).
-
-### 5. Analytics
-
-- `PageViewMiddleware` captures every public page hit — path, referrer, UTM parameters, IP hash, user agent, country, and region.
-- Admin-only dashboard at `/admin/analytics` shows daily/weekly trends, top pages, top referrers, and traffic source breakdown.
-- Authenticated admin requests are never counted.
-
-### 6. Audit Trail
-
-- Every create, update, delete, publish, login, and settings change is written to `AuditLogs`.
-- Accessible only to Admin-role users at `/admin/audit`.
-- Read-only — no delete or truncate endpoint is ever exposed.
-- Filterable by entity type, action, user, and date range. CSV export supported.
-- Before/after JSON snapshots stored for settings and role changes.
-
-### 7. Newsletter & Subscribers
-
-- Compose and send newsletters from `/admin/newsletter`.
-- Subscriber list management at `/admin/subscribers` with CSV import/export.
-- Members can be segmented with labels at `/admin/members`.
-
-### 8. Redirects
-
-- Rule-based redirects managed at `/admin/redirects`.
-- Hit counts tracked per rule; 301/302 selectable.
-
----
-
 ## Database Scripts
 
 All schema changes follow a mandatory naming convention:
@@ -191,32 +138,30 @@ All schema changes follow a mandatory naming convention:
 DBScripts/YYYY-MM-DD_short-description.sql
 ```
 
-Scripts are idempotent and include `IF NOT EXISTS` guards. `MigrationService` applies all required schema on app startup so a fresh install needs no manual SQL step. The `DBScripts/` folder is the authoritative history of all schema changes.
+Scripts are idempotent and include `IF NOT EXISTS` guards. `MigrationService` applies all required schema on app startup — a fresh install needs no manual SQL step. The `DBScripts/` folder is the authoritative history of all schema changes.
 
 ---
 
-## Development Notes
+## Development
 
-- Run with `dotnet watch run --project Blog.Web` for hot-reload during development.
-- The `OptometryTaxonomySeeder` seeds 200+ optometry-specific categories and tags for domain-specific blogs.
-- reCAPTCHA keys are configured in `appsettings.json` under `ReCaptcha:SiteKey` and `ReCaptcha:SecretKey`.
-- SMTP settings live under `Smtp:Host`, `Smtp:Port`, `Smtp:Username`, `Smtp:Password`.
+```bash
+dotnet watch run --project Blog.Web   # hot-reload during development
+```
+
+Key configuration in `appsettings.json`:
+
+| Key | Purpose |
+|---|---|
+| `ConnectionStrings:DefaultConnection` | SQL Server connection string |
+| `ReCaptcha:SiteKey` / `SecretKey` | Google reCAPTCHA v2 keys |
+| `Smtp:Host/Port/Username/Password` | Transactional email |
 
 ---
 
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
-=======
-## License
-MIT © Maruti Software Solutions
-```
 
-> Also add: a `LICENSE` file (MIT) if missing, and 1–2 screenshots/GIF of the Desk and a
-> rendered blog — reviewers and stars both respond to visuals.
+---
 
-### 1e. First stars (legitimate, not bought)
-Star from the team's own accounts, link the repo from the website footer (already done),
-and from the Show HN / Reddit posts below. awesome-selfhosted no longer hard-requires a
-star count, but a repo with visible activity + a real README is far more likely to be accepted.
->>>>>>> eccb46da103c268c0a030d90cc24a91470d0a086
+*Built with care by [Maruti Software Solutions](https://marutisoftwaresolutions.com)*
