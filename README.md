@@ -1,9 +1,34 @@
-# Blogfront
+# Inkwell
 
+<<<<<<< HEAD
 A modern, open-source blog engine built with .NET 10 and C#. Designed for performance, simplicity, and editorial clarity, Blogfront empowers creators to manage their content without fighting complex configuration.
+=======
+**A free, open-source, self-hosted blogging platform built on .NET.**
+Multi-tenant by default, themeable, and crafted for writers who care about
+typography, content ownership, and a calm editorial experience.
 
----
+🌐 https://www.useinkwell.app · 📄 MIT licensed · 🔒 No telemetry, no cloud account
 
+## Why Inkwell
+- **Self-hosted & private** — your content, your server, your data. GDPR-compliant by
+  architecture (no third-party calls, you are the sole data controller).
+- **Multi-tenant** — one install serves many blogs, each with its own Layout + Preset.
+- **.NET 8+** — single ASP.NET Core binary. No Node, no PHP, no plugin marketplace.
+- **Themeable** — four Layouts (Magazine, Journal, Notebook, Studio) × four Presets
+  (Cream, Ink, Linen, Paper), plus a clean custom-theme API.
+- **The Desk** — keyboard-first Markdown editor with live preview, autosave, footnotes.
+- **Your database** — PostgreSQL (recommended), SQLite, or SQL Server. Dockerfile included.
+>>>>>>> eccb46da103c268c0a030d90cc24a91470d0a086
+
+## Quick start
+\`\`\`bash
+git clone https://github.com/marutisoftwaresolutions/inkwell
+cd inkwell
+dotnet run
+\`\`\`
+Full docs: https://www.useinkwell.app/docs
+
+<<<<<<< HEAD
 ## Features
 
 - **Clean & Fast** — Lightweight MVC architecture with Dapper for zero-ORM SQL performance.
@@ -182,3 +207,16 @@ Scripts are idempotent and include `IF NOT EXISTS` guards. `MigrationService` ap
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
+=======
+## License
+MIT © Maruti Software Solutions
+```
+
+> Also add: a `LICENSE` file (MIT) if missing, and 1–2 screenshots/GIF of the Desk and a
+> rendered blog — reviewers and stars both respond to visuals.
+
+### 1e. First stars (legitimate, not bought)
+Star from the team's own accounts, link the repo from the website footer (already done),
+and from the Show HN / Reddit posts below. awesome-selfhosted no longer hard-requires a
+star count, but a repo with visible activity + a real README is far more likely to be accepted.
+>>>>>>> eccb46da103c268c0a030d90cc24a91470d0a086
