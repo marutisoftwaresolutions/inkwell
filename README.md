@@ -1,7 +1,5 @@
 # Inkwell
 
-A modern, open-source blog engine built with .NET 10 and C#. Designed for performance, simplicity, and editorial clarity, Blogfront empowers creators to manage their content without fighting complex configuration.
-
 **A free, open-source, self-hosted blogging platform built on .NET.**
 Multi-tenant by default, themeable, and crafted for writers who care about
 typography, content ownership, and a calm editorial experience.
