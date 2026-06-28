@@ -1,8 +1,6 @@
 # Inkwell
 
-**A free, open-source, self-hosted blogging platform built on .NET.**
-Multi-tenant by default, themeable, and crafted for writers who care about
-typography, content ownership, and a calm editorial experience.
+Free, open-source, self-hosted .NET blogging platform. Multi-tenant by default, themeable with Layouts + Presets, GDPR-friendly with zero telemetry. Built on ASP.NET Core + EF Core. Markdown editor, PostgreSQL/SQLite/SQL Server, Docker.
 
 🌐 [useinkwell.app](https://www.useinkwell.app) · 📄 MIT licensed · 🔒 No telemetry, no cloud account
 
