@@ -1,38 +1,33 @@
 # Inkwell
 
-Free, open-source, self-hosted blogging platform built on .NET 10 and ASP.NET Core MVC.
-No ORM, no cloud account, no telemetry. Dapper-backed, multi-tenant, and designed for writers.
+**A free, open-source, self-hosted blogging platform built on .NET 10.**
+Multi-tenant by default, themeable, and crafted for writers and teams who care about
+typography, content ownership, and a calm editorial experience.
 
-🌐 [useinkwell.app](https://www.useinkwell.app) · 📄 MIT licensed · 🔒 No telemetry, no cloud account
-
----
+🌐 https://www.useinkwell.app · 📄 MIT licensed · 🔒 No telemetry, no cloud account
 
 ## Why Inkwell
+- **Self-hosted & private** — your content, your server, your data. GDPR-compliant by
+  architecture (no third-party calls, you are the sole data controller).
+- **Multi-tenant** — one install serves many blogs, each with its own Layout + Preset.
+- **.NET 10** — single ASP.NET Core binary. No Node, no PHP, no plugin marketplace.
+- **Full WYSIWYG editor** — draft, schedule, autosave, and publish visually.
+- **Themeable** — six Layouts (Magazine, Grid, Minimal, Neutral, Classic, Modern) and
+  ten colour Presets, plus a clean custom-theme API.
+- **Built-in tooling** — analytics dashboard, immutable audit trail, newsletter &
+  subscriber management, redirect rules, and an SEO toolkit (OG images, structured data).
+- **Microsoft SQL Server** (2019+ or LocalDB). Dockerfile included.
 
-- **Self-hosted & private** — your content, your server, your data. You are the sole data controller.
-- **Zero-ORM performance** — Dapper with raw SQL. No Entity Framework, no lazy-load surprises.
-- **Multi-tenant** — one binary serves many blogs. Cloud mode isolates tenants by URL slug; self-hosted mode runs a single-owner install.
-- **Themeable** — 10 Inkwell color presets × 6 layouts (Magazine, Grid, Minimal, Neutral, Classic, Modern) with live CSS variable customization from the admin panel.
-- **Analytics built-in** — page view tracking, UTM attribution, geo-location (country/region via ip-api.com), traffic source classification, and Chart.js dashboards. No third-party tracker required.
-- **Audit Trail** — immutable, admin-only log of every write action across the platform. Filterable and Excel-exportable.
-- **Your database** — SQL Server 2019+, SQL Server LocalDB, or SQLite. Schema auto-applies on startup via `MigrationService`; no manual migration step needed.
-
----
-
-## Quick Start
-
-```bash
+## Quick start
+\`\`\`bash
 git clone https://github.com/marutisoftwaresolutions/inkwell
 cd inkwell
-cp Blog.Web/appsettings.example.json Blog.Web/appsettings.json
-# Edit appsettings.json — set your ConnectionStrings:DefaultConnection
-dotnet run --project Blog.Web
-```
+dotnet run
+\`\`\`
+Full docs: https://www.useinkwell.app/docs
 
-Navigate to `/account/register` to claim the Admin account on first launch.
-
-Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
-
+## License
+MIT © Maruti Software Solutions
 ---
 
 ## Features
