@@ -1,11 +1,10 @@
 # Inkwell
 
-Free, open-source, self-hosted blogging platform built on .NET 10 and ASP.NET Core MVC.
-No ORM, no cloud account, no telemetry. Dapper-backed, multi-tenant, and designed for writers.
+**A free, open-source, self-hosted blogging platform built on .NET 10.**
+Multi-tenant by default, themeable, and crafted for writers and teams who care about
+typography, content ownership, and a calm editorial experience.
 
-🌐 [useinkwell.app](https://www.useinkwell.app) · 📄 MIT licensed · 🔒 No telemetry, no cloud account
-
----
+🌐 https://www.useinkwell.app · 📄 MIT licensed · 🔒 No telemetry, no cloud account
 
 ## Why Inkwell
 
@@ -15,7 +14,8 @@ No ORM, no cloud account, no telemetry. Dapper-backed, multi-tenant, and designe
 - **Themeable** — 16 Inkwell color presets × 20 layouts (Magazine, Feed, Catalog, Verdict, Grid, Minimal, Neutral, Classic, Modern, and more) with live CSS variable customization from the admin panel.
 - **Analytics built-in** — page view tracking, UTM attribution, geo-location (country/region via ip-api.com), traffic source classification, and Chart.js dashboards. No third-party tracker required.
 - **Audit Trail** — immutable, admin-only log of every write action across the platform. Filterable and Excel-exportable.
-- **Error Monitor** — automatic capture of 4xx/5xx errors grouped by signature with occurrence counts and first/last-seen, an admin dashboard, and optional email alerts to multiple recipients on new server errors.
+- **Error Monitor** — 4xx/5xx errors grouped by signature with counts and first/last-seen, an admin dashboard, and optional email alerts on new server errors.
+- **SEO & AI-search ready** — structured data, author E-E-A-T pages, per-tenant `llms.txt`/`llms-full.txt`, and **IndexNow** instant indexing (Bing, Yandex, Seznam, Naver).
 - **Your database** — SQL Server 2019+ or SQL Server LocalDB. Schema auto-applies on startup via `MigrationService`; no manual migration step needed.
 
 ---
@@ -25,14 +25,9 @@ No ORM, no cloud account, no telemetry. Dapper-backed, multi-tenant, and designe
 ```bash
 git clone https://github.com/marutisoftwaresolutions/inkwell
 cd inkwell
-cp Blog.Web/appsettings.example.json Blog.Web/appsettings.json
-# Edit appsettings.json — set your ConnectionStrings:DefaultConnection
-dotnet run --project Blog.Web
+dotnet run
 ```
-
-Navigate to `/account/register` to claim the Admin account on first launch.
-
-Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
+Full docs: https://www.useinkwell.app/docs
 
 ---
 
