@@ -75,3 +75,30 @@ Blog.Web/local-admin-login-credentials.txt
 
 # Publish profiles (server-specific deployment config)
 Blog.Web/Properties/PublishProfiles/
+DBScripts/2026-07-11_draft-week1-ai-diagnostics-teleoptometry.sql
+DBScripts/2026-07-11_draft-week2-teleoptometry-practice-management.sql
+tools/FeatureImageGenerator/Resources/optosoft-logo-dark.png
+.gitignore
+.gitignore
+deploy/2026-07-24_feature-images-manifest.txt
+deploy/2026-07-24_copy-feature-images.ps1
+tools/FeatureImageGenerator/Resources/optosoft-logo-light.png
+DBScripts/2026-07-24_DEPLOY-README.md
+CLAUDE.md
+SEO-AEO-PLAN.md
+CLAUDE.md
+.claude/commands/deploy-content.md
+Blog.Web/scratch/build_svgs.js
+Blog.Web/wwwroot/assets/optosoft-logo-dark.png
+Blog.Web/wwwroot/assets/optosoft-logo-light.png
+DBScripts/2026-07-18_publish-teleoptometry-practice-ai-guides.sql
+DBScripts/2026-07-24_deploy-01-teleoptometry-guides.sql
+DBScripts/2026-07-24_deploy-02-practice-management-guides.sql
+DBScripts/2026-07-24_deploy-03-ai-guides.sql
+DBScripts/2026-07-24_deploy-04-roundups-new.sql
+DBScripts/2026-07-24_deploy-05-roundups-retrofit.sql
+DBScripts/2026-07-24_deploy-ALL.sql
+DBScripts/2026-07-27_add-howto-steps-guides.sql
+Blog.Web/wwwroot/llms.txt
+Blog.Web/wwwroot/assets/logo-b64.txt
+Blog.Web/wwwroot/llms.txt

@@ -5,6 +5,76 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+_Nothing yet._
+
+---
+
+## [1.0.2] — 2026-07-29
+
+Public release: a full SEO / AEO (AI-search) overhaul, the **Verdict** scored-roundup content system, new blog **layouts**, **IndexNow** instant indexing, author **E-E-A-T** pages, and an **Error Monitor** subsystem. Backward-compatible — existing tenants keep their layout, theme, and content unchanged.
+
+### Added
+
+- **Verdict roundup theme** — a scored "Top N Best … Software" comparison format for buyer's-guide posts. Adds the `Verdict` layout (index, post card, single-post template) and a `clinic` Inkwell preset (white / near-black / blue CTA, all-sans headings). A post renders as a Verdict roundup whenever it carries roundup data, independent of the site's `layout-post` setting.
+- **`Posts.RoundupJson`** column (nullable, JSON blob mirroring the `FaqJson` pattern) storing per-entry rank, score, weighted sub-scores, best-for, standout, pros/cons, CTA, and logo. Authored via a repeater UI in the post editor (shared by Create and Edit).
+- **Roundup structured data** — `ItemList` → `SoftwareApplication` per entry with `Review`, `reviewRating`, `positiveNotes`/`negativeNotes`, emitted alongside the existing Article/Breadcrumb/FAQ JSON-LD. Makes "best-of" pages eligible for rich results and AI-answer citation.
+- **Internal-aware roundup CTAs** — entry links that point at an internal review (e.g. `/eyefinity-ehr-review`) render as in-tab dofollow links to build topic clusters; external vendor links stay `nofollow noopener sponsored`.
+- **Roundup entry `website`** — each roundup entry carries the product/company's real URL, rendered as an outbound "Visit website" reference (`rel="nofollow noopener"`) and used as the `SoftwareApplication.url` in the `ItemList`/`Review` JSON-LD. Governed by the **Content External-Link Rule** in `CLAUDE.md`.
+- **First-party roundup disclosure** — a roundup entry whose website is the operator's own domain (e.g. `opto-soft.com`) is flagged as first-party: it shows an "Our platform" tag and an on-page disclosure, and is deliberately omitted from the `Review`/`AggregateRating` structured data (still listed in the `ItemList` as a `SoftwareApplication`), preventing self-serving ratings that violate search-engine rich-result policy.
+- **Catalog layout** — a single-column, boxed-card blog index with left-aligned thumbnails, a horizontal category filter bar ("All Posts" + per-category tabs), and numbered pagination, matching a modern SaaS/company-blog style. Selectable from Admin → Theme (Modern family); navbar/footer map to the Neutral variants, and unknown/legacy layout values fall back to Neutral.
+- **Error Monitor** — a global exception handler + status-code logging records every 5xx and 4xx, grouped by signature (status + normalized path + exception type) so repeated/similar errors collapse into a single counted row. A new Admin → Error Monitor page (Admin-only, read-only) lists groups with occurrence counts, first/last-seen, path, exception type/message, and summary tiles, with status/keyword filters. Backed by a new `ErrorLogs` table.
+- **Error alert emails** — optionally email one or more recipients (Admin → Settings) the first time a new server-error (5xx) signature is detected; repeats and 404 noise never email. Uses the existing SMTP settings; a no-op when disabled or unset.
+- **IndexNow instant indexing** — Admin → Settings can enable IndexNow and set (or auto-generate) an API key. When enabled, publishing/updating a post pings `api.indexnow.org` so Bing, Yandex, Seznam, and Naver re-crawl within minutes. The ownership key is served automatically at the site root `/{key}.txt` (root placement authorizes all URLs per the protocol). Per-tenant, disabled by default, best-effort — never blocks a publish.
+- **Author pages with E-E-A-T structured data** — each author gets a public page at `/author/{slug}` listing their published articles and emitting `Person` JSON-LD (name, job title, credentials, bio, linked profiles) plus an `og:profile` card. Post bylines link to it; author pages are in the sitemap.
+- **Automatic author slugs** — every user is assigned a unique URL slug (new users on creation, existing users backfilled once on startup), with an editable "Author Page URL" field in the profile editor.
+- **`llms-full.txt`** — an expanded companion to `llms.txt` at `/llms-full.txt` indexing every published article (title, URL, one-line summary) grouped by category, so AI answer engines can map the full breadth of a site's content.
+- **CollectionPage structured data** on listing pages (home, category, tag), tied to the site's `WebSite` entity.
+- **Key Facts / "At a glance" block** — a post-editor field (label/value repeater) stores quotable facts (`Posts.KeyFactsJson`), rendered as a semantic definition list near the top of the article and highly extractable by AI answer engines.
+- **How-To step-by-step guides** — a post-editor field (`Posts.HowToJson`) captures ordered steps, rendered as a visible numbered list and emitted as `HowTo` structured data.
+- **Configurable content language** — a `Content Language` setting (BCP-47, e.g. `en`, `es`, `hi`) drives the page `lang` attribute, `og:locale`, `hreflang` (self + `x-default`), and schema `inLanguage`.
+- **Entity/knowledge-graph signals** — `Organization` JSON-LD advertises topics of expertise (`knowsAbout`, from categories), and `llms.txt` includes an explicit identity section (exact name, official URL, citation guidance, disambiguation note).
+- **Search-engine site verification** — Admin → Settings accepts Google Search Console and Bing Webmaster verification codes, rendered as `<meta name="google-site-verification">` / `<meta name="msvalidate.01">`.
+- **Sitelinks search box** — the `WebSite` structured data includes a `SearchAction`, backed by a dedicated `/search?q=` route.
+- **Image sitemap** — the sitemap lists each post's feature image (`<image:image>`).
+- **Meta-description length helper in the editor** — a live character count with green/amber/red guidance for the 120–158 character range.
+- **`WebSite` structured data** and enriched **`Organization`** JSON-LD (stable `@id` plus a full `sameAs` list from all configured social links) on every public page.
+- **Universal page metadata** — canonical URL, `author`, `theme-color`, and default Open Graph / Twitter Card tags render on all public pages (home, index, category, tag, CMS pages), not just posts.
+- **AI-crawler discovery hint** — `<link rel="alternate" type="text/plain" href="/llms.txt">` in the page head.
+- **Richer article meta** on post pages: `og:url`, `og:image:alt`, `og:locale`, `article:author`, `article:section`, `article:tag`, `article:modified_time`, `twitter:site`, `twitter:creator`, `twitter:image:alt`.
+- **`SEO-AEO-PLAN.md`** — a living SEO/AEO audit, prioritized action plan, and progress tracker.
+
+### Changed
+
+- **Precompiled Tailwind CSS on the public site** — the public frontend serves a small static stylesheet instead of compiling Tailwind in the browser on every page load, eliminating the largest render-blocking script and the flash of unstyled content. Runtime theming (presets/custom colors) is unchanged; regenerate with `npx tailwindcss` or `-p:BuildTailwindCss=true`.
+- **Faster first paint** — Highlight.js and Lucide now load only on pages that need them (code blocks / `data-lucide`), removing render-blocking scripts from the common text-only article path.
+- **Critical fonts preloaded** — the two brand fonts (Geist, Source Serif 4) are preloaded, with a `preconnect` to the analytics origin when GA is configured.
+- **Optimized article images** — feature images get `fetchpriority=high` for LCP while related-post thumbnails lazy-load.
+- **Per-tenant `llms.txt`** — the `/llms.txt` summary is generated from each blog's own name, description, and categories.
+- **Smarter related posts / stronger internal linking** — "See Also" links and related-post cards are ranked by topical relevance (a shared category outweighs a shared tag) instead of pure recency, and the module always fills (recency backfill) so every article carries internal links.
+- **Richer home-page meta description** — the home listing emits a fuller, keyword-relevant description built from the site's own tagline and top categories (truncated to ~158 chars); tenant-neutral.
+- **Consistent page titles** — every public page ends with a single ` | {Site Name}` brand suffix (added when missing, never doubled).
+- **Cleaner auto-generated descriptions** — a missing summary is cut on a word boundary with an ellipsis instead of mid-word.
+- **Thin/duplicate pages kept out of the index** — tag archives, on-site search, and paginated/query-filtered listings emit `noindex,follow`.
+- **Sitemap no longer capped at 1000 posts** — split across a sitemap index and chunked child sitemaps.
+- **Roundup ratings made policy-safe** — entries carry only their genuine editorial `Review`, not a self-serving per-entry `AggregateRating`.
+- **Sitemap** now includes category, tag, and published CMS page URLs, and stamps the homepage `lastmod` from the most recent post update.
+- **`robots.txt`** AI-crawler allow-list expanded (OAI-SearchBot, ChatGPT-User, Claude-Web, Perplexity-User, Bingbot, DuckDuckBot, Amazonbot, cohere-ai, Meta-ExternalAgent); `Bytespider` added to the blocklist.
+
+### Fixed
+
+- **`llms.txt` / `llms-full.txt` / `sitemap.xml` / `robots.txt` are fully dynamic** — a stale static `wwwroot/llms.txt` could shadow the per-tenant dynamic route (serving one hardcoded, inaccurate AI summary to every tenant). The app now deletes any such stale static SEO file on startup so the correct dynamic route always serves.
+- **Absolute `og:image` / `twitter:image`** — relative `/uploads/...` image paths are promoted to fully-qualified URLs on every public page, so social/AI scrapers that reject relative paths work.
+- **Inbound mixed-case URLs now 301 to lowercase** — `/Best-Optometry-EHR-Software-2026` permanently redirects to its lowercase canonical instead of serving a duplicate 200 (static assets and non-GET requests untouched).
+- **Sensible default database connection** — running without a configured `DefaultConnection` falls back to SQL Server LocalDB (the data layer is SQL Server only); the unused SQLite driver dependency was removed.
+- **Build/publish no longer breaks on missing feature images** — the `Blog.Web.csproj` feature-image list is now a self-healing glob instead of ~34 pinned paths.
+- **Category and tag pages had blank titles/descriptions** — they now render a proper `<title>` and meta description derived from the category/tag name.
+- **`robots.txt`** used the invalid token `Googlebot-Extended`; corrected to Google's actual AI-grounding token **`Google-Extended`** so Google AI/Gemini permissions are honored.
+- Post pages no longer emit a duplicate `<link rel="canonical">`; the canonical is emitted exactly once by the shared layout.
+
+---
+
 ## [1.0.1] — 2026-06-27
 
 ### Added

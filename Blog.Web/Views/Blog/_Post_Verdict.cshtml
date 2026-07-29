@@ -1,0 +1,210 @@
+@model Blog.Core.Domain.Post
+@{
+    // Only reached when Model.Roundup is non-null (see Post.cshtml routing), but stay defensive:
+    // a null blob must degrade to the Neutral template rather than throw.
+    var roundup = Model.Roundup;
+}
+@if (roundup is null)
+{
+    <partial name="_Post_Neutral" model="Model" />
+}
+else
+{
+    var entries = roundup.Ranked.ToList();
+    var authorImage = !string.IsNullOrEmpty(Model.AvatarUrl)
+        ? Model.AvatarUrl
+        : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
+    var authorLine = string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName;
+    if (!string.IsNullOrEmpty(Model.AuthorCredentials)) { authorLine += $", {Model.AuthorCredentials}"; }
+
+    ViewData["Weights"] = roundup.Weights;
+
+    <div class="vd-wrap" id="top">
+
+        @* ── Breadcrumb ─────────────────────────────────────────── *@
+        <nav aria-label="Breadcrumb" style="padding:var(--sp-6) 0;font-size:var(--fs-sm);color:var(--fg-meta);">
+            <a href="/" style="color:inherit;">Home</a>
+            <span aria-hidden="true"> › </span>
+            @if (Model.Categories.Any())
+            {
+                <a href="/?category=@Model.Categories.First().Slug" style="color:inherit;">@Model.Categories.First().Name</a>
+                <span aria-hidden="true"> › </span>
+            }
+            <span style="color:var(--fg);">@Model.Title</span>
+        </nav>
+
+        <article>
+            @* ── Header ─────────────────────────────────────────── *@
+            <header>
+                <h1 style="font-family:var(--sans);font-size:var(--fs-display);font-weight:700;line-height:var(--lh-tight);color:var(--fg);margin:0 0 var(--sp-4);">
+                    @Model.Title
+                </h1>
+
+                @if (!string.IsNullOrEmpty(Model.MetaDescription))
+                {
+                    <p style="font-size:var(--fs-lede);line-height:var(--lh-body);color:var(--fg-body);margin:0 0 var(--sp-6);max-width:70ch;">
+                        @Model.MetaDescription
+                    </p>
+                }
+
+                @* ── Trust strip: byline + verification badges ───── *@
+                <div class="vd-trust">
+                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                        <img src="@authorImage" alt="@Model.AuthorName" width="28" height="28"
+                             style="border-radius:50%;object-fit:cover;" />
+                        <span>
+                            @{ var vAuthorSlug = ViewBag.AuthorSlug as string; }
+                            <strong style="color:var(--fg);">@if (!string.IsNullOrEmpty(vAuthorSlug)) { <a href="/author/@vAuthorSlug" rel="author" style="color:inherit;text-decoration:none;">@authorLine</a> } else { @authorLine }</strong>
+                            @if (!string.IsNullOrEmpty(Model.AuthorSpecialty))
+                            {
+                                <span style="display:block;font-size:var(--fs-xs);">@Model.AuthorSpecialty</span>
+                            }
+                        </span>
+                    </span>
+
+                    @if (Model.PublishedAt.HasValue)
+                    {
+                        <time datetime="@Model.PublishedAt.Value.ToString("yyyy-MM-dd")">
+                            @Model.PublishedAt.Value.ToString("d MMM yyyy")
+                        </time>
+                    }
+
+                    <span class="vd-trust-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        @entries.Count tools compared
+                    </span>
+
+                    <span class="vd-trust-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Expert reviewed
+                    </span>
+
+                    @if (Model.LastVerifiedAt.HasValue)
+                    {
+                        <span class="vd-trust-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Verified @Model.LastVerifiedAt.Value.ToString("d MMM yyyy")
+                        </span>
+                    }
+                </div>
+            </header>
+
+            @if (!string.IsNullOrEmpty(Model.FeatureImage))
+            {
+                <img src="@Model.FeatureImage" alt="@Model.Title"
+                     style="width:100%;height:auto;border-radius:var(--r-2);margin-bottom:var(--sp-8);"
+                     fetchpriority="high" decoding="async" asp-append-version="true" />
+            }
+
+            @* ── On this page ───────────────────────────────────── *@
+            <nav class="vd-method" aria-labelledby="on-this-page" style="margin-top:0;">
+                <h2 id="on-this-page" style="margin-top:0;font-size:var(--fs-h4);">
+                    On this page <span class="vd-score-max">(@(entries.Count + 3))</span>
+                </h2>
+                <ol style="columns:2;column-gap:var(--sp-8);margin:0;padding-left:1.2em;font-size:var(--fs-sm);">
+                    <li><a href="#editors-picks">Editor's picks</a></li>
+                    <li><a href="#methodology">How we ranked these tools</a></li>
+                    <li><a href="#comparison-table">Comparison table</a></li>
+                    @foreach (var e in entries)
+                    {
+                        <li><a href="#@e.Anchor">@e.Name</a></li>
+                    }
+                </ol>
+            </nav>
+
+            <partial name="_Roundup_Picks" model="roundup" />
+            <partial name="_Roundup_Methodology" model="roundup" />
+            <partial name="_Roundup_Table" model="roundup" />
+
+            <div style="max-width:75ch;">
+                <partial name="_KeyFacts" model="Model" />
+                <partial name="_HowTo" model="Model" />
+            </div>
+
+            @* ── Author's narrative: intro, buyer's guide, mistakes, etc. ── *@
+            @if (!string.IsNullOrEmpty(Model.Html))
+            {
+                <div class="vd-entry-body" style="max-width:75ch;">
+                    @Html.Raw(Model.Html)
+                </div>
+            }
+
+            @* ── Detailed reviews ───────────────────────────────── *@
+            <section aria-labelledby="detailed-reviews">
+                <h2 id="detailed-reviews">The @entries.Count best options, reviewed</h2>
+                @foreach (var e in entries)
+                {
+                    <partial name="_Roundup_Entry" model="e" view-data="ViewData" />
+                }
+            </section>
+
+            <partial name="_SeeAlso" view-data="ViewData" />
+
+            @* ── FAQ ────────────────────────────────────────────── *@
+            @if (Model.Faqs.Any())
+            {
+                <section class="ink-faq" aria-labelledby="faq" style="margin:var(--sp-10) 0;">
+                    <h2 id="faq">Frequently asked questions</h2>
+                    @foreach (var faq in Model.Faqs)
+                    {
+                        <div class="ink-faq-item" x-data="{ open: false }">
+                            <button type="button" @@click="open = !open" class="ink-faq-question"
+                                    style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;background:none;border:none;cursor:pointer;">
+                                <span>@faq.Question</span>
+                                <svg :class="open ? 'rotate-180' : ''" style="flex:none;transition:transform .2s;"
+                                     width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div x-show="open" x-transition class="ink-faq-answer">@faq.Answer</div>
+                        </div>
+                    }
+                </section>
+            }
+
+            <partial name="_Roundup_Sources" model="roundup" />
+
+            @* ── Tags ───────────────────────────────────────────── *@
+            @if (Model.Tags.Any())
+            {
+                <div style="padding-top:var(--sp-6);border-top:1px solid var(--border);">
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        @foreach (var tag in Model.Tags)
+                        {
+                            <a href="/?tags=@tag.Slug" class="vd-chip" style="text-decoration:none;">@tag.Name</a>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── Related reading ────────────────────────────────── *@
+            @{
+                var relatedPosts = ViewBag.RelatedPostCards as List<Blog.Core.Domain.Post>;
+            }
+            @if (relatedPosts != null && relatedPosts.Any())
+            {
+                <section style="margin-top:var(--sp-10);padding-top:var(--sp-8);border-top:1px solid var(--border);">
+                    <h2>Related reading</h2>
+                    <div class="vd-picks">
+                        @foreach (var rp in relatedPosts)
+                        {
+                            <a href="/@rp.Slug" class="vd-pick" style="text-decoration:none;">
+                                @if (!string.IsNullOrEmpty(rp.FeatureImage))
+                                {
+                                    <img src="@rp.FeatureImage" alt="@rp.Title"
+                                         style="width:100%;height:120px;object-fit:cover;border-radius:var(--r-2);"
+                                         loading="lazy" decoding="async" asp-append-version="true" />
+                                }
+                                @if (rp.Categories.Any())
+                                {
+                                    <span class="vd-chip">@rp.Categories.First().Name</span>
+                                }
+                                <h3 class="vd-pick-name" style="font-size:var(--fs-ui);">@rp.Title</h3>
+                            </a>
+                        }
+                    </div>
+                </section>
+            }
+        </article>
+    </div>
+}

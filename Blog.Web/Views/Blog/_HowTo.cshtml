@@ -1,0 +1,31 @@
+@model Blog.Core.Domain.Post
+@{
+    var steps = Model.HowToSteps
+        .Where(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.Text))
+        .ToList();
+}
+@* Visible step-by-step list. Paired with HowTo JSON-LD in _SchemaJsonLd so the structured data
+   reflects on-page content (readers + AI answer engines both benefit). *@
+@if (steps.Count > 0)
+{
+    <section class="ink-howto" aria-label="Step-by-step guide"
+             style="border:1px solid var(--border); border-radius:var(--r-2,6px); padding:1rem 1.25rem; margin:1.5rem 0; background:var(--surface,var(--muted));">
+        <h2 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; margin:0 0 0.75rem; color:var(--fg-meta,var(--muted-foreground));">Step-by-step</h2>
+        <ol style="margin:0; padding-left:1.25rem; display:flex; flex-direction:column; gap:0.6rem;">
+            @foreach (var s in steps)
+            {
+                <li style="color:var(--fg-body,var(--foreground));">
+                    @if (!string.IsNullOrWhiteSpace(s.Name))
+                    {
+                        <strong style="color:var(--fg,var(--foreground));">@s.Name</strong>
+                        @if (!string.IsNullOrWhiteSpace(s.Text)) { <span> — @s.Text</span> }
+                    }
+                    else
+                    {
+                        @s.Text
+                    }
+                </li>
+            }
+        </ol>
+    </section>
+}

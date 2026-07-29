@@ -20,7 +20,9 @@ public class TenantMiddleware
     {
         "admin", "account", "setup", "error", "api",
         "feed", "sitemap.xml", "uploads", "lib", "css", "js",
-        "favicon.ico", "robots.txt", "_framework", "_content"
+        "favicon.ico", "robots.txt", "llms.txt", "llms-full.txt",
+        "author", "category", "tag", "search", "sitemap-static.xml",
+        "_framework", "_content"
     };
 
     public TenantMiddleware(RequestDelegate next, IConfiguration configuration)

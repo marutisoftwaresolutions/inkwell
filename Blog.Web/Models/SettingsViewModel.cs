@@ -11,6 +11,9 @@ public class SettingsViewModel
     [Display(Name = "Tagline")]
     public string? SiteTagline { get; set; }
 
+    [Display(Name = "Content Language (e.g. en, es, hi)")]
+    public string? SiteLanguage { get; set; }
+
     [Display(Name = "Site Logo URL")]
     public string? SiteLogoUrl { get; set; }
 
@@ -33,6 +36,24 @@ public class SettingsViewModel
 
     [Display(Name = "Google Analytics Measurement ID")]
     public string? GoogleAnalyticsId { get; set; }
+
+    [Display(Name = "Google Search Console verification code")]
+    public string? GoogleSiteVerification { get; set; }
+
+    [Display(Name = "Bing Webmaster verification code")]
+    public string? BingSiteVerification { get; set; }
+
+    [Display(Name = "Enable IndexNow (instant indexing)")]
+    public bool IndexNowEnabled { get; set; }
+
+    [Display(Name = "IndexNow API Key")]
+    public string? IndexNowApiKey { get; set; }
+
+    [Display(Name = "Email me when a server error occurs")]
+    public bool ErrorNotificationsEnabled { get; set; }
+
+    [Display(Name = "Error notification recipients")]
+    public string? ErrorNotificationEmails { get; set; }
 
     [Display(Name = "X (Twitter) URL")]
     public string? SocialTwitter { get; set; }

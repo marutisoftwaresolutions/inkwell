@@ -1,0 +1,35 @@
+@model Blog.Core.Domain.RoundupData
+@{
+    // Fall back to the standard 4-step process when the author hasn't customised it.
+    var steps = Model.Methodology.Any()
+        ? Model.Methodology
+        : new List<Blog.Core.Domain.RoundupStep>
+        {
+            new() { Step = "Feature verification", Detail = "Every capability was checked against vendor documentation." },
+            new() { Step = "Review aggregation",   Detail = "Public user reviews were collected and de-duplicated." },
+            new() { Step = "Criteria scoring",     Detail = "Each tool scored on features, ease of use, and value." },
+            new() { Step = "Editorial review",     Detail = "A subject-matter editor signed off on the final ranking." }
+        };
+    var w = Model.Weights;
+}
+<section class="vd-method" aria-labelledby="methodology">
+    <h2 id="methodology" style="margin-top:0;">How we ranked these tools</h2>
+    <div class="vd-method-grid">
+        @{ var n = 1; }
+        @foreach (var step in steps)
+        {
+            <div>
+                <div class="vd-method-num">@n.ToString("00")</div>
+                <p class="vd-method-step">@step.Step</p>
+                <p class="vd-method-detail">@step.Detail</p>
+            </div>
+            n++;
+        }
+    </div>
+    <p class="vd-method-detail" style="margin-top:16px;">
+        Scores are based on three dimensions:
+        <strong>Features</strong> (~@(w.Features)%),
+        <strong>Ease of use</strong> (~@(w.Ease)%),
+        <strong>Value</strong> (~@(w.Value)%).
+    </p>
+</section>

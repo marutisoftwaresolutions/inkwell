@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Infrastructure.Data; // SlugHelper
 using Dapper;
 
 namespace Blog.Infrastructure.Data.Repositories;
@@ -29,6 +30,14 @@ public class UserRepository : IUserRepository
         using var conn = _ctx.CreateConnection();
         if (user.Id == Guid.Empty) user.Id = Guid.NewGuid();
         if (user.Uuid == Guid.Empty) user.Uuid = Guid.NewGuid();
+        // Every user gets a unique slug so their author E-E-A-T page (/author/{slug}) works out of the box.
+        if (string.IsNullOrWhiteSpace(user.Slug))
+        {
+            var baseName = !string.IsNullOrWhiteSpace(user.DisplayName) ? user.DisplayName
+                : !string.IsNullOrWhiteSpace(user.Username) ? user.Username
+                : (user.Email ?? "user").Split('@')[0];
+            user.Slug = await GenerateUniqueSlugCoreAsync(conn, baseName, user.Id);
+        }
         return await conn.ExecuteScalarAsync<Guid>(@"
             INSERT INTO Users (Id, Uuid, Email, Username, DisplayName, Slug, PasswordHash, Role, Status, CreatedByUserId, Bio, ProfileImage, AvatarUrl, CoverImage, Website, Twitter, Facebook, MetaTitle, MetaDescription, IsActive, LastLogin, Credentials, Specialty, LicenseNumber, CreatedAt, UpdatedAt)
             OUTPUT INSERTED.Id
@@ -67,6 +76,47 @@ public class UserRepository : IUserRepository
         using var conn = _ctx.CreateConnection();
         return await conn.QueryFirstOrDefaultAsync<User>(
             "SELECT * FROM Users WHERE Slug = @Slug", new { Slug = slug });
+    }
+
+    public async Task<string> GenerateUniqueSlugAsync(string baseName, Guid? excludeId = null)
+    {
+        using var conn = _ctx.CreateConnection();
+        return await GenerateUniqueSlugCoreAsync(conn, baseName, excludeId);
+    }
+
+    // Core generator — reuses SlugHelper for the base slug, then appends -2, -3, … until unique.
+    private static async Task<string> GenerateUniqueSlugCoreAsync(System.Data.IDbConnection conn, string baseName, Guid? excludeId)
+    {
+        var baseSlug = SlugHelper.Generate(baseName);
+        if (string.IsNullOrEmpty(baseSlug)) baseSlug = "user";
+        var slug = baseSlug;
+        var n = 2;
+        while (await conn.ExecuteScalarAsync<int>(
+                   "SELECT COUNT(*) FROM Users WHERE Slug = @Slug" + (excludeId.HasValue ? " AND Id <> @ExcludeId" : ""),
+                   new { Slug = slug, ExcludeId = excludeId }) > 0)
+        {
+            slug = $"{baseSlug}-{n++}";
+        }
+        return slug;
+    }
+
+    public async Task<int> BackfillMissingSlugsAsync()
+    {
+        using var conn = _ctx.CreateConnection();
+        var users = (await conn.QueryAsync<User>(
+            "SELECT * FROM Users WHERE Slug IS NULL OR LTRIM(RTRIM(Slug)) = ''")).ToList();
+        var count = 0;
+        foreach (var u in users)
+        {
+            var baseName = !string.IsNullOrWhiteSpace(u.DisplayName) ? u.DisplayName
+                : !string.IsNullOrWhiteSpace(u.Username) ? u.Username
+                : (u.Email ?? "user").Split('@')[0];
+            var slug = await GenerateUniqueSlugCoreAsync(conn, baseName, u.Id);
+            await conn.ExecuteAsync("UPDATE Users SET Slug = @Slug, UpdatedAt = @Now WHERE Id = @Id",
+                new { Slug = slug, Now = DateTime.Now, u.Id });
+            count++;
+        }
+        return count;
     }
 
     public async Task<User?> GetFirstAdminAsync()

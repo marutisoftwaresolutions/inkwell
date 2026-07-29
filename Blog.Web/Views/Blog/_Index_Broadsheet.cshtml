@@ -67,7 +67,7 @@
                 @if (!string.IsNullOrEmpty(leadPost.FeatureImage))
                 {
                     <a href="/@leadPost.Slug" style="display:block;border-radius:var(--r-1);overflow:hidden;aspect-ratio:4/3;">
-                        <img src="@leadPost.FeatureImage" alt="@leadPost.Title" loading="eager"
+                        <img src="@leadPost.FeatureImage" alt="@leadPost.Title" loading="eager" fetchpriority="high" decoding="async"
                              style="width:100%;height:100%;object-fit:cover;display:block;" />
                     </a>
                 }

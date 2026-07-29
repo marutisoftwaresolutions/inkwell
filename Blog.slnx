@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="Blog.Core/Blog.Core.csproj" />
   <Project Path="Blog.Infrastructure/Blog.Infrastructure.csproj" />
+  <Project Path="Blog.Tests/Blog.Tests.csproj" />
   <Project Path="Blog.Web/Blog.Web.csproj" />
   <Properties Name="ExtensibilityGlobals" Scope="PostLoad">
     <Property Name="VisualSVNWorkingCopyRoot" Value="." />

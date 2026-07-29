@@ -29,6 +29,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IPageViewRepository, PageViewRepository>();
         services.AddScoped<IRedirectRepository, RedirectRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
+        services.AddScoped<IErrorLogRepository, ErrorLogRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
         services.AddScoped<OptometryTaxonomySeeder>();

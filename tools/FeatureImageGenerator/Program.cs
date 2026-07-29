@@ -26,6 +26,17 @@ foreach (var name in new[] { "Segoe UI", "Arial", "Helvetica", "Liberation Sans"
     if (SystemFonts.TryGet(name, out font)) break;
 if (font.Name is null) font = SystemFonts.Families.First();
 
+// ── Comparison "vs" cards — OptoSoft (first-party) logo only. Run: -- --comparison ──────────────
+if (args.Contains("--comparison"))
+{
+    GenerateComparisonCard("optosoft-vs-global-optical-software-2026",
+        "International", "Global Optical\nSoftware", font, resourcesDir, baseDir);
+    GenerateComparisonCard("optosoft-vs-indian-optical-software-2026",
+        "India", "Indian Optical\nSoftware", font, resourcesDir, baseDir);
+    Console.WriteLine("Done — 2 OptoSoft comparison cards generated.");
+    return;
+}
+
 // ── Post definitions ───────────────────────────────────────────────────────────
 var posts = new[]
 {
@@ -238,6 +249,162 @@ var posts = new[]
         "Diabetic Eye Exam AI Screening Tools for Optometrists in 2026",
         "AI IN CLINIC", "AI & Machine Learning in Optometry",
         "172554", "1e3a8a", "34d399", ShapeStyle.TechDashboard),
+
+    // ── Verdict roundups: track-2 (optical retail family) ────────────────────────
+    new PostSpec(
+        "best-optical-retail-shop-software-2026",
+        "Best Optical Retail Shop Software in 2026: 6 Platforms Compared",
+        "BUYER'S GUIDE", "Optical Retail Technology",
+        "450a0a", "7f1d1d", "fb923c", ShapeStyle.Grid),
+
+    new PostSpec(
+        "best-online-optical-software-2026",
+        "Best Online Optical Software in 2026: 6 Cloud Platforms Compared",
+        "BUYER'S GUIDE", "Optical Retail Technology",
+        "0c4a6e", "0369a1", "38bdf8", ShapeStyle.Dots),
+
+    new PostSpec(
+        "best-optical-shop-pos-software-2026",
+        "Best Optical Shop and POS Software in 2026: 6 Systems Compared",
+        "BUYER'S GUIDE", "Optical Retail Technology",
+        "450a0a", "7f1d1d", "fb923c", ShapeStyle.Versus),
+
+    // ── Verdict roundups: track-3 (diagnostics & practice) ───────────────────────
+    new PostSpec(
+        "oct-software-comparison-zeiss-heidelberg-topcon-2026",
+        "OCT Software Comparison 2026: Zeiss Cirrus vs Heidelberg vs Topcon",
+        "DEVICE COMPARISON", "Digital Imaging & Diagnostics",
+        "0f172a", "334155", "10b981", ShapeStyle.Comparison),
+
+    new PostSpec(
+        "visual-field-software-humphrey-octopus-fdt-comparison-2026",
+        "Visual Field Software Compared 2026: Humphrey vs Octopus vs FDT",
+        "DEVICE COMPARISON", "Digital Imaging & Diagnostics",
+        "172554", "1e3a8a", "60a5fa", ShapeStyle.Comparison),
+
+    new PostSpec(
+        "corneal-topography-software-pentacam-orbscan-atlas-2026",
+        "Corneal Topography Compared 2026: Pentacam vs Orbscan vs Atlas",
+        "DEVICE COMPARISON", "Digital Imaging & Diagnostics",
+        "0f172a", "334155", "fb923c", ShapeStyle.Comparison),
+
+    new PostSpec(
+        "patient-recall-systems-optometry-top-5-tools-2026",
+        "Best Patient Recall Systems for Optometry 2026: Top 5 Tools Compared",
+        "BUYER'S GUIDE", "Practice Management Software",
+        "4a044e", "86198f", "e879f9", ShapeStyle.Dots),
+
+    new PostSpec(
+        "best-ai-retinal-screening-software-comparison-guide-2026",
+        "Best AI Retinal Screening Software 2026: FDA-Cleared Systems Compared",
+        "AI IN CLINIC", "AI & Machine Learning in Optometry",
+        "172554", "1e3a8a", "34d399", ShapeStyle.TechDashboard),
+
+    // ── Batch: teleoptometry cluster ─────────────────────────────────────────────
+    new PostSpec(
+        "teleoptometry-software-complete-guide-2026",
+        "Teleoptometry Software: Complete Guide 2026",
+        "COMPLETE GUIDE", "Teleoptometry & Remote Care",
+        "1e1b4b", "312e81", "818cf8", ShapeStyle.TechDashboard),
+
+    new PostSpec(
+        "asynchronous-vs-synchronous-telehealth-eye-care-2026",
+        "Asynchronous vs Synchronous Telehealth for Eye Care 2026",
+        "COMPARISON", "Teleoptometry & Remote Care",
+        "1e1b4b", "312e81", "818cf8", ShapeStyle.Comparison),
+
+    new PostSpec(
+        "how-to-set-up-telehealth-service-eye-care-practice-2026",
+        "How to Set Up a Telehealth Service in Your Eye Care Practice 2026",
+        "HOW-TO GUIDE", "Teleoptometry & Remote Care",
+        "1e1b4b", "312e81", "818cf8", ShapeStyle.Steps),
+
+    new PostSpec(
+        "remote-patient-monitoring-glaucoma-tools-protocols-2026",
+        "Remote Patient Monitoring for Glaucoma: Tools & Protocols 2026",
+        "CLINICAL TECH", "Teleoptometry & Remote Care",
+        "091d2c", "0e3244", "4fc3d9", ShapeStyle.TechDashboard),
+
+    new PostSpec(
+        "telehealth-consent-forms-optometry-templates-2026",
+        "Telehealth Consent Forms for Optometry: Templates & Best Practices 2026",
+        "COMPLIANCE", "Teleoptometry & Remote Care",
+        "091d2c", "0e3244", "4fc3d9", ShapeStyle.Checklist),
+
+    new PostSpec(
+        "patient-satisfaction-remote-eye-exams-research-review-2026",
+        "Patient Satisfaction with Remote Eye Exams: Research Review 2026",
+        "RESEARCH REVIEW", "Teleoptometry & Remote Care",
+        "091d2c", "0e3244", "4fc3d9", ShapeStyle.Analytics),
+
+    new PostSpec(
+        "integrating-teleoptometry-existing-ehr-2026",
+        "Integrating Teleoptometry with Your Existing EHR 2026",
+        "INTEGRATIONS", "Teleoptometry & Remote Care",
+        "1e1b4b", "312e81", "818cf8", ShapeStyle.TechDashboard),
+
+    // ── Batch: practice-management cluster ───────────────────────────────────────
+    new PostSpec(
+        "appointment-scheduling-software-eye-care-practices-2026",
+        "Appointment Scheduling Software for Eye Care Practices 2026",
+        "PRACTICE OPS", "Practice Management Software",
+        "312e81", "4338ca", "a78bfa", ShapeStyle.Steps),
+
+    new PostSpec(
+        "automated-patient-communication-optometry-texts-emails-reminders-2026",
+        "Automated Patient Communication for Optometry: Texts, Emails & Reminders 2026",
+        "PRACTICE GROWTH", "Practice Management Software",
+        "4a044e", "86198f", "e879f9", ShapeStyle.Dots),
+
+    new PostSpec(
+        "optometry-patient-portal-what-to-look-for-2026",
+        "Optometry Patient Portal: What to Look For in 2026",
+        "BUYER'S GUIDE", "Practice Management Software",
+        "312e81", "4338ca", "a78bfa", ShapeStyle.Grid),
+
+    new PostSpec(
+        "staff-scheduling-software-optometry-clinics-2026",
+        "Staff Scheduling Software for Optometry Clinics 2026",
+        "PRACTICE OPS", "Practice Management Software",
+        "4a044e", "86198f", "e879f9", ShapeStyle.Steps),
+
+    new PostSpec(
+        "paperless-optometry-practice-tools-workflow-guide-2026",
+        "Paperless Optometry Practice: Tools and Workflow Guide 2026",
+        "WORKFLOW GUIDE", "Practice Management Software",
+        "312e81", "4338ca", "a78bfa", ShapeStyle.Checklist),
+
+    // ── Batch: AI cluster ────────────────────────────────────────────────────────
+    new PostSpec(
+        "how-ai-reducing-referral-burden-optometry-2026",
+        "How AI Is Reducing Referral Burden in Optometry 2026",
+        "AI IN CLINIC", "AI & Machine Learning in Optometry",
+        "172554", "1e3a8a", "60a5fa", ShapeStyle.Dots),
+
+    new PostSpec(
+        "fda-approved-ai-devices-eye-care-full-list-2026",
+        "FDA-Approved AI Devices for Eye Care: Full List 2026",
+        "REFERENCE GUIDE", "AI & Machine Learning in Optometry",
+        "172554", "1e3a8a", "60a5fa", ShapeStyle.Grid),
+};
+
+// ── Verdict roundups always use the programmatic branded card, for a consistent
+//    series look (bypasses legacy overrides and custom PNG illustrations). ────────
+var forceProgrammatic = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    "best-optometry-ehr-software-2026",
+    "best-optometry-practice-management-software-2026",
+    "teleoptometry-platforms-compared-2026",
+    "best-contact-lens-fitting-software-optometrists-2026",
+    "best-digital-retinal-cameras-optometry-2026",
+    "best-optical-retail-shop-software-2026",
+    "best-online-optical-software-2026",
+    "best-optical-shop-pos-software-2026",
+    "oct-software-comparison-zeiss-heidelberg-topcon-2026",
+    "visual-field-software-humphrey-octopus-fdt-comparison-2026",
+    "corneal-topography-software-pentacam-orbscan-atlas-2026",
+    "patient-recall-systems-optometry-top-5-tools-2026",
+    "best-ai-retinal-screening-software-comparison-guide-2026",
 };
 
 // ── Generate ───────────────────────────────────────────────────────────────────
@@ -266,6 +433,22 @@ for (int i = 0; i < posts.Length; i++)
 {
     var p = posts[i];
     var outPath = IOPath.Combine(baseDir, $"{p.Slug}.jpg");
+
+    // 0. Verdict roundups: photographic scene (default) or legacy flat card (--flat-cards)
+    if (forceProgrammatic.Contains(p.Slug))
+    {
+        if (args.Contains("--flat-cards"))
+        {
+            GenerateImage(p, font, outPath);
+            Console.WriteLine($"  [+] {p.Slug}.jpg (flat branded card)");
+        }
+        else
+        {
+            GeneratePhotographicScene(p, outPath);
+            Console.WriteLine($"  [+] {p.Slug}.jpg (photographic scene)");
+        }
+        continue;
+    }
 
     // 1. Check for legacy 17-May-2026 overrides first
     var legacyPath = IOPath.Combine(resourcesDir, "17-May-2026", $"{p.Slug}.jpg");
@@ -329,6 +512,13 @@ IOFile.WriteAllText(sqlPath, sb.ToString());
 Console.WriteLine($"SQL  → {sqlPath}");
 
 // ── Logo + Favicon ─────────────────────────────────────────────────────────────
+// Skipped with --no-branding so a feature-image-only run never clobbers site branding.
+if (args.Contains("--no-branding"))
+{
+    Console.WriteLine("Skipping logo/favicon/cover/settings regeneration (--no-branding).");
+    return;
+}
+
 var wwwroot    = IOPath.GetFullPath(IOPath.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Blog.Web", "wwwroot"));
 var logoPath   = IOPath.Combine(wwwroot, "logo.png");
 var faviconPath= IOPath.Combine(wwwroot, "favicon.ico");
@@ -377,6 +567,89 @@ ssql.AppendLine("       JSON_VALUE(JsonPayload,'$.SiteCoverUrl')    AS Cover");
 ssql.AppendLine("FROM   Settings;");
 IOFile.WriteAllText(settingsSqlPath, ssql.ToString());
 Console.WriteLine($"SQL  → {settingsSqlPath}");
+
+// ── Comparison "vs" card — composites the real OptoSoft (first-party) logo vs a category label ────
+static void GenerateComparisonCard(string slug, string eyebrowContext, string vsTarget,
+                                    FontFamily fontFamily, string resourcesDir, string outDir)
+{
+    const int W = 1200, H = 630;
+    var bgTop    = Color.ParseHex("0f172a");   // deep navy
+    var bgBot    = Color.ParseHex("1e3a5f");
+    var accent   = Color.ParseHex("f59e0b");   // amber
+    var white    = Color.White;
+    var whiteMid = Color.FromRgba(255, 255, 255, 200);
+    var whiteDim = Color.FromRgba(255, 255, 255, 120);
+
+    var eyebrowFont = fontFamily.CreateFont(21, FontStyle.Bold);
+    var vsFont      = fontFamily.CreateFont(30, FontStyle.Bold);
+    var targetFont  = fontFamily.CreateFont(46, FontStyle.Bold);
+    var capFont     = fontFamily.CreateFont(18, FontStyle.Regular);
+    var siteFont    = fontFamily.CreateFont(24, FontStyle.Bold);
+
+    using var img = new Image<Rgba32>(W, H);
+    img.Mutate(ctx =>
+    {
+        ctx.Fill(new LinearGradientBrush(new PointF(0, 0), new PointF(W, H), GradientRepetitionMode.None,
+            new ColorStop(0f, bgTop), new ColorStop(1f, bgBot)));
+
+        // faint decorative rings on the right
+        var ap = accent.ToPixel<Rgba32>();
+        ctx.Fill(Color.FromRgba(ap.R, ap.G, ap.B, 20), new EllipsePolygon(W - 90f, 90f, 200f, 200f));
+
+        ctx.Fill(accent, new RectangleF(0, 0, 10, H)); // left accent bar
+
+        // eyebrow
+        ctx.DrawText(new RichTextOptions(eyebrowFont) { Origin = new PointF(90, 66) },
+            ("COMPARISON  •  " + eyebrowContext + "  •  2026").ToUpperInvariant(), accent);
+
+        // OptoSoft logo (real first-party asset), centered in the left column
+        var logoPath = IOPath.Combine(resourcesDir, "optosoft-logo-light.png");
+        if (IOFile.Exists(logoPath))
+        {
+            using var logo = Image.Load<Rgba32>(logoPath);
+            int logoH = 116;
+            int logoW = (int)(logo.Width * (logoH / (float)logo.Height));
+            logo.Mutate(x => x.Resize(logoW, logoH));
+            int leftCx = 320;
+            ctx.DrawImage(logo, new Point(leftCx - logoW / 2, 275 - logoH / 2), 1f);
+            ctx.DrawText(new RichTextOptions(capFont)
+            {
+                HorizontalAlignment = HorizontalAlignment.Center, Origin = new PointF(leftCx, 360)
+            }, "opto-soft.com", whiteDim);
+        }
+
+        // VS badge (center)
+        float vcx = 600f, vcy = 275f;
+        ctx.Fill(accent, new EllipsePolygon(vcx, vcy, 46f, 46f));
+        ctx.DrawText(new RichTextOptions(vsFont)
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Origin = new PointF(vcx, vcy)
+        }, "VS", Color.Black);
+
+        // right column: comparison target (text only — OptoSoft logo is the only brand mark used)
+        ctx.DrawText(new RichTextOptions(targetFont)
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Origin = new PointF(880f, 275f),
+            WrappingLength = 440f,
+            LineSpacing = 1.1f
+        }, vsTarget, white);
+
+        // bottom strip + domain
+        ctx.Fill(Color.FromRgba(0, 0, 0, 90), new RectangleF(0, H - 70, W, 70));
+        ctx.Fill(accent, new RectangleF(10, H - 70, W - 10, 2));
+        ctx.DrawText(new RichTextOptions(siteFont) { Origin = new PointF(90, H - 50) },
+            "opticalsoftware.org", whiteMid);
+    });
+
+    IODir.CreateDirectory(outDir);
+    var outPath = IOPath.Combine(outDir, slug + ".jpg");
+    img.Save(outPath, new JpegEncoder { Quality = 90 });
+    Console.WriteLine($"  [+] {slug}.jpg (comparison card with OptoSoft logo)");
+}
 
 // ── Image generation ───────────────────────────────────────────────────────────
 static void GenerateImage(PostSpec p, FontFamily fontFamily, string outPath)
@@ -903,6 +1176,157 @@ static void GenerateFavicon(string outPath)
         bw.Write(data);
 
     IOFile.WriteAllBytes(outPath, ico.ToArray());
+}
+
+// ── Photographic-style scene generator (no text) ───────────────────────────────
+// Builds a realistic editorial hero: soft depth-of-field bokeh, a subtly rendered
+// subject, cinematic vignette, and film grain. Deterministic per slug. No overlay text.
+static void GeneratePhotographicScene(PostSpec p, string outPath)
+{
+    const int W = 1200, H = 630;
+    int seed = 17; foreach (var ch in p.Slug) seed = seed * 31 + ch;
+    var rng = new Random(seed);
+
+    // Palette + subject motif chosen from the post's category (muted, cinematic tones).
+    var cat = p.Category.ToLowerInvariant();
+    (string a, string b, string c, string glow, string motif) pal =
+        cat.Contains("retail") || cat.Contains("frame") || cat.Contains("optical retail")
+            ? ("1c130c", "2f1f13", "4a2f1b", "e6a35c", "glasses")
+      : cat.Contains("imaging") || cat.Contains("diagnostic")
+            ? ("0a1620", "112632", "1b3a4c", "63d0e6", "eye")
+      : cat.Contains("ai") || cat.Contains("machine")
+            ? ("0c1030", "161b4d", "222a6b", "6ea8ff", "network")
+      : cat.Contains("practice") || cat.Contains("billing")
+            ? ("18102a", "281a42", "3d285c", "c07af0", "network")
+      : cat.Contains("teleoptometry") || cat.Contains("remote")
+            ? ("091d2c", "0e3244", "15495c", "4fc3d9", "eye")
+      : cat.Contains("contact lens")
+            ? ("07201e", "0e3a36", "16544f", "3fd9c8", "lens")
+      : cat.Contains("ehr") || cat.Contains("electronic")
+            ? ("0a1322", "12233c", "1c3151", "5b8fd6", "eye")
+            : ("0f1720", "1e2c39", "2f4457", "7aa0c0", "eye");
+
+    var cA = Color.ParseHex(pal.a); var cB = Color.ParseHex(pal.b); var cC = Color.ParseHex(pal.c);
+    var glow = Color.ParseHex(pal.glow);
+    var gp = glow.ToPixel<Rgba32>();
+
+    using var img = new Image<Rgba32>(W, H);
+
+    // 1. Deep three-stop diagonal base — the "unlit room" behind the subject.
+    img.Mutate(x => x.Fill(new LinearGradientBrush(
+        new PointF(0, 0), new PointF(W, H), GradientRepetitionMode.None,
+        new ColorStop(0f, cA), new ColorStop(0.55f, cB), new ColorStop(1f, cC))));
+
+    // 2. Depth-of-field bokeh: soft out-of-focus light orbs, blurred hard.
+    using (var bokeh = new Image<Rgba32>(W, H))
+    {
+        bokeh.Mutate(x =>
+        {
+            for (int k = 0; k < 14; k++)
+            {
+                float bx = rng.Next(-80, W + 80);
+                float by = rng.Next(-60, H + 60);
+                float r  = rng.Next(40, 150);
+                byte al  = (byte)rng.Next(30, 120);
+                var tint = rng.Next(100) < 70 ? gp : new Rgba32(255, 255, 255, 255);
+                x.Fill(Color.FromRgba(tint.R, tint.G, tint.B, al), new EllipsePolygon(bx, by, r, r));
+            }
+        });
+        bokeh.Mutate(x => x.GaussianBlur(40f));
+        img.Mutate(x => x.DrawImage(bokeh, 0.85f));
+    }
+
+    // 3. Soft key light from upper-left for dimensionality.
+    using (var key = new Image<Rgba32>(W, H))
+    {
+        key.Mutate(x => x.Fill(Color.FromRgba(255, 255, 255, 60), new EllipsePolygon(W * 0.30f, H * 0.18f, 260, 260)));
+        key.Mutate(x => x.GaussianBlur(70f));
+        img.Mutate(x => x.DrawImage(key, 0.5f));
+    }
+
+    // 4. The subject — rendered on its own layer, softly out of focus, off-centre.
+    using (var subj = new Image<Rgba32>(W, H))
+    {
+        float cx = W * 0.66f, cy = H * 0.52f;
+        var pen = Pens.Solid(Color.FromRgba(gp.R, gp.G, gp.B, 210), 7f);
+        var soft = Color.FromRgba(255, 255, 255, 40);
+        subj.Mutate(x =>
+        {
+            switch (pal.motif)
+            {
+                case "glasses":
+                    float lw = 150, lh = 110, gap = 46;
+                    x.Draw(pen, new EllipsePolygon(cx - lw / 2 - gap, cy, lw, lh));
+                    x.Draw(pen, new EllipsePolygon(cx + lw / 2 + gap, cy, lw, lh));
+                    x.DrawLine(pen, new PointF(cx - gap + 14, cy - 14), new PointF(cx + gap - 14, cy - 14));
+                    x.DrawLine(pen, new PointF(cx - lw - gap, cy - 6), new PointF(cx - lw - gap - 120, cy - 40));
+                    x.DrawLine(pen, new PointF(cx + lw + gap, cy - 6), new PointF(cx + lw + gap + 120, cy - 40));
+                    x.Fill(soft, new EllipsePolygon(cx - lw / 2 - gap, cy, lw - 16, lh - 16));
+                    x.Fill(soft, new EllipsePolygon(cx + lw / 2 + gap, cy, lw - 16, lh - 16));
+                    break;
+                case "lens":
+                    x.Fill(Color.FromRgba(gp.R, gp.G, gp.B, 55), new EllipsePolygon(cx, cy, 175, 175));
+                    x.Draw(Pens.Solid(Color.FromRgba(gp.R, gp.G, gp.B, 220), 6f), new EllipsePolygon(cx, cy, 175, 175));
+                    x.Draw(Pens.Solid(Color.FromRgba(255, 255, 255, 90), 3f), new EllipsePolygon(cx, cy, 120, 120));
+                    x.Fill(Color.FromRgba(255, 255, 255, 120), new EllipsePolygon(cx - 70, cy - 70, 26, 60));
+                    break;
+                case "network":
+                    var pts = new PointF[9];
+                    for (int n = 0; n < pts.Length; n++)
+                        pts[n] = new PointF(cx - 180 + rng.Next(0, 360), cy - 150 + rng.Next(0, 300));
+                    for (int n = 0; n < pts.Length; n++)
+                        for (int m = n + 1; m < pts.Length; m++)
+                            if (rng.Next(100) < 35)
+                                x.DrawLine(Pens.Solid(Color.FromRgba(gp.R, gp.G, gp.B, 90), 2f), pts[n], pts[m]);
+                    foreach (var pt in pts)
+                    {
+                        x.Fill(Color.FromRgba(255, 255, 255, 60), new EllipsePolygon(pt.X, pt.Y, 16, 16));
+                        x.Fill(Color.FromRgba(gp.R, gp.G, gp.B, 230), new EllipsePolygon(pt.X, pt.Y, 8, 8));
+                    }
+                    break;
+                default: // eye
+                    x.Fill(Color.FromRgba(gp.R, gp.G, gp.B, 60), new EllipsePolygon(cx, cy, 165, 165));
+                    x.Fill(new RadialGradientBrush(new PointF(cx, cy), 150, GradientRepetitionMode.None,
+                        new ColorStop(0f, Color.FromRgba(gp.R, gp.G, gp.B, 230)),
+                        new ColorStop(0.7f, Color.FromRgba(gp.R, gp.G, gp.B, 120)),
+                        new ColorStop(1f, Color.FromRgba(gp.R, gp.G, gp.B, 0))),
+                        new EllipsePolygon(cx, cy, 150, 150));
+                    x.Fill(Color.FromRgba(8, 12, 18, 235), new EllipsePolygon(cx, cy, 62, 62));
+                    x.Fill(Color.FromRgba(255, 255, 255, 220), new EllipsePolygon(cx - 26, cy - 30, 20, 20));
+                    x.Fill(Color.FromRgba(255, 255, 255, 90), new EllipsePolygon(cx + 34, cy + 22, 8, 8));
+                    break;
+            }
+        });
+        // Glow copy (heavier blur) behind a lightly-blurred subject for a real-lens falloff.
+        using var glowLayer = subj.Clone(x => x.GaussianBlur(22f));
+        img.Mutate(x => x.DrawImage(glowLayer, 0.6f));
+        subj.Mutate(x => x.GaussianBlur(3.2f));
+        img.Mutate(x => x.DrawImage(subj, 0.9f));
+    }
+
+    // 5. Cinematic vignette to sink the edges.
+    img.Mutate(x => x.Vignette(Color.FromRgba(0, 0, 0, 255)));
+
+    // 6. Film grain — kills the flat-vector look.
+    img.ProcessPixelRows(accessor =>
+    {
+        var grng = new Random(seed ^ 0x5f3759df);
+        for (int y = 0; y < accessor.Height; y++)
+        {
+            var row = accessor.GetRowSpan(y);
+            for (int x = 0; x < row.Length; x++)
+            {
+                int n = grng.Next(-11, 12);
+                var px = row[x];
+                px.R = (byte)Math.Clamp(px.R + n, 0, 255);
+                px.G = (byte)Math.Clamp(px.G + n, 0, 255);
+                px.B = (byte)Math.Clamp(px.B + n, 0, 255);
+                row[x] = px;
+            }
+        }
+    });
+
+    img.Save(outPath, new JpegEncoder { Quality = 86 });
 }
 
 record PostSpec(string Slug, string Title, string Badge, string Category,

@@ -228,7 +228,7 @@ public class ThemeSettingsController : Controller
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var validLayouts = new[] { "Neutral", "Magazine", "Grid", "Minimal", "Classic", "Modern",
             "Feed", "Reader", "Showcase", "Bento", "Timeline", "Stream", "Newsletter", "Journal",
-            "Notebook", "Studio", "Broadsheet", "Almanac" };
+            "Notebook", "Studio", "Broadsheet", "Almanac", "Verdict", "Catalog" };
 
         // LowercaseUrls routing option lowercases route values — normalise back to PascalCase
         var normalised = validLayouts.FirstOrDefault(l =>
@@ -252,6 +252,7 @@ public class ThemeSettingsController : Controller
             { "Bento",      "Grid"     }, { "Timeline",   "Neutral"  }, { "Stream",     "Neutral"  },
             { "Newsletter", "Minimal"  }, { "Journal",    "Classic"  }, { "Notebook",   "Classic"  },
             { "Studio",     "Magazine" }, { "Broadsheet", "Classic"  }, { "Almanac",    "Neutral"  },
+            { "Verdict",    "Modern"   }, { "Catalog",    "Neutral"  },
         };
         var footerLayout = footerNavbarMap.TryGetValue(presetId, out var fl) ? fl : presetId;
         // Navbar has an extra Feed view; others fall back same as footer
@@ -279,7 +280,7 @@ public class ThemeSettingsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApplyInkwellPreset(string presetName)
     {
-        var validPresets = new[] { "cream", "linen", "manuscript", "folio", "press", "letterpress", "foxglove", "cobalt", "ink", "onyx", "slate", "sand", "plum", "forest", "mono" };
+        var validPresets = new[] { "cream", "linen", "manuscript", "folio", "press", "letterpress", "foxglove", "cobalt", "ink", "onyx", "slate", "sand", "plum", "forest", "mono", "clinic" };
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var normalised = validPresets.FirstOrDefault(p => p.Equals(presetName, StringComparison.OrdinalIgnoreCase));
@@ -294,6 +295,7 @@ public class ThemeSettingsController : Controller
         {
             new() { SettingKey = "inkwell-preset", SettingValue = normalised }
         });
+        await _audit.LogAsync(AuditActions.ThemePresetApplied, "Theme", null, $"Inkwell: {normalised}");
 
         TempData["Success"] = $"Inkwell preset '{normalised}' applied.";
         return RedirectToAction("Index");

@@ -41,7 +41,8 @@
                         }
                         <img src="@pAuthorImage" alt="@Model.AuthorName" class="w-8 h-8 rounded-full object-cover" />
                         <span>
-                            <span class="font-medium" style="color: var(--foreground);">@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)@(!string.IsNullOrEmpty(Model.AuthorCredentials) ? $", {Model.AuthorCredentials}" : "")</span>
+                            @{ var nAuthorSlug = ViewBag.AuthorSlug as string; var nAuthorName = string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName; }
+                            <span class="font-medium" style="color: var(--foreground);">@if (!string.IsNullOrEmpty(nAuthorSlug)) { <a href="/author/@nAuthorSlug" rel="author" style="color:inherit;text-decoration:none;">@nAuthorName</a> } else { @nAuthorName }@(!string.IsNullOrEmpty(Model.AuthorCredentials) ? $", {Model.AuthorCredentials}" : "")</span>
                             @if (!string.IsNullOrEmpty(Model.AuthorSpecialty))
                             {
                                 <span class="block text-xs" style="color: var(--muted-foreground);">@Model.AuthorSpecialty</span>
@@ -83,9 +84,12 @@
             @if (!string.IsNullOrEmpty(Model.FeatureImage))
             {
                 <div class="mb-8 overflow-hidden">
-                    <img src="@Model.FeatureImage" alt="@Model.Title" class="w-full h-auto object-cover" asp-append-version="true" />
+                    <img src="@Model.FeatureImage" alt="@Model.Title" class="w-full h-auto object-cover" fetchpriority="high" decoding="async" asp-append-version="true" />
                 </div>
             }
+
+            <partial name="_KeyFacts" model="Model" />
+            <partial name="_HowTo" model="Model" />
 
             <!-- Post Content -->
             <div class="post-prose mb-8" style="font-family: var(--font-body); line-height: 1.8;">
@@ -156,7 +160,7 @@
                             <a href="/@rp.Slug" class="group border border-dashed rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col" style="border-color: var(--border); background: var(--card);">
                                 @if (!string.IsNullOrEmpty(rp.FeatureImage))
                                 {
-                                    <img src="@rp.FeatureImage" alt="@rp.Title" class="w-full h-36 object-cover group-hover:opacity-90 transition-opacity" asp-append-version="true" />
+                                    <img src="@rp.FeatureImage" alt="@rp.Title" class="w-full h-36 object-cover group-hover:opacity-90 transition-opacity" loading="lazy" decoding="async" asp-append-version="true" />
                                 }
                                 <div class="p-3 flex flex-col gap-1 flex-1">
                                     @if (rp.Categories.Any())

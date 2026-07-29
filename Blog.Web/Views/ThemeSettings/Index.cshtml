@@ -72,6 +72,7 @@
                     new { Id = "Timeline",   Name = "The Timeline",   Desc = "Vertical timeline, journal-friendly",      Family = "Modern" },
                     new { Id = "Stream",     Name = "The Stream",     Desc = "Microblog, threaded notes",                Family = "Modern" },
                     new { Id = "Newsletter", Name = "The Newsletter", Desc = "Subscribe-first, digest layout",           Family = "Modern" },
+                    new { Id = "Catalog",    Name = "The Catalog",    Desc = "Boxed card list, thumbnail-left",          Family = "Modern" },
                     // Editorial family
                     new { Id = "Magazine",   Name = "The Magazine",   Desc = "Issue masthead, hero, multi-author",       Family = "Editorial" },
                     new { Id = "Journal",    Name = "The Journal",    Desc = "Column + sidebar of recent letters",       Family = "Editorial" },
@@ -79,13 +80,17 @@
                     new { Id = "Studio",     Name = "The Studio",     Desc = "Cover-heavy masonry, photo essays",        Family = "Editorial" },
                     new { Id = "Broadsheet", Name = "The Broadsheet", Desc = "Multi-column newspaper, dense type",       Family = "Editorial" },
                     new { Id = "Almanac",    Name = "The Almanac",    Desc = "Archive index, chronological ledger",      Family = "Editorial" },
+                    // Review family
+                    new { Id = "Verdict",    Name = "The Verdict",    Desc = "Scored roundups, comparison tables",       Family = "Review" },
                     // Classic family
                     new { Id = "Neutral",    Name = "Neutral",        Desc = "Clean default, no frills",                 Family = "Classic" },
                     new { Id = "Classic",    Name = "Classic",        Desc = "Traditional blog list view",               Family = "Classic" },
                     new { Id = "Minimal",    Name = "Minimal",        Desc = "Stripped back, content first",             Family = "Classic" },
                     new { Id = "Modern",     Name = "Modern",         Desc = "Bold cards with accent colours",           Family = "Classic" },
                 };
-                var familyGroups = layouts.GroupBy(l => l.Family).OrderBy(g => g.Key == "Modern" ? 0 : g.Key == "Editorial" ? 1 : 2).ToList();
+                var familyGroups = layouts.GroupBy(l => l.Family)
+                    .OrderBy(g => g.Key == "Modern" ? 0 : g.Key == "Editorial" ? 1 : g.Key == "Review" ? 2 : 3)
+                    .ToList();
             }
             @foreach (var familyGroup in familyGroups)
             {
@@ -310,6 +315,37 @@
                                                 }
                                             </div>
                                         }
+                                        else if (layout.Id == "Verdict")
+                                        {
+                                            @* Verdict: ranked rows with score pills *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="display:flex;align-items:center;gap:3px;padding:2px 3px;border:1px solid rgba(26,26,26,.15);border-radius:2px;background:rgba(26,26,26,.03);">
+                                                        <div style="width:5px;height:5px;border-radius:1px;background:rgba(26,26,26,.35);flex:none;"></div>
+                                                        <div style="flex:1;display:flex;flex-direction:column;gap:1.5px;">
+                                                            <div style="height:2px;background:rgba(26,26,26,.30);border-radius:1px;width:@(90 - i * 12)%;"></div>
+                                                            <div style="height:1.5px;background:rgba(26,26,26,.14);border-radius:1px;width:55%;"></div>
+                                                        </div>
+                                                        <div style="width:10px;height:5px;border-radius:999px;background:rgba(29,78,216,.55);flex:none;"></div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (layout.Id == "Catalog")
+                                        {
+                                            @* Catalog: single-column boxed cards, thumbnail-left *@
+                                            <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
+                                                @for (int i = 0; i < 3; i++) {
+                                                    <div style="display:flex;align-items:stretch;gap:3px;padding:2px;border:1px solid rgba(26,26,26,.15);border-radius:2px;background:rgba(26,26,26,.03);">
+                                                        <div style="width:12px;height:12px;background:rgba(26,26,26,.30);border-radius:1px;flex:none;"></div>
+                                                        <div style="flex:1;display:flex;flex-direction:column;gap:2px;justify-content:center;">
+                                                            <div style="height:2px;background:rgba(26,26,26,.30);border-radius:1px;width:80%;"></div>
+                                                            <div style="height:1.5px;background:rgba(26,26,26,.14);border-radius:1px;width:60%;"></div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
                                     </div>
                                     <div class="px-2.5 py-2 bg-card border-t border-border">
                                         <div class="flex items-center justify-between">
@@ -352,6 +388,7 @@
                     new { Id = "plum",        Name = "Plum",        Bg = "#FBFAFB", Fg = "#1F1B24", Accent = "#6B46C1", Surface = "#F5F2F6" },
                     new { Id = "forest",      Name = "Forest",      Bg = "#F8FAF7", Fg = "#14271C", Accent = "#1F5236", Surface = "#EEF2EB" },
                     new { Id = "mono",        Name = "Mono",        Bg = "#FFFFFF", Fg = "#000000", Accent = "#525252", Surface = "#F7F7F7" },
+                    new { Id = "clinic",      Name = "Clinic",      Bg = "#FFFFFF", Fg = "#0F172A", Accent = "#1D4ED8", Surface = "#F8FAFC" },
                     new { Id = "ink",         Name = "Ink",         Bg = "#16140F", Fg = "#F4EFE6", Accent = "#E8B27A", Surface = "#1E1B16" },
                     new { Id = "onyx",        Name = "Onyx",        Bg = "#0A0A0C", Fg = "#FAFAFA", Accent = "#FCD9A8", Surface = "#14141A" },
                 };

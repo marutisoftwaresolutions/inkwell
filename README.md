@@ -12,10 +12,11 @@ No ORM, no cloud account, no telemetry. Dapper-backed, multi-tenant, and designe
 - **Self-hosted & private** — your content, your server, your data. You are the sole data controller.
 - **Zero-ORM performance** — Dapper with raw SQL. No Entity Framework, no lazy-load surprises.
 - **Multi-tenant** — one binary serves many blogs. Cloud mode isolates tenants by URL slug; self-hosted mode runs a single-owner install.
-- **Themeable** — 10 Inkwell color presets × 6 layouts (Magazine, Grid, Minimal, Neutral, Classic, Modern) with live CSS variable customization from the admin panel.
+- **Themeable** — 16 Inkwell color presets × 20 layouts (Magazine, Feed, Catalog, Verdict, Grid, Minimal, Neutral, Classic, Modern, and more) with live CSS variable customization from the admin panel.
 - **Analytics built-in** — page view tracking, UTM attribution, geo-location (country/region via ip-api.com), traffic source classification, and Chart.js dashboards. No third-party tracker required.
 - **Audit Trail** — immutable, admin-only log of every write action across the platform. Filterable and Excel-exportable.
-- **Your database** — SQL Server 2019+, SQL Server LocalDB, or SQLite. Schema auto-applies on startup via `MigrationService`; no manual migration step needed.
+- **Error Monitor** — automatic capture of 4xx/5xx errors grouped by signature with occurrence counts and first/last-seen, an admin dashboard, and optional email alerts to multiple recipients on new server errors.
+- **Your database** — SQL Server 2019+ or SQL Server LocalDB. Schema auto-applies on startup via `MigrationService`; no manual migration step needed.
 
 ---
 
@@ -39,14 +40,15 @@ Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
 
 - **Quill WYSIWYG Editor** — rich-text post editing with image upload, code blocks, dividers, and custom button blots. Auto-save drafts.
 - **Role-Based Access Control** — Admin, Editor, and Author roles with 10 granular permission claims (`posts.edit`, `posts.publish`, `posts.delete`, `pages.manage`, `comments.manage`, `categories.manage`, `tags.manage`, `media.manage`, `settings.manage`, `themes.manage`).
-- **Theme & Layout System** — 10 Inkwell presets, 6+ layout variants, and a `CustomThemeSettings` key/value store for CSS variable overrides.
+- **Theme & Layout System** — Inkwell color presets, 20 layout variants (including the **Verdict** scored-roundup format for "Top N Best… Software" buyer's guides and the **Catalog** single-column boxed card list for SaaS-style company blogs), and a `CustomThemeSettings` key/value store for CSS variable overrides.
 - **Analytics Dashboard** — page view tracking with UTM params, referrer, visit source, country/region. Bot detection filters 100+ known bot signatures. Chart.js visualizations.
 - **Audit Trail** — every admin write action logged with user, IP, and timestamp. Read-only from the UI; exportable as Excel via ClosedXML.
+- **Error Monitor** — a global exception handler and status-code logger record 4xx/5xx errors into an `ErrorLogs` table, grouped by signature (status + normalized path + exception type) so similar/repeat errors collapse into one counted row. Admin → Error Monitor lists groups with counts, first/last-seen, and filters; optional SMTP email alerts notify configured recipients the first time a new server error appears.
 - **Newsletter & Subscribers** — compose and send newsletters, manage subscribers, import/export CSV.
 - **Redirects Manager** — source/destination redirect rules with per-rule hit-count tracking.
 - **Members** — member directory with label-based segmentation.
 - **Media Library** — secure upload organized by year/month, paginated API for in-editor browsing, automatic image processing via SixLabors.ImageSharp.Web.
-- **SEO-Ready** — OG image generation, FAQ schema (JSON-LD), structured data, canonical URLs, content freshness dates (`LastVerifiedAt` / `NextReviewAt`).
+- **SEO & AI-search ready** — per-page canonical URLs, Open Graph / Twitter Cards, and OG image generation; JSON-LD structured data (`Organization`, `WebSite` + `SearchAction`, `BlogPosting`, `BreadcrumbList`, `FAQPage`, `CollectionPage`, roundup `ItemList`/`Review`, author `Person`); consistent ` | Brand` page titles and `noindex` on thin tag/search/paginated pages; **author E-E-A-T pages** at `/author/{slug}`; **"At a glance" key-facts** and **How-To step** blocks (with `HowTo` schema) for AI-extractable content; per-tenant **content language** driving `lang`/`hreflang`/`og:locale`/`inLanguage`; dynamic `sitemap.xml` (posts, categories, tags, pages, authors) with per-post image entries and automatic sitemap-index chunking for large sites, plus an RSS feed; content freshness dates (`LastVerifiedAt` / `NextReviewAt`); AEO signals — a **per-tenant `llms.txt`** + expanded **`llms-full.txt`** generated from each blog's name/description/categories/articles, a curated AI-crawler allow-list in `robots.txt`, and an `llms.txt` discovery hint for answer engines (ChatGPT, Claude, Perplexity, Gemini); optional **IndexNow instant indexing** — enable it in Admin → Settings and each publish/update pings Bing, Yandex, Seznam, and Naver (key auto-generated and served at the site root `/{key}.txt`).
 - **Post Scheduling** — schedule posts for future publish with `ScheduledAt`.
 - **SMTP Email** — transactional email via `System.Net.Mail`; no dependency on third-party email SDKs.
 - **reCAPTCHA** — optional Google reCAPTCHA v2 on public forms. Skipped gracefully when not configured.
@@ -62,8 +64,8 @@ Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
 |---|---|
 | Runtime | .NET 10 / ASP.NET Core MVC |
 | Data access | Dapper 2.1.66 (raw SQL, no ORM) |
-| Database | SQL Server 2019+ · SQL Server LocalDB · SQLite |
-| DB driver | Microsoft.Data.SqlClient 5.2.2 · Microsoft.Data.Sqlite 10.0.3 |
+| Database | SQL Server 2019+ · SQL Server LocalDB |
+| DB driver | Microsoft.Data.SqlClient 5.2.2 |
 | Authentication | ASP.NET Core cookie auth — 8 hr sliding window, HttpOnly, SameSite=Lax |
 | Password hashing | PBKDF2-SHA256, 100 000 iterations, 16-byte random salt |
 | Authorization | Policy-based RBAC — permission claims loaded from DB at sign-in |
@@ -76,7 +78,7 @@ Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
 
 | Concern | Technology |
 |---|---|
-| CSS framework | Tailwind CSS (local) · Bootstrap 5 |
+| CSS framework | Tailwind CSS (precompiled static stylesheet, no runtime compiler on the public site) · Bootstrap 5 |
 | Reactivity | Alpine.js |
 | Dynamic content | HTMX |
 | Rich text editor | Quill (self-hosted, Snow theme) |
@@ -93,6 +95,8 @@ Full docs: [useinkwell.app/docs](https://www.useinkwell.app/docs)
 | Schema migrations | `MigrationService` — `IF NOT EXISTS` guards run on every startup |
 | DB scripts | `DBScripts/YYYY-MM-DD_description.sql` — idempotent, dated |
 | OG image CLI | `tools/FeatureImageGenerator` — .NET 10 console app (SixLabors.ImageSharp) |
+| CSS build | Public `wwwroot/css/tailwind.css` is compiled from `tailwind.config.js` + `tailwind.src.css` and committed. Regenerate after adding utility classes with `npx tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify`, or build with `-p:BuildTailwindCss=true` (needs Node). `dotnet build` alone needs no Node. |
+| Tests | `Blog.Tests` (xUnit) — SEO unit guards (title branding, meta-description truncation, robots.txt tokens, locale mapping) plus `WebApplicationFactory` HTTP smoke tests (home/robots/sitemap/llms/search/post). Integration tests self-skip when no SQL Server is reachable. Run with `dotnet test`. |
 | Solution format | `Blog.slnx` (modern .NET solution file) |
 
 ---
@@ -135,7 +139,7 @@ DBScripts/              Idempotent, dated SQL scripts (YYYY-MM-DD_description.sq
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- One of: SQL Server 2019+, SQL Server LocalDB, or SQLite
+- SQL Server 2019+ or SQL Server LocalDB
 
 ### Installation
 
@@ -165,9 +169,6 @@ DBScripts/              Idempotent, dated SQL scripts (YYYY-MM-DD_description.sq
 
    // SQL Server LocalDB
    "DefaultConnection": "Server=(localdb)\\MSSQLLocalDB;Database=inkwell;Trusted_Connection=True;TrustServerCertificate=True;"
-
-   // SQLite
-   "DefaultConnection": "Data Source=inkwell.db"
    ```
 
 4. **Run the application:**

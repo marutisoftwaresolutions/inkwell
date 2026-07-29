@@ -2,6 +2,7 @@
 @inject Blog.Core.Interfaces.ISettingRepository SettingsRepo
 @inject Blog.Core.Interfaces.ITenantContext TenantContext
 @inject Blog.Core.Interfaces.IUserRepository UserRepo
+@inject Blog.Core.Interfaces.ICategoryRepository CategoryRepo
 @inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
 @using System.Security.Claims
 @{
@@ -31,6 +32,20 @@
 
 	string GetTheme(string key, string fallback) => themeDict.TryGetValue(key, out var v) ? v : fallback;
 
+	// Normalizes a stored Twitter/X value (full URL or bare handle) into an @handle for twitter:site.
+	static string TwitterHandle(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+		raw = raw.Trim();
+		if (raw.Contains("twitter.com/", StringComparison.OrdinalIgnoreCase) || raw.Contains("x.com/", StringComparison.OrdinalIgnoreCase))
+		{
+			var seg = raw.TrimEnd('/').Split('/').LastOrDefault();
+			raw = seg ?? string.Empty;
+		}
+		raw = raw.TrimStart('@');
+		return string.IsNullOrEmpty(raw) ? string.Empty : "@" + raw;
+	}
+
 	var fontHeading = GetTheme("font-heading", "Inter");
 	var fontBody = GetTheme("font-body", "Inter");
 	var fontsToLoad = new HashSet<string> { fontHeading, fontBody, "Inter" };
@@ -40,17 +55,102 @@
 	var siteDescription = userSettings.SiteDescription;
 
 	var globalSettings = await SettingsRepo.GetSettingsAsync(brandingId);
+
+	// ── Title template ──────────────────────────────────────────────────────
+	// Every page ends up with a single " | {SiteName}" suffix: no missing brand,
+	// no double brand. A title that already contains the site name is left as-is
+	// (e.g. the homepage "SiteName – Tagline", or a MetaTitle that includes it).
+	var brandedTitle = Blog.Core.Services.TextHelper.BrandTitle((string?)ViewData["Title"], siteName);
+
+	var robotsDirective = (string?)ViewData["Robots"];
+
+	// ── Content language (drives <html lang>, hreflang, og:locale, schema inLanguage) ──
+	var siteLang = string.IsNullOrWhiteSpace(userSettings.SiteLanguage) ? "en" : userSettings.SiteLanguage.Trim();
+	var siteLocale = Blog.Core.Services.LocaleHelper.OgLocale(siteLang);
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@siteLang">
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>@ViewData["Title"]</title>
+	<title>@brandedTitle</title>
 	<meta name="description" content="@ViewData["Description"]" />
+	@if (!string.IsNullOrEmpty(robotsDirective))
+	{
+		<meta name="robots" content="@robotsDirective" />
+	}
 	@if (!string.IsNullOrEmpty(globalSettings.SiteFaviconUrl))
 	{
 		<link rel="icon" type="image/x-icon" href="@globalSettings.SiteFaviconUrl" />
+	}
+	@* Search-engine ownership verification (Google Search Console / Bing Webmaster Tools) *@
+	@if (!string.IsNullOrWhiteSpace(globalSettings.GoogleSiteVerification))
+	{
+		<meta name="google-site-verification" content="@globalSettings.GoogleSiteVerification" />
+	}
+	@if (!string.IsNullOrWhiteSpace(globalSettings.BingSiteVerification))
+	{
+		<meta name="msvalidate.01" content="@globalSettings.BingSiteVerification" />
+	}
+
+	@* ── Performance: preconnect + preload the two critical brand fonts ─────────
+	   Geist (headings/UI) and Source Serif 4 (body copy) are the Inkwell design-system
+	   defaults used on virtually every page; preloading their latin subsets removes a
+	   font-swap round-trip on the LCP text. font-display:swap is already set in fonts.css. *@
+	@if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
+	{
+		<link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+	}
+	<link rel="preload" href="~/fonts/gyByhwUxId8gMEwcGFU.woff2" as="font" type="font/woff2" crossorigin />
+	<link rel="preload" href="~/fonts/vEFI2_tTDB4M7-auWDN0ahZJW1gb8tc.woff2" as="font" type="font/woff2" crossorigin />
+
+	@* ── Canonical + universal metadata (every public page) ─────────────────── *@
+	@{
+		var canonicalUrl = (string?)ViewData["Canonical"];
+		if (string.IsNullOrEmpty(canonicalUrl))
+			canonicalUrl = $"{Context.Request.Scheme}://{Context.Request.Host}{Context.Request.Path}";
+		var pageTitle = brandedTitle;
+		var pageDesc = (string?)(ViewData["Description"]) ?? siteDescription;
+		themeDict.TryGetValue("bg", out var themeColor);
+	}
+	<link rel="canonical" href="@canonicalUrl" />
+	@* Self-referential hreflang. For a single-language site this declares the page's language and
+	   marks it as the default; when translated URLs exist, add their alternates alongside these. *@
+	<link rel="alternate" hreflang="@siteLang" href="@canonicalUrl" />
+	<link rel="alternate" hreflang="x-default" href="@canonicalUrl" />
+	<meta name="author" content="@siteName" />
+	<meta name="theme-color" content="@(string.IsNullOrEmpty(themeColor) ? "#ffffff" : themeColor)" />
+	@* AI-crawler discovery hint — points assistants at the plain-text site summary *@
+	<link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-friendly site summary" />
+
+	@* Default Open Graph / Twitter for pages that don't define their own MetaTags (home, index, category, tag, CMS pages). Post pages define MetaTags and own their OG/Twitter block. *@
+	@if (!IsSectionDefined("MetaTags"))
+	{
+		var defaultImage = !string.IsNullOrEmpty(globalSettings.SiteCoverUrl) ? globalSettings.SiteCoverUrl
+			: !string.IsNullOrEmpty(globalSettings.SiteLogoUrl) ? globalSettings.SiteLogoUrl
+			: string.Empty;
+			// og:image / twitter:image must be ABSOLUTE — most social scrapers reject relative paths.
+			if (defaultImage.StartsWith("/"))
+				defaultImage = $"{Context.Request.Scheme}://{Context.Request.Host}{defaultImage}";
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="@pageTitle" />
+		<meta property="og:description" content="@pageDesc" />
+		<meta property="og:url" content="@canonicalUrl" />
+		<meta property="og:site_name" content="@siteName" />
+		<meta property="og:locale" content="@siteLocale" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="@pageTitle" />
+		<meta name="twitter:description" content="@pageDesc" />
+		if (!string.IsNullOrEmpty(defaultImage))
+		{
+			<meta property="og:image" content="@defaultImage" />
+			<meta name="twitter:image" content="@defaultImage" />
+		}
+		var twSite = TwitterHandle(globalSettings.SocialTwitter);
+		if (!string.IsNullOrEmpty(twSite))
+		{
+			<meta name="twitter:site" content="@twSite" />
+		}
 	}
 	@await RenderSectionAsync("MetaTags", required: false)
 	@if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
@@ -70,34 +170,10 @@
 	<!-- Bootstrap Icons (self-hosted) -->
 	<link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
 
-	<!-- Tailwind CSS (self-hosted) -->
-	<script src="~/lib/tailwindcss/tailwind.js"></script>
-	<script>
-		tailwind.config = {
-		theme: {
-		extend: {
-		fontFamily: {
-		sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
-		serif: ["'Source Serif 4'", 'Georgia', 'serif'],
-		body: ["'Source Serif 4'", 'Georgia', 'serif'],
-		mono: ["'Geist Mono'", 'monospace'],
-		},
-		colors: {
-		neutral: {
-		50: 'var(--bg)',
-		100: 'var(--surface)',
-		200: 'var(--border)',
-		500: 'var(--fg-meta)',
-		700: 'var(--fg-body)',
-		900: 'var(--fg)',
-		},
-		primary: 'var(--ink-black)',
-		'primary-foreground': 'var(--ink-cream)',
-		}
-		}
-		}
-		}
-	</script>
+	@* Tailwind CSS — precompiled static stylesheet (replaces the render-blocking runtime
+	   JIT compiler). Color utilities map to CSS variables so runtime theming still works.
+	   Regenerate after adding new utility classes with the npx command in tailwind.config.js. *@
+	<link rel="stylesheet" href="~/css/tailwind.css" asp-append-version="true" />
 
 	<!-- Theme CSS Variables -->
 	@if (themeSettings.Any())
@@ -145,13 +221,36 @@
 	<!-- Legacy neutral styles (filters, pagination, non-Magazine layouts) -->
 	<link rel="stylesheet" href="~/css/neutral-blog.css" asp-append-version="true" />
 
-	<!-- Highlight.js for code blocks (self-hosted) -->
-	<link rel="stylesheet" href="~/lib/highlightjs/github-dark.min.css">
-	<script src="~/lib/highlightjs/highlight.min.js"></script>
-	<script>hljs.highlightAll();</script>
-
-	<!-- Lucide icons (self-hosted) -->
-	<script src="~/lib/lucide/lucide.min.js"></script>
+	<!-- Highlight.js + Lucide are loaded on demand (only when the page actually
+	     contains code blocks / lucide icons) so they never block first paint on the
+	     common case of a text-only article. Paths go through Url.Content so they
+	     resolve correctly under a virtual-directory deployment. -->
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+			// Syntax highlighting — only if the page has <pre><code> blocks.
+			if (document.querySelector('pre code')) {
+				var hlCss = document.createElement('link');
+				hlCss.rel = 'stylesheet';
+				hlCss.href = '@Url.Content("~/lib/highlightjs/github-dark.min.css")';
+				document.head.appendChild(hlCss);
+				var hlJs = document.createElement('script');
+				hlJs.src = '@Url.Content("~/lib/highlightjs/highlight.min.js")';
+				hlJs.onload = function () {
+					document.querySelectorAll('pre code').forEach(function (el) {
+						if (window.hljs) hljs.highlightElement(el);
+					});
+				};
+				document.head.appendChild(hlJs);
+			}
+			// Lucide icons — only if the page uses data-lucide (public pages use Bootstrap Icons).
+			if (document.querySelector('[data-lucide]')) {
+				var lu = document.createElement('script');
+				lu.src = '@Url.Content("~/lib/lucide/lucide.min.js")';
+				lu.onload = function () { if (window.lucide) lucide.createIcons(); };
+				document.head.appendChild(lu);
+			}
+		});
+	</script>
 	<!-- Alpine.js (self-hosted) -->
 	<script defer src="~/lib/alpinejs/alpine.min.js"></script>
 
@@ -164,6 +263,7 @@
 		{
 			["@context"] = "https://schema.org",
 			["@type"] = "Organization",
+			["@id"] = $"{orgBaseUrl}/#organization",
 			["name"] = siteName,
 			["url"] = orgBaseUrl,
 			["description"] = siteDescription
@@ -174,10 +274,52 @@
 				["@type"] = "ImageObject",
 				["url"] = globalSettings.SiteLogoUrl
 			};
-		if (!string.IsNullOrEmpty(globalSettings.SocialTwitter))
-			orgData["sameAs"] = new[] { globalSettings.SocialTwitter };
+		// sameAs — every configured social profile strengthens the entity graph for Google & AI answer engines.
+		var sameAs = new[]
+		{
+			globalSettings.SocialTwitter, globalSettings.SocialFacebook, globalSettings.SocialInstagram,
+			globalSettings.SocialYoutube, globalSettings.SocialLinkedin, globalSettings.SocialGithub
+		}.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+		if (sameAs.Length > 0)
+			orgData["sameAs"] = sameAs;
+
+		// knowsAbout — the tenant's own categories describe the entity's topical expertise, which helps
+		// Google and AI answer engines disambiguate this brand and pick it for topic-relevant answers.
+		var orgTopics = (await CategoryRepo.GetAllAsync(brandingId))
+			.Select(c => c.Name)
+			.Where(n => !string.IsNullOrWhiteSpace(n))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.Take(15)
+			.ToArray();
+		if (orgTopics.Length > 0)
+			orgData["knowsAbout"] = orgTopics;
+
+		// WebSite schema — establishes the canonical site name/entity and its publisher.
+		var siteData = new System.Collections.Generic.Dictionary<string, object>
+		{
+			["@context"] = "https://schema.org",
+			["@type"] = "WebSite",
+			["@id"] = $"{orgBaseUrl}/#website",
+			["name"] = siteName,
+			["url"] = orgBaseUrl,
+			["description"] = siteDescription,
+			["inLanguage"] = siteLang,
+			["publisher"] = new System.Collections.Generic.Dictionary<string, string> { ["@id"] = $"{orgBaseUrl}/#organization" },
+			// SearchAction → Google sitelinks search box (target is the real /search?q= route).
+			["potentialAction"] = new System.Collections.Generic.Dictionary<string, object>
+			{
+				["@type"] = "SearchAction",
+				["target"] = new System.Collections.Generic.Dictionary<string, object>
+				{
+					["@type"] = "EntryPoint",
+					["urlTemplate"] = $"{orgBaseUrl}/search?q={{search_term_string}}"
+				},
+				["query-input"] = "required name=search_term_string"
+			}
+		};
 	}
 	<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(orgData, orgSchema))</script>
+	<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(siteData, orgSchema))</script>
 </head>
 
 @{

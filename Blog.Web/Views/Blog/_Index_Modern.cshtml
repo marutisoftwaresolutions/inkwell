@@ -31,7 +31,7 @@
         <a href="/@heroPost.Slug" class="group block relative overflow-hidden" style="height: 90vh; max-height: 700px;">
             @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
             {
-                <img src="@heroPost.FeatureImage" alt="@heroPost.Title"
+                <img src="@heroPost.FeatureImage" alt="@heroPost.Title" fetchpriority="high" decoding="async"
                      class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
             }
             else

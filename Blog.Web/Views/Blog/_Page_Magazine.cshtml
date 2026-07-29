@@ -18,7 +18,7 @@
         @if (!string.IsNullOrEmpty(Model.FeaturedImageUrl))
         {
             <div class="mb-10 overflow-hidden rounded-2xl shadow-lg">
-                <img src="@Model.FeaturedImageUrl" alt="@Model.Title" class="w-full h-auto object-cover" />
+                <img src="@Model.FeaturedImageUrl" alt="@Model.Title" class="w-full h-auto object-cover" fetchpriority="high" decoding="async" />
             </div>
         }
 

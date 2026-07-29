@@ -1,0 +1,24 @@
+@* Live meta-description length guidance for the post editor (SEO ideal: 120–158 chars). *@
+<script>
+    (function () {
+        function attach(ta) {
+            var label = ta.parentElement ? ta.parentElement.querySelector('[data-meta-counter-label]') : null;
+            if (!label) return;
+            function update() {
+                var n = (ta.value || '').trim().length;
+                var msg, color;
+                if (n === 0) { msg = 'Add a summary — ideal 120–158 characters for search snippets.'; color = '#8B7355'; }
+                else if (n < 120) { msg = n + ' characters — a bit short. Aim for 120–158.'; color = '#B45309'; }
+                else if (n <= 158) { msg = n + ' characters — ideal length ✓'; color = '#1F5236'; }
+                else { msg = n + ' characters — too long; search engines truncate around 158.'; color = '#8C2A1F'; }
+                label.textContent = msg;
+                label.style.color = color;
+            }
+            ta.addEventListener('input', update);
+            update();
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-meta-counter]').forEach(attach);
+        });
+    })();
+</script>

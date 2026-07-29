@@ -149,6 +149,16 @@
                         <input type="email" name="email" value="@Model.Email" required class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
                     </div>
 
+                    <!-- Author page slug -->
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-foreground mb-1">Author Page URL</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2 text-muted-foreground text-sm">/author/</span>
+                            <input type="text" name="slug" value="@Model.Slug" placeholder="auto-generated from your name" class="w-full pl-16 px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                        </div>
+                        <p class="text-xs text-muted-foreground mt-1">Your public author page (E-E-A-T). Leave blank to auto-generate; letters, numbers and hyphens only.</p>
+                    </div>
+
                     <!-- Website -->
                     <div class="col-span-2">
                         <label class="block text-sm font-medium text-foreground mb-1">Website URL</label>

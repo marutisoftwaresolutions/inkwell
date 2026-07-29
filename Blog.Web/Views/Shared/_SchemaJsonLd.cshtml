@@ -7,7 +7,7 @@
     var siteLogoUrl = (string)(ViewData["SiteLogoUrl"] ?? "");
     var description = !string.IsNullOrEmpty(Model.MetaDescription)
         ? Model.MetaDescription
-        : (Model.Plaintext?.Length > 160 ? Model.Plaintext[..157] + "..." : Model.Plaintext ?? "");
+        : Blog.Core.Services.TextHelper.SmartTruncate(Model.Plaintext);
     var imageUrl = !string.IsNullOrEmpty(Model.OgImage) ? Model.OgImage
                  : !string.IsNullOrEmpty(Model.FeatureImage) ? Model.FeatureImage
                  : null;
@@ -43,7 +43,7 @@
         ["mainEntityOfPage"] = new Dictionary<string, string> { ["@type"] = "WebPage", ["@id"] = postUrl },
         ["author"] = author,
         ["publisher"] = publisher,
-        ["inLanguage"] = "en-US"
+        ["inLanguage"] = (string?)(ViewData["SiteLanguage"]) is { Length: > 0 } lang ? lang : "en"
     };
     if (imageUrl is not null) article["image"] = imageUrl;
     if (Model.Categories.Any()) article["articleSection"] = Model.Categories.First().Name;
@@ -92,11 +92,133 @@
         };
     }
 
+    // ── HowTo schema ─────────────────────────────────────────────────────────
+    Dictionary<string, object>? howTo = null;
+    var howToSteps = Model.HowToSteps
+        .Where(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.Text))
+        .ToList();
+    if (howToSteps.Count > 0)
+    {
+        var steps = howToSteps.Select((s, i) =>
+        {
+            var step = new Dictionary<string, object>
+            {
+                ["@type"] = "HowToStep",
+                ["position"] = i + 1,
+                ["text"] = string.IsNullOrWhiteSpace(s.Text) ? s.Name : s.Text
+            };
+            if (!string.IsNullOrWhiteSpace(s.Name)) step["name"] = s.Name;
+            return (object)step;
+        }).ToList();
+
+        howTo = new Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "HowTo",
+            ["name"] = Model.Title,
+            ["step"] = steps
+        };
+    }
+
+    // ── ItemList + Review schema (Verdict roundup posts) ─────────────────────
+    // Each ranked entry becomes a ListItem wrapping the reviewed thing (SoftwareApplication
+    // by default), carrying its own single editorial Review + reviewRating. We deliberately do
+    // NOT emit an AggregateRating: an aggregate implies many pooled user ratings, and a single
+    // editor score dressed up as `ratingCount:1` is a self-serving rating that search engines
+    // may flag. One editorial opinion → one Review, never an AggregateRating.
+    Dictionary<string, object>? itemList = null;
+    var roundup = Model.Roundup;
+    if (roundup is not null)
+    {
+        var listItems = new List<object>();
+        foreach (var e in roundup.Ranked)
+        {
+            var reviewed = new Dictionary<string, object>
+            {
+                ["@type"] = string.IsNullOrWhiteSpace(roundup.ListType) ? "SoftwareApplication" : roundup.ListType,
+                ["name"] = e.Name
+            };
+            // The product's canonical URL is its real website; fall back to an external CtaUrl.
+            // Never claim our internal review page as the product's own URL.
+            if (e.HasWebsite) reviewed["url"] = e.Website!;
+            else if (e.CtaIsExternal) reviewed["url"] = e.CtaUrl!;
+            if (!string.IsNullOrEmpty(e.LogoUrl)) reviewed["image"] = e.LogoUrl;
+            if (!string.IsNullOrEmpty(e.Category)) reviewed["applicationCategory"] = e.Category;
+            if (!string.IsNullOrEmpty(e.Standout)) reviewed["description"] = e.Standout;
+
+            // First-party product (OptoSoft): list it as a SoftwareApplication but never emit a
+            // self-authored Review/AggregateRating — that would be a self-serving rating.
+            if (e.Score > 0 && !e.IsFirstParty)
+            {
+                var review = new Dictionary<string, object>
+                {
+                    ["@type"] = "Review",
+                    ["author"] = author,
+                    ["reviewRating"] = new Dictionary<string, object>
+                    {
+                        ["@type"] = "Rating",
+                        ["ratingValue"] = e.Score,
+                        ["bestRating"] = 10,
+                        ["worstRating"] = 0
+                    }
+                };
+                if (!string.IsNullOrEmpty(e.Body)) review["reviewBody"] = e.Body;
+                if (e.Pros.Any())
+                    review["positiveNotes"] = new Dictionary<string, object>
+                    {
+                        ["@type"] = "ItemList",
+                        ["itemListElement"] = e.Pros.Select((p, i) => (object)new Dictionary<string, object>
+                        {
+                            ["@type"] = "ListItem", ["position"] = i + 1, ["name"] = p
+                        }).ToList()
+                    };
+                if (e.Cons.Any())
+                    review["negativeNotes"] = new Dictionary<string, object>
+                    {
+                        ["@type"] = "ItemList",
+                        ["itemListElement"] = e.Cons.Select((c, i) => (object)new Dictionary<string, object>
+                        {
+                            ["@type"] = "ListItem", ["position"] = i + 1, ["name"] = c
+                        }).ToList()
+                    };
+
+                reviewed["review"] = review;
+            }
+
+            listItems.Add(new Dictionary<string, object>
+            {
+                ["@type"] = "ListItem",
+                ["position"] = e.Rank,
+                ["item"] = reviewed
+            });
+        }
+
+        itemList = new Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "ItemList",
+            ["name"] = Model.Title,
+            ["description"] = description,
+            ["numberOfItems"] = listItems.Count,
+            ["itemListOrder"] = "https://schema.org/ItemListOrderDescending",
+            ["mainEntityOfPage"] = new Dictionary<string, string> { ["@type"] = "WebPage", ["@id"] = postUrl },
+            ["itemListElement"] = listItems
+        };
+    }
+
     var opts = new JsonSerializerOptions { WriteIndented = false };
 }
 <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(article, opts))</script>
 <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(breadcrumb, opts))</script>
+@if (itemList is not null)
+{
+    <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(itemList, opts))</script>
+}
 @if (faqPage is not null)
 {
     <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(faqPage, opts))</script>
+}
+@if (howTo is not null)
+{
+    <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(howTo, opts))</script>
 }

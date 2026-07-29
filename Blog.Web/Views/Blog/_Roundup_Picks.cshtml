@@ -1,0 +1,57 @@
+@model Blog.Core.Domain.RoundupData
+@{
+    var picks = Model.Ranked.Take(3).ToList();
+    var labels = new[] { "Best pick", "Runner-up", "Also great" };
+}
+@if (picks.Any())
+{
+    <section aria-labelledby="editors-picks">
+        <h2 id="editors-picks">Editor's picks</h2>
+        <div class="vd-picks">
+            @for (var i = 0; i < picks.Count; i++)
+            {
+                var p = picks[i];
+                <div class="vd-pick @(i == 0 ? "vd-pick--top" : "")">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        @if (!string.IsNullOrEmpty(p.LogoUrl))
+                        {
+                            <img src="@p.LogoUrl" alt="@p.Name logo" class="vd-pick-logo" loading="lazy" />
+                        }
+                        @if (p.Score > 0)
+                        {
+                            <div style="margin-left:auto;text-align:right;">
+                                <span class="vd-score">@p.Score.ToString("0.0")</span><span class="vd-score-max">/10</span>
+                            </div>
+                        }
+                    </div>
+
+                    <span class="vd-badge">@(string.IsNullOrEmpty(p.Badge) ? labels[i] : p.Badge)</span>
+
+                    <h3 class="vd-pick-name">@p.Name</h3>
+
+                    @if (!string.IsNullOrEmpty(p.Standout))
+                    {
+                        <p class="vd-pick-blurb"><em>@p.Standout</em></p>
+                    }
+
+                    @if (!string.IsNullOrEmpty(p.BestFor))
+                    {
+                        <p class="vd-pick-blurb"><strong>Best for:</strong> @p.BestFor</p>
+                    }
+
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        @if (p.HasCta && p.CtaIsExternal)
+                        {
+                            <a href="@p.CtaUrl" class="vd-cta" target="_blank" rel="nofollow noopener sponsored">Visit</a>
+                        }
+                        else if (p.HasCta)
+                        {
+                            <a href="@p.CtaUrl" class="vd-cta">Read review</a>
+                        }
+                        <a href="#@p.Anchor" class="vd-cta vd-cta--ghost">Details ↓</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}

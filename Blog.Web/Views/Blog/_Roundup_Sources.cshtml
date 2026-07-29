@@ -1,0 +1,45 @@
+@model Blog.Core.Domain.RoundupData
+@{
+    // Prefer the real vendor website as the "source"; fall back to an internal review link.
+    var sourced = Model.Ranked.Where(e => e.HasWebsite || e.HasCta).ToList();
+}
+@if (sourced.Any())
+{
+    <section class="vd-sources" aria-labelledby="sources">
+        <h2 id="sources">Tools featured in this list</h2>
+        <p class="vd-verified" style="margin-bottom:12px;">Showing @sourced.Count source@(sourced.Count == 1 ? "" : "s").</p>
+        @{ var n = 1; }
+        @foreach (var e in sourced)
+        {
+            <div class="vd-source">
+                <span class="vd-source-num">@n.ToString("00")</span>
+                @if (!string.IsNullOrEmpty(e.LogoUrl))
+                {
+                    <img src="@e.LogoUrl" alt="" width="20" height="20"
+                         style="object-fit:contain;flex:none;" loading="lazy" />
+                }
+                @if (e.HasWebsite)
+                {
+                    <a href="@e.Website" target="_blank" rel="nofollow noopener">@e.Name</a>
+                }
+                else if (e.CtaIsExternal)
+                {
+                    <a href="@e.CtaUrl" target="_blank" rel="nofollow noopener sponsored">@e.Name</a>
+                }
+                else
+                {
+                    <a href="@e.CtaUrl">@e.Name review</a>
+                }
+                @if (!string.IsNullOrEmpty(e.Domain))
+                {
+                    <span class="vd-verified">· @e.Domain</span>
+                }
+                @if (e.HasWebsite && e.HasCta && !e.CtaIsExternal)
+                {
+                    <span class="vd-verified">·&nbsp;<a href="@e.CtaUrl">our review</a></span>
+                }
+            </div>
+            n++;
+        }
+    </section>
+}

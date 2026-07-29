@@ -1,0 +1,21 @@
+@model Blog.Core.Domain.Post
+@{
+    var facts = Model.KeyFacts
+        .Where(f => !string.IsNullOrWhiteSpace(f.Label) && !string.IsNullOrWhiteSpace(f.Value))
+        .ToList();
+}
+@* "At a glance" key-facts box — a semantic definition list that AI answer engines extract cleanly. *@
+@if (facts.Count > 0)
+{
+    <aside class="ink-keyfacts" aria-label="At a glance"
+           style="border:1px solid var(--border); border-radius:var(--r-2,6px); padding:1rem 1.25rem; margin:1.5rem 0; background:var(--surface,var(--muted));">
+        <h2 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; margin:0 0 0.6rem; color:var(--fg-meta,var(--muted-foreground));">At a glance</h2>
+        <dl style="display:grid; grid-template-columns:auto 1fr; gap:0.4rem 1rem; margin:0;">
+            @foreach (var f in facts)
+            {
+                <dt style="font-weight:600; color:var(--fg,var(--foreground));">@f.Label</dt>
+                <dd style="margin:0; color:var(--fg-body,var(--foreground));">@f.Value</dd>
+            }
+        </dl>
+    </aside>
+}

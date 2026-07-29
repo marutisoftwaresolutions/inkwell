@@ -1,0 +1,144 @@
+@using Blog.Core.Interfaces
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+    var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+    var allCategories = ViewBag.Categories as IEnumerable<Blog.Core.Domain.Category>
+                        ?? Enumerable.Empty<Blog.Core.Domain.Category>();
+
+    string GetExcerpt(Blog.Core.Domain.Post p) =>
+        !string.IsNullOrEmpty(p.MetaDescription) ? p.MetaDescription :
+        !string.IsNullOrEmpty(p.Plaintext) ? (p.Plaintext.Length > 180 ? p.Plaintext[..177] + "…" : p.Plaintext) :
+        string.Empty;
+
+    var qParts = new List<string>();
+    if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
+    if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
+    if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+    var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
+    var noFilter = !selectedCategories.Any() && !selectedTags.Any() && string.IsNullOrEmpty(searchTerm);
+
+    // numbered-pagination window
+    const int win = 2;
+    var startP = Math.Max(1, Model.Page - win);
+    var endP = Math.Min(Model.TotalPages, Model.Page + win);
+}
+
+@* ── CATALOG LAYOUT — single-column boxed cards, thumbnail-left (SaaS blog style) ── *@
+<div style="max-width:var(--container);margin:0 auto;padding:var(--sp-10) var(--gutter);">
+
+    @if (!string.IsNullOrEmpty(searchTerm))
+    {
+        <div style="margin-bottom:var(--sp-8);padding-bottom:var(--sp-6);border-bottom:1px solid var(--border);">
+            <span style="font-family:var(--sans);font-size:13px;color:var(--fg-meta);">Results for</span>
+            <strong style="font-family:var(--serif);font-size:1.125rem;margin-left:6px;">"@searchTerm"</strong>
+            <a href="/" style="margin-left:12px;font-family:var(--sans);font-size:11px;color:var(--fg-meta);text-decoration:none;opacity:.7;">Clear ✕</a>
+        </div>
+    }
+
+    @* ── Category filter bar (horizontal tabs) ────────────────────────────── *@
+    @if (allCategories.Any())
+    {
+        <nav aria-label="Categories" style="display:flex;flex-wrap:wrap;gap:var(--sp-3);margin-bottom:var(--sp-8);padding-bottom:var(--sp-6);border-bottom:1px solid var(--border);">
+            <a href="/" style="font-family:var(--sans);font-size:13px;font-weight:600;text-decoration:none;padding:6px 14px;border-radius:999px;border:1px solid var(--border);
+                       background:@(noFilter ? "var(--link)" : "transparent");color:@(noFilter ? "var(--bg)" : "var(--fg-body)");">All Posts</a>
+            @foreach (var cat in allCategories)
+            {
+                var on = selectedCategories.Contains(cat.Slug);
+                <a href="/?category=@cat.Slug" style="font-family:var(--sans);font-size:13px;font-weight:600;text-decoration:none;padding:6px 14px;border-radius:999px;border:1px solid @(on ? "var(--link)" : "var(--border)");
+                           background:@(on ? "var(--link)" : "transparent");color:@(on ? "var(--bg)" : "var(--fg-body)");">@cat.Name</a>
+            }
+        </nav>
+    }
+
+    @if (!Model.Items.Any())
+    {
+        <div style="padding:var(--sp-16) 0;text-align:center;">
+            <p style="font-family:var(--serif);font-size:1.25rem;color:var(--fg-meta);">No posts found.</p>
+            <a href="/" style="display:inline-block;margin-top:var(--sp-6);font-family:var(--sans);font-size:13px;font-weight:600;color:var(--link);">Back to Home</a>
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;flex-direction:column;gap:var(--sp-6);">
+            @foreach (var post in Model.Items)
+            {
+                var excerpt = GetExcerpt(post);
+                var hasImage = !string.IsNullOrEmpty(post.FeatureImage);
+                var category = post.Categories?.FirstOrDefault();
+                <article style="display:grid;grid-template-columns:@(hasImage ? "clamp(110px,26vw,210px) 1fr" : "1fr");gap:var(--sp-6);align-items:stretch;
+                               background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2);overflow:hidden;">
+                    @if (hasImage)
+                    {
+                        <a href="/@post.Slug" style="display:block;align-self:stretch;min-height:100%;overflow:hidden;">
+                            <img src="@post.FeatureImage" alt="@post.Title" loading="lazy"
+                                 style="width:100%;height:100%;min-height:150px;object-fit:cover;display:block;" />
+                        </a>
+                    }
+                    <div style="min-width:0;padding:var(--sp-6) var(--sp-6) var(--sp-6) @(hasImage ? "0" : "var(--sp-6)");display:flex;flex-direction:column;justify-content:center;">
+                        @if (category != null)
+                        {
+                            <a href="/?category=@category.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-3);">@category.Name</a>
+                        }
+                        <h2 style="font-family:var(--serif);font-size:clamp(1.0625rem,2vw,1.375rem);font-weight:700;line-height:1.3;margin:0 0 var(--sp-3);">
+                            <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>
+                        </h2>
+                        @if (!string.IsNullOrEmpty(excerpt))
+                        {
+                            <p style="font-family:var(--sans);font-size:0.9375rem;line-height:1.6;color:var(--fg-body);margin:0 0 var(--sp-4);max-width:var(--measure-prose);">@excerpt</p>
+                        }
+                        <div style="display:flex;align-items:center;gap:var(--sp-5);flex-wrap:wrap;">
+                            <time style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">@post.PublishedAt?.ToString("MMM d, yyyy")</time>
+                            @if (!string.IsNullOrEmpty(post.AuthorName))
+                            {
+                                <span style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">by @post.AuthorName</span>
+                            }
+                            <a href="/@post.Slug" style="font-family:var(--sans);font-size:12px;font-weight:600;color:var(--link);text-decoration:none;">Read More →</a>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+
+    @* ── Numbered pagination (SaaS style) ─────────────────────────────────── *@
+    @if (Model.TotalPages > 1)
+    {
+        <nav aria-label="Pagination" style="margin-top:var(--sp-12);display:flex;align-items:center;justify-content:center;gap:var(--sp-3);flex-wrap:wrap;">
+            @if (Model.Page > 1)
+            {
+                <a href="?page=@(Model.Page-1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg-body);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-2);">←</a>
+            }
+            @if (startP > 1)
+            {
+                <a href="?page=1@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg-body);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-2);">1</a>
+                @if (startP > 2)
+                {
+                    <span style="font-family:var(--sans);font-size:13px;color:var(--fg-meta);">…</span>
+                }
+            }
+            @for (var pnum = startP; pnum <= endP; pnum++)
+            {
+                var isCurrent = pnum == Model.Page;
+                <a href="?page=@(pnum)@baseQuery" aria-current="@(isCurrent ? "page" : null)"
+                   style="font-family:var(--sans);font-size:13px;font-weight:700;text-decoration:none;padding:6px 12px;border-radius:var(--r-2);
+                          border:1px solid @(isCurrent ? "var(--link)" : "var(--border)");
+                          background:@(isCurrent ? "var(--link)" : "transparent");
+                          color:@(isCurrent ? "var(--bg)" : "var(--fg-body)");">@pnum</a>
+            }
+            @if (endP < Model.TotalPages)
+            {
+                @if (endP < Model.TotalPages - 1)
+                {
+                    <span style="font-family:var(--sans);font-size:13px;color:var(--fg-meta);">…</span>
+                }
+                <a href="?page=@(Model.TotalPages)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg-body);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-2);">@Model.TotalPages</a>
+            }
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a href="?page=@(Model.Page+1)@baseQuery" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--fg-body);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-2);">→</a>
+            }
+        </nav>
+    }
+</div>

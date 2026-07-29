@@ -51,6 +51,73 @@ public class Post
         string.IsNullOrEmpty(FaqJson) ? new() :
         System.Text.Json.JsonSerializer.Deserialize<List<FaqItem>>(FaqJson,
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+
+    // "Key Facts / At a glance" — a short list of quotable label/value facts rendered as a definition
+    // list. Highly extractable by AI answer engines. Malformed JSON degrades to empty, never throws.
+    public string? KeyFactsJson { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<KeyFact> KeyFacts
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(KeyFactsJson)) return new();
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<KeyFact>>(KeyFactsJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            }
+            catch (System.Text.Json.JsonException) { return new(); }
+        }
+    }
+
+    // Ordered how-to steps (name + text). Rendered as a visible numbered list and emitted as HowTo
+    // JSON-LD for AI answer engines. Malformed JSON degrades to empty, never throws.
+    public string? HowToJson { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<HowToStep> HowToSteps
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(HowToJson)) return new();
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<HowToStep>>(HowToJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            }
+            catch (System.Text.Json.JsonException) { return new(); }
+        }
+    }
+
+    public string? RoundupJson { get; set; }
+
+    /// <summary>
+    /// Structured roundup data, or null for an ordinary post. When non-null the post renders
+    /// with the Verdict template regardless of the site's layout-post setting.
+    /// Malformed JSON degrades to null rather than throwing — a bad blob must never 500 a page.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public RoundupData? Roundup
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(RoundupJson)) return null;
+            try
+            {
+                var data = System.Text.Json.JsonSerializer.Deserialize<RoundupData>(RoundupJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return data is { HasEntries: true } ? data : null;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return null;
+            }
+        }
+    }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsRoundup => Roundup is not null;
 }
 
 public enum PostStatus
@@ -61,3 +128,7 @@ public enum PostStatus
 }
 
 public record FaqItem(string Question, string Answer);
+
+public record KeyFact(string Label, string Value);
+
+public record HowToStep(string Name, string Text);

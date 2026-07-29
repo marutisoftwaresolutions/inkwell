@@ -1,0 +1,146 @@
+@using Blog.Core.Interfaces
+@using System.Text.Json
+@model PagedResult<Blog.Core.Domain.Post>
+@{
+    Layout = "_PublicLayout";
+    var author = (Blog.Core.Domain.User)ViewBag.Author;
+    var siteName = (string)(ViewBag.SiteName ?? "Blog");
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var authorUrl = $"{baseUrl}/author/{author.Slug}";
+    var authorImage = !string.IsNullOrEmpty(author.ProfileImage) ? author.ProfileImage
+        : !string.IsNullOrEmpty(author.AvatarUrl) ? author.AvatarUrl
+        : null;
+    var displayName = string.IsNullOrWhiteSpace(author.DisplayName) ? (author.Username ?? "Author") : author.DisplayName;
+    var metaDesc = !string.IsNullOrWhiteSpace(author.MetaDescription) ? author.MetaDescription
+        : !string.IsNullOrWhiteSpace(author.Bio) ? author.Bio
+        : $"Articles by {displayName} on {siteName}.";
+    if (metaDesc.Length > 160) metaDesc = metaDesc.Substring(0, 157) + "...";
+
+    var pageTitle = !string.IsNullOrWhiteSpace(author.MetaTitle) ? author.MetaTitle : $"{displayName} — {siteName}";
+    ViewData["Title"] = pageTitle;
+    ViewData["Description"] = metaDesc;
+    ViewData["Canonical"] = authorUrl;
+
+    var socials = new[] { author.Website, author.Twitter, author.Facebook }
+        .Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+
+    // ── Person (E-E-A-T) + BreadcrumbList structured data ────────────────────
+    var person = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "Person",
+        ["@id"] = $"{authorUrl}#person",
+        ["name"] = displayName,
+        ["url"] = authorUrl
+    };
+    if (!string.IsNullOrWhiteSpace(author.Specialty)) person["jobTitle"] = author.Specialty;
+    if (!string.IsNullOrWhiteSpace(author.Bio)) person["description"] = author.Bio;
+    if (authorImage is not null) person["image"] = authorImage;
+    if (!string.IsNullOrWhiteSpace(author.Credentials))
+        person["hasCredential"] = new Dictionary<string, string>
+        {
+            ["@type"] = "EducationalOccupationalCredential",
+            ["credentialCategory"] = "degree",
+            ["name"] = author.Credentials
+        };
+    if (socials.Length > 0) person["sameAs"] = socials;
+    person["worksFor"] = new Dictionary<string, string> { ["@type"] = "Organization", ["name"] = siteName };
+
+    var breadcrumb = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "BreadcrumbList",
+        ["itemListElement"] = new List<object>
+        {
+            new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "Home", ["item"] = baseUrl },
+            new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 2, ["name"] = displayName, ["item"] = authorUrl }
+        }
+    };
+    var jsonOpts = new JsonSerializerOptions { WriteIndented = false };
+}
+
+@section MetaTags {
+    <meta property="og:type" content="profile" />
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="@metaDesc" />
+    <meta property="og:url" content="@authorUrl" />
+    <meta property="og:site_name" content="@siteName" />
+    <meta property="og:locale" content="en_US" />
+    @if (!string.IsNullOrEmpty(author.Slug))
+    {
+        <meta property="profile:username" content="@author.Slug" />
+    }
+    @if (authorImage is not null)
+    {
+        <meta property="og:image" content="@authorImage" />
+        <meta name="twitter:image" content="@authorImage" />
+    }
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="@pageTitle" />
+    <meta name="twitter:description" content="@metaDesc" />
+    <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(person, jsonOpts))</script>
+    <script type="application/ld+json">@Html.Raw(JsonSerializer.Serialize(breadcrumb, jsonOpts))</script>
+}
+
+<div class="max-w-4xl mx-auto px-4 py-10">
+    <!-- Author header -->
+    <header class="flex flex-col sm:flex-row items-start gap-6 pb-8 mb-8 border-b border-dashed" style="border-color: var(--border);">
+        @if (authorImage is not null)
+        {
+            <img src="@authorImage" alt="@displayName" width="96" height="96"
+                 class="w-24 h-24 rounded-full object-cover flex-shrink-0" fetchpriority="high" decoding="async" />
+        }
+        <div class="flex flex-col gap-2">
+            <h1 class="text-3xl font-serif" style="color: var(--fg);">@displayName</h1>
+            @if (!string.IsNullOrWhiteSpace(author.Credentials) || !string.IsNullOrWhiteSpace(author.Specialty))
+            {
+                <p class="text-sm font-medium" style="color: var(--fg-meta);">
+                    @author.Credentials@(!string.IsNullOrWhiteSpace(author.Credentials) && !string.IsNullOrWhiteSpace(author.Specialty) ? " · " : "")@author.Specialty
+                </p>
+            }
+            @if (!string.IsNullOrWhiteSpace(author.Bio))
+            {
+                <p class="max-w-prose" style="color: var(--fg-body);">@author.Bio</p>
+            }
+            @if (socials.Length > 0)
+            {
+                <div class="flex items-center gap-4 mt-1 text-sm">
+                    @if (!string.IsNullOrWhiteSpace(author.Website))
+                    {
+                        <a href="@author.Website" rel="me noopener" target="_blank" style="color: var(--link);"><i class="bi bi-globe me-1"></i>Website</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(author.Twitter))
+                    {
+                        <a href="@author.Twitter" rel="me noopener" target="_blank" style="color: var(--link);"><i class="bi bi-twitter-x me-1"></i>Twitter</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(author.Facebook))
+                    {
+                        <a href="@author.Facebook" rel="me noopener" target="_blank" style="color: var(--link);"><i class="bi bi-facebook me-1"></i>Facebook</a>
+                    }
+                </div>
+            }
+        </div>
+    </header>
+
+    <!-- Author's articles -->
+    <h2 class="text-sm uppercase tracking-wide mb-2" style="color: var(--fg-meta);">Articles by @displayName (@Model.TotalItems)</h2>
+    <div>
+        @foreach (var post in Model.Items)
+        {
+            <partial name="_PostCard_Neutral" model="post" />
+        }
+    </div>
+
+    @if (Model.TotalPages > 1)
+    {
+        var current = (int)(ViewBag.CurrentPage ?? 1);
+        <nav class="flex items-center justify-center gap-2 mt-10" aria-label="Pagination">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                <a href="/author/@author.Slug?page=@i"
+                   class="h-9 w-9 flex items-center justify-center border border-dashed text-sm @(i == current ? "font-black" : "hover:opacity-80")"
+                   style="border-color: var(--border); @(i == current ? "background: var(--muted);" : "")">@i</a>
+            }
+        </nav>
+    }
+</div>

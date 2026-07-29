@@ -45,6 +45,24 @@ public class MigrationService
                     ALTER TABLE Posts ADD FaqJson NVARCHAR(MAX) NULL;
                 END
 
+                -- Verdict roundup posts (DBScripts/2026-07-14_add-roundupjson-to-posts.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'RoundupJson')
+                BEGIN
+                    ALTER TABLE Posts ADD RoundupJson NVARCHAR(MAX) NULL;
+                END
+
+                -- Key Facts / At a glance (DBScripts/2026-07-16_add-keyfactsjson-to-posts.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'KeyFactsJson')
+                BEGIN
+                    ALTER TABLE Posts ADD KeyFactsJson NVARCHAR(MAX) NULL;
+                END
+
+                -- HowTo step-by-step guides (DBScripts/2026-07-16_add-howtojson-to-posts.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'HowToJson')
+                BEGIN
+                    ALTER TABLE Posts ADD HowToJson NVARCHAR(MAX) NULL;
+                END
+
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'Credentials')
                 BEGIN
                     ALTER TABLE Users ADD Credentials NVARCHAR(200) NULL;
@@ -58,6 +76,27 @@ public class MigrationService
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'LicenseNumber')
                 BEGIN
                     ALTER TABLE Users ADD LicenseNumber NVARCHAR(100) NULL;
+                END
+
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ErrorLogs')
+                BEGIN
+                    CREATE TABLE ErrorLogs (
+                        Id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                        Fingerprint NVARCHAR(64) NOT NULL,
+                        StatusCode INT NOT NULL,
+                        Method NVARCHAR(10) NOT NULL DEFAULT 'GET',
+                        Path NVARCHAR(1024) NOT NULL,
+                        ExceptionType NVARCHAR(256) NULL,
+                        Message NVARCHAR(2048) NULL,
+                        StackTrace NVARCHAR(MAX) NULL,
+                        UserAgent NVARCHAR(512) NULL,
+                        Referer NVARCHAR(1024) NULL,
+                        OccurrenceCount INT NOT NULL DEFAULT 1,
+                        FirstSeenAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                        LastSeenAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                    );
+                    CREATE UNIQUE INDEX UX_ErrorLogs_Fingerprint ON ErrorLogs(Fingerprint);
+                    CREATE INDEX IX_ErrorLogs_LastSeenAt ON ErrorLogs(LastSeenAt DESC);
                 END
 
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CustomThemeSettings')

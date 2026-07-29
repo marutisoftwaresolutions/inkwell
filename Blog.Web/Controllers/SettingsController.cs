@@ -44,6 +44,7 @@ public class SettingsController : Controller
         {
             SiteName = globalSettings.SiteName,
             SiteTagline = globalSettings.SiteDescription,
+            SiteLanguage = globalSettings.SiteLanguage,
             SiteLogoUrl = globalSettings.SiteLogoUrl,
             SiteFaviconUrl = globalSettings.SiteFaviconUrl,
             SiteCoverUrl = globalSettings.SiteCoverUrl,
@@ -51,6 +52,12 @@ public class SettingsController : Controller
             CommentsEnabled = globalSettings.CommentsEnabled,
             CommentsModeration = globalSettings.CommentsModeration,
             GoogleAnalyticsId = globalSettings.GoogleAnalyticsId,
+            GoogleSiteVerification = globalSettings.GoogleSiteVerification,
+            BingSiteVerification = globalSettings.BingSiteVerification,
+            IndexNowEnabled = globalSettings.IndexNowEnabled,
+            IndexNowApiKey = globalSettings.IndexNowApiKey,
+            ErrorNotificationsEnabled = globalSettings.ErrorNotificationsEnabled,
+            ErrorNotificationEmails = globalSettings.ErrorNotificationEmails,
             SocialTwitter = globalSettings.SocialTwitter,
             SocialFacebook = globalSettings.SocialFacebook,
             SocialInstagram = globalSettings.SocialInstagram,
@@ -76,7 +83,8 @@ public class SettingsController : Controller
         var globalSettings = await _settings.GetSettingsAsync(targetId);
         
         globalSettings.SiteName = model.SiteName;
-        globalSettings.SiteDescription = model.SiteTagline;
+        globalSettings.SiteDescription = model.SiteTagline ?? string.Empty;
+        globalSettings.SiteLanguage = string.IsNullOrWhiteSpace(model.SiteLanguage) ? "en" : model.SiteLanguage.Trim();
         globalSettings.SiteLogoUrl = model.SiteLogoUrl ?? string.Empty;
         globalSettings.SiteFaviconUrl = model.SiteFaviconUrl ?? string.Empty;
         globalSettings.SiteCoverUrl = model.SiteCoverUrl ?? string.Empty;
@@ -84,6 +92,22 @@ public class SettingsController : Controller
         globalSettings.CommentsEnabled = model.CommentsEnabled;
         globalSettings.CommentsModeration = model.CommentsModeration;
         globalSettings.GoogleAnalyticsId = model.GoogleAnalyticsId ?? string.Empty;
+        globalSettings.GoogleSiteVerification = (model.GoogleSiteVerification ?? string.Empty).Trim();
+        globalSettings.BingSiteVerification = (model.BingSiteVerification ?? string.Empty).Trim();
+
+        // IndexNow: keep only valid key chars (a-z A-Z 0-9 and dash, per the IndexNow spec).
+        // Auto-generate a compliant 32-char key when enabling without one, so the operator never
+        // has to hand-craft it. Clearing the key disables discovery even if the box stays checked.
+        globalSettings.IndexNowEnabled = model.IndexNowEnabled;
+        var indexNowKey = new string((model.IndexNowApiKey ?? string.Empty).Trim()
+            .Where(c => char.IsLetterOrDigit(c) || c == '-').ToArray());
+        if (globalSettings.IndexNowEnabled && string.IsNullOrEmpty(indexNowKey))
+            indexNowKey = Guid.NewGuid().ToString("N"); // 32 hex chars — a valid IndexNow key
+        globalSettings.IndexNowApiKey = indexNowKey;
+
+        globalSettings.ErrorNotificationsEnabled = model.ErrorNotificationsEnabled;
+        globalSettings.ErrorNotificationEmails = (model.ErrorNotificationEmails ?? string.Empty).Trim();
+
         globalSettings.SocialTwitter = model.SocialTwitter ?? string.Empty;
         globalSettings.SocialFacebook = model.SocialFacebook ?? string.Empty;
         globalSettings.SocialInstagram = model.SocialInstagram ?? string.Empty;

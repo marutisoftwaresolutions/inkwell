@@ -149,7 +149,7 @@ else
             @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
             {
                 <a href="/@heroPost.Slug" class="ink-hero-cover" style="background:var(--surface);">
-                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title"
+                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title" fetchpriority="high" decoding="async"
                          style="width:100%;height:100%;object-fit:cover;display:block;" />
                 </a>
             }
@@ -227,7 +227,7 @@ else
                         @if (!string.IsNullOrEmpty(post.FeatureImage))
                         {
                             <a href="/@post.Slug" class="ink-card-cover">
-                                <img src="@post.FeatureImage" alt="@post.Title"
+                                <img src="@post.FeatureImage" alt="@post.Title" loading="lazy" decoding="async"
                                      style="width:100%;height:100%;object-fit:cover;display:block;" />
                             </a>
                         }
@@ -264,7 +264,7 @@ else
                         @if (!string.IsNullOrEmpty(post.FeatureImage))
                         {
                             <a href="/@post.Slug" class="ink-card-cover">
-                                <img src="@post.FeatureImage" alt="@post.Title"
+                                <img src="@post.FeatureImage" alt="@post.Title" loading="lazy" decoding="async"
                                      style="width:100%;height:100%;object-fit:cover;display:block;" />
                             </a>
                         }
@@ -310,7 +310,7 @@ else
                         @if (!string.IsNullOrEmpty(post.FeatureImage))
                         {
                             <a href="/@post.Slug" style="text-decoration:none;flex-shrink:0;">
-                                <img src="@post.FeatureImage" alt="@post.Title"
+                                <img src="@post.FeatureImage" alt="@post.Title" loading="lazy" decoding="async"
                                      style="width:120px;height:80px;object-fit:cover;border-radius:var(--r-2);display:block;" />
                             </a>
                         }

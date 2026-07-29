@@ -200,13 +200,13 @@ public class PostRepository : IPostRepository
                                MetaTitle, MetaDescription, CanonicalUrl, OgImage, OgTitle, OgDescription,
                                TwitterImage, TwitterTitle, TwitterDescription,
                                AuthorId, Status, PublishedAt, LastVerifiedAt, NextReviewAt, ScheduledAt,
-                               AllowComments, FaqJson, CreatedAt, UpdatedAt)
+                               AllowComments, FaqJson, RoundupJson, KeyFactsJson, HowToJson, CreatedAt, UpdatedAt)
             OUTPUT INSERTED.Id
             VALUES (@Id, @Uuid, @Title, @Slug, @Html, @Plaintext, @Type, @Visibility, @FeatureImage,
                     @MetaTitle, @MetaDescription, @CanonicalUrl, @OgImage, @OgTitle, @OgDescription,
                     @TwitterImage, @TwitterTitle, @TwitterDescription,
                     @AuthorId, @Status, @PublishedAt, @LastVerifiedAt, @NextReviewAt, @ScheduledAt,
-                    @AllowComments, @FaqJson, @CreatedAt, @UpdatedAt)",
+                    @AllowComments, @FaqJson, @RoundupJson, @KeyFactsJson, @HowToJson, @CreatedAt, @UpdatedAt)",
             new
             {
                 post.Id, post.Uuid, post.Title, post.Slug, post.Html, post.Plaintext, post.Type, post.Visibility, post.FeatureImage,
@@ -214,7 +214,7 @@ public class PostRepository : IPostRepository
                 post.TwitterImage, post.TwitterTitle, post.TwitterDescription,
                 post.AuthorId, Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
-                post.AllowComments, post.FaqJson,
+                post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson,
                 CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now
             });
     }
@@ -231,7 +231,8 @@ public class PostRepository : IPostRepository
                 TwitterImage = @TwitterImage, TwitterTitle = @TwitterTitle, TwitterDescription = @TwitterDescription,
                 Status = @Status, PublishedAt = @PublishedAt, LastVerifiedAt = @LastVerifiedAt,
                 NextReviewAt = @NextReviewAt, ScheduledAt = @ScheduledAt,
-                AllowComments = @AllowComments, FaqJson = @FaqJson, UpdatedAt = @UpdatedAt
+                AllowComments = @AllowComments, FaqJson = @FaqJson, RoundupJson = @RoundupJson, KeyFactsJson = @KeyFactsJson, HowToJson = @HowToJson,
+                UpdatedAt = @UpdatedAt
             WHERE Id = @Id AND AuthorId = @AuthorId",
             new
             {
@@ -240,7 +241,7 @@ public class PostRepository : IPostRepository
                 post.TwitterImage, post.TwitterTitle, post.TwitterDescription,
                 Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
-                post.AllowComments, post.FaqJson,
+                post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson,
                 UpdatedAt = DateTime.Now, post.Id, post.AuthorId
             });
     }
@@ -360,21 +361,23 @@ public class PostRepository : IPostRepository
         p.Add("PostId", postId);
         p.Add("Count", count);
 
-        var conditions = new List<string>();
+        // Relevance score for topic-cluster internal linking: a shared category weighs more than a
+        // shared tag. Posts with no overlap score 0 and act as a recency backfill, so the See-Also /
+        // Related module is always populated (maximises internal-link density) while the most
+        // topically-relevant posts still rank first. (Previously matched on ANY shared category/tag
+        // and ordered purely by recency — thin clusters and sometimes an empty module.)
+        var scoreTerms = new List<string>();
         if (categoryIds.Any())
         {
-            conditions.Add("EXISTS (SELECT 1 FROM PostCategories pc WHERE pc.PostId = p.Id AND pc.CategoryId IN @CategoryIds)");
+            scoreTerms.Add("(SELECT COUNT(*) FROM PostCategories pc WHERE pc.PostId = p.Id AND pc.CategoryId IN @CategoryIds) * 3");
             p.Add("CategoryIds", categoryIds);
         }
         if (tagIds.Any())
         {
-            conditions.Add("EXISTS (SELECT 1 FROM PostTags pt WHERE pt.PostId = p.Id AND pt.TagId IN @TagIds)");
+            scoreTerms.Add("(SELECT COUNT(*) FROM PostTags pt WHERE pt.PostId = p.Id AND pt.TagId IN @TagIds)");
             p.Add("TagIds", tagIds);
         }
-
-        var whereMatch = conditions.Any()
-            ? $"AND ({string.Join(" OR ", conditions)})"
-            : string.Empty;
+        var relevanceExpr = scoreTerms.Any() ? string.Join(" + ", scoreTerms) : "0";
 
         var sql = $@"
             SELECT TOP(@Count) p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl,
@@ -383,8 +386,7 @@ public class PostRepository : IPostRepository
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE p.Id != @PostId
               AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))
-              {whereMatch}
-            ORDER BY p.PublishedAt DESC";
+            ORDER BY ({relevanceExpr}) DESC, p.PublishedAt DESC";
 
         return (await conn.QueryAsync<Post>(sql, p)).ToList();
     }

@@ -76,8 +76,10 @@
                     <!-- Summary -->
                     <div>
                         <label class="block text-sm font-medium mb-1">Summary (Meta)</label>
-                        <textarea name="MetaDescription" rows="3" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none">@Model.MetaDescription</textarea>
+                        <textarea name="MetaDescription" data-meta-counter rows="3" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none">@Model.MetaDescription</textarea>
+                        <p class="text-xs mt-1 text-muted-foreground" data-meta-counter-label></p>
                     </div>
+                    <partial name="_MetaCounterScript" />
 
                     <!-- Categories -->
                     <div x-data="categoryDropdown()" class="relative mb-4">
@@ -324,6 +326,63 @@
                         </div>
                     </div>
 
+                    <!-- Key Facts / At a glance -->
+                    <div x-data="keyFactsManager()" class="pt-4 border-t border-border">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <p class="text-sm font-medium">Key Facts (At a glance)</p>
+                                <p class="text-xs text-muted-foreground">Quotable label/value facts — great for AI answers</p>
+                            </div>
+                            <button type="button" @@click="add()" class="text-xs font-medium text-primary hover:underline">+ Add fact</button>
+                        </div>
+                        <input type="hidden" name="KeyFactsJson" id="keyFactsJsonInput" value="@Model.KeyFactsJson" />
+                        <div class="space-y-2">
+                            <template x-for="(fact, i) in facts" :key="i">
+                                <div class="p-2.5 border border-border rounded-md space-y-1.5 bg-muted/20">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-muted-foreground font-medium">Fact #<span x-text="i+1"></span></span>
+                                        <button type="button" @@click="remove(i)" class="text-xs text-destructive hover:underline">Remove</button>
+                                    </div>
+                                    <input type="text" x-model="fact.label" @@input="serialize()" placeholder="Label (e.g. Best for)…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <input type="text" x-model="fact.value" @@input="serialize()" placeholder="Value (e.g. Small practices)…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                </div>
+                            </template>
+                            <template x-if="facts.length === 0">
+                                <p class="text-xs text-muted-foreground text-center py-1">No key facts added yet.</p>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- HowTo / Step-by-step guide -->
+                    <div x-data="howToManager()" class="pt-4 border-t border-border">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <p class="text-sm font-medium">How-To Steps</p>
+                                <p class="text-xs text-muted-foreground">Numbered guide + HowTo structured data for AI answers</p>
+                            </div>
+                            <button type="button" @@click="add()" class="text-xs font-medium text-primary hover:underline">+ Add step</button>
+                        </div>
+                        <input type="hidden" name="HowToJson" id="howToJsonInput" value="@Model.HowToJson" />
+                        <div class="space-y-2">
+                            <template x-for="(step, i) in steps" :key="i">
+                                <div class="p-2.5 border border-border rounded-md space-y-1.5 bg-muted/20">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-muted-foreground font-medium">Step <span x-text="i+1"></span></span>
+                                        <button type="button" @@click="remove(i)" class="text-xs text-destructive hover:underline">Remove</button>
+                                    </div>
+                                    <input type="text" x-model="step.name" @@input="serialize()" placeholder="Step title…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <textarea x-model="step.text" @@input="serialize()" placeholder="What to do…" rows="2" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"></textarea>
+                                </div>
+                            </template>
+                            <template x-if="steps.length === 0">
+                                <p class="text-xs text-muted-foreground text-center py-1">No steps added yet.</p>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Roundup / Comparison Section -->
+                    <partial name="_RoundupEditor" model="Model" />
+
                     <!-- Featured Image -->
                     <div class="pt-4 border-t border-border">
                         <label class="block text-sm font-medium mb-2">Featured Image</label>
@@ -428,6 +487,32 @@
                 serialize() {
                     document.getElementById('faqJsonInput').value =
                         JSON.stringify(this.faqs.filter(f => f.question || f.answer));
+                }
+            };
+        }
+
+        function keyFactsManager() {
+            return {
+                facts: JSON.parse(document.getElementById('keyFactsJsonInput').value || '[]'),
+                init() { this.serialize(); },
+                add() { this.facts.push({ label: '', value: '' }); this.serialize(); },
+                remove(i) { this.facts.splice(i, 1); this.serialize(); },
+                serialize() {
+                    document.getElementById('keyFactsJsonInput').value =
+                        JSON.stringify(this.facts.filter(f => f.label || f.value));
+                }
+            };
+        }
+
+        function howToManager() {
+            return {
+                steps: JSON.parse(document.getElementById('howToJsonInput').value || '[]'),
+                init() { this.serialize(); },
+                add() { this.steps.push({ name: '', text: '' }); this.serialize(); },
+                remove(i) { this.steps.splice(i, 1); this.serialize(); },
+                serialize() {
+                    document.getElementById('howToJsonInput').value =
+                        JSON.stringify(this.steps.filter(s => s.name || s.text));
                 }
             };
         }

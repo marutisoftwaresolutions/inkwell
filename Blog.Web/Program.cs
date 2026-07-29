@@ -20,7 +20,10 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 });
 
 // ── Infrastructure (DB repositories for posts, media, etc.) ──────────────────
-var connStr = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=beacon.db";
+// The data layer is SQL Server only (DapperContext → SqlConnection). If no connection string is
+// configured, fall back to SQL Server LocalDB so `dotnet run` works out of the box on a dev machine.
+var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Server=(localdb)\\MSSQLLocalDB;Database=inkwell;Trusted_Connection=True;TrustServerCertificate=True;";
 builder.Services.AddInfrastructure(connStr);
 
 // ── Core Services ─────────────────────────────────────────────────────────────
@@ -30,6 +33,8 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Blog.Core.Interfaces.IEmailService, SmtpEmailService>();
 builder.Services.AddHttpClient<ReCaptchaService>();
+builder.Services.AddHttpClient<IndexNowService>(c => c.Timeout = TimeSpan.FromSeconds(8));
+builder.Services.AddScoped<ErrorLogService>();
 
 // ── Multi-Tenancy ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<TenantContext>();
@@ -95,6 +100,29 @@ if (Directory.Exists(oldUploads))
 
 var app = builder.Build();
 
+// Self-heal stale static AI files: older deployments shipped a static wwwroot/llms.txt (and
+// wwwroot/llms-full.txt) that static-file middleware serves BEFORE the dynamic per-tenant
+// /llms.txt route — pinning every tenant to one hardcoded, often-wrong summary. Delete them on
+// startup so the dynamic, correct route always wins (they are regenerated per request). Non-fatal.
+try
+{
+    var webRoot = app.Environment.WebRootPath
+        ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    foreach (var stale in new[] { "llms.txt", "llms-full.txt", "sitemap.xml", "robots.txt" })
+    {
+        var path = Path.Combine(webRoot, stale);
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+            app.Logger.LogInformation("Removed stale static {File} so the dynamic route serves it.", stale);
+        }
+    }
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Stale llms.txt cleanup skipped (non-fatal).");
+}
+
 // Run migrations and taxonomy seeding on startup
 using (var scope = app.Services.CreateScope())
 {
@@ -112,12 +140,26 @@ using (var scope = app.Services.CreateScope())
     } catch (Exception ex) {
         app.Logger.LogError(ex, "Taxonomy Seeder Error");
     }
+
+    try {
+        // Backfill author-page slugs for any pre-existing users that have none (idempotent).
+        var userRepo = scope.ServiceProvider.GetRequiredService<Blog.Core.Interfaces.IUserRepository>();
+        var filled = userRepo.BackfillMissingSlugsAsync().GetAwaiter().GetResult();
+        if (filled > 0) app.Logger.LogInformation("User slug backfill: assigned {Count} author slug(s).", filled);
+    } catch (Exception ex) {
+        app.Logger.LogError(ex, "User Slug Backfill Error");
+    }
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+}
+else
+{
+    // Render the friendly 500 page for unhandled exceptions in production.
+    app.UseExceptionHandler("/error/500");
 }
 
 // Canonical host redirect — enforce https://www.opticalsoftware.org in production
@@ -127,7 +169,7 @@ if (!string.IsNullOrEmpty(canonicalHost) && !app.Environment.IsDevelopment())
     app.Use(async (ctx, next) =>
     {
         var req = ctx.Request;
-        if (req.Scheme != "https" || !req.Host.Value.Equals(canonicalHost, StringComparison.OrdinalIgnoreCase))
+        if (req.Scheme != "https" || !string.Equals(req.Host.Value, canonicalHost, StringComparison.OrdinalIgnoreCase))
         {
             var url = $"https://{canonicalHost}{req.PathBase}{req.Path}{req.QueryString}";
             ctx.Response.StatusCode = 301;
@@ -137,6 +179,39 @@ if (!string.IsNullOrEmpty(canonicalHost) && !app.Environment.IsDevelopment())
         await next();
     });
 }
+
+// Lowercase-path canonicalization — 301 inbound mixed-case page URLs to their lowercase form.
+// (RouteOptions.LowercaseUrls above only affects GENERATED links, not inbound requests, so an
+// inbound /Best-Optometry-EHR-Software-2026 would otherwise serve a 200 duplicate.) Skips static
+// assets (paths with a file extension) and non-GET/HEAD so filenames and form posts are untouched.
+app.Use(async (ctx, next) =>
+{
+    var path = ctx.Request.Path.Value;
+    if (!string.IsNullOrEmpty(path) && path.Length > 1
+        && (HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method))
+        && !System.IO.Path.HasExtension(path)
+        && path.Any(char.IsUpper))
+    {
+        var lower = path.ToLowerInvariant();
+        ctx.Response.StatusCode = 301;
+        ctx.Response.Headers.Location = $"{ctx.Request.PathBase}{lower}{ctx.Request.QueryString}";
+        return;
+    }
+    await next();
+});
+
+// Error logging — record unhandled exceptions (500) grouped, then rethrow so the
+// dev page / UseExceptionHandler above renders the response. Non-fatal (swallows its own errors).
+app.Use(async (ctx, next) =>
+{
+    try { await next(); }
+    catch (Exception ex)
+    {
+        var svc = ctx.RequestServices.GetService<Blog.Web.Services.ErrorLogService>();
+        if (svc != null) await svc.RecordAsync(ctx, StatusCodes.Status500InternalServerError, ex);
+        throw;
+    }
+});
 
 app.UseStatusCodePagesWithReExecute("/error/{0}");
 

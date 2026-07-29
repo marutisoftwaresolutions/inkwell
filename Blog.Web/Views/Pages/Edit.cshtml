@@ -103,7 +103,7 @@
                                 Select Image
                             </button>
                             <button type="button" onclick="document.getElementById('FeaturedImageUrlInput').value='';document.getElementById('FeaturedImageIdInput').value='';document.getElementById('FeaturedImagePreview').classList.add('hidden');this.classList.add('hidden');"
-                                    class="mt-1 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model.FeaturedImageUrl) ? "hidden" : "")" id="RemoveFeaturedImageBtn">Remove</button>
+                                    class="mt-1 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model?.FeaturedImageUrl) ? "hidden" : "")" id="RemoveFeaturedImageBtn">Remove</button>
                         </div>
                         
                         <div class="pt-3 border-t border-border space-y-3">

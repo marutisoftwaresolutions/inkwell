@@ -145,6 +145,8 @@ BEGIN
         FaqJson              NVARCHAR(MAX)    NULL,
         LastVerifiedAt       DATETIME2        NULL,
         NextReviewAt         DATETIME2        NULL,
+        -- Verdict roundup posts
+        RoundupJson          NVARCHAR(MAX)    NULL,
 
         CONSTRAINT UQ_Posts_Slug UNIQUE (Slug)
     );
@@ -158,6 +160,8 @@ BEGIN
         ALTER TABLE Posts ADD LastVerifiedAt DATETIME2 NULL;
     IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'Posts') AND name = N'NextReviewAt')
         ALTER TABLE Posts ADD NextReviewAt DATETIME2 NULL;
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'Posts') AND name = N'RoundupJson')
+        ALTER TABLE Posts ADD RoundupJson NVARCHAR(MAX) NULL;
     PRINT '  [=] Posts already exists — upgrade columns checked.';
 END
 

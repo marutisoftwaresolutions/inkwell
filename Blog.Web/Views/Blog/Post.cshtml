@@ -3,45 +3,94 @@
 @{
     Layout = "_PublicLayout";
     ViewData["Title"] = !string.IsNullOrEmpty(Model.MetaTitle) ? Model.MetaTitle : Model.Title;
-    ViewData["Description"] = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription : (Model.Plaintext?.Length > 160 ? Model.Plaintext.Substring(0, 157) + "..." : Model.Plaintext);
+    ViewData["Description"] = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription : Blog.Core.Services.TextHelper.SmartTruncate(Model.Plaintext);
     ViewData["SiteName"] = ViewBag.SiteName ?? "Blog";
     ViewData["SiteLogoUrl"] = ViewBag.SiteLogoUrl ?? "";
 
+    // Canonical is emitted once by _PublicLayout from this value — do not emit a second <link> here.
+    ViewData["Canonical"] = !string.IsNullOrEmpty(Model.CanonicalUrl)
+        ? Model.CanonicalUrl
+        : $"{Context.Request.Scheme}://{Context.Request.Host}/{Model.Slug}";
+
     var blogLayout = (string)(ViewBag.LayoutPost ?? "Neutral");
     var reCaptchaSiteKey = _rcfg["ReCaptcha:SiteKey"];
+
+    // Twitter site handle (normalize URL or bare handle → @handle)
+    string PostTwitterHandle(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        raw = raw.Trim();
+        if (raw.Contains("twitter.com/", StringComparison.OrdinalIgnoreCase) || raw.Contains("x.com/", StringComparison.OrdinalIgnoreCase))
+            raw = raw.TrimEnd('/').Split('/').LastOrDefault() ?? string.Empty;
+        raw = raw.TrimStart('@');
+        return string.IsNullOrEmpty(raw) ? string.Empty : "@" + raw;
+    }
+    var siteTwitter = PostTwitterHandle((string)(ViewBag.SiteTwitter ?? ""));
 }
 
 @section MetaTags {
-    <link rel="canonical" href="@(!string.IsNullOrEmpty(Model.CanonicalUrl) ? Model.CanonicalUrl : $"{Context.Request.Scheme}://{Context.Request.Host}/{Model.Slug}")" />
     <!-- Open Graph -->
     @{
+        var canonical = (string?)ViewData["Canonical"] ?? "";
         var ogImageUrl = !string.IsNullOrEmpty(Model.OgImage) ? Model.OgImage
             : !string.IsNullOrEmpty(Model.FeatureImage) ? Model.FeatureImage
             : $"{Context.Request.Scheme}://{Context.Request.Host}/og-image/{Model.Slug}.png";
         var twitterImageUrl = !string.IsNullOrEmpty(Model.TwitterImage) ? Model.TwitterImage
             : !string.IsNullOrEmpty(Model.FeatureImage) ? Model.FeatureImage
             : ogImageUrl;
+        var imageAlt = Model.Title;
+        // og:image / twitter:image must be ABSOLUTE — most social scrapers reject relative paths.
+        if (ogImageUrl.StartsWith("/")) ogImageUrl = $"{Context.Request.Scheme}://{Context.Request.Host}{ogImageUrl}";
+        if (twitterImageUrl.StartsWith("/")) twitterImageUrl = $"{Context.Request.Scheme}://{Context.Request.Host}{twitterImageUrl}";
     }
     <meta property="og:type" content="article" />
     <meta property="og:title" content="@(!string.IsNullOrEmpty(Model.OgTitle) ? Model.OgTitle : ViewData["Title"])" />
     <meta property="og:description" content="@(!string.IsNullOrEmpty(Model.OgDescription) ? Model.OgDescription : ViewData["Description"])" />
+    <meta property="og:url" content="@canonical" />
     <meta property="og:image" content="@ogImageUrl" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="@imageAlt" />
     <meta property="og:site_name" content="@ViewData["SiteName"]" />
+    <meta property="og:locale" content="@Blog.Core.Services.LocaleHelper.OgLocale((string?)ViewData["SiteLanguage"])" />
     @if (Model.PublishedAt.HasValue)
     {
         <meta property="article:published_time" content="@Model.PublishedAt.Value.ToString("O")" />
+    }
+    <meta property="article:modified_time" content="@Model.UpdatedAt.ToString("O")" />
+    @if (!string.IsNullOrEmpty(Model.AuthorName))
+    {
+        <meta property="article:author" content="@Model.AuthorName" />
+    }
+    @if (Model.Categories.Any())
+    {
+        <meta property="article:section" content="@Model.Categories.First().Name" />
+    }
+    @foreach (var tag in Model.Tags)
+    {
+        <meta property="article:tag" content="@tag.Name" />
     }
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="@(!string.IsNullOrEmpty(Model.TwitterTitle) ? Model.TwitterTitle : ViewData["Title"])" />
     <meta name="twitter:description" content="@(!string.IsNullOrEmpty(Model.TwitterDescription) ? Model.TwitterDescription : ViewData["Description"])" />
     <meta name="twitter:image" content="@twitterImageUrl" />
+    <meta name="twitter:image:alt" content="@imageAlt" />
+    @if (!string.IsNullOrEmpty(siteTwitter))
+    {
+        <meta name="twitter:site" content="@siteTwitter" />
+        <meta name="twitter:creator" content="@siteTwitter" />
+    }
     <partial name="_SchemaJsonLd" model="Model" view-data="ViewData" />
 }
 
-@if (blogLayout == "Magazine")
+@* A post carrying roundup data always renders as a Verdict comparison, whatever the
+   site's layout-post setting — the format is driven by the content, not the theme. *@
+@if (Model.IsRoundup || blogLayout == "Verdict")
+{
+    <partial name="_Post_Verdict" model="Model" />
+}
+else if (blogLayout == "Magazine")
 {
     <partial name="_Post_Magazine" model="Model" />
 }

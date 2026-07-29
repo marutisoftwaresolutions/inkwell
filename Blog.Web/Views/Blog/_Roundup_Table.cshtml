@@ -1,0 +1,62 @@
+@model Blog.Core.Domain.RoundupData
+<section aria-labelledby="comparison-table">
+    <h2 id="comparison-table">Comparison table</h2>
+    <div class="vd-table-wrap">
+        <table class="vd-table">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Tool</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Score</th>
+                    <th scope="col"><span class="sr-only">Visit</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.Ranked)
+                {
+                    <tr>
+                        <td class="vd-table-rank">@e.Rank</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                @if (!string.IsNullOrEmpty(e.LogoUrl))
+                                {
+                                    <img src="@e.LogoUrl" alt="" width="28" height="28"
+                                         style="object-fit:contain;border-radius:4px;flex:none;" loading="lazy" />
+                                }
+                                <a href="#@e.Anchor" class="vd-table-name">@e.Name</a>
+                                @if (!string.IsNullOrEmpty(e.Badge))
+                                {
+                                    <span class="vd-badge">@e.Badge</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(e.Category))
+                            {
+                                <span class="vd-chip">@e.Category</span>
+                            }
+                        </td>
+                        <td>
+                            @if (e.Score > 0)
+                            {
+                                <strong>@e.Score.ToString("0.0")</strong><span class="vd-score-max">/10</span>
+                            }
+                        </td>
+                        <td>
+                            @if (e.HasCta && e.CtaIsExternal)
+                            {
+                                <a href="@e.CtaUrl" class="vd-cta vd-cta--ghost" target="_blank"
+                                   rel="nofollow noopener sponsored">Visit</a>
+                            }
+                            else if (e.HasCta)
+                            {
+                                <a href="@e.CtaUrl" class="vd-cta vd-cta--ghost">Review</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

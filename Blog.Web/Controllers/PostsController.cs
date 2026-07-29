@@ -19,9 +19,11 @@ public class PostsController : Controller
     private readonly IMediaRepository _media;
     private readonly PostService _postService;
     private readonly AuditService _audit;
+    private readonly IndexNowService _indexNow;
 
     public PostsController(IPostRepository posts, ICategoryRepository categories,
-        ITagRepository tags, IMediaRepository media, PostService postService, AuditService audit)
+        ITagRepository tags, IMediaRepository media, PostService postService, AuditService audit,
+        IndexNowService indexNow)
     {
         _posts = posts;
         _categories = categories;
@@ -29,6 +31,15 @@ public class PostsController : Controller
         _media = media;
         _postService = postService;
         _audit = audit;
+        _indexNow = indexNow;
+    }
+
+    // Ping IndexNow with a freshly published/updated post's public URL (best-effort, non-throwing).
+    private async Task PingIndexNowAsync(Guid postId)
+    {
+        var saved = await _posts.GetByIdAsync(postId, null);
+        if (saved is { Status: PostStatus.Published } && !string.IsNullOrEmpty(saved.Slug))
+            await _indexNow.SubmitAsync($"{Request.Scheme}://{Request.Host}/{saved.Slug}");
     }
 
     [HttpGet("")]
@@ -113,6 +124,7 @@ public class PostsController : Controller
             : post.Status == PostStatus.Published ? AuditActions.PostPublished
             : AuditActions.PostCreated;
         await _audit.LogAsync(auditAction, "Post", id.ToString(), post.Title);
+        await PingIndexNowAsync(id);
 
         if (post.Status == PostStatus.Scheduled)
             TempData["Success"] = "Post scheduled!";
@@ -194,6 +206,7 @@ public class PostsController : Controller
             : post.Status == PostStatus.Published ? AuditActions.PostPublished
             : AuditActions.PostUpdated;
         await _audit.LogAsync(editAuditAction, "Post", id.ToString(), post.Title);
+        await PingIndexNowAsync(id);
 
         if (post.Status == PostStatus.Scheduled)
             TempData["Success"] = "Post scheduled!";

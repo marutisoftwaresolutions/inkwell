@@ -1,0 +1,7 @@
+/* Tailwind source — compiled to wwwroot/css/tailwind.css by the BeforeBuild MSBuild
+   target (see Blog.Web.csproj) or manually via:
+     npx tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify
+   Do NOT edit tailwind.css by hand — it is generated. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

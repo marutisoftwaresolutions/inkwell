@@ -34,6 +34,11 @@
                     <input asp-for="SiteTagline" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
                     <span asp-validation-for="SiteTagline" class="text-sm font-medium text-destructive"></span>
                 </div>
+                <div class="space-y-2">
+                    <label asp-for="SiteLanguage" class="text-sm font-medium leading-none"></label>
+                    <input asp-for="SiteLanguage" placeholder="en" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                    <p class="text-xs text-muted-foreground">BCP-47 code (<code>en</code>, <code>es</code>, <code>hi</code>, <code>fr-CA</code>…). Sets the page <code>lang</code>, hreflang and schema language.</p>
+                </div>
             </div>
 
             <div class="grid gap-6 md:grid-cols-2">
@@ -113,6 +118,49 @@
                     <label asp-for="GoogleAnalyticsId" class="text-sm font-medium leading-none"></label>
                     <input asp-for="GoogleAnalyticsId" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="G-XXXXXXXXXX" />
                     <p class="text-xs text-muted-foreground">GA4 Measurement ID from Google Analytics → Admin → Data Streams.</p>
+                </div>
+                <div class="space-y-2">
+                    <label asp-for="GoogleSiteVerification" class="text-sm font-medium leading-none"></label>
+                    <input asp-for="GoogleSiteVerification" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="content value from the google-site-verification meta tag" />
+                    <p class="text-xs text-muted-foreground">Search Console → Settings → Ownership verification → HTML tag. Paste only the <code>content</code> value.</p>
+                </div>
+                <div class="space-y-2">
+                    <label asp-for="BingSiteVerification" class="text-sm font-medium leading-none"></label>
+                    <input asp-for="BingSiteVerification" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="content value from the msvalidate.01 meta tag" />
+                    <p class="text-xs text-muted-foreground">Bing Webmaster Tools → verify via meta tag. Paste only the <code>content</code> value.</p>
+                </div>
+
+                <div class="space-y-2 pt-4 border-t border-border">
+                    <div class="flex items-start gap-3">
+                        <input asp-for="IndexNowEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background" />
+                        <div>
+                            <label asp-for="IndexNowEnabled" class="text-sm font-medium leading-none">Enable IndexNow (instant indexing)</label>
+                            <p class="text-xs text-muted-foreground mt-1">Pings Bing, Yandex, Seznam and Naver the moment you publish or update a post, so they re-crawl in minutes instead of days.</p>
+                        </div>
+                    </div>
+                    <label asp-for="IndexNowApiKey" class="text-sm font-medium leading-none"></label>
+                    <input asp-for="IndexNowApiKey" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Leave blank to auto-generate a key on save" />
+                    @if (!string.IsNullOrEmpty(Model.IndexNowApiKey))
+                    {
+                        <p class="text-xs text-muted-foreground">Verification file: <a href="/@(Model.IndexNowApiKey).txt" target="_blank" class="underline"><code>/@(Model.IndexNowApiKey).txt</code></a> — served automatically at the site root. No file upload needed.</p>
+                    }
+                    else
+                    {
+                        <p class="text-xs text-muted-foreground">A key (a–z, 0–9, dashes) is generated automatically when you enable this and save. It's then served at <code>/{key}.txt</code> (site root) for ownership verification.</p>
+                    }
+                </div>
+
+                <div class="space-y-2 pt-4 border-t border-border">
+                    <div class="flex items-start gap-3">
+                        <input asp-for="ErrorNotificationsEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background" />
+                        <div>
+                            <label asp-for="ErrorNotificationsEnabled" class="text-sm font-medium leading-none">Email me when a server error occurs</label>
+                            <p class="text-xs text-muted-foreground mt-1">Sends an alert the first time a new server-error (5xx) signature is detected, so repeats don't flood your inbox. All errors (incl. 404s) are always visible in Admin → Error Monitor.</p>
+                        </div>
+                    </div>
+                    <label asp-for="ErrorNotificationEmails" class="text-sm font-medium leading-none"></label>
+                    <input asp-for="ErrorNotificationEmails" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="ops@example.com, dev@example.com" />
+                    <p class="text-xs text-muted-foreground">One or more addresses, separated by commas, semicolons, or new lines.</p>
                 </div>
             </div>
 

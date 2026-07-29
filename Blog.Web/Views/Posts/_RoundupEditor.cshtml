@@ -1,0 +1,229 @@
+@model Blog.Core.Domain.Post
+@*
+    Roundup editor — authors the Posts.RoundupJson blob that powers the Verdict template.
+    Shared by Posts/Create.cshtml and Posts/Edit.cshtml so the two never drift.
+    A post with zero entries serializes to an empty value => renders as an ordinary post.
+*@
+<div x-data="roundupManager()" class="pt-4 border-t border-border">
+    <div class="flex items-center justify-between mb-2">
+        <div>
+            <p class="text-sm font-medium">Roundup / Comparison</p>
+            <p class="text-xs text-muted-foreground">Scored "Top N Best…" list. Emits ItemList + Review rich results.</p>
+        </div>
+        <button type="button" @@click="addEntry()" class="text-xs font-medium text-primary hover:underline">+ Add entry</button>
+    </div>
+
+    <input type="hidden" name="RoundupJson" id="roundupJsonInput" value="@Model.RoundupJson" />
+
+    <template x-if="data.entries.length > 0">
+        <div class="space-y-3">
+            <!-- Scoring weights -->
+            <div class="p-2.5 border border-border rounded-md bg-muted/20">
+                <p class="text-xs text-muted-foreground font-medium mb-1.5">Scoring weights (%)</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="block">
+                        <span class="text-[11px] text-muted-foreground">Features</span>
+                        <input type="number" min="0" max="100" x-model.number="data.weights.features" @@input="serialize()"
+                               class="w-full px-2 py-1 bg-background border border-input rounded text-xs" />
+                    </label>
+                    <label class="block">
+                        <span class="text-[11px] text-muted-foreground">Ease of use</span>
+                        <input type="number" min="0" max="100" x-model.number="data.weights.ease" @@input="serialize()"
+                               class="w-full px-2 py-1 bg-background border border-input rounded text-xs" />
+                    </label>
+                    <label class="block">
+                        <span class="text-[11px] text-muted-foreground">Value</span>
+                        <input type="number" min="0" max="100" x-model.number="data.weights.value" @@input="serialize()"
+                               class="w-full px-2 py-1 bg-background border border-input rounded text-xs" />
+                    </label>
+                </div>
+                <p class="text-[11px] mt-1.5" :class="weightTotal === 100 ? 'text-muted-foreground' : 'text-destructive'">
+                    Total: <span x-text="weightTotal"></span>% <span x-show="weightTotal !== 100">— should be 100%</span>
+                </p>
+            </div>
+
+            <!-- Entries -->
+            <template x-for="(e, i) in data.entries" :key="i">
+                <div class="p-2.5 border border-border rounded-md space-y-1.5 bg-muted/20">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-muted-foreground font-medium">
+                            #<span x-text="e.rank"></span> <span x-text="e.name || 'Untitled'"></span>
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @@click="move(i, -1)" x-show="i > 0"
+                                    class="text-xs text-muted-foreground hover:underline">↑</button>
+                            <button type="button" @@click="move(i, 1)" x-show="i < data.entries.length - 1"
+                                    class="text-xs text-muted-foreground hover:underline">↓</button>
+                            <button type="button" @@click="removeEntry(i)" class="text-xs text-destructive hover:underline">Remove</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <input type="text" x-model="e.name" @@input="serialize()" placeholder="Product name"
+                               class="px-2 py-1.5 bg-background border border-input rounded text-xs" />
+                        <input type="text" x-model="e.category" @@input="serialize()" placeholder="Category chip (e.g. optical-POS)"
+                               class="px-2 py-1.5 bg-background border border-input rounded text-xs" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <select x-model="e.badge" @@change="serialize()"
+                                class="px-2 py-1.5 bg-background border border-input rounded text-xs">
+                            <option value="">No badge</option>
+                            <option value="Editor's pick">Editor's pick</option>
+                            <option value="Runner-up">Runner-up</option>
+                            <option value="Also great">Also great</option>
+                        </select>
+                        <input type="url" x-model="e.website" @@input="serialize()" placeholder="Vendor website — https://vendor.com (required)"
+                               class="px-2 py-1.5 bg-background border border-input rounded text-xs" />
+                    </div>
+                    <input type="text" x-model="e.ctaUrl" @@input="serialize()" placeholder="Internal review path — /vendor-review (optional)"
+                           class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs" />
+
+                    <!-- Sub-scores; overall is derived from the weights -->
+                    <div class="grid grid-cols-4 gap-1.5 items-end">
+                        <label class="block">
+                            <span class="text-[11px] text-muted-foreground">Features</span>
+                            <input type="number" step="0.1" min="0" max="10" x-model.number="e.scores.features" @@input="rescore(e)"
+                                   class="w-full px-2 py-1 bg-background border border-input rounded text-xs" />
+                        </label>
+                        <label class="block">
+                            <span class="text-[11px] text-muted-foreground">Ease</span>
+                            <input type="number" step="0.1" min="0" max="10" x-model.number="e.scores.ease" @@input="rescore(e)"
+                                   class="w-full px-2 py-1 bg-background border border-input rounded text-xs" />
+                        </label>
+                        <label class="block">
+                            <span class="text-[11px] text-muted-foreground">Value</span>
+                            <input type="number" step="0.1" min="0" max="10" x-model.number="e.scores.value" @@input="rescore(e)"
+                                   class="w-full px-2 py-1 bg-background border border-input rounded text-xs" />
+                        </label>
+                        <div class="text-center pb-1">
+                            <span class="text-[11px] text-muted-foreground block">Overall</span>
+                            <span class="text-sm font-semibold" x-text="(e.score || 0).toFixed(1)"></span>
+                        </div>
+                    </div>
+
+                    <input type="text" x-model="e.bestFor" @@input="serialize()" placeholder="Best for…"
+                           class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs" />
+                    <input type="text" x-model="e.standout" @@input="serialize()" placeholder="Standout feature…"
+                           class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs" />
+                    <textarea x-model="e.body" @@input="serialize()" placeholder="Review narrative…" rows="2"
+                              class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs resize-none"></textarea>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <textarea x-model="e.prosText" @@input="serialize()" placeholder="Pros — one per line" rows="3"
+                                  class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs resize-none"></textarea>
+                        <textarea x-model="e.consText" @@input="serialize()" placeholder="Cons — one per line" rows="3"
+                                  class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs resize-none"></textarea>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <template x-if="data.entries.length === 0">
+        <p class="text-xs text-muted-foreground text-center py-1">Not a roundup post. Add an entry to turn it into one.</p>
+    </template>
+</div>
+
+<script>
+    function roundupManager() {
+        const blank = () => ({
+            listType: 'SoftwareApplication',
+            weights: { features: 40, ease: 30, value: 30 },
+            methodology: [],
+            entries: []
+        });
+
+        // Pros/cons round-trip through newline-delimited textareas, so each entry carries
+        // transient prosText/consText fields that are stripped before serializing.
+        const hydrate = (raw) => {
+            let d;
+            try { d = raw ? JSON.parse(raw) : blank(); } catch { d = blank(); }
+            d.listType = d.listType || 'SoftwareApplication';
+            d.weights = d.weights || { features: 40, ease: 30, value: 30 };
+            d.methodology = d.methodology || [];
+            d.entries = (d.entries || []).map(e => ({
+                ...e,
+                scores: e.scores || { features: 0, ease: 0, value: 0 },
+                pros: e.pros || [],
+                cons: e.cons || [],
+                prosText: (e.pros || []).join('\n'),
+                consText: (e.cons || []).join('\n')
+            }));
+            return d;
+        };
+
+        return {
+            data: hydrate(document.getElementById('roundupJsonInput').value),
+
+            get weightTotal() {
+                const w = this.data.weights;
+                return (w.features || 0) + (w.ease || 0) + (w.value || 0);
+            },
+
+            addEntry() {
+                this.data.entries.push({
+                    rank: this.data.entries.length + 1,
+                    name: '', badge: '', category: '', score: 0,
+                    scores: { features: 0, ease: 0, value: 0 },
+                    bestFor: '', standout: '', body: '',
+                    pros: [], cons: [], prosText: '', consText: '',
+                    website: '', ctaUrl: '', logoUrl: '', domain: ''
+                });
+                this.serialize();
+            },
+
+            removeEntry(i) {
+                this.data.entries.splice(i, 1);
+                this.renumber();
+            },
+
+            move(i, delta) {
+                const j = i + delta;
+                if (j < 0 || j >= this.data.entries.length) return;
+                const [item] = this.data.entries.splice(i, 1);
+                this.data.entries.splice(j, 0, item);
+                this.renumber();
+            },
+
+            renumber() {
+                this.data.entries.forEach((e, i) => e.rank = i + 1);
+                this.serialize();
+            },
+
+            // Overall score = weighted mean of the three dimensions.
+            rescore(e) {
+                const w = this.data.weights;
+                const total = (w.features || 0) + (w.ease || 0) + (w.value || 0);
+                if (total > 0) {
+                    const s = e.scores;
+                    const weighted = (s.features || 0) * (w.features || 0)
+                                   + (s.ease || 0) * (w.ease || 0)
+                                   + (s.value || 0) * (w.value || 0);
+                    e.score = Math.round((weighted / total) * 10) / 10;
+                }
+                this.serialize();
+            },
+
+            serialize() {
+                const payload = {
+                    listType: this.data.listType,
+                    weights: this.data.weights,
+                    methodology: this.data.methodology,
+                    entries: this.data.entries
+                        .filter(e => e.name)
+                        .map(e => {
+                            const { prosText, consText, ...rest } = e;
+                            const split = (t) => (t || '')
+                                .split('\n')
+                                .map(x => x.trim())
+                                .filter(Boolean);
+                            return { ...rest, pros: split(prosText), cons: split(consText) };
+                        })
+                };
+                document.getElementById('roundupJsonInput').value =
+                    payload.entries.length ? JSON.stringify(payload) : '';
+            }
+        };
+    }
+</script>

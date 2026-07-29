@@ -1,0 +1,48 @@
+@model Blog.Core.Domain.Post
+@{
+    var data = Model.Roundup;
+    var top = data?.Ranked.FirstOrDefault();
+    var readingMinutes = Math.Max(1, (Model.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+}
+<a href="/@Model.Slug" class="vd-pick" style="text-decoration:none;">
+    @if (!string.IsNullOrEmpty(Model.FeatureImage))
+    {
+        <img src="@Model.FeatureImage" alt="@Model.Title"
+             style="width:100%;height:140px;object-fit:cover;border-radius:var(--r-2);"
+             asp-append-version="true" />
+    }
+
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        @if (data is not null)
+        {
+            <span class="vd-badge">@data.Entries.Count compared</span>
+        }
+        @if (Model.Categories.Any())
+        {
+            <span class="vd-chip">@Model.Categories.First().Name</span>
+        }
+    </div>
+
+    <h3 class="vd-pick-name">@Model.Title</h3>
+
+    @if (top is not null)
+    {
+        <p class="vd-pick-blurb">
+            <strong>Top pick:</strong> @top.Name
+            @if (top.Score > 0)
+            {
+                <span class="vd-score-max">— @top.Score.ToString("0.0")/10</span>
+            }
+        </p>
+    }
+    else if (!string.IsNullOrEmpty(Model.Plaintext))
+    {
+        <p class="vd-pick-blurb">
+            @(Model.Plaintext.Length > 140 ? Model.Plaintext[..140] + "…" : Model.Plaintext)
+        </p>
+    }
+
+    <p class="vd-verified" style="margin:0;">
+        @(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName) · @readingMinutes min read
+    </p>
+</a>

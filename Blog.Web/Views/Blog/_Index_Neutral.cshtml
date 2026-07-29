@@ -45,7 +45,7 @@
             <div class="relative overflow-hidden w-full aspect-[1/1] sm:aspect-[3/2] md:aspect-[2/1] flex justify-center items-center" style="background: var(--muted);">
                 @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
                 {
-                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title" class="absolute w-full inset-x-0 bottom-0 object-cover h-full" />
+                    <img src="@heroPost.FeatureImage" alt="@heroPost.Title" class="absolute w-full inset-x-0 bottom-0 object-cover h-full" fetchpriority="high" decoding="async" />
                 }
                 <!-- Card overlay -->
                 <div class="relative max-w-[80%] lg:max-w-[60%] md:min-w-[60%] aspect-[1/1] sm:aspect-[3/2] md:aspect-[2/1] p-4 sm:p-6 text-center" style="background: var(--background);">
@@ -101,7 +101,7 @@
                                 <a href="/@pop.Slug" class="flex gap-2 py-3 border-b border-dashed last:border-b-0" style="border-color: var(--border);">
                                     @if (!string.IsNullOrEmpty(pop.FeatureImage))
                                     {
-                                        <img src="@pop.FeatureImage" alt="@pop.Title" class="w-16 h-16 object-cover flex-shrink-0" />
+                                        <img src="@pop.FeatureImage" alt="@pop.Title" class="w-16 h-16 object-cover flex-shrink-0" loading="lazy" decoding="async" />
                                     }
                                     else
                                     {

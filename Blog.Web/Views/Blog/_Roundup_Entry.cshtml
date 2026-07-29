@@ -1,0 +1,135 @@
+@model Blog.Core.Domain.RoundupEntry
+@{
+    var weights = ViewData["Weights"] as Blog.Core.Domain.RoundupWeights ?? new Blog.Core.Domain.RoundupWeights();
+    var s = Model.Scores;
+}
+<section class="vd-entry" id="@Model.Anchor">
+    <div class="vd-entry-head">
+        <span class="vd-entry-rank">@Model.Rank</span>
+
+        @if (!string.IsNullOrEmpty(Model.LogoUrl))
+        {
+            <img src="@Model.LogoUrl" alt="@Model.Name logo" class="vd-pick-logo" loading="lazy" />
+        }
+
+        <div style="flex:1;min-width:200px;">
+            <h2 class="vd-entry-title">@Model.Name</h2>
+            <div class="vd-entry-meta">
+                @if (!string.IsNullOrEmpty(Model.Badge))
+                {
+                    <span class="vd-badge">@Model.Badge</span>
+                }
+                @if (Model.IsFirstParty)
+                {
+                    <span class="vd-badge" style="background:var(--vd-pro-bg);color:var(--vd-pro);">Our platform</span>
+                }
+                @if (!string.IsNullOrEmpty(Model.Category))
+                {
+                    <span class="vd-chip">@Model.Category</span>
+                }
+            </div>
+        </div>
+
+        @if (Model.Score > 0)
+        {
+            <div class="vd-entry-score">
+                <span class="vd-score">@Model.Score.ToString("0.0")</span><span class="vd-score-max">/10</span>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.BestFor))
+    {
+        <p class="vd-callout"><strong>Best for:</strong> @Model.BestFor</p>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.Standout))
+    {
+        <p class="vd-callout"><strong>Standout feature:</strong> @Model.Standout</p>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.Body))
+    {
+        <p class="vd-entry-body">@Model.Body</p>
+    }
+
+    @if (s is not null && (s.Features > 0 || s.Ease > 0 || s.Value > 0))
+    {
+        <div class="vd-score-bars">
+            <div class="vd-score-bar">
+                <span>Features @weights.Features%</span>
+                <span class="vd-score-track"><span class="vd-score-fill" style="width:@(s.Features * 10)%"></span></span>
+                <span>@s.Features.ToString("0.0")</span>
+            </div>
+            <div class="vd-score-bar">
+                <span>Ease of use @weights.Ease%</span>
+                <span class="vd-score-track"><span class="vd-score-fill" style="width:@(s.Ease * 10)%"></span></span>
+                <span>@s.Ease.ToString("0.0")</span>
+            </div>
+            <div class="vd-score-bar">
+                <span>Value @weights.Value%</span>
+                <span class="vd-score-track"><span class="vd-score-fill" style="width:@(s.Value * 10)%"></span></span>
+                <span>@s.Value.ToString("0.0")</span>
+            </div>
+        </div>
+    }
+
+    @if (Model.Pros.Any() || Model.Cons.Any())
+    {
+        <div class="vd-proscons">
+            @if (Model.Pros.Any())
+            {
+                <div class="vd-list vd-list--pro">
+                    <p class="vd-list-title">Pros</p>
+                    <ul>
+                        @foreach (var pro in Model.Pros)
+                        {
+                            <li>@pro</li>
+                        }
+                    </ul>
+                </div>
+            }
+            @if (Model.Cons.Any())
+            {
+                <div class="vd-list vd-list--con">
+                    <p class="vd-list-title">Cons</p>
+                    <ul>
+                        @foreach (var con in Model.Cons)
+                        {
+                            <li>@con</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="vd-entry-foot">
+        <span style="display:flex;gap:8px;flex-wrap:wrap;">
+            @if (Model.HasWebsite)
+            {
+                <a href="@Model.Website" class="vd-cta" target="_blank" rel="nofollow noopener">
+                    Visit @Model.Name ↗
+                </a>
+            }
+            @if (Model.HasCta && Model.CtaIsExternal)
+            {
+                <a href="@Model.CtaUrl" class="vd-cta@(Model.HasWebsite ? " vd-cta--ghost" : "")" target="_blank" rel="nofollow noopener sponsored">
+                    Visit @Model.Name
+                </a>
+            }
+            else if (Model.HasCta)
+            {
+                <a href="@Model.CtaUrl" class="vd-cta@(Model.HasWebsite ? " vd-cta--ghost" : "")">Read our review →</a>
+            }
+        </span>
+
+        <span class="vd-verified">
+            @if (!string.IsNullOrEmpty(Model.Domain))
+            {
+                <text>Verified · @Model.Domain &nbsp;·&nbsp; </text>
+            }
+            <a href="#top" class="vd-backtotop">↑ Back to top</a>
+        </span>
+    </div>
+</section>

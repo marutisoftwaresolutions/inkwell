@@ -2,13 +2,52 @@
 @model PagedResult<Blog.Core.Domain.Post>
 @{
     Layout = "_PublicLayout";
-    ViewData["Title"] = ViewBag.SiteName + " – " + ViewBag.Tagline;
     ViewData["SiteName"] = ViewBag.SiteName;
     ViewData["Tagline"] = ViewBag.Tagline;
-    ViewData["Description"] = ViewBag.Tagline;
+    // Home sets the default title/description here; category & tag actions set their own before this runs.
+    if (ViewData["Title"] == null) ViewData["Title"] = (string)ViewBag.SiteName + " – " + (string)ViewBag.Tagline;
+    if (ViewData["Description"] == null)
+    {
+        // Home page: enrich the (often short) tagline into a fuller, keyword-relevant meta
+        // description built from the tenant's OWN categories — tenant-neutral, nothing hardcoded.
+        var tagline = (string)(ViewBag.Tagline ?? "");
+        var searchT = ViewBag.SearchTerm as string;
+        var selCats = ViewBag.SelectedCategories as List<string> ?? new List<string>();
+        var selTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
+        var isHome = string.IsNullOrEmpty(searchT) && !selCats.Any() && !selTags.Any() && Model.Page <= 1;
+        if (isHome)
+        {
+            var catNames = (ViewBag.Categories as IEnumerable<Blog.Core.Domain.Category>)?
+                .Select(c => c.Name).Take(3).ToList() ?? new List<string>();
+            var homeDesc = catNames.Any()
+                ? $"{tagline}. Compare {string.Join(", ", catNames)} and more — hands-on reviews, side-by-side comparisons, and practical buyer's guides."
+                : $"{tagline}. Hands-on reviews, in-depth comparisons, and practical buyer's guides.";
+            ViewData["Description"] = Blog.Core.Services.TextHelper.SmartTruncate(homeDesc, 158);
+        }
+        else
+        {
+            ViewData["Description"] = tagline;
+        }
+    }
 
     var blogLayout = (string)(ViewBag.LayoutIndex ?? "Neutral");
+
+    // ── CollectionPage schema (listing pages: home / category / tag) ──────────
+    var collBase = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var collData = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "CollectionPage",
+        ["name"] = (string)(ViewData["Title"] ?? ViewBag.SiteName ?? ""),
+        ["url"] = collBase + Context.Request.Path,
+        ["isPartOf"] = new Dictionary<string, string> { ["@id"] = $"{collBase}/#website" }
+    };
+    var collDesc = (string)(ViewData["Description"] ?? "");
+    if (!string.IsNullOrEmpty(collDesc)) collData["description"] = collDesc;
+    var collOpts = new System.Text.Json.JsonSerializerOptions { WriteIndented = false };
 }
+<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(collData, collOpts))</script>
+
 
 @if (blogLayout == "Magazine")
 {
@@ -77,6 +116,14 @@ else if (blogLayout == "Broadsheet")
 else if (blogLayout == "Almanac")
 {
     <partial name="_Index_Almanac" model="Model" />
+}
+else if (blogLayout == "Verdict")
+{
+    <partial name="_Index_Verdict" model="Model" />
+}
+else if (blogLayout == "Catalog")
+{
+    <partial name="_Index_Catalog" model="Model" />
 }
 else
 {

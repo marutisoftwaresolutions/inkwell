@@ -238,7 +238,7 @@ public class AccountController : Controller
     [HttpPost("profile")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Profile(string displayName, string email, string? bio, string? avatarUrl, IFormFile? avatarFile, bool removeAvatar, string? website, string? newPassword, string? credentials, string? specialty, string? licenseNumber)
+    public async Task<IActionResult> Profile(string displayName, string email, string? bio, string? avatarUrl, IFormFile? avatarFile, bool removeAvatar, string? website, string? newPassword, string? credentials, string? specialty, string? licenseNumber, string? slug)
     {
         var idString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (idString == null || !Guid.TryParse(idString, out var id)) return RedirectToAction("Login");
@@ -266,6 +266,13 @@ public class AccountController : Controller
         user.Specialty = specialty;
         user.LicenseNumber = licenseNumber;
         user.UpdatedAt = DateTime.UtcNow;
+
+        // Author-page slug (/author/{slug}) — use the provided value, else keep existing, else derive
+        // from the display name. Always normalized and made unique across users.
+        var slugSource = !string.IsNullOrWhiteSpace(slug) ? slug
+            : !string.IsNullOrWhiteSpace(user.Slug) ? user.Slug
+            : displayName;
+        user.Slug = await _users.GenerateUniqueSlugAsync(slugSource, user.Id);
 
         if (removeAvatar)
         {

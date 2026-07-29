@@ -45,7 +45,8 @@
                      style="width:36px;height:36px;border-radius:var(--r-1);object-fit:cover;border:1px solid var(--border);" />
                 <div>
                     <div style="font-family:var(--sans);font-size:13px;font-weight:500;color:var(--fg);line-height:1.2;">
-                        @(string.IsNullOrEmpty(Model.AuthorName) ? "The editors" : Model.AuthorName)@(!string.IsNullOrEmpty(Model.AuthorCredentials) ? $", {Model.AuthorCredentials}" : "")
+                        @{ var mAuthorSlug = ViewBag.AuthorSlug as string; var mAuthorName = string.IsNullOrEmpty(Model.AuthorName) ? "The editors" : Model.AuthorName; }
+                        @if (!string.IsNullOrEmpty(mAuthorSlug)) { <a href="/author/@mAuthorSlug" rel="author" style="color:inherit;text-decoration:none;">@mAuthorName</a> } else { @mAuthorName }@(!string.IsNullOrEmpty(Model.AuthorCredentials) ? $", {Model.AuthorCredentials}" : "")
                     </div>
                     @if (!string.IsNullOrEmpty(Model.AuthorSpecialty))
                     {
@@ -76,12 +77,16 @@
     @if (!string.IsNullOrEmpty(Model.FeatureImage))
     {
         <div style="max-width:var(--measure-wide);margin:0 auto var(--sp-12);padding:0 var(--gutter);">
-            <img src="@Model.FeatureImage" alt="@Model.Title" class="ink-essay-cover" />
+            <img src="@Model.FeatureImage" alt="@Model.Title" class="ink-essay-cover" fetchpriority="high" decoding="async" />
         </div>
     }
 
     @* ── Essay body ────────────────────────────────────────────── *@
     <div class="ink-essay-wrap" style="padding-top:0;">
+        <div style="max-width:var(--measure-prose);margin:0 auto;padding:0 var(--gutter);">
+            <partial name="_KeyFacts" model="Model" />
+            <partial name="_HowTo" model="Model" />
+        </div>
         <div class="ink-essay-body dropcap">
             @Html.Raw(Model.Html)
         </div>
@@ -160,7 +165,7 @@
                         <a href="/@rp.Slug" class="ink-related-card">
                             @if (!string.IsNullOrEmpty(rp.FeatureImage))
                             {
-                                <img src="@rp.FeatureImage" alt="@rp.Title" class="ink-related-card-cover" />
+                                <img src="@rp.FeatureImage" alt="@rp.Title" class="ink-related-card-cover" loading="lazy" decoding="async" />
                             }
                             else
                             {
