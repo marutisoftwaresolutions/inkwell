@@ -1,0 +1,342 @@
+@using Blog.Core.Domain
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Security";
+
+    var items      = (IReadOnlyList<IpFirewallRule>)ViewBag.Items;
+    var stats      = (FirewallStats)ViewBag.Stats;
+    var watchlist  = (IReadOnlyList<IpWatchEntry>)ViewBag.Watchlist;
+    var settings   = (UserSettings)ViewBag.Settings;
+    var invalid    = (IReadOnlyList<string>)ViewBag.InvalidAllowlistEntries;
+    var yourIp     = (string)ViewBag.YourIp;
+    var page       = (int)ViewBag.Page;
+    var totalPages = (int)ViewBag.TotalPages;
+    string? filterKind  = ViewBag.FilterKind;
+    string? filterQuery = ViewBag.FilterQuery;
+
+    string Ago(DateTime utc)
+    {
+        var d = DateTime.UtcNow - utc;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
+        return $"{(int)d.TotalDays}d ago";
+    }
+    string Until(DateTime? utc)
+    {
+        if (utc is null) return "permanent";
+        var d = utc.Value - DateTime.UtcNow;
+        if (d.TotalSeconds <= 0) return "expired";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m left";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h left";
+        return $"{(int)d.TotalDays}d left";
+    }
+}
+
+<div class="mb-5">
+    <h2 class="text-lg font-semibold text-foreground">Security</h2>
+    <p class="text-xs text-muted-foreground mt-0.5">
+        Automatic IP blocking. Addresses that probe for exploits, hammer missing URLs, or fail sign-in
+        repeatedly are scored and blocked without intervention. Admin-only.
+    </p>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">@TempData["Error"]</div>
+}
+
+@* ── Summary tiles ─────────────────────────────────────────────── *@
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@stats.ActiveBlocks.ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">Active blocks</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-amber-600">@stats.BlocksLast24h.ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">Blocked in 24h</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-red-600">@stats.PermanentBlocks.ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">Permanent</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@stats.RequestsDenied.ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">Requests denied</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@watchlist.Count.ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">Under observation</div>
+    </div>
+</div>
+
+@if (!settings.FirewallEnabled)
+{
+    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        The firewall is <strong>off</strong> — existing rules are not enforced and no new blocks are created.
+        Turn it on under Firewall settings below.
+    </div>
+}
+@if (invalid.Count > 0)
+{
+    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Ignoring unparseable allowlist @(invalid.Count == 1 ? "entry" : "entries"): <strong>@string.Join(", ", invalid)</strong>.
+        Use an address (<code>203.0.113.7</code>) or a CIDR range (<code>203.0.113.0/24</code>).
+    </div>
+}
+
+@* ── Manual rules ──────────────────────────────────────────────── *@
+<div class="grid md:grid-cols-2 gap-3 mb-6">
+    <form method="post" action="/admin/security/block" class="rounded-xl border border-border bg-card p-4">
+        @Html.AntiForgeryToken()
+        <div class="text-sm font-medium text-foreground mb-2">Block an address</div>
+        <div class="flex flex-wrap gap-2">
+            <input type="text" name="ip" placeholder="203.0.113.7" required
+                   class="h-8 flex-1 min-w-[9rem] rounded border border-input bg-background px-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+            <select name="hours" class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="24">24 hours</option>
+                <option value="168">7 days</option>
+                <option value="720">30 days</option>
+                <option value="0">Permanent</option>
+            </select>
+            <button type="submit" class="h-8 px-3 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700">Block</button>
+        </div>
+        <input type="text" name="reason" placeholder="Reason (optional)"
+               class="h-8 w-full mt-2 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+    </form>
+
+    <form method="post" action="/admin/security/allow" class="rounded-xl border border-border bg-card p-4">
+        @Html.AntiForgeryToken()
+        <div class="text-sm font-medium text-foreground mb-2">Allowlist an address</div>
+        <div class="flex flex-wrap gap-2">
+            <input type="text" name="ip" placeholder="@yourIp" required
+                   class="h-8 flex-1 min-w-[9rem] rounded border border-input bg-background px-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+            <button type="submit" class="h-8 px-3 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700">Allow</button>
+        </div>
+        <input type="text" name="reason" placeholder="Reason (optional)"
+               class="h-8 w-full mt-2 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <p class="text-[11px] text-muted-foreground mt-2">
+            Your current address is <span class="font-mono">@yourIp</span>. Loopback and private ranges are always allowed.
+        </p>
+    </form>
+</div>
+
+@* ── Watchlist ─────────────────────────────────────────────────── *@
+@if (watchlist.Count > 0)
+{
+    <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
+        <div class="px-4 py-2 border-b border-border">
+            <span class="text-sm font-medium text-foreground">Under observation</span>
+            <span class="text-xs text-muted-foreground ml-2">
+                Scoring toward the @settings.FirewallThresholdScore-point threshold in the current @settings.FirewallWindowMinutes-minute window.
+            </span>
+        </div>
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <th class="px-4 py-2 font-medium">IP</th>
+                    <th class="px-4 py-2 font-medium text-right">Score</th>
+                    <th class="px-4 py-2 font-medium text-right">Requests</th>
+                    <th class="px-4 py-2 font-medium">Last signal</th>
+                    <th class="px-4 py-2 font-medium">Seen</th>
+                    <th class="px-4 py-2 font-medium text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var w in watchlist)
+                {
+                    <tr class="border-b border-border/50 hover:bg-muted/40">
+                        <td class="px-4 py-2 font-mono text-xs text-foreground">@w.IpAddress</td>
+                        <td class="px-4 py-2 text-right font-semibold text-amber-600">@w.Score</td>
+                        <td class="px-4 py-2 text-right text-xs text-muted-foreground">@w.Requests</td>
+                        <td class="px-4 py-2 text-xs text-muted-foreground break-all max-w-[24rem]">@w.LastReason</td>
+                        <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@w.LastSeenAt.ToString("u")">@Ago(w.LastSeenAt)</td>
+                        <td class="px-4 py-2 text-right">
+                            <form method="post" action="/admin/security/block" class="inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ip" value="@w.IpAddress" />
+                                <input type="hidden" name="hours" value="24" />
+                                <input type="hidden" name="reason" value="Blocked from the watchlist (score @w.Score)" />
+                                <button type="submit" class="h-7 px-2 rounded border border-input text-xs text-red-600 hover:bg-red-50">Block</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@* ── Filters ───────────────────────────────────────────────────── *@
+<form method="get" class="flex flex-wrap gap-2 mb-4">
+    <select name="kind" class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+        <option value="">All rules</option>
+        <option value="Block" selected="@(filterKind == "Block")">Blocked</option>
+        <option value="Allow" selected="@(filterKind == "Allow")">Allowlisted</option>
+    </select>
+    <input type="text" name="q" value="@filterQuery" placeholder="Search IP / reason / path"
+           class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-64" />
+    <button type="submit" class="h-8 px-3 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700">Filter</button>
+    @if (!string.IsNullOrEmpty(filterKind) || !string.IsNullOrEmpty(filterQuery))
+    {
+        <a href="/admin/security" class="h-8 px-3 rounded border border-input text-xs text-foreground flex items-center hover:bg-muted">Clear</a>
+    }
+</form>
+
+@* ── Rules ─────────────────────────────────────────────────────── *@
+<div class="rounded-xl border border-border bg-card overflow-hidden">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                <th class="px-4 py-2 font-medium">IP</th>
+                <th class="px-4 py-2 font-medium">Rule</th>
+                <th class="px-4 py-2 font-medium">Reason</th>
+                <th class="px-4 py-2 font-medium text-right">Denied</th>
+                <th class="px-4 py-2 font-medium">Created</th>
+                <th class="px-4 py-2 font-medium">Expires</th>
+                <th class="px-4 py-2 font-medium text-right">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (items.Count == 0)
+            {
+                <tr><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">No firewall rules yet.</td></tr>
+            }
+            @foreach (var r in items)
+            {
+                var isBlock = r.Kind == IpRuleKinds.Block;
+                <tr class="border-b border-border/50 align-top hover:bg-muted/40">
+                    <td class="px-4 py-2 font-mono text-xs text-foreground">@r.IpAddress</td>
+                    <td class="px-4 py-2">
+                        <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold @(isBlock ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")">@r.Kind</span>
+                        <div class="text-[10px] text-muted-foreground mt-1">
+                            @r.Source@(isBlock && r.OffenseCount > 1 ? $" · offense #{r.OffenseCount}" : "")
+                        </div>
+                    </td>
+                    <td class="px-4 py-2 max-w-[26rem]">
+                        <div class="text-xs text-foreground break-words">@r.Reason</div>
+                        @if (!string.IsNullOrEmpty(r.LastPath))
+                        {
+                            <div class="text-[11px] font-mono text-muted-foreground break-all mt-0.5">@r.LastPath</div>
+                        }
+                    </td>
+                    <td class="px-4 py-2 text-right font-semibold text-foreground">@r.HitCount.ToString("N0")</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@r.CreatedAt.ToString("u")">@Ago(r.CreatedAt)</td>
+                    <td class="px-4 py-2 text-xs whitespace-nowrap @(r.IsPermanent ? "text-red-600 font-medium" : "text-muted-foreground")"
+                        title="@(r.ExpiresAt?.ToString("u") ?? "never")">@Until(r.ExpiresAt)</td>
+                    <td class="px-4 py-2 text-right">
+                        <form method="post" action="/admin/security/remove/@r.Id?kind=@filterKind&q=@filterQuery&page=@(page)" class="inline"
+                              onsubmit="return confirm('@(isBlock ? "Unblock" : "Remove allowlist entry for") @r.IpAddress?')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="h-7 px-2 rounded border border-input text-xs text-foreground hover:bg-muted">
+                                @(isBlock ? "Unblock" : "Remove")
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (totalPages > 1)
+{
+    <div class="flex items-center justify-between mt-4 text-xs text-muted-foreground">
+        <span>Page @(page) of @totalPages</span>
+        <div class="flex gap-2">
+            @if (page > 1)
+            {
+                <a href="?kind=@filterKind&q=@filterQuery&page=@(page-1)" class="h-8 px-3 rounded border border-input flex items-center hover:bg-muted">Prev</a>
+            }
+            @if (page < totalPages)
+            {
+                <a href="?kind=@filterKind&q=@filterQuery&page=@(page+1)" class="h-8 px-3 rounded border border-input flex items-center hover:bg-muted">Next</a>
+            }
+        </div>
+    </div>
+}
+
+@* ── Settings ──────────────────────────────────────────────────── *@
+<details class="mt-6 rounded-xl border border-border bg-card" open="@(!settings.FirewallEnabled)">
+    <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">Firewall settings</summary>
+    <form method="post" action="/admin/security/settings" class="px-4 pb-4 border-t border-border pt-4">
+        @Html.AntiForgeryToken()
+        <div class="grid md:grid-cols-3 gap-4">
+            <label class="flex items-start gap-2 text-xs text-foreground md:col-span-3">
+                <input type="checkbox" name="firewallEnabled" value="true" checked="@settings.FirewallEnabled" class="mt-0.5" />
+                <span>
+                    <strong>Enable automatic IP blocking</strong>
+                    <span class="block text-muted-foreground">When off, nothing is blocked and no scores are recorded. Existing rules are kept.</span>
+                </span>
+            </label>
+
+            <label class="text-xs text-foreground">
+                Block at score
+                <input type="number" name="thresholdScore" min="3" max="1000" value="@settings.FirewallThresholdScore"
+                       class="h-8 w-full mt-1 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                <span class="block text-[11px] text-muted-foreground mt-1">Exploit probe = 5, failed sign-in = 3, 404 = 1.</span>
+            </label>
+
+            <label class="text-xs text-foreground">
+                Scoring window (minutes)
+                <input type="number" name="windowMinutes" min="1" max="1440" value="@settings.FirewallWindowMinutes"
+                       class="h-8 w-full mt-1 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                <span class="block text-[11px] text-muted-foreground mt-1">Scores reset after a quiet window.</span>
+            </label>
+
+            <label class="text-xs text-foreground">
+                First block lasts (hours)
+                <input type="number" name="blockHours" min="1" max="8760" value="@settings.FirewallBlockHours"
+                       class="h-8 w-full mt-1 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                <span class="block text-[11px] text-muted-foreground mt-1">Escalation extends repeat offenders.</span>
+            </label>
+
+            <label class="flex items-start gap-2 text-xs text-foreground">
+                <input type="checkbox" name="escalate" value="true" checked="@settings.FirewallEscalateRepeatOffenders" class="mt-0.5" />
+                <span>
+                    <strong>Escalate repeat offenders</strong>
+                    <span class="block text-muted-foreground">Second block lasts a week; a third is permanent.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-2 text-xs text-foreground">
+                <input type="checkbox" name="protectCrawlers" value="true" checked="@settings.FirewallProtectSearchCrawlers" class="mt-0.5" />
+                <span>
+                    <strong>Protect search &amp; AI crawlers</strong>
+                    <span class="block text-muted-foreground">Googlebot and friends are never blocked for 404s. Exploit probes still count.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-2 text-xs text-foreground">
+                <input type="checkbox" name="notifyOnBlock" value="true" checked="@settings.FirewallNotifyOnBlock" class="mt-0.5" />
+                <span>
+                    <strong>Email on automatic block</strong>
+                    <span class="block text-muted-foreground">Uses the error-notification recipients from General settings.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-2 text-xs text-foreground md:col-span-3">
+                <input type="checkbox" name="trustProxyHeaders" value="true" checked="@settings.FirewallTrustProxyHeaders" class="mt-0.5" />
+                <span>
+                    <strong>Trust proxy headers (CF-Connecting-IP / X-Forwarded-For)</strong>
+                    <span class="block text-muted-foreground">
+                        Enable only when the site sits behind Cloudflare or another trusted proxy — otherwise a client can forge its address.
+                    </span>
+                </span>
+            </label>
+
+            <label class="text-xs text-foreground md:col-span-3">
+                Never-block list
+                <textarea name="allowlist" rows="3" placeholder="203.0.113.7&#10;198.51.100.0/24"
+                          class="w-full mt-1 rounded border border-input bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring">@settings.FirewallIpAllowlist</textarea>
+                <span class="block text-[11px] text-muted-foreground mt-1">
+                    One address or CIDR range per line. Loopback and private ranges are always included.
+                </span>
+            </label>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="h-8 px-4 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700">Save settings</button>
+        </div>
+    </form>
+</details>

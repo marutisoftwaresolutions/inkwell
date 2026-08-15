@@ -1,0 +1,120 @@
+@model IEnumerable<Blog.Core.Domain.ImportJob>
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Import";
+}
+
+<div class="flex flex-col gap-6 max-w-5xl">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="rounded-md border border-border bg-primary/10 text-foreground px-4 py-3 text-sm">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm">@TempData["Error"]</div>
+    }
+
+    <div class="bg-card rounded-lg border border-border p-5">
+        <h2 class="font-semibold mb-1">Import content</h2>
+        <p class="text-sm text-muted-foreground mb-4">Migrate an existing blog into Inkwell. Upload an export file, choose what to bring in, and watch the import run — with a per-item report at the end.</p>
+        <form method="post" action="/admin/import/upload" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-3 items-end">
+            @Html.AntiForgeryToken()
+            <div>
+                <label class="block text-sm font-medium mb-1">Source</label>
+                <select name="source" id="sourceSelect" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm">
+                    <option value="WordPress">WordPress (WXR .xml)</option>
+                    <option value="Ghost">Ghost (.json / .zip)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Export file</label>
+                <input type="file" name="file" id="fileInput" accept=".xml,.json,.zip" required class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm" />
+            </div>
+            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Upload &amp; analyze</button>
+        </form>
+
+        <!-- Step-by-step export instructions -->
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <details class="rounded-md border border-border bg-muted/30 p-3 text-sm" open>
+                <summary class="font-medium cursor-pointer">How to export from WordPress</summary>
+                <ol class="list-decimal list-inside mt-2 space-y-1 text-muted-foreground">
+                    <li>Sign in to your WordPress admin (<span class="font-mono">/wp-admin</span>).</li>
+                    <li>Go to <span class="font-mono">Tools → Export</span>.</li>
+                    <li>Choose <strong>All content</strong>.</li>
+                    <li>Click <strong>Download Export File</strong> — you get a <span class="font-mono">.xml</span> (WXR) file.</li>
+                    <li>Select <strong>WordPress</strong> above and upload that file.</li>
+                </ol>
+                <p class="mt-2 text-xs text-muted-foreground">Images are pulled from your live site during import, so keep the old site online until it finishes.</p>
+            </details>
+            <details class="rounded-md border border-border bg-muted/30 p-3 text-sm">
+                <summary class="font-medium cursor-pointer">How to export from Ghost</summary>
+                <ol class="list-decimal list-inside mt-2 space-y-1 text-muted-foreground">
+                    <li>Open Ghost Admin → <span class="font-mono">Settings → (Labs / Advanced) → Import/Export</span>.</li>
+                    <li>Click <strong>Export</strong> — you get a <span class="font-mono">.json</span> file.</li>
+                    <li>Select <strong>Ghost</strong> above and upload the <span class="font-mono">.json</span> (or a <span class="font-mono">.zip</span> containing it).</li>
+                </ol>
+                <p class="mt-2 text-xs text-muted-foreground">Ghost images live on your site — keep it online so images can be fetched and converted. If posts were written in newer editors, some rich formatting may be simplified.</p>
+            </details>
+        </div>
+    </div>
+
+    <script>
+        // Hint the file picker with the right extension for the selected source.
+        document.getElementById('sourceSelect').addEventListener('change', function () {
+            document.getElementById('fileInput').setAttribute('accept', this.value === 'Ghost' ? '.json,.zip' : '.xml');
+        });
+    </script>
+
+    <div class="bg-card rounded-lg border border-border overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead>
+                <tr class="bg-muted text-muted-foreground border-b border-border">
+                    <th class="px-4 py-3 font-medium">Source / file</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium">Progress</th>
+                    <th class="px-4 py-3 font-medium w-[180px]">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="4" class="px-4 py-8 text-center text-muted-foreground">No imports yet.</td></tr>
+                }
+                @foreach (var job in Model)
+                {
+                    <tr class="hover:bg-muted/50">
+                        <td class="px-4 py-3">
+                            <div class="font-medium">@job.Source</div>
+                            <div class="text-xs text-muted-foreground">@job.FileName</div>
+                        </td>
+                        <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded bg-muted">@job.Status</span></td>
+                        <td class="px-4 py-3 text-muted-foreground text-xs">
+                            @job.ImportedItems imported · @job.FailedItems failed · @job.SkippedItems skipped / @job.TotalItems
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2">
+                                @if (job.Status == Blog.Core.Domain.ImportJobStatus.Analyzed)
+                                {
+                                    <a href="/admin/import/configure/@job.Id" class="text-primary hover:underline text-xs">Configure</a>
+                                }
+                                @if (job.Status == Blog.Core.Domain.ImportJobStatus.Running || job.Status == Blog.Core.Domain.ImportJobStatus.Paused)
+                                {
+                                    <a href="/admin/import/run/@job.Id" class="text-primary hover:underline text-xs">Resume</a>
+                                }
+                                @if (job.Status == Blog.Core.Domain.ImportJobStatus.Completed)
+                                {
+                                    <a href="/admin/import/summary/@job.Id" class="text-primary hover:underline text-xs">Summary</a>
+                                }
+                                <form method="post" action="/admin/import/delete/@job.Id" onsubmit="return confirm('Delete this import record? Imported content is kept.');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="text-destructive hover:underline text-xs">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

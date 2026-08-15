@@ -1,0 +1,32 @@
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = "410 - Page No Longer Available";
+}
+
+@* A 410 is a deliberate removal, not a mistake. Say so plainly and send the reader somewhere useful
+   rather than leaving them at a dead end. Search engines drop 410s from the index faster than 404s. *@
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+    <div class="mb-8">
+        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-primary/20 mx-auto">
+            <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+    </div>
+
+    <h1 class="text-6xl font-black text-foreground mb-4 tabular-nums tracking-tighter">410</h1>
+    <h2 class="text-2xl font-bold text-foreground mb-4">This page is no longer available</h2>
+    <p class="text-muted-foreground max-w-md mx-auto mb-8">
+        It was removed on purpose and will not be coming back. Everything current lives in our
+        reviews and guides — start there, or search for what you were after.
+    </p>
+
+    <div class="flex flex-col sm:flex-row gap-4 items-center justify-center">
+        <a href="/search" class="px-6 py-2.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md font-medium transition-colors flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            Search
+        </a>
+        <a href="/" class="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium shadow-sm transition-colors flex items-center gap-2">
+            Latest reviews &amp; guides
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+    </div>
+</div>

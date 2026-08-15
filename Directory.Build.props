@@ -2,7 +2,7 @@
   <!-- Solution-wide version + product metadata. Single source of truth for the release version;
        stamped into every assembly's AssemblyVersion / FileVersion / InformationalVersion. -->
   <PropertyGroup>
-    <Version>1.0.2</Version>
+    <Version>1.0.4</Version>
     <Product>Inkwell</Product>
     <Company>Maruti Software Solutions</Company>
     <Authors>Maruti Software Solutions</Authors>

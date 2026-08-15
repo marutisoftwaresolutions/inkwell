@@ -1,0 +1,32 @@
+@model Blog.Core.Domain.SeriesNav
+@*
+    In-article reading-flow banner for a post that belongs to a series:
+    "Part N of M · <series>" plus Previous / Next links. Rendered above the article body.
+*@
+<div class="container xl:max-w-6xl mx-auto px-4 pt-6 lg:pt-10">
+    <div class="max-w-4xl mx-auto w-full">
+        <div class="rounded-lg border p-4" style="border-color: var(--border); background: var(--muted);">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="text-sm" style="color: var(--muted-foreground);">
+                    <span class="uppercase tracking-wide text-xs font-bold" style="color: var(--foreground);">Part @Model.Part of @Model.Total</span>
+                    <span class="mx-1">in the series</span>
+                    <a href="/series/@Model.Series.Slug" class="font-medium hover:opacity-80" style="color: var(--foreground);">@Model.Series.Title</a>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                    @if (Model.Previous != null)
+                    {
+                        <a href="/@Model.Previous.Slug" class="hover:opacity-80 inline-flex items-center gap-1" style="color: var(--foreground);" title="@Model.Previous.Title">
+                            <span aria-hidden="true">←</span> Previous
+                        </a>
+                    }
+                    @if (Model.Next != null)
+                    {
+                        <a href="/@Model.Next.Slug" class="hover:opacity-80 inline-flex items-center gap-1" style="color: var(--foreground);" title="@Model.Next.Title">
+                            Next <span aria-hidden="true">→</span>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

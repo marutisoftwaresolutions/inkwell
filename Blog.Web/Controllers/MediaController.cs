@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.IO;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
 
 namespace Blog.Web.Controllers;
 
@@ -16,6 +18,7 @@ public class MediaController : Controller
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<MediaController> _logger;
     private readonly AuditService _audit;
+    private readonly IImageProcessingService _imageProcessing;
     private static readonly HashSet<string> AllowedMimes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg","image/png","image/gif","image/webp","image/svg+xml",
@@ -25,12 +28,14 @@ public class MediaController : Controller
         "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     };
 
-    public MediaController(IMediaRepository media, IWebHostEnvironment env, ILogger<MediaController> logger, AuditService audit)
+    public MediaController(IMediaRepository media, IWebHostEnvironment env, ILogger<MediaController> logger,
+        AuditService audit, IImageProcessingService imageProcessing)
     {
         _media = media;
         _env = env;
         _logger = logger;
         _audit = audit;
+        _imageProcessing = imageProcessing;
     }
 
     [HttpGet("")]
@@ -61,33 +66,23 @@ public class MediaController : Controller
             if (!AllowedMimes.Contains(mime))
                 return BadRequest(new { error = "File type not allowed." });
 
-            // Save to the "uploads" folder inside the standard wwwroot
-            // Note: Hot Reload is ignored for this folder via Blog.Web.csproj <Watch Remove="wwwroot\uploads\**" />
-            var uploadsRoot = Path.Combine(_env.WebRootPath, "uploads");
-            // Normalize slashes for Windows so Directory.CreateDirectory doesn't choke on mixed slashes
-            // Ensure folder is safe
+            // Save under wwwroot/uploads/{folder}/{yyyy-MM}. Raster images are auto-converted to WebP
+            // (with dimensions captured) by the shared IImageProcessingService — the same code path the
+            // content importer uses. Non-image types and SVG/WebP pass through unchanged.
             var safeFolder = folder.ToLowerInvariant() switch {
                 "og" => "og",
                 "twitter" => "twitter",
                 _ => "images"
             };
+            var relativeMonthDir = DateTime.UtcNow.ToString("yyyy-MM");
+            var subdir = $"{safeFolder}/{relativeMonthDir}";
 
-            var relativeMonthDir = DateTime.UtcNow.ToString("yyyy-MM"); 
-            var uploadsDir = Path.Combine(uploadsRoot, safeFolder, relativeMonthDir);
-            Directory.CreateDirectory(uploadsDir);
-
-            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var fileName = $"{Guid.NewGuid():N}";
-            int? width = null, height = null;
-
-            fileName += ext;
-            var destPath = Path.Combine(uploadsDir, fileName);
-            using (var stream = new FileStream(destPath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            var relativePath = $"/uploads/{safeFolder}/{relativeMonthDir}/{fileName}";
+            var saved = await _imageProcessing.SaveImageAsync(file.OpenReadStream(), file.FileName, mime, subdir, convertToWebp: true);
+            var fileName = saved.FileName;
+            mime = saved.ContentType;
+            var storedSize = saved.FileSize;
+            int? width = saved.Width, height = saved.Height;
+            var relativePath = saved.RelativeUrl;
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
                 return Unauthorized(new { error = "User not identified." });
@@ -99,7 +94,7 @@ public class MediaController : Controller
                 FilePath = relativePath,
                 Url = relativePath,
                 ContentType = mime,
-                FileSize = file.Length,
+                FileSize = storedSize,
                 Width = width,
                 Height = height,
                 UploadedBy = userId

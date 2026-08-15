@@ -1,0 +1,142 @@
+@using Blog.Core.Domain
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Content Health";
+
+    var items   = (IReadOnlyList<ContentHealthItem>)ViewBag.Items;
+    var summary = (ContentHealthSummary)ViewBag.Summary;
+    var filter  = (string)ViewBag.Filter;
+
+    string Ago(DateTime? utc)
+    {
+        if (utc is null) return "—";
+        var d = DateTime.UtcNow - utc.Value;
+        if (d.TotalDays < 1) return "today";
+        if (d.TotalDays < 30) return $"{(int)d.TotalDays}d ago";
+        if (d.TotalDays < 365) return $"{(int)(d.TotalDays / 30)}mo ago";
+        return $"{(int)(d.TotalDays / 365)}y ago";
+    }
+    string Due(DateTime? utc)
+    {
+        if (utc is null) return "not set";
+        var d = utc.Value - DateTime.UtcNow;
+        if (d.TotalDays < 0) return $"overdue {(int)-d.TotalDays}d";
+        if (d.TotalDays < 30) return $"in {(int)d.TotalDays}d";
+        return utc.Value.ToString("d MMM yyyy");
+    }
+    string TileClass(string key) => filter == key
+        ? "rounded-xl border-2 border-emerald-500 bg-card p-4 block"
+        : "rounded-xl border border-border bg-card p-4 block hover:border-emerald-400";
+}
+
+<div class="mb-5">
+    <h2 class="text-lg font-semibold text-foreground">Content Health</h2>
+    <p class="text-xs text-muted-foreground mt-0.5">
+        Published posts that need maintenance — reviews falling due, missing answer blocks, and snippets
+        that will truncate in search results. Read-only; each row links to the editor.
+    </p>
+</div>
+
+@* ── Tiles double as filters ───────────────────────────────────────────── *@
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+    <a href="?filter=all" class="@TileClass("all")">
+        <div class="text-2xl font-bold text-foreground">@summary.Total</div>
+        <div class="text-xs text-muted-foreground mt-1">Published</div>
+    </a>
+    <a href="?filter=overdue" class="@TileClass("overdue")">
+        <div class="text-2xl font-bold @(summary.ReviewOverdue > 0 ? "text-red-600" : "text-foreground")">@summary.ReviewOverdue</div>
+        <div class="text-xs text-muted-foreground mt-1">Review overdue</div>
+    </a>
+    <a href="?filter=duesoon" class="@TileClass("duesoon")">
+        <div class="text-2xl font-bold @(summary.ReviewDueSoon > 0 ? "text-amber-600" : "text-foreground")">@summary.ReviewDueSoon</div>
+        <div class="text-xs text-muted-foreground mt-1">Due in 30 days</div>
+    </a>
+    <a href="?filter=unverified" class="@TileClass("unverified")">
+        <div class="text-2xl font-bold text-foreground">@summary.NeverVerified</div>
+        <div class="text-xs text-muted-foreground mt-1">Never verified</div>
+    </a>
+    <a href="?filter=nokeyfacts" class="@TileClass("nokeyfacts")">
+        <div class="text-2xl font-bold @(summary.MissingKeyFacts > 0 ? "text-amber-600" : "text-foreground")">@summary.MissingKeyFacts</div>
+        <div class="text-xs text-muted-foreground mt-1">No Key Facts</div>
+    </a>
+    <a href="?filter=meta" class="@TileClass("meta")">
+        <div class="text-2xl font-bold @(summary.MetaIssues > 0 ? "text-amber-600" : "text-foreground")">@summary.MetaIssues</div>
+        <div class="text-xs text-muted-foreground mt-1">Snippet issues</div>
+    </a>
+    <a href="?filter=staleyear" class="@TileClass("staleyear")">
+        <div class="text-2xl font-bold @(summary.StaleYearStamps > 0 ? "text-red-600" : "text-foreground")">@summary.StaleYearStamps</div>
+        <div class="text-xs text-muted-foreground mt-1">Stale year in title</div>
+    </a>
+</div>
+
+@if (filter != "attention")
+{
+    <a href="/admin/content-health" class="inline-block mb-4 text-xs text-emerald-700 hover:underline">← Back to everything needing attention</a>
+}
+
+@* ── Worklist ──────────────────────────────────────────────────────────── *@
+<div class="rounded-xl border border-border bg-card overflow-hidden">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                <th class="px-4 py-2 font-medium">Post</th>
+                <th class="px-4 py-2 font-medium">Verified</th>
+                <th class="px-4 py-2 font-medium">Review</th>
+                <th class="px-4 py-2 font-medium">Blocks</th>
+                <th class="px-4 py-2 font-medium">Snippet</th>
+                <th class="px-4 py-2 font-medium text-right">Open</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (items.Count == 0)
+            {
+                <tr><td colspan="6" class="px-4 py-10 text-center text-muted-foreground">Nothing needs attention here. 🎉</td></tr>
+            }
+            @foreach (var i in items)
+            {
+                <tr class="border-b border-border/50 align-top hover:bg-muted/40">
+                    <td class="px-4 py-2 max-w-[26rem]">
+                        <div class="text-foreground">@i.Title</div>
+                        <div class="text-[11px] font-mono text-muted-foreground break-all">/@i.Slug</div>
+                        @if (i.StaleYearStamp)
+                        {
+                            <span class="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">year stamp is stale</span>
+                        }
+                    </td>
+                    <td class="px-4 py-2 text-xs whitespace-nowrap @(i.NeverVerified ? "text-amber-600" : "text-muted-foreground")"
+                        title="@(i.LastVerifiedAt?.ToString("u") ?? "never verified")">
+                        @(i.NeverVerified ? "never" : Ago(i.LastVerifiedAt))
+                    </td>
+                    <td class="px-4 py-2 text-xs whitespace-nowrap @(i.ReviewOverdue ? "text-red-600 font-medium" : i.ReviewDueSoon ? "text-amber-600" : "text-muted-foreground")"
+                        title="@(i.NextReviewAt?.ToString("u") ?? "no review date")">
+                        @Due(i.NextReviewAt)
+                    </td>
+                    <td class="px-4 py-2 whitespace-nowrap">
+                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold @(i.HasKeyFacts ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")">Key Facts</span>
+                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold @(i.HasFaq ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")">FAQ</span>
+                    </td>
+                    <td class="px-4 py-2 text-xs whitespace-nowrap @(i.MetaMissing || i.MetaTooLong ? "text-amber-600" : "text-muted-foreground")">
+                        @if (i.MetaMissing)
+                        {
+                            <span>missing</span>
+                        }
+                        else
+                        {
+                            <span>@i.MetaLength chars@(i.MetaTooLong ? " · truncates" : "")</span>
+                        }
+                    </td>
+                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <a href="/admin/posts/edit/@i.Id" class="h-7 px-2 rounded border border-input text-xs text-foreground hover:bg-muted inline-flex items-center">Edit</a>
+                        <a href="/@i.Slug" target="_blank" rel="noopener" class="h-7 px-2 rounded border border-input text-xs text-muted-foreground hover:bg-muted inline-flex items-center ml-1">View</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="text-[11px] text-muted-foreground mt-3">
+    Snippets are flagged over @ContentHealthItem.MetaDescriptionLimit characters, the point at which search
+    results usually truncate. A stale year stamp means the title promises a year that has already passed —
+    update the content, not just the number.
+</p>

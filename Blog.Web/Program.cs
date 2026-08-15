@@ -36,6 +36,24 @@ builder.Services.AddHttpClient<ReCaptchaService>();
 builder.Services.AddHttpClient<IndexNowService>(c => c.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddScoped<ErrorLogService>();
 
+// ── Security: automatic IP blocking ───────────────────────────────────────────
+// Singleton: keeps the rule snapshot and the sliding-window threat scores in memory so the
+// enforcement path costs no database work per request.
+builder.Services.AddSingleton<Blog.Web.Services.Security.IpFirewallService>();
+
+// ── Content importer (WordPress / Ghost) ──────────────────────────────────────
+builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
+builder.Services.AddScoped<Blog.Web.Services.Import.HtmlRewriter>();
+builder.Services.AddScoped<Blog.Web.Services.Import.IContentImporter, Blog.Web.Services.Import.WordPressImporter>();
+builder.Services.AddScoped<Blog.Web.Services.Import.IContentImporter, Blog.Web.Services.Import.GhostImporter>();
+builder.Services.AddHttpClient<Blog.Web.Services.Import.ImageImportService>(c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(20);
+    c.MaxResponseContentBufferSize = 20 * 1024 * 1024; // 20 MB cap per image
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("InkwellImporter/1.0");
+});
+builder.Services.AddScoped<Blog.Web.Services.Import.ImportProcessor>();
+
 // ── Multi-Tenancy ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
@@ -162,6 +180,11 @@ else
     app.UseExceptionHandler("/error/500");
 }
 
+// IP firewall — refuse blocked addresses before any other work happens, and score failing
+// requests on the way out so scanners block themselves. Fail-open: if it cannot reach the
+// database it lets traffic through rather than taking the site down.
+app.UseIpFirewall();
+
 // Canonical host redirect — enforce https://www.opticalsoftware.org in production
 var canonicalHost = app.Configuration["CanonicalHost"];
 if (!string.IsNullOrEmpty(canonicalHost) && !app.Environment.IsDevelopment())
@@ -217,6 +240,10 @@ app.UseStatusCodePagesWithReExecute("/error/{0}");
 
 app.UseImageSharp(); // Intercepts image requests from wwwroot automatically!
 app.UseStaticFiles(); // Core wwwroot file serving
+
+// HEAD support for MVC routes. Runs after static files (which already handle HEAD natively) and
+// before routing, which matches methods exactly and would otherwise answer every HEAD with a 405.
+app.UseHeadRequests();
 
 app.UseRouting();
 app.UseAuthentication();

@@ -41,6 +41,11 @@ public class ErrorController : Controller
             case 404:
                 ViewData["Title"] = "Page Not Found";
                 return View("NotFound");
+            case 410:
+                // Deliberately retired URL (e.g. a legacy product route). Distinct from 404 so the
+                // page can explain the removal and point at what replaced it.
+                ViewData["Title"] = "Page No Longer Available";
+                return View("Gone");
             default:
                 ViewData["Title"] = "An Error Occurred";
                 return View("GenericError");

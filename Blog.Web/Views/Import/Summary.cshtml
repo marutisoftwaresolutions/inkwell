@@ -1,0 +1,50 @@
+@model Blog.Core.Domain.ImportJob
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Import summary";
+    var failed = ViewBag.Failed as List<Blog.Core.Domain.ImportItem> ?? new();
+}
+
+<div class="flex flex-col gap-6 max-w-3xl">
+    <div>
+        <a href="/admin/import" class="text-sm text-muted-foreground hover:text-primary">← Back to imports</a>
+        <h2 class="font-semibold text-lg mt-2">Import @(Model.Status == Blog.Core.Domain.ImportJobStatus.Completed ? "complete" : Model.Status.ToString())</h2>
+        <p class="text-sm text-muted-foreground">@Model.Source — @Model.FileName</p>
+    </div>
+
+    <div class="grid grid-cols-4 gap-3 text-center">
+        <div class="bg-card border border-border rounded-lg p-3"><div class="text-2xl font-semibold">@Model.ImportedItems</div><div class="text-xs text-muted-foreground">Imported</div></div>
+        <div class="bg-card border border-border rounded-lg p-3"><div class="text-2xl font-semibold text-destructive">@Model.FailedItems</div><div class="text-xs text-muted-foreground">Failed</div></div>
+        <div class="bg-card border border-border rounded-lg p-3"><div class="text-2xl font-semibold text-muted-foreground">@Model.SkippedItems</div><div class="text-xs text-muted-foreground">Skipped</div></div>
+        <div class="bg-card border border-border rounded-lg p-3"><div class="text-2xl font-semibold">@Model.TotalItems</div><div class="text-xs text-muted-foreground">Total</div></div>
+    </div>
+
+    <div class="flex items-center gap-3 flex-wrap">
+        <a href="/admin/posts" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium">View imported posts →</a>
+        <a href="/admin/import/report/@Model.Id" class="px-4 py-2 border border-input rounded-md text-sm font-medium">Download report (.xlsx)</a>
+        @if (Model.Status == Blog.Core.Domain.ImportJobStatus.Completed && Model.ImportedItems > 0
+             && !string.Equals(Model.Options.SlugConflict, "Overwrite", StringComparison.OrdinalIgnoreCase))
+        {
+            <form method="post" action="/admin/import/undo/@Model.Id" onsubmit="return confirm('Undo this import? The imported posts, pages, images and comments will be deleted. Categories and tags are kept. This cannot be reversed.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-4 py-2 border border-destructive/40 text-destructive hover:bg-destructive/10 rounded-md text-sm font-medium">Undo import</button>
+            </form>
+        }
+    </div>
+
+    @if (failed.Any())
+    {
+        <div class="bg-card border border-border rounded-lg p-4">
+            <h3 class="font-semibold text-sm mb-2">Failed items (@failed.Count)</h3>
+            <table class="w-full text-left text-xs">
+                <thead><tr class="text-muted-foreground border-b border-border"><th class="py-2 pr-3">Type</th><th class="py-2 pr-3">Title</th><th class="py-2">Error</th></tr></thead>
+                <tbody class="divide-y divide-border">
+                    @foreach (var f in failed)
+                    {
+                        <tr><td class="py-2 pr-3">@f.ItemType</td><td class="py-2 pr-3">@f.Title</td><td class="py-2 text-destructive font-mono">@f.Error</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

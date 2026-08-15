@@ -18,6 +18,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IPageRepository, PageRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
+        services.AddScoped<ISeriesRepository, SeriesRepository>();
         services.AddScoped<ICommentRepository, CommentRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
@@ -30,6 +31,9 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IRedirectRepository, RedirectRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
         services.AddScoped<IErrorLogRepository, ErrorLogRepository>();
+        services.AddScoped<IImportJobRepository, ImportJobRepository>();
+        services.AddScoped<IIpFirewallRepository, IpFirewallRepository>();
+        services.AddScoped<IContentHealthRepository, ContentHealthRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
         services.AddScoped<OptometryTaxonomySeeder>();

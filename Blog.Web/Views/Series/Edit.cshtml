@@ -1,0 +1,178 @@
+@model Blog.Core.Domain.Series
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = $"Edit Series — {Model.Title}";
+    var seriesPosts = ViewBag.SeriesPosts as List<Blog.Core.Domain.Post> ?? new List<Blog.Core.Domain.Post>();
+    var allPosts = ViewBag.AllPosts as List<Blog.Core.Domain.Post> ?? new List<Blog.Core.Domain.Post>();
+    var inSeriesIds = seriesPosts.Select(p => p.Id).ToHashSet();
+    var candidates = allPosts.Where(p => !inSeriesIds.Contains(p.Id)).ToList();
+}
+
+<div class="flex flex-col gap-6 max-w-4xl">
+
+    <div class="flex items-center justify-between">
+        <a href="/admin/series" class="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Back to Series
+        </a>
+        <a href="/series/@Model.Slug" target="_blank" class="text-sm text-muted-foreground hover:text-primary">View public page ↗</a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="rounded-md border border-border bg-primary/10 text-foreground px-4 py-3 text-sm">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm">@TempData["Error"]</div>
+    }
+
+    <!-- Metadata -->
+    <div class="bg-card rounded-lg border border-border p-5">
+        <h2 class="font-semibold mb-4">Series details</h2>
+        <form method="post" action="/admin/series/edit/@Model.Id" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Title</label>
+                    <input type="text" name="title" id="seriesTitle" required value="@Model.Title" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Slug</label>
+                    <input type="text" name="slug" id="seriesSlug" value="@Model.Slug" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Description</label>
+                <textarea name="description" rows="3" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">@Model.Description</textarea>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save details</button>
+        </form>
+    </div>
+
+    <!-- Posts manager -->
+    <div class="bg-card rounded-lg border border-border p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold">Posts in this series <span class="text-muted-foreground font-normal">(ordered)</span></h2>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2 mb-4">
+            <select id="addPostSelect" class="flex-1 px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="">Add a post to this series…</option>
+                @foreach (var p in candidates)
+                {
+                    <option value="@p.Id" data-title="@p.Title">@p.Title</option>
+                }
+            </select>
+            <button type="button" id="addPostBtn" class="px-4 py-2 border border-input rounded-md text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap">Add post</button>
+        </div>
+
+        <form method="post" action="/admin/series/@Model.Id/posts" id="postsForm">
+            @Html.AntiForgeryToken()
+            <ul id="postList" class="divide-y divide-border border border-border rounded-md">
+                @foreach (var p in seriesPosts)
+                {
+                    <li class="flex items-center gap-3 px-3 py-2" data-id="@p.Id">
+                        <input type="hidden" name="postIds" value="@p.Id" />
+                        <span class="text-xs text-muted-foreground w-6 text-center part-num"></span>
+                        <span class="flex-1 text-sm truncate">
+                            @p.Title
+                            @if (p.Status != Blog.Core.Domain.PostStatus.Published)
+                            {
+                                <span class="ml-2 text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">@p.Status</span>
+                            }
+                        </span>
+                        <div class="flex items-center gap-1">
+                            <button type="button" class="move-up p-1 rounded hover:bg-muted text-muted-foreground" title="Move up">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+                            </button>
+                            <button type="button" class="move-down p-1 rounded hover:bg-muted text-muted-foreground" title="Move down">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </button>
+                        </div>
+                    </li>
+                }
+            </ul>
+            <p id="emptyHint" class="text-sm text-muted-foreground py-3 @(seriesPosts.Any() ? "hidden" : "")">No posts yet — add posts above, order them, then save.</p>
+            <div class="mt-4">
+                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save posts &amp; order</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const list = document.getElementById('postList');
+        const emptyHint = document.getElementById('emptyHint');
+        const addSelect = document.getElementById('addPostSelect');
+        const addBtn = document.getElementById('addPostBtn');
+
+        function slugify(v) {
+            return v.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+        }
+        document.getElementById('seriesTitle').addEventListener('input', function () {
+            // Only auto-fill slug if it was left empty (never clobber an existing slug on edit).
+        });
+
+        function renumber() {
+            const items = list.querySelectorAll('li');
+            items.forEach((li, i) => {
+                const n = li.querySelector('.part-num');
+                if (n) n.textContent = (i + 1);
+            });
+            emptyHint.classList.toggle('hidden', items.length > 0);
+        }
+
+        function buildItem(id, title) {
+            const li = document.createElement('li');
+            li.className = 'flex items-center gap-3 px-3 py-2';
+            li.setAttribute('data-id', id);
+            li.innerHTML =
+                '<input type="hidden" name="postIds" value="' + id + '">' +
+                '<span class="text-xs text-muted-foreground w-6 text-center part-num"></span>' +
+                '<span class="flex-1 text-sm truncate"></span>' +
+                '<div class="flex items-center gap-1">' +
+                '<button type="button" class="move-up p-1 rounded hover:bg-muted text-muted-foreground" title="Move up"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg></button>' +
+                '<button type="button" class="move-down p-1 rounded hover:bg-muted text-muted-foreground" title="Move down"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>' +
+                '<button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>' +
+                '</div>';
+            li.querySelector('.flex-1').textContent = title;
+            return li;
+        }
+
+        addBtn.addEventListener('click', function () {
+            const opt = addSelect.selectedOptions[0];
+            if (!opt || !opt.value) return;
+            list.appendChild(buildItem(opt.value, opt.getAttribute('data-title') || opt.textContent));
+            opt.remove();
+            addSelect.value = '';
+            renumber();
+        });
+
+        list.addEventListener('click', function (e) {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            const li = btn.closest('li');
+            if (btn.classList.contains('move-up') && li.previousElementSibling) {
+                list.insertBefore(li, li.previousElementSibling);
+            } else if (btn.classList.contains('move-down') && li.nextElementSibling) {
+                list.insertBefore(li.nextElementSibling, li);
+            } else if (btn.classList.contains('remove-post')) {
+                // Return the post to the add-picker so it can be re-added.
+                const id = li.getAttribute('data-id');
+                const title = li.querySelector('.flex-1').textContent.trim();
+                const o = document.createElement('option');
+                o.value = id; o.setAttribute('data-title', title); o.textContent = title;
+                addSelect.appendChild(o);
+                li.remove();
+            }
+            renumber();
+        });
+
+        renumber();
+    })();
+</script>

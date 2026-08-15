@@ -1,0 +1,50 @@
+@model IEnumerable<Blog.Core.Domain.Series>
+@{
+    Layout = "_PublicLayout";
+    ViewData["SiteName"] = ViewBag.SiteName;
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    ViewData["Canonical"] = $"{baseUrl}/series";
+
+    // CollectionPage schema for the series directory.
+    var collData = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "CollectionPage",
+        ["name"] = (string)(ViewData["Title"] ?? "Series"),
+        ["url"] = $"{baseUrl}/series",
+        ["isPartOf"] = new Dictionary<string, string> { ["@id"] = $"{baseUrl}/#website" }
+    };
+    var collDesc = (string)(ViewData["Description"] ?? "");
+    if (!string.IsNullOrEmpty(collDesc)) collData["description"] = collDesc;
+}
+<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(collData))</script>
+
+<div class="container xl:max-w-6xl mx-auto px-4 py-8 lg:py-12">
+    <div class="max-w-4xl mx-auto w-full">
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-medium mb-2 leading-tight">Series</h1>
+            <p class="text-base" style="color: var(--muted-foreground);">Multi-part guides and article collections, in reading order.</p>
+        </header>
+
+        @if (!Model.Any())
+        {
+            <p style="color: var(--muted-foreground);">No series published yet.</p>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                @foreach (var s in Model)
+                {
+                    <a href="/series/@s.Slug" class="block rounded-lg border p-5 hover:opacity-90 transition-opacity" style="border-color: var(--border); background: var(--muted);">
+                        <div class="text-xs uppercase tracking-wide font-bold mb-2" style="color: var(--muted-foreground);">@s.PostCount @(s.PostCount == 1 ? "part" : "parts")</div>
+                        <h2 class="text-lg font-medium mb-1" style="color: var(--foreground);">@s.Title</h2>
+                        @if (!string.IsNullOrWhiteSpace(s.Description))
+                        {
+                            <p class="text-sm line-clamp-2" style="color: var(--muted-foreground);">@s.Description</p>
+                        }
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</div>

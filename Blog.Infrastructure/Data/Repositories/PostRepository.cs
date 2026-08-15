@@ -377,7 +377,12 @@ public class PostRepository : IPostRepository
             scoreTerms.Add("(SELECT COUNT(*) FROM PostTags pt WHERE pt.PostId = p.Id AND pt.TagId IN @TagIds)");
             p.Add("TagIds", tagIds);
         }
-        var relevanceExpr = scoreTerms.Any() ? string.Join(" + ", scoreTerms) : "0";
+        // When the post has no categories or tags, there is no relevance term. Emitting a constant
+        // ("ORDER BY (0) DESC") is invalid — SQL Server treats a bare integer in ORDER BY as an ordinal
+        // column position (0 is out of range → runtime error), so fall back to pure recency ordering.
+        var orderBy = scoreTerms.Any()
+            ? $"ORDER BY ({string.Join(" + ", scoreTerms)}) DESC, p.PublishedAt DESC"
+            : "ORDER BY p.PublishedAt DESC";
 
         var sql = $@"
             SELECT TOP(@Count) p.*, u.DisplayName as AuthorName, COALESCE(u.ProfileImage, u.AvatarUrl) as AvatarUrl,
@@ -386,7 +391,7 @@ public class PostRepository : IPostRepository
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE p.Id != @PostId
               AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))
-            ORDER BY ({relevanceExpr}) DESC, p.PublishedAt DESC";
+            {orderBy}";
 
         return (await conn.QueryAsync<Post>(sql, p)).ToList();
     }

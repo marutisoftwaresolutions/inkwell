@@ -84,6 +84,12 @@
     <partial name="_SchemaJsonLd" model="Model" view-data="ViewData" />
 }
 
+@* If this post belongs to a series, show the "Part N of M · Prev/Next" reading-flow banner. *@
+@if (ViewBag.PostSeriesNav != null)
+{
+    <partial name="_SeriesNav" model="(Blog.Core.Domain.SeriesNav)ViewBag.PostSeriesNav" />
+}
+
 @* A post carrying roundup data always renders as a Verdict comparison, whatever the
    site's layout-post setting — the format is driven by the content, not the theme. *@
 @if (Model.IsRoundup || blogLayout == "Verdict")

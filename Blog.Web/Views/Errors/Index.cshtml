@@ -76,12 +76,13 @@
                 <th class="px-4 py-2 font-medium text-right">Count</th>
                 <th class="px-4 py-2 font-medium">First</th>
                 <th class="px-4 py-2 font-medium">Last</th>
+                <th class="px-4 py-2 font-medium">Last IP</th>
             </tr>
         </thead>
         <tbody>
             @if (items.Count == 0)
             {
-                <tr><td colspan="6" class="px-4 py-10 text-center text-muted-foreground">No errors recorded. 🎉</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">No errors recorded. 🎉</td></tr>
             }
             @foreach (var e in items)
             {
@@ -104,6 +105,25 @@
                     <td class="px-4 py-2 text-right font-semibold text-foreground">@e.OccurrenceCount.ToString("N0")</td>
                     <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@e.FirstSeenAt.ToString("u")">@Ago(e.FirstSeenAt)</td>
                     <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@e.LastSeenAt.ToString("u")">@Ago(e.LastSeenAt)</td>
+                    <td class="px-4 py-2 whitespace-nowrap">
+                        @if (string.IsNullOrEmpty(e.LastIpAddress))
+                        {
+                            <span class="text-xs text-muted-foreground">—</span>
+                        }
+                        else
+                        {
+                            <div class="font-mono text-[11px] text-foreground">@e.LastIpAddress</div>
+                            <form method="post" action="/admin/security/block" class="inline"
+                                  onsubmit="return confirm('Block @e.LastIpAddress for 24 hours?')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ip" value="@e.LastIpAddress" />
+                                <input type="hidden" name="hours" value="24" />
+                                <input type="hidden" name="reason" value="Blocked from the Error Monitor (@e.StatusCode on @e.Path)" />
+                                <input type="hidden" name="returnUrl" value="@($"/admin/errors?status={filterStatus}&q={filterQuery}&page={page}")" />
+                                <button type="submit" class="mt-1 h-6 px-2 rounded border border-input text-[11px] text-red-600 hover:bg-red-50">Block</button>
+                            </form>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>

@@ -3,6 +3,7 @@ using Blog.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Blog.Web.Controllers;
 
@@ -12,6 +13,7 @@ public class BlogController : Controller
     private readonly IPageRepository _pages;
     private readonly ICategoryRepository _categories;
     private readonly ITagRepository _tags;
+    private readonly ISeriesRepository _series;
     private readonly ICommentRepository _comments;
     private readonly ISettingRepository _settings;
     private readonly ICustomThemeSettingRepository _themeSettings;
@@ -21,7 +23,7 @@ public class BlogController : Controller
     private readonly ReCaptchaService _recaptcha;
 
     public BlogController(IPostRepository posts, IPageRepository pages, ICategoryRepository categories,
-        ITagRepository tags, ICommentRepository comments, ISettingRepository settings,
+        ITagRepository tags, ISeriesRepository series, ICommentRepository comments, ISettingRepository settings,
         ICustomThemeSettingRepository themeSettings, ITenantContext tenantContext, IUserRepository users,
         IRedirectRepository redirects, ReCaptchaService recaptcha)
     {
@@ -29,6 +31,7 @@ public class BlogController : Controller
         _pages = pages;
         _categories = categories;
         _tags = tags;
+        _series = series;
         _comments = comments;
         _settings = settings;
         _themeSettings = themeSettings;
@@ -58,6 +61,21 @@ public class BlogController : Controller
     [HttpGet("")]
     public async Task<IActionResult> Index([FromQuery] string? search, [FromQuery] string? category, [FromQuery] string? tags, int page = 1)
     {
+        // Home-feed filter URLs (/?tags=x, /?category=y) duplicate the canonical /tag/{slug} and
+        // /category/{slug} archives, and were being indexed in their own right — Search Console
+        // 2026-08-15 shows ~45 such URLs drawing ~1,400 impressions. Consolidate the single-value
+        // case onto the clean route with a 301 so the equity lands on one URL. Multi-value
+        // combinations (?tags=a,b) have no canonical equivalent, so they stay here and remain
+        // noindex,follow as before.
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            var suffix = page > 1 ? $"?page={page}" : "";
+            if (string.IsNullOrWhiteSpace(category) && TrySingleSlug(tags, out var tagSlug))
+                return RedirectPermanent($"/tag/{tagSlug}{suffix}");
+            if (string.IsNullOrWhiteSpace(tags) && TrySingleSlug(category, out var categorySlug))
+                return RedirectPermanent($"/category/{categorySlug}{suffix}");
+        }
+
         var ownerId = await GetOwnerUserIdAsync(_users);
         // Site-wide settings come from Guid.Empty in Self-Hosted mode; per-user in Cloud
         var settingsId = _tenantContext.IsCloudMode ? ownerId : ownerId;
@@ -95,21 +113,7 @@ public class BlogController : Controller
         ViewBag.SelectedTags = filter.Tags;
         ViewBag.SearchTerm = search;
 
-        // Popular posts for sidebar (top 4 by view count)
-        var popularFilter = new Blog.Core.Interfaces.PostFilter
-        {
-            Status = Blog.Core.Domain.PostStatus.Published,
-            AuthorId = ownerId == Guid.Empty ? null : ownerId,
-            Page = 1,
-            PageSize = 4
-        };
-        var popularResult = await _posts.GetPostsAsync(popularFilter);
-        ViewBag.PopularPosts = popularResult.Items.OrderByDescending(p => p.ViewCount).Take(4).ToList();
-
-        // Layout variant
-        var settingsList = await _themeSettings.GetAllAsync(ownerId);
-        ViewBag.LayoutIndex = settingsList.FirstOrDefault(s => s.SettingKey == "layout-index")?.EffectiveValue ?? "Neutral";
-        ViewBag.LayoutPostCard = settingsList.FirstOrDefault(s => s.SettingKey == "layout-postcard")?.EffectiveValue ?? "Neutral";
+        await PopulateListingChromeAsync(ownerId);
 
         ViewBag.CurrentPage = page;
         // Filtered / paginated / search variants of the home feed duplicate the canonical archive pages —
@@ -119,6 +123,62 @@ public class BlogController : Controller
 
         // Explicit view name so this renders correctly when reused by the Search action (whose action name differs).
         return View("Index", result);
+    }
+
+    /// <summary>
+    /// Everything the shared listing view needs beyond the posts themselves: filter chips, the
+    /// popular-posts sidebar, and the tenant's configured layout. The home feed and the category/tag
+    /// archives all render the same view, so they must all populate this — otherwise an archive
+    /// silently loses its chips and falls back to the default layout, which became visible once
+    /// single-value filter URLs started redirecting to the archives.
+    /// </summary>
+    private async Task PopulateListingChromeAsync(Guid ownerId)
+    {
+        ViewBag.Categories = await _categories.GetAllAsync(ownerId);
+        ViewBag.Tags = await _tags.GetAllAsync(ownerId);
+
+        // Popular posts for sidebar (top 4 by view count)
+        var popularResult = await _posts.GetPostsAsync(new PostFilter
+        {
+            Status = Blog.Core.Domain.PostStatus.Published,
+            AuthorId = ownerId == Guid.Empty ? null : ownerId,
+            Page = 1,
+            PageSize = 4
+        });
+        ViewBag.PopularPosts = popularResult.Items.OrderByDescending(p => p.ViewCount).Take(4).ToList();
+
+        // Layout variant
+        var settingsList = await _themeSettings.GetAllAsync(ownerId);
+        ViewBag.LayoutIndex = settingsList.FirstOrDefault(s => s.SettingKey == "layout-index")?.EffectiveValue ?? "Neutral";
+        ViewBag.LayoutPostCard = settingsList.FirstOrDefault(s => s.SettingKey == "layout-postcard")?.EffectiveValue ?? "Neutral";
+    }
+
+    /// <summary>
+    /// A tag/category archive is worth indexing only once it has real depth; below this it is a thin,
+    /// duplicative page. Used by both the archive action and sitemap generation so the two can never
+    /// disagree (submitting a noindex URL in a sitemap is a contradictory signal).
+    /// </summary>
+    private const int MinPostsForIndexableArchive = 3;
+
+    // Matches exactly one well-formed slug. Anything else — several values, uppercase, a scheme, a
+    // slash, an encoded character — is left alone, so a crafted query string can never be turned
+    // into an arbitrary redirect target.
+    private static readonly Regex _slugPattern =
+        new(@"^[a-z0-9][a-z0-9-]{0,99}$", RegexOptions.Compiled);
+
+    private static bool TrySingleSlug(string? raw, out string slug)
+    {
+        slug = "";
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        var parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length != 1) return false;
+
+        var candidate = parts[0].ToLowerInvariant();
+        if (!_slugPattern.IsMatch(candidate)) return false;
+
+        slug = candidate;
+        return true;
     }
 
     // Dedicated search route — backs the WebSite SearchAction (sitelinks search box). Reuses the
@@ -143,6 +203,9 @@ public class BlogController : Controller
         });
 
         ViewBag.CurrentCategory = slug;
+        // Same as the tag archive: seed the chip state so multi-select keeps working from here.
+        ViewBag.SelectedCategories = new List<string> { slug };
+        await PopulateListingChromeAsync(ownerId);
         ViewBag.CurrentPage = page;
         ViewBag.Settings = settings;
         ViewBag.SiteName = settings.SiteName;
@@ -176,6 +239,11 @@ public class BlogController : Controller
         });
 
         ViewBag.CurrentTag = slug;
+        // The filter chips build their links from SelectedTags. Now that /?tags={slug} 301s here,
+        // this archive must seed that state or the chip would render inactive and selecting a second
+        // tag would silently drop this one (that combination correctly goes back to the home feed).
+        ViewBag.SelectedTags = new List<string> { slug };
+        await PopulateListingChromeAsync(ownerId);
         ViewBag.CurrentPage = page;
         ViewBag.Settings = settings;
         ViewBag.SiteName = settings.SiteName;
@@ -186,10 +254,58 @@ public class BlogController : Controller
         ViewData["Title"] = $"{tagName} – {settings.SiteName}";
         ViewData["Description"] = $"Posts tagged {tagName} on {settings.SiteName}.";
 
-        // Tag archives are thin and duplicative — keep them out of the index but let crawlers follow links.
-        ViewData["Robots"] = "noindex,follow";
+        // A thin tag archive is duplicative and stays out of the index, but one with real depth is a
+        // legitimate topic page — and the /?tags={slug} equivalents were already ranking (e.g.
+        // /?tags=cloud-based-ehr at avg position 12.5), so the demand for these listings is real.
+        // Deeper pages are near-duplicates regardless.
+        if (page > 1 || posts.TotalItems < MinPostsForIndexableArchive)
+            ViewData["Robots"] = "noindex,follow";
 
         return View("Index", posts);
+    }
+
+    // Series index — lists every series (ordered post collections / multi-part guides).
+    [HttpGet("series")]
+    public async Task<IActionResult> SeriesIndex()
+    {
+        var ownerId = await GetOwnerUserIdAsync(_users);
+        var settings = await _settings.GetSettingsAsync(ownerId);
+        ViewBag.OwnerId = ownerId;
+        ViewBag.SiteName = settings.SiteName;
+        ViewBag.Tagline = settings.SiteDescription;
+
+        // Only surface series that actually have at least one published post.
+        var all = await _series.GetAllAsync(ownerId);
+        var series = all.Where(s => s.PostCount > 0).ToList();
+
+        ViewData["Title"] = $"Series – {settings.SiteName}";
+        ViewData["Description"] = $"Multi-part guides and article series on {settings.SiteName}.";
+        return View("SeriesIndex", series);
+    }
+
+    // A single series reading page — its posts in the author-defined order.
+    [HttpGet("series/{slug}")]
+    public async Task<IActionResult> Series(string slug)
+    {
+        var ownerId = await GetOwnerUserIdAsync(_users);
+        var series = await _series.GetBySlugAsync(slug, ownerId);
+        if (series == null) return NotFound();
+
+        var settings = await _settings.GetSettingsAsync(ownerId);
+        ViewBag.OwnerId = ownerId;
+        ViewBag.SiteName = settings.SiteName;
+        ViewBag.Tagline = settings.SiteDescription;
+
+        var posts = await _series.GetPostsAsync(series.Id, publishedOnly: true);
+        // An empty series has no useful content — treat as not found so it never ships a blank page.
+        if (posts.Count == 0) return NotFound();
+
+        ViewBag.SeriesPosts = posts;
+        ViewData["Title"] = $"{series.Title} – {settings.SiteName}";
+        ViewData["Description"] = !string.IsNullOrWhiteSpace(series.Description)
+            ? Blog.Core.Services.TextHelper.SmartTruncate(series.Description, 158)
+            : $"A {posts.Count}-part series on {settings.SiteName}.";
+        return View("Series", series);
     }
 
     // Author E-E-A-T page — establishes authorship/expertise for Google & AI answer engines
@@ -240,10 +356,19 @@ public class BlogController : Controller
         var post = await _posts.GetBySlugAsync(slug);
         if (post == null || (post.Status != Blog.Core.Domain.PostStatus.Published && !(post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now)))
         {
-            // Check the Redirects table — slug may have changed (e.g. year update)
-            var destination = await _redirects.GetDestinationAsync($"/{slug}");
-            if (destination != null)
-                return RedirectPermanent(destination);
+            // Check the Redirects table — the slug may have moved (e.g. a year update), or the URL
+            // may be a retired legacy route that must answer 410 Gone rather than 404 so search
+            // engines drop it instead of re-crawling it indefinitely.
+            var rule = await _redirects.GetRuleAsync($"/{slug}");
+            if (rule is not null)
+            {
+                if (rule.IsGone)
+                    return StatusCode(StatusCodes.Status410Gone);
+                if (!string.IsNullOrWhiteSpace(rule.To))
+                    return rule.StatusCode == Blog.Core.Domain.RedirectStatus.Found
+                        ? Redirect(rule.To)
+                        : RedirectPermanent(rule.To);
+            }
             return NotFound();
         }
 
@@ -306,6 +431,16 @@ public class BlogController : Controller
         // First 2 used as See Also text links (internal linking), rest used as discovery cards
         ViewBag.SeeAlsoPosts = relatedPosts.Take(2).ToList();
         ViewBag.RelatedPostCards = relatedPosts.Skip(2).Take(3).ToList();
+
+        // Reading flow: if this post belongs to a series, build the "Part N of M · Prev / Next" nav.
+        var postSeries = await _series.GetForPostAsync(post.Id, ownerId);
+        if (postSeries != null)
+        {
+            var seriesPosts = await _series.GetPostsAsync(postSeries.Id, publishedOnly: true);
+            var idx = seriesPosts.FindIndex(p => p.Id == post.Id);
+            if (idx >= 0)
+                ViewBag.PostSeriesNav = new Blog.Core.Domain.SeriesNav(postSeries, seriesPosts, idx);
+        }
 
         return View(post);
     }
@@ -524,9 +659,19 @@ public class BlogController : Controller
         foreach (var category in categories)
             AddUrl($"{baseUrl}/category/{category.Slug}", null, "weekly", "0.5");
 
+        // Only tags deep enough to be indexable (same threshold the Tag action applies) — a sitemap
+        // must never advertise a URL that answers noindex. PostCount includes unpublished posts, so
+        // a tag whose posts are all drafts can still be filtered out by the action's own check.
         var tags = await _tags.GetAllAsync(ownerId);
-        foreach (var tag in tags)
+        foreach (var tag in tags.Where(t => t.PostCount >= MinPostsForIndexableArchive))
             AddUrl($"{baseUrl}/tag/{tag.Slug}", null, "weekly", "0.4");
+
+        // Series index + each non-empty series (richer than tags → slightly higher priority).
+        var seriesList = await _series.GetAllAsync(ownerId);
+        if (seriesList.Any(s => s.PostCount > 0))
+            AddUrl($"{baseUrl}/series", null, "weekly", "0.5");
+        foreach (var s in seriesList.Where(s => s.PostCount > 0))
+            AddUrl($"{baseUrl}/series/{s.Slug}", s.UpdatedAt, "weekly", "0.6");
 
         // Author pages — only for authors with a slug who actually have published posts (avoid 404s).
         var allUsers = await _users.GetAllUsersAsync();

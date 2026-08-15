@@ -43,6 +43,28 @@ public class UserSettings
     public bool ErrorNotificationsEnabled { get; set; } = false;
     public string ErrorNotificationEmails { get; set; } = string.Empty;
 
+    // IP Firewall (Admin → Security) — automatic blocking of hostile addresses. Stored in the
+    // Settings JSON blob (no schema change). Ships enabled with conservative defaults so a tenant
+    // that never opens the Security screen is still protected; every field falls back to the
+    // default below when absent from an older JSON payload.
+    public bool   FirewallEnabled                 { get; set; } = true;
+    /// <summary>Threat score within the window that triggers an automatic block.</summary>
+    public int    FirewallThresholdScore          { get; set; } = 10;
+    /// <summary>Sliding window, in minutes, over which the score accumulates.</summary>
+    public int    FirewallWindowMinutes           { get; set; } = 10;
+    /// <summary>Duration of a first-offense block, in hours.</summary>
+    public int    FirewallBlockHours              { get; set; } = 24;
+    /// <summary>Second offense blocks for a week; a third makes the block permanent.</summary>
+    public bool   FirewallEscalateRepeatOffenders { get; set; } = true;
+    /// <summary>Never auto-block verified-looking search/AI crawlers on 404 noise alone.</summary>
+    public bool   FirewallProtectSearchCrawlers   { get; set; } = true;
+    /// <summary>Read the client IP from CF-Connecting-IP / X-Forwarded-For. Enable only behind a trusted proxy.</summary>
+    public bool   FirewallTrustProxyHeaders       { get; set; } = false;
+    /// <summary>Never-block addresses / CIDR ranges, comma- or newline-separated.</summary>
+    public string FirewallIpAllowlist             { get; set; } = string.Empty;
+    /// <summary>Email the error-notification recipients whenever an address is auto-blocked.</summary>
+    public bool   FirewallNotifyOnBlock           { get; set; } = false;
+
     // Social Links
     public string SocialTwitter { get; set; } = string.Empty;
     public string SocialFacebook { get; set; } = string.Empty;

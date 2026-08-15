@@ -17,12 +17,15 @@ public class AccountController : Controller
     private readonly Blog.Core.Interfaces.IUserRepository _users;
     private readonly Blog.Core.Interfaces.IRoleRepository _roles;
     private readonly AuditService _audit;
+    private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
 
-    public AccountController(Blog.Core.Interfaces.IUserRepository users, Blog.Core.Interfaces.IRoleRepository roles, AuditService audit)
+    public AccountController(Blog.Core.Interfaces.IUserRepository users, Blog.Core.Interfaces.IRoleRepository roles,
+        AuditService audit, Blog.Web.Services.Security.IpFirewallService firewall)
     {
         _users = users;
         _roles = roles;
         _audit = audit;
+        _firewall = firewall;
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────
@@ -65,6 +68,9 @@ public class AccountController : Controller
         if (user == null || !VerifyPassword(password, user.PasswordHash))
         {
             await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", null, email);
+            // A rejected sign-in returns 200, so the firewall cannot see it from the status code —
+            // report it explicitly so credential-stuffing runs block themselves.
+            await _firewall.RegisterFailedLoginAsync(HttpContext);
             ViewBag.Error = "Invalid email or password.";
             return View();
         }
@@ -72,6 +78,7 @@ public class AccountController : Controller
         if (!user.IsActive)
         {
             await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", user.Id.ToString(), email);
+            await _firewall.RegisterFailedLoginAsync(HttpContext);
             ViewBag.Error = "Account is disabled.";
             return View();
         }

@@ -26,18 +26,20 @@ public class ErrorLogRepository : IErrorLogRepository
                 Message         = @Message,
                 StackTrace      = @StackTrace,
                 UserAgent       = @UserAgent,
-                Referer         = @Referer
+                Referer         = @Referer,
+                LastIpAddress   = @LastIpAddress
             WHEN NOT MATCHED THEN INSERT
                 (Fingerprint, StatusCode, Method, Path, ExceptionType, Message, StackTrace,
-                 UserAgent, Referer, OccurrenceCount, FirstSeenAt, LastSeenAt)
+                 UserAgent, Referer, LastIpAddress, OccurrenceCount, FirstSeenAt, LastSeenAt)
             VALUES
                 (@Fingerprint, @StatusCode, @Method, @Path, @ExceptionType, @Message, @StackTrace,
-                 @UserAgent, @Referer, 1, @Now, @Now)
+                 @UserAgent, @Referer, @LastIpAddress, 1, @Now, @Now)
             OUTPUT $action;",
             new
             {
                 e.Fingerprint, e.StatusCode, e.Method, e.Path, e.ExceptionType,
-                e.Message, e.StackTrace, e.UserAgent, e.Referer, Now = DateTime.UtcNow
+                e.Message, e.StackTrace, e.UserAgent, e.Referer, e.LastIpAddress,
+                Now = DateTime.UtcNow
             });
         return string.Equals(action, "INSERT", StringComparison.OrdinalIgnoreCase);
     }

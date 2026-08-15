@@ -1,0 +1,99 @@
+@model Blog.Core.Domain.Series
+@{
+    Layout = "_PublicLayout";
+    ViewData["SiteName"] = ViewBag.SiteName;
+    var posts = ViewBag.SeriesPosts as List<Blog.Core.Domain.Post> ?? new List<Blog.Core.Domain.Post>();
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    ViewData["Canonical"] = $"{baseUrl}/series/{Model.Slug}";
+
+    // ── Structured data: CollectionPage + ItemList (ordered) + BreadcrumbList ──
+    var itemListElements = posts.Select((p, i) => (object)new Dictionary<string, object>
+    {
+        ["@type"] = "ListItem",
+        ["position"] = i + 1,
+        ["url"] = $"{baseUrl}/{p.Slug}",
+        ["name"] = p.Title
+    }).ToList();
+
+    var collData = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "CollectionPage",
+        ["name"] = Model.Title,
+        ["url"] = $"{baseUrl}/series/{Model.Slug}",
+        ["isPartOf"] = new Dictionary<string, string> { ["@id"] = $"{baseUrl}/#website" },
+        ["mainEntity"] = new Dictionary<string, object>
+        {
+            ["@type"] = "ItemList",
+            ["itemListOrder"] = "https://schema.org/ItemListOrderAscending",
+            ["numberOfItems"] = posts.Count,
+            ["itemListElement"] = itemListElements
+        }
+    };
+    if (!string.IsNullOrWhiteSpace(Model.Description)) collData["description"] = Model.Description;
+
+    var breadcrumb = new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "BreadcrumbList",
+        ["itemListElement"] = new List<object>
+        {
+            new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "Home", ["item"] = $"{baseUrl}/" },
+            new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 2, ["name"] = "Series", ["item"] = $"{baseUrl}/series" },
+            new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 3, ["name"] = Model.Title, ["item"] = $"{baseUrl}/series/{Model.Slug}" }
+        }
+    };
+}
+<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(collData))</script>
+<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(breadcrumb))</script>
+
+<div class="container xl:max-w-6xl mx-auto px-4 py-8 lg:py-12">
+    <div class="max-w-4xl mx-auto w-full">
+
+        <!-- Breadcrumb -->
+        <div class="flex items-center gap-2 text-sm mb-6" style="color: var(--muted-foreground);">
+            <a href="/" class="hover:opacity-80">Home</a>
+            <span aria-hidden="true">/</span>
+            <a href="/series" class="hover:opacity-80">Series</a>
+            <span aria-hidden="true">/</span>
+            <span>@Model.Title</span>
+        </div>
+
+        <header class="mb-8">
+            <div class="text-xs uppercase tracking-wide font-bold mb-2" style="color: var(--muted-foreground);">
+                @posts.Count-part series
+            </div>
+            <h1 class="text-3xl md:text-4xl font-medium mb-3 leading-tight">@Model.Title</h1>
+            @if (!string.IsNullOrWhiteSpace(Model.Description))
+            {
+                <p class="text-base" style="color: var(--muted-foreground);">@Model.Description</p>
+            }
+        </header>
+
+        <ol class="space-y-4">
+            @for (var i = 0; i < posts.Count; i++)
+            {
+                var p = posts[i];
+                var excerpt = !string.IsNullOrWhiteSpace(p.MetaDescription)
+                    ? p.MetaDescription
+                    : Blog.Core.Services.TextHelper.SmartTruncate(p.Plaintext, 160);
+                <li>
+                    <a href="/@p.Slug" class="flex gap-4 rounded-lg border p-4 hover:opacity-90 transition-opacity" style="border-color: var(--border);">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style="background: var(--muted); color: var(--foreground);">@(i + 1)</div>
+                        @if (!string.IsNullOrWhiteSpace(p.FeatureImage))
+                        {
+                            <img src="@p.FeatureImage" alt="@p.Title" loading="lazy" decoding="async" class="hidden sm:block w-28 h-20 object-cover rounded-md flex-shrink-0" />
+                        }
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-medium mb-1" style="color: var(--foreground);">@p.Title</h2>
+                            @if (!string.IsNullOrWhiteSpace(excerpt))
+                            {
+                                <p class="text-sm line-clamp-2" style="color: var(--muted-foreground);">@excerpt</p>
+                            }
+                        </div>
+                    </a>
+                </li>
+            }
+        </ol>
+    </div>
+</div>

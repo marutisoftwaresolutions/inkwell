@@ -25,6 +25,7 @@
     <Content Include="wwwroot\uploads\images\2026-03\e851349a6a9e4562b17d18723c510225.jpg" />
     <Content Include="wwwroot\uploads\images\2026-05\902891987b43472088947a9f7eef8a8b.jpg" />
     <Content Include="wwwroot\uploads\images\site-cover.jpg" />
+    <Content Include="wwwroot\uploads\imported\2026-07\2b949a5e99f5487487ddc30fe909b251.png" />
     <Content Include="wwwroot\uploads\og\2026-02\8aa6de381a35444fbfb168e33d79c47c.jpg" />
     <Content Include="wwwroot\uploads\og\2026-02\ca0b3bd2e30344239ccf2442f3376ae6.jpg" />
     <Content Include="wwwroot\uploads\twitter\2026-02\73774db2331549feb705e0b3eae24944.png" />
@@ -66,8 +67,7 @@
        and is the source of truth. Maintainers who add new utility classes should either run the npx
        command in tailwind.config.js, or build once with -p:BuildTailwindCss=true (requires Node/npx). -->
   <Target Name="BuildTailwindCss" BeforeTargets="BeforeBuild" Condition="'$(BuildTailwindCss)' == 'true'">
-    <Exec Command="npx --yes tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="npx --yes tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
 </Project>

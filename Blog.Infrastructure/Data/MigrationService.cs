@@ -286,6 +286,109 @@ public class MigrationService
                     CREATE INDEX IX_AuditLogs_OwnerId_CreatedAt ON AuditLogs (OwnerId, CreatedAt DESC);
                     CREATE INDEX IX_AuditLogs_EntityType        ON AuditLogs (OwnerId, EntityType, CreatedAt DESC);
                     CREATE INDEX IX_AuditLogs_UserId            ON AuditLogs (OwnerId, UserId, CreatedAt DESC);
+                END
+
+                -- Series / collections (DBScripts/2026-07-31_create-series-tables.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Series')
+                BEGIN
+                    CREATE TABLE Series (
+                        Id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                        Title       NVARCHAR(255)    NOT NULL,
+                        Slug        NVARCHAR(255)    NOT NULL,
+                        Description NVARCHAR(MAX)    NULL,
+                        AuthorId    UNIQUEIDENTIFIER NULL REFERENCES Users(Id) ON DELETE SET NULL,
+                        CreatedAt   DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+                        UpdatedAt   DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+                        CONSTRAINT UQ_Series_Slug UNIQUE (Slug)
+                    );
+                END
+
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SeriesPosts')
+                BEGIN
+                    CREATE TABLE SeriesPosts (
+                        SeriesId  UNIQUEIDENTIFIER NOT NULL REFERENCES Series(Id) ON DELETE CASCADE,
+                        PostId    UNIQUEIDENTIFIER NOT NULL REFERENCES Posts(Id)  ON DELETE CASCADE,
+                        SortOrder INT              NOT NULL DEFAULT 0,
+                        CONSTRAINT PK_SeriesPosts PRIMARY KEY (SeriesId, PostId)
+                    );
+                    CREATE INDEX IX_SeriesPosts_SeriesId_SortOrder ON SeriesPosts (SeriesId, SortOrder);
+                    CREATE INDEX IX_SeriesPosts_PostId             ON SeriesPosts (PostId);
+                END
+
+                -- Content importer (DBScripts/2026-07-31_create-import-tables.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ImportJobs')
+                BEGIN
+                    CREATE TABLE ImportJobs (
+                        Id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                        OwnerId       UNIQUEIDENTIFIER NOT NULL,
+                        Source        NVARCHAR(20)     NOT NULL,
+                        FileName      NVARCHAR(500)    NULL,
+                        FilePath      NVARCHAR(1000)   NULL,
+                        Status        NVARCHAR(20)     NOT NULL DEFAULT 'Draft',
+                        OptionsJson   NVARCHAR(MAX)    NULL,
+                        TotalItems    INT NOT NULL DEFAULT 0,
+                        ImportedItems INT NOT NULL DEFAULT 0,
+                        FailedItems   INT NOT NULL DEFAULT 0,
+                        SkippedItems  INT NOT NULL DEFAULT 0,
+                        CreatedAt     DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        UpdatedAt     DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        CompletedAt   DATETIME2 NULL
+                    );
+                    CREATE INDEX IX_ImportJobs_OwnerId_CreatedAt ON ImportJobs (OwnerId, CreatedAt DESC);
+                END
+
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ImportItems')
+                BEGIN
+                    CREATE TABLE ImportItems (
+                        Id       BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        JobId    UNIQUEIDENTIFIER NOT NULL REFERENCES ImportJobs(Id) ON DELETE CASCADE,
+                        ItemType NVARCHAR(20)   NOT NULL,
+                        SourceId NVARCHAR(450)  NOT NULL,
+                        Title    NVARCHAR(1000) NULL,
+                        Status   NVARCHAR(20)   NOT NULL DEFAULT 'Pending',
+                        TargetId UNIQUEIDENTIFIER NULL,
+                        Error    NVARCHAR(MAX)  NULL,
+                        Ordinal  INT NOT NULL DEFAULT 0,
+                        DataJson NVARCHAR(MAX)  NULL
+                    );
+                    CREATE INDEX IX_ImportItems_Job_Status_Ordinal ON ImportItems (JobId, Status, Ordinal, Id);
+                    CREATE INDEX IX_ImportItems_Job_Type_Source    ON ImportItems (JobId, ItemType, SourceId);
+                END
+
+                -- IP firewall rules (DBScripts/2026-08-15_create-ip-firewall-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'IpFirewallRules')
+                BEGIN
+                    CREATE TABLE IpFirewallRules (
+                        Id            BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        IpAddress     NVARCHAR(45)   NOT NULL,
+                        Kind          NVARCHAR(10)   NOT NULL DEFAULT 'Block',
+                        Source        NVARCHAR(10)   NOT NULL DEFAULT 'Auto',
+                        Reason        NVARCHAR(500)  NULL,
+                        Score         INT            NOT NULL DEFAULT 0,
+                        OffenseCount  INT            NOT NULL DEFAULT 1,
+                        HitCount      INT            NOT NULL DEFAULT 0,
+                        LastPath      NVARCHAR(1024) NULL,
+                        LastUserAgent NVARCHAR(512)  NULL,
+                        CreatedBy     NVARCHAR(200)  NULL,
+                        CreatedAt     DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
+                        ExpiresAt     DATETIME2      NULL,
+                        LastHitAt     DATETIME2      NULL,
+                        CONSTRAINT UQ_IpFirewallRules_IpAddress UNIQUE (IpAddress)
+                    );
+                    CREATE INDEX IX_IpFirewallRules_Kind_ExpiresAt ON IpFirewallRules (Kind, ExpiresAt);
+                    CREATE INDEX IX_IpFirewallRules_CreatedAt      ON IpFirewallRules (CreatedAt DESC);
+                END
+
+                -- Retire legacy URLs with 301/302/410 (DBScripts/2026-08-15_add-statuscode-to-redirects.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Redirects') AND name = 'StatusCode')
+                BEGIN
+                    ALTER TABLE Redirects ADD StatusCode INT NOT NULL CONSTRAINT DF_Redirects_StatusCode DEFAULT 301 WITH VALUES;
+                END
+
+                -- Offender IP on error signatures (DBScripts/2026-08-15_add-lastipaddress-to-errorlogs.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ErrorLogs') AND name = 'LastIpAddress')
+                BEGIN
+                    ALTER TABLE ErrorLogs ADD LastIpAddress NVARCHAR(45) NULL;
                 END";
             
             await Dapper.SqlMapper.ExecuteAsync(connection, sql);

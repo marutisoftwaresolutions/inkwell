@@ -17,16 +17,19 @@ public sealed class ErrorLogService
     private readonly IEmailService _email;
     private readonly ISettingRepository _settings;
     private readonly IUserRepository _users;
+    private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
 
     public ErrorLogService(
         IErrorLogRepository repo, ILogger<ErrorLogService> log,
-        IEmailService email, ISettingRepository settings, IUserRepository users)
+        IEmailService email, ISettingRepository settings, IUserRepository users,
+        Blog.Web.Services.Security.IpFirewallService firewall)
     {
         _repo = repo;
         _log = log;
         _email = email;
         _settings = settings;
         _users = users;
+        _firewall = firewall;
     }
 
     // Paths we never want to log (noise / infinite-loop risk).
@@ -49,13 +52,17 @@ public sealed class ErrorLogService
             {
                 Fingerprint   = fingerprint,
                 StatusCode    = statusCode,
-                Method        = ctx.Request.Method,
+                // A HEAD arrives rewritten to GET so it can route — record what the client actually sent.
+                Method        = ctx.Items.ContainsKey(Blog.Web.Middleware.HeadRequestMiddleware.OriginalMethodWasHeadKey)
+                                    ? "HEAD" : ctx.Request.Method,
                 Path          = Trim(path, 1024),
                 ExceptionType = Trim(exceptionType, 256),
                 Message       = Trim(ex?.Message, 2048),
                 StackTrace    = Trim(ex?.StackTrace, 8000),
                 UserAgent     = Trim(ctx.Request.Headers.UserAgent.ToString(), 512),
                 Referer       = Trim(ctx.Request.Headers.Referer.ToString(), 1024),
+                // Recorded so the Error Monitor can offer a one-click block for the offender.
+                LastIpAddress = Trim(_firewall.ResolveClientIp(ctx), 45),
             };
             var isNew = await _repo.RecordAsync(entry);
 

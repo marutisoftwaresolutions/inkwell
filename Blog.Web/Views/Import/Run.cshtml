@@ -1,0 +1,107 @@
+@model Blog.Core.Domain.ImportJob
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Running import";
+}
+
+<div class="flex flex-col gap-6 max-w-3xl">
+    <div>
+        <h2 class="font-semibold text-lg">Importing @Model.Source content</h2>
+        <p class="text-sm text-muted-foreground">@Model.FileName</p>
+    </div>
+
+    @Html.AntiForgeryToken()
+
+    <div class="bg-card border border-border rounded-lg p-5 space-y-4">
+        <div class="flex items-center justify-between text-sm">
+            <span id="phase" class="font-medium">Ready to start.</span>
+            <span id="pct" class="text-muted-foreground">0%</span>
+        </div>
+        <div class="w-full h-3 rounded-full bg-muted overflow-hidden">
+            <div id="bar" class="h-full bg-primary transition-all" style="width:0%"></div>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-center text-sm">
+            <div><div id="c-imported" class="text-xl font-semibold text-foreground">0</div><div class="text-xs text-muted-foreground">Imported</div></div>
+            <div><div id="c-failed" class="text-xl font-semibold text-destructive">0</div><div class="text-xs text-muted-foreground">Failed</div></div>
+            <div><div id="c-skipped" class="text-xl font-semibold text-muted-foreground">0</div><div class="text-xs text-muted-foreground">Skipped</div></div>
+            <div><div id="c-total" class="text-xl font-semibold">@Model.TotalItems</div><div class="text-xs text-muted-foreground">Total</div></div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button id="startBtn" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium">Start import</button>
+            <button id="pauseBtn" class="px-4 py-2 border border-input rounded-md text-sm font-medium hidden">Pause</button>
+            <a id="summaryLink" href="/admin/import/summary/@Model.Id" class="px-4 py-2 border border-input rounded-md text-sm font-medium hidden">View summary →</a>
+        </div>
+    </div>
+
+    <div class="bg-card border border-border rounded-lg p-4">
+        <h3 class="font-semibold text-sm mb-2">Exceptions <span id="errCount" class="text-muted-foreground font-normal"></span></h3>
+        <ul id="errLog" class="text-xs text-destructive space-y-1 max-h-64 overflow-auto font-mono"></ul>
+        <p id="noErr" class="text-xs text-muted-foreground">No errors yet.</p>
+    </div>
+</div>
+
+<script>
+(function () {
+    const jobId = "@Model.Id";
+    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+    const bar = document.getElementById('bar'), pct = document.getElementById('pct'), phase = document.getElementById('phase');
+    const cImported = document.getElementById('c-imported'), cFailed = document.getElementById('c-failed'),
+          cSkipped = document.getElementById('c-skipped'), cTotal = document.getElementById('c-total');
+    const startBtn = document.getElementById('startBtn'), pauseBtn = document.getElementById('pauseBtn'),
+          summaryLink = document.getElementById('summaryLink');
+    const errLog = document.getElementById('errLog'), noErr = document.getElementById('noErr'), errCount = document.getElementById('errCount');
+    let running = false, paused = false, errTotal = 0;
+
+    function update(d) {
+        const total = d.total || 0;
+        const done = (d.imported || 0) + (d.failed || 0) + (d.skipped || 0);
+        const p = total > 0 ? Math.round(done * 100 / total) : (d.done ? 100 : 0);
+        bar.style.width = p + '%'; pct.textContent = p + '%';
+        cImported.textContent = d.imported || 0; cFailed.textContent = d.failed || 0;
+        cSkipped.textContent = d.skipped || 0; cTotal.textContent = total;
+        if (d.errors && d.errors.length) {
+            noErr.classList.add('hidden');
+            d.errors.forEach(e => { const li = document.createElement('li'); li.textContent = e; errLog.appendChild(li); });
+            errTotal += d.errors.length; errCount.textContent = '(' + errTotal + ')';
+        }
+    }
+
+    async function step() {
+        if (!running || paused) return;
+        phase.textContent = 'Importing…';
+        try {
+            const fd = new FormData(); fd.append('__RequestVerificationToken', token);
+            const res = await fetch('/admin/import/process-batch/' + jobId, { method: 'POST', body: fd });
+            if (!res.ok) throw new Error('Server returned ' + res.status);
+            const d = await res.json();
+            update(d);
+            if (d.done) { finish(); return; }
+            setTimeout(step, 150);
+        } catch (e) {
+            phase.textContent = 'Error — will retry…';
+            const li = document.createElement('li'); li.textContent = 'Batch error: ' + e.message; errLog.appendChild(li); noErr.classList.add('hidden');
+            setTimeout(step, 2000);
+        }
+    }
+
+    function finish() {
+        running = false;
+        phase.textContent = 'Import complete.';
+        pauseBtn.classList.add('hidden'); startBtn.classList.add('hidden');
+        summaryLink.classList.remove('hidden');
+    }
+
+    startBtn.addEventListener('click', () => {
+        running = true; paused = false;
+        startBtn.classList.add('hidden'); pauseBtn.classList.remove('hidden');
+        step();
+    });
+    pauseBtn.addEventListener('click', () => {
+        paused = !paused;
+        pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+        phase.textContent = paused ? 'Paused.' : 'Importing…';
+        if (!paused) step();
+    });
+})();
+</script>

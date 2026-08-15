@@ -69,6 +69,9 @@ public class PageViewMiddleware
     private static bool ShouldTrack(HttpContext context)
     {
         if (!HttpMethods.IsGet(context.Request.Method)) return false;
+        // A HEAD request is rewritten to GET upstream so it can route; it is a monitor or link
+        // checker fetching headers, not a reader, and must never count as a page view.
+        if (context.Items.ContainsKey(HeadRequestMiddleware.OriginalMethodWasHeadKey)) return false;
         if (context.Response.StatusCode >= 400) return false;
 
         var path = context.Request.Path.Value ?? "/";

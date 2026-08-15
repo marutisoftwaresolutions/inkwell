@@ -52,11 +52,27 @@ public static class AuditActions
     public const string CategoryDeleted = "Category.Deleted";
     public const string TagCreated      = "Tag.Created";
     public const string TagDeleted      = "Tag.Deleted";
+    public const string SeriesCreated      = "Series.Created";
+    public const string SeriesUpdated      = "Series.Updated";
+    public const string SeriesDeleted      = "Series.Deleted";
+    public const string SeriesPostsUpdated = "Series.PostsUpdated";
 
     // Newsletter / Subscribers
     public const string NewsletterSent      = "Newsletter.Sent";
     public const string SubscriberDeleted   = "Subscriber.Deleted";
     public const string SubscriberExported  = "Subscriber.Exported";
+
+    // Import (WordPress / Ghost migration)
+    public const string ImportStarted   = "Import.Started";
+    public const string ImportCompleted = "Import.Completed";
+    public const string ImportCancelled = "Import.Cancelled";
+
+    // Security / IP firewall
+    public const string SecurityIpBlocked       = "Security.IpBlocked";
+    public const string SecurityIpUnblocked     = "Security.IpUnblocked";
+    public const string SecurityIpAllowed       = "Security.IpAllowed";
+    public const string SecurityRuleDeleted     = "Security.RuleDeleted";
+    public const string SecuritySettingsUpdated = "Security.SettingsUpdated";
 
     // Redirects
     public const string RedirectCreated = "Redirect.Created";

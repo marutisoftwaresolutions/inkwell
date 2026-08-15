@@ -18,6 +18,8 @@ public class ErrorLog
     public string?  StackTrace      { get; set; }
     public string?  UserAgent       { get; set; }
     public string?  Referer         { get; set; }
+    /// <summary>Client IP of the most recent request in this group — the one-click block target.</summary>
+    public string?  LastIpAddress   { get; set; }
     public int      OccurrenceCount { get; set; }
     public DateTime FirstSeenAt     { get; set; }
     public DateTime LastSeenAt      { get; set; }

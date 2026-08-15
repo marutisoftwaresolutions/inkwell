@@ -374,6 +374,89 @@ ELSE
     PRINT '  [=] PostTags already exists — skipped.';
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 11b. Series (ordered post collections / multi-part guides) + SeriesPosts join
+-- ─────────────────────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'Series')
+BEGIN
+    CREATE TABLE Series (
+        Id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        Title       NVARCHAR(255)    NOT NULL,
+        Slug        NVARCHAR(255)    NOT NULL,
+        Description NVARCHAR(MAX)    NULL,
+        AuthorId    UNIQUEIDENTIFIER NULL REFERENCES Users(Id) ON DELETE SET NULL,
+        CreatedAt   DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+        UpdatedAt   DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+        CONSTRAINT UQ_Series_Slug UNIQUE (Slug)
+    );
+    PRINT '  [+] Series table created.';
+END
+ELSE
+    PRINT '  [=] Series already exists — skipped.';
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'SeriesPosts')
+BEGIN
+    CREATE TABLE SeriesPosts (
+        SeriesId  UNIQUEIDENTIFIER NOT NULL REFERENCES Series(Id) ON DELETE CASCADE,
+        PostId    UNIQUEIDENTIFIER NOT NULL REFERENCES Posts(Id)  ON DELETE CASCADE,
+        SortOrder INT              NOT NULL DEFAULT 0,
+        CONSTRAINT PK_SeriesPosts PRIMARY KEY (SeriesId, PostId)
+    );
+    CREATE INDEX IX_SeriesPosts_SeriesId_SortOrder ON SeriesPosts (SeriesId, SortOrder);
+    CREATE INDEX IX_SeriesPosts_PostId             ON SeriesPosts (PostId);
+    PRINT '  [+] SeriesPosts table created.';
+END
+ELSE
+    PRINT '  [=] SeriesPosts already exists — skipped.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11c. Content importer (WordPress / Ghost migration jobs + per-item tracking)
+-- ─────────────────────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ImportJobs')
+BEGIN
+    CREATE TABLE ImportJobs (
+        Id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        OwnerId       UNIQUEIDENTIFIER NOT NULL,
+        Source        NVARCHAR(20)     NOT NULL,
+        FileName      NVARCHAR(500)    NULL,
+        FilePath      NVARCHAR(1000)   NULL,
+        Status        NVARCHAR(20)     NOT NULL DEFAULT 'Draft',
+        OptionsJson   NVARCHAR(MAX)    NULL,
+        TotalItems    INT NOT NULL DEFAULT 0,
+        ImportedItems INT NOT NULL DEFAULT 0,
+        FailedItems   INT NOT NULL DEFAULT 0,
+        SkippedItems  INT NOT NULL DEFAULT 0,
+        CreatedAt     DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        UpdatedAt     DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        CompletedAt   DATETIME2 NULL
+    );
+    CREATE INDEX IX_ImportJobs_OwnerId_CreatedAt ON ImportJobs (OwnerId, CreatedAt DESC);
+    PRINT '  [+] ImportJobs table created.';
+END
+ELSE
+    PRINT '  [=] ImportJobs already exists — skipped.';
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ImportItems')
+BEGIN
+    CREATE TABLE ImportItems (
+        Id       BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        JobId    UNIQUEIDENTIFIER NOT NULL REFERENCES ImportJobs(Id) ON DELETE CASCADE,
+        ItemType NVARCHAR(20)   NOT NULL,
+        SourceId NVARCHAR(450)  NOT NULL,
+        Title    NVARCHAR(1000) NULL,
+        Status   NVARCHAR(20)   NOT NULL DEFAULT 'Pending',
+        TargetId UNIQUEIDENTIFIER NULL,
+        Error    NVARCHAR(MAX)  NULL,
+        Ordinal  INT NOT NULL DEFAULT 0,
+        DataJson NVARCHAR(MAX)  NULL
+    );
+    CREATE INDEX IX_ImportItems_Job_Status_Ordinal ON ImportItems (JobId, Status, Ordinal, Id);
+    CREATE INDEX IX_ImportItems_Job_Type_Source    ON ImportItems (JobId, ItemType, SourceId);
+    PRINT '  [+] ImportItems table created.';
+END
+ELSE
+    PRINT '  [=] ImportItems already exists — skipped.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 12. Members  (newsletter subscribers, double opt-in)
 -- ─────────────────────────────────────────────────────────────────────────────
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'Members')

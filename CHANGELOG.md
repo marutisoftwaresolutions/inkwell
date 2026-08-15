@@ -1,13 +1,43 @@
 # Changelog
 
-All notable changes to Blogfront are documented here.
+All notable changes to Inkwell are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
 ## [Unreleased]
 
-_Nothing yet._
+---
+
+## [1.0.4] — 2026-08-15
+
+### Added
+
+- **Content Health dashboard** — a new Admin → Content Health screen turns the maintenance fields that already exist on every post into a worklist: reviews that are overdue or due within 30 days, posts never verified, posts missing a Key Facts or FAQ block, meta descriptions that are absent or long enough to be truncated in search results, and titles still promising a year that has passed. Tiles double as filters, each row links straight to the editor, and the default view shows only what needs attention. Read-only — it surfaces work, it never edits. Available to Editors and Admins.
+- **Filter-URL canonicalization** — a single-value home-feed filter (`/?tags=cloud-based-ehr`, `/?category=practice-management`) now issues a 301 to the matching `/tag/{slug}` or `/category/{slug}` archive, so filter permutations stop competing with the canonical archive as separate indexed URLs. Multi-value combinations have no canonical equivalent and are unchanged (`noindex,follow`), search results are untouched, and pagination is preserved through the redirect. Only well-formed single slugs redirect, so a crafted query string cannot be turned into a redirect target.
+- **Tag archives are indexable once they have depth** — a tag archive holding at least three posts is now a real topic page instead of being unconditionally `noindex`; thinner ones stay out of the index as before. `sitemap.xml` lists only the archives that are actually indexable, so it no longer advertises `noindex` URLs.
+- **Retire a URL with 410 Gone** — redirect rules now carry a status code, so a URL can be moved (301, the default), temporarily moved (302), or **intentionally retired (410 Gone)**. A 410 serves a dedicated "no longer available" page that points readers at current content, and tells search engines the URL was removed on purpose — which drops it from the index far faster than a 404, whose repeated re-crawling keeps stale titles and snippets in search results. Existing redirect rules are unaffected and continue to serve 301.
+- **IP Firewall — automatic blocking of hostile addresses** — every failing request is now weighed by a threat scorer, and addresses that cross the threshold block themselves. Exploit probes (`.php`, `wp-admin`, `.env`, `.git`, path traversal, SQL-injection payloads, app-server consoles) score 5 points, a rejected sign-in scores 3, and an ordinary 404 scores 1; at 10 points within 10 minutes (both configurable) the address is blocked — 24 hours on the first offense, a week on the second, permanently on the third — and every subsequent request is refused with a bare 403 before routing, views, or logging run. A new **Admin → Security** screen shows active blocks with their reason and denied-request count, a live watchlist of addresses currently building a score, and the thresholds, allowlist, and notification settings; addresses can also be blocked or allowlisted by hand, and **Admin → Error Monitor** now records each signature's last client IP with a one-click Block button. Blocks are stored in a new `IpFirewallRules` table so they survive a restart, while enforcement reads an in-memory snapshot so an ongoing attack costs no per-request database work. Safe by default: loopback and private ranges are never blocked, signed-in staff are never scored, search and AI crawlers (Googlebot, Bingbot, GPTBot, ClaudeBot, …) are never blocked for 404s, proxy headers are ignored unless a trusted proxy is declared, and the firewall fails open if the database is unreachable. Optional email alerts reuse the error-notification recipients. Every block, unblock, allowlist entry, and settings change is written to the audit trail.
+- **WordPress & Ghost content importer** — migrate an existing blog from Admin → Import. Upload a WordPress WXR (`.xml`) export or a Ghost JSON (`.json`/`.zip`) export, preview what it contains, choose what to bring in (posts, pages, categories/tags, images, comments; published-only filter; slug-conflict policy), then run the import with a live progress bar and a per-item exception log. Posts, pages, categories and tags are created; referenced images are downloaded, converted to WebP and re-linked in the content; old permalinks become redirects to preserve SEO; imported HTML is sanitized. Ghost bodies use the rendered HTML when present, with a best-effort Lexical/Mobiledoc conversion otherwise; for a Ghost `.zip` that bundles the `content/images` folder, images are read straight from the archive (no live source site required). The import is batched and resumable, finishes with a summary and a downloadable `.xlsx` report, and can be **undone** (removes the posts, pages, images and comments it created; categories and tags are kept). Step-by-step export instructions for both platforms are shown in the importer. Admin-only; new tables only (backward-compatible).
+- **Series & collections** — group posts into an ordered reading sequence (e.g. a multi-part guide). A new Admin → Series area creates series and manages their posts and order (add, reorder, remove). Each series gets a public page at `/series/{slug}` listing its posts in order, plus a `/series` directory of all series. Posts that belong to a series show an in-article "Part N of M · Previous / Next" navigation banner. Series pages emit `CollectionPage` + ordered `ItemList` + `BreadcrumbList` structured data and are included in `sitemap.xml`. Backward-compatible: new tables only, and blogs that never create a series are unaffected.
+
+### Changed
+
+- **Shared image pipeline** — the media library's automatic WebP conversion is now a shared service reused by the content importer, so both direct uploads and downloaded/imported images are optimized through one code path.
+
+### Fixed
+
+- **HEAD requests no longer return 405 Method Not Allowed** — routing matches HTTP methods exactly and every page route is declared as GET-only, so every HEAD request was refused: `HEAD /`, `HEAD /robots.txt`, even HEAD for a URL that does not exist (405 instead of 404). Uptime monitors, link checkers and some crawlers use HEAD precisely because it is cheap, and the refusals also filled the Error Monitor with 405 rows that resembled attack traffic. HEAD now returns exactly what GET would — same status, same headers, no body. Static files were already correct and are untouched, HEAD requests are excluded from page-view analytics, and the Error Monitor records them as HEAD rather than GET.
+- **Category and tag archives render the full listing chrome again** — they share the home-feed view but never populated its filter chips, popular-posts sidebar, or the tenant's configured layout, so those pages silently fell back to the default layout with no filters. All three listing routes now populate the same view data, and an archive seeds its own filter selection so adding a second filter from an archive page keeps the first.
+- **Post pages no longer 500 when a post has no categories or tags** — the related-posts query built an invalid `ORDER BY (0)` (a bare integer that SQL Server treats as a column ordinal) for posts with no topic overlap, throwing a `SqlException` and returning HTTP 500 on the article page. It now falls back to recency ordering. Affected any category-less/tag-less published post (e.g. freshly imported or bulk-loaded content).
+
+---
+
+## [1.0.3] — 2026-07-31
+
+### Added
+
+- **Automatic WebP conversion on upload** — raster images (JPEG/PNG/GIF) uploaded to the media library are re-encoded to WebP for smaller, faster-loading assets, and their dimensions are captured in the same pass. SVG and images already in WebP pass through unchanged; if an image can't be decoded, the original bytes are stored as a fallback. Completes the media-library image-management capability.
 
 ---
 
