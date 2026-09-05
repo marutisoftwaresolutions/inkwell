@@ -260,4 +260,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-*Built with care by [Maruti Software Solutions](https://marutisoftwaresolutions.com)*
+*Built with care by [Pixobots Infotech - C/o Maruti Software Solutions](https://www.pixobots.com/)*
