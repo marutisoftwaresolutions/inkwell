@@ -1,0 +1,133 @@
+@using Blog.Core.Domain
+@using Blog.Core.Services
+@model ImportJob
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Preview import";
+    var p = (ImportPreview)ViewBag.Preview;
+
+    string Badge(ImportOutcome o) => o switch
+    {
+        ImportOutcome.Overwrite        => "bg-red-100 text-red-700",
+        ImportOutcome.CreateWithNewSlug=> "bg-amber-100 text-amber-700",
+        ImportOutcome.Skip             => "bg-slate-100 text-slate-700",
+        _                              => "bg-emerald-100 text-emerald-700"
+    };
+    string Label(ImportOutcome o) => o switch
+    {
+        ImportOutcome.CreateWithNewSlug => "new slug",
+        ImportOutcome.Overwrite         => "overwrite",
+        ImportOutcome.Skip              => "skip",
+        _                               => "create"
+    };
+}
+
+<div class="mb-5">
+    <h2 class="text-lg font-semibold text-foreground">Preview import</h2>
+    <p class="text-xs text-muted-foreground mt-0.5">
+        What would happen if this import ran — @Model.Source, @Model.FileName. <strong>Nothing has been
+        written.</strong> This is a prediction from the staged file and your current options, not a trial run:
+        images are counted, not downloaded.
+    </p>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-emerald-600">@p.Creates</div>
+        <div class="text-xs text-muted-foreground mt-1">Will be created</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold @(p.Renames > 0 ? "text-amber-600" : "text-foreground")">@p.Renames</div>
+        <div class="text-xs text-muted-foreground mt-1">Given a new slug</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold @(p.Overwrites > 0 ? "text-red-600" : "text-foreground")">@p.Overwrites</div>
+        <div class="text-xs text-muted-foreground mt-1">Will overwrite</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@p.Skips</div>
+        <div class="text-xs text-muted-foreground mt-1">Skipped</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@p.ImagesToFetch</div>
+        <div class="text-xs text-muted-foreground mt-1">Images to fetch</div>
+    </div>
+</div>
+
+@if (p.Overwrites > 0)
+{
+    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <strong>@p.Overwrites existing @(p.Overwrites == 1 ? "post or page" : "posts or pages") would be replaced.</strong>
+        The current content is overwritten and is not recoverable from the import. Change the slug-conflict
+        policy to <em>Suffix</em> or <em>Skip</em> on the previous step if that is not what you intend.
+    </div>
+}
+
+@if (p.BrokenLinks.Count > 0)
+{
+    <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
+        <div class="px-4 py-2 border-b border-border">
+            <span class="text-sm font-medium text-foreground">Links that would not resolve (@p.BrokenLinks.Count)</span>
+            <span class="text-xs text-muted-foreground ml-2">
+                These point at content this import does not bring and that does not already exist here.
+            </span>
+        </div>
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <th class="px-4 py-2 font-medium">In</th>
+                    <th class="px-4 py-2 font-medium">Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in p.BrokenLinks.Take(100))
+                {
+                    <tr class="border-b border-border/50 hover:bg-muted/40">
+                        <td class="px-4 py-2 text-xs text-foreground max-w-[24rem]">@l.InPostTitle</td>
+                        <td class="px-4 py-2 font-mono text-[11px] text-muted-foreground break-all">@l.Href</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@foreach (var group in p.ByType)
+{
+    <div class="rounded-xl border border-border bg-card overflow-hidden mb-4">
+        <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">
+            @group.Key (@group.Count())
+        </div>
+        <table class="w-full text-sm">
+            <tbody>
+                @foreach (var item in group.Take(200))
+                {
+                    <tr class="border-b border-border/50 align-top hover:bg-muted/40">
+                        <td class="px-4 py-2 w-24">
+                            <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold @Badge(item.Outcome)">@Label(item.Outcome)</span>
+                        </td>
+                        <td class="px-4 py-2 max-w-[24rem]">
+                            <div class="text-xs text-foreground">@item.Title</div>
+                            @if (!string.IsNullOrEmpty(item.Slug))
+                            {
+                                <div class="text-[11px] font-mono text-muted-foreground">/@item.Slug</div>
+                            }
+                        </td>
+                        <td class="px-4 py-2 text-xs text-muted-foreground">@item.Reason</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<div class="flex gap-3 mt-6">
+    <a href="/admin/import/configure/@Model.Id"
+       class="h-9 px-4 rounded border border-input text-sm text-foreground hover:bg-muted inline-flex items-center">
+        ← Change options
+    </a>
+    <a href="/admin/import/run/@Model.Id"
+       class="h-9 px-4 rounded bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 inline-flex items-center">
+        Run the import
+    </a>
+</div>

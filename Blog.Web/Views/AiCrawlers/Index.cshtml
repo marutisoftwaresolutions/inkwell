@@ -1,0 +1,163 @@
+@using Blog.Core.Domain
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "AI Crawlers";
+
+    var ai       = (IReadOnlyList<CrawlerActivity>)ViewBag.Ai;
+    var search   = (IReadOnlyList<CrawlerActivity>)ViewBag.Search;
+    var topPages = (IReadOnlyList<CrawledPage>)ViewBag.TopPages;
+    var daily    = (IReadOnlyList<CrawlerDay>)ViewBag.Daily;
+    int days = ViewBag.Days, aiVisits = ViewBag.AiVisits, aiEngines = ViewBag.AiEngines;
+
+    var peak = daily.Count > 0 ? daily.Max(d => d.Visits) : 0;
+
+    string Ago(DateTime? utc)
+    {
+        if (utc is null) return "never";
+        var d = DateTime.UtcNow - utc.Value;
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
+        return $"{(int)d.TotalDays}d ago";
+    }
+}
+
+<div class="mb-5">
+    <h2 class="text-lg font-semibold text-foreground">AI Crawlers</h2>
+    <p class="text-xs text-muted-foreground mt-0.5">
+        Which AI answer engines and search crawlers actually fetch this site, and what they read.
+        Search Console reports generative-AI impressions without naming the engine — this names it.
+    </p>
+</div>
+
+<div class="flex gap-2 mb-6 text-xs">
+    @foreach (var d in new[] { 7, 30, 90 })
+    {
+        <a href="?days=@d" class="h-8 px-3 rounded border @(days == d ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-input text-foreground hover:bg-muted") inline-flex items-center">
+            Last @d days
+        </a>
+    }
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@aiVisits.ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">AI crawler visits</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold @(aiEngines > 0 ? "text-emerald-600" : "text-amber-600")">@aiEngines</div>
+        <div class="text-xs text-muted-foreground mt-1">AI engines reading you</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@topPages.Count</div>
+        <div class="text-xs text-muted-foreground mt-1">Pages fetched by AI</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@search.Sum(s => s.Visits).ToString("N0")</div>
+        <div class="text-xs text-muted-foreground mt-1">Search crawler visits</div>
+    </div>
+</div>
+
+@if (aiVisits == 0)
+{
+    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        No AI crawler has fetched this site in the last @days days. That is worth knowing: if the pages
+        are not being read, no amount of answer-capsule or structured-data work can produce a citation.
+        Check that <code>robots.txt</code> permits these agents, and that the site is reachable and indexed.
+    </div>
+}
+
+@if (peak > 0)
+{
+    <div class="rounded-xl border border-border bg-card p-4 mb-6">
+        <div class="text-sm font-medium text-foreground mb-3">AI crawler visits per day</div>
+        <div class="flex items-end gap-1 h-24">
+            @foreach (var d in daily)
+            {
+                var h = d.Visits == 0 ? 2 : (int)Math.Max(4, Math.Round(d.Visits * 100.0 / peak));
+                <div class="flex-1 rounded-t @(d.Visits == 0 ? "bg-border" : "bg-emerald-500/70")"
+                     style="height:@(h)%"
+                     title="@d.Day.ToString("d MMM yyyy"): @d.Visits visits"></div>
+            }
+        </div>
+    </div>
+}
+
+<div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
+    <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">AI answer engines</div>
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                <th class="px-4 py-2 font-medium">Crawler</th>
+                <th class="px-4 py-2 font-medium">Operator</th>
+                <th class="px-4 py-2 font-medium">What it is for</th>
+                <th class="px-4 py-2 font-medium text-right">Visits</th>
+                <th class="px-4 py-2 font-medium text-right">Pages</th>
+                <th class="px-4 py-2 font-medium">Last seen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in ai)
+            {
+                <tr class="border-b border-border/50 hover:bg-muted/40 @(c.Visits == 0 ? "opacity-50" : "")">
+                    <td class="px-4 py-2 font-mono text-xs text-foreground">@c.Crawler</td>
+                    <td class="px-4 py-2 text-xs text-foreground">@c.Operator</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground max-w-[22rem]">@c.Purpose</td>
+                    <td class="px-4 py-2 text-right font-semibold @(c.Visits > 0 ? "text-foreground" : "text-muted-foreground")">@c.Visits.ToString("N0")</td>
+                    <td class="px-4 py-2 text-right text-xs text-muted-foreground">@c.Pages</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (topPages.Count > 0)
+{
+    <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
+        <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">Pages AI engines read most</div>
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <th class="px-4 py-2 font-medium">Page</th>
+                    <th class="px-4 py-2 font-medium text-right">Visits</th>
+                    <th class="px-4 py-2 font-medium text-right">Engines</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in topPages)
+                {
+                    <tr class="border-b border-border/50 hover:bg-muted/40">
+                        <td class="px-4 py-2">
+                            <a href="@p.Path" target="_blank" rel="noopener" class="font-mono text-[11px] text-foreground hover:underline break-all">@p.Path</a>
+                        </td>
+                        <td class="px-4 py-2 text-right font-semibold text-foreground">@p.Visits.ToString("N0")</td>
+                        <td class="px-4 py-2 text-right text-xs text-muted-foreground">@p.Crawlers</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<details class="rounded-xl border border-border bg-card">
+    <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">Search crawlers</summary>
+    <table class="w-full text-sm border-t border-border">
+        <tbody>
+            @foreach (var c in search)
+            {
+                <tr class="border-b border-border/50 @(c.Visits == 0 ? "opacity-50" : "")">
+                    <td class="px-4 py-2 font-mono text-xs text-foreground">@c.Crawler</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground">@c.Operator</td>
+                    <td class="px-4 py-2 text-right font-semibold text-foreground">@c.Visits.ToString("N0")</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</details>
+
+<p class="text-[11px] text-muted-foreground mt-3">
+    A user-agent is self-asserted and can be forged, so this shows <em>claimed</em> identity. It is a
+    visibility report and is never used to allow or deny a request — the firewall decides that on
+    behaviour, not on a name.
+</p>

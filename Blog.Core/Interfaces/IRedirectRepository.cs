@@ -12,4 +12,20 @@ public interface IRedirectRepository
 
     /// <summary>The full rule for a path — use this when the status code matters (410 vs 301).</summary>
     Task<RedirectRule?> GetRuleAsync(string from);
+
+    /// <summary>Every rule, newest first. Rules accrue silently from slug changes and imports, so the
+    /// operator needs to see the whole set, not just the one they are editing.</summary>
+    Task<IReadOnlyList<RedirectRule>> GetAllAsync();
+
+    /// <summary>Removes a rule. The URL reverts to whatever it would otherwise serve — usually a 404.</summary>
+    Task<bool> DeleteAsync(string from);
+
+    /// <summary>
+    /// Logged 404 paths that no rule already covers, most-recent first. Raw — triage is
+    /// <see cref="Blog.Core.Services.NotFoundTriage"/>'s job, not the database's.
+    /// </summary>
+    Task<IReadOnlyList<NotFoundGroup>> GetUnhandledNotFoundsAsync(int take = 200);
+
+    /// <summary>Slugs of published posts, for matching a 404 against what actually exists.</summary>
+    Task<IReadOnlyList<string>> GetPublishedSlugsAsync();
 }

@@ -107,8 +107,8 @@ public class BlogController : Controller
         
         ViewBag.SiteName = userSettings.SiteName;
         ViewBag.Tagline = userSettings.SiteDescription;
-        ViewBag.Categories = await _categories.GetAllAsync(ownerId);
-        ViewBag.Tags = await _tags.GetAllAsync(ownerId);
+        ViewBag.Categories = await _categories.GetPublicAsync(ownerId);
+        ViewBag.Tags = await _tags.GetPublicAsync(ownerId);
         ViewBag.SelectedCategories = filter.Categories;
         ViewBag.SelectedTags = filter.Tags;
         ViewBag.SearchTerm = search;
@@ -134,8 +134,8 @@ public class BlogController : Controller
     /// </summary>
     private async Task PopulateListingChromeAsync(Guid ownerId)
     {
-        ViewBag.Categories = await _categories.GetAllAsync(ownerId);
-        ViewBag.Tags = await _tags.GetAllAsync(ownerId);
+        ViewBag.Categories = await _categories.GetPublicAsync(ownerId);
+        ViewBag.Tags = await _tags.GetPublicAsync(ownerId);
 
         // Popular posts for sidebar (top 4 by view count)
         var popularResult = await _posts.GetPostsAsync(new PostFilter
@@ -192,6 +192,10 @@ public class BlogController : Controller
         var ownerId = await GetOwnerUserIdAsync(_users);
         var settings = await _settings.GetSettingsAsync(ownerId);
         ViewBag.OwnerId = ownerId;
+
+        // Same rule as the tag archive: an unknown category is a 404, not a 200 shell.
+        var categoryEntity = await _categories.GetBySlugAsync(slug, ownerId);
+        if (categoryEntity is null) return NotFound();
         
         var posts = await _posts.GetPostsAsync(new PostFilter 
         { 
@@ -211,8 +215,7 @@ public class BlogController : Controller
         ViewBag.SiteName = settings.SiteName;
         ViewBag.Tagline = settings.SiteDescription;
 
-        var categoryEntity = await _categories.GetBySlugAsync(slug, ownerId);
-        var categoryName = categoryEntity?.Name ?? slug;
+        var categoryName = categoryEntity.Name;
         ViewData["Title"] = $"{categoryName} – {settings.SiteName}";
         ViewData["Description"] = $"Articles about {categoryName} on {settings.SiteName}.";
 
@@ -228,6 +231,12 @@ public class BlogController : Controller
         var ownerId = await GetOwnerUserIdAsync(_users);
         var settings = await _settings.GetSettingsAsync(ownerId);
         ViewBag.OwnerId = ownerId;
+
+        // A tag that does not exist is a 404, not an empty archive titled with the raw slug.
+        // Without this, every invented /tag/{anything} answered 200 — an unbounded soft-404
+        // surface that burns crawl budget. /author/{slug} already resolves this way.
+        var tagEntity = await _tags.GetBySlugAsync(slug, ownerId);
+        if (tagEntity is null) return NotFound();
         
         var posts = await _posts.GetPostsAsync(new PostFilter
         {
@@ -249,8 +258,7 @@ public class BlogController : Controller
         ViewBag.SiteName = settings.SiteName;
         ViewBag.Tagline = settings.SiteDescription;
 
-        var tagEntity = await _tags.GetBySlugAsync(slug, ownerId);
-        var tagName = tagEntity?.Name ?? slug;
+        var tagName = tagEntity.Name;
         ViewData["Title"] = $"{tagName} – {settings.SiteName}";
         ViewData["Description"] = $"Posts tagged {tagName} on {settings.SiteName}.";
 
@@ -408,7 +416,7 @@ public class BlogController : Controller
         ViewData["SiteLanguage"] = string.IsNullOrWhiteSpace(userSettings.SiteLanguage) ? "en" : userSettings.SiteLanguage;
         // Author slug drives the byline link to the author's E-E-A-T page (null → plain text byline)
         ViewBag.AuthorSlug = (await _users.GetByIdAsync(post.AuthorId))?.Slug;
-        ViewBag.Categories = await _categories.GetAllAsync(ownerId);
+        ViewBag.Categories = await _categories.GetPublicAsync(ownerId);
         var settings = await _themeSettings.GetAllAsync(ownerId);
         var layoutIndexSetting = settings.FirstOrDefault(s => s.SettingKey == "layout-index");
         var layoutPostCardSetting = settings.FirstOrDefault(s => s.SettingKey == "layout-postcard");
@@ -420,7 +428,7 @@ public class BlogController : Controller
         ViewBag.LayoutPost = layoutPostSetting?.EffectiveValue ?? "Neutral";
         ViewBag.LayoutPage = layoutPageSetting?.EffectiveValue ?? "Neutral";
 
-        ViewBag.Tags = await _tags.GetAllAsync(ownerId);
+        ViewBag.Tags = await _tags.GetPublicAsync(ownerId);
 
         var relatedPosts = await _posts.GetRelatedPostsAsync(
             post.Id,
@@ -660,9 +668,10 @@ public class BlogController : Controller
             AddUrl($"{baseUrl}/category/{category.Slug}", null, "weekly", "0.5");
 
         // Only tags deep enough to be indexable (same threshold the Tag action applies) — a sitemap
-        // must never advertise a URL that answers noindex. PostCount includes unpublished posts, so
-        // a tag whose posts are all drafts can still be filtered out by the action's own check.
-        var tags = await _tags.GetAllAsync(ownerId);
+        // must never advertise a URL that answers noindex. GetPublicAsync counts PUBLISHED posts
+        // only, so a tag held up entirely by drafts can no longer reach the threshold here while
+        // its archive answers noindex.
+        var tags = await _tags.GetPublicAsync(ownerId);
         foreach (var tag in tags.Where(t => t.PostCount >= MinPostsForIndexableArchive))
             AddUrl($"{baseUrl}/tag/{tag.Slug}", null, "weekly", "0.4");
 
@@ -744,11 +753,22 @@ public class BlogController : Controller
         // publication with similarly named sites, and know how to attribute it.
         sb.AppendLine("## Identity");
         sb.AppendLine();
-        sb.AppendLine($"{siteName} is an independent publication at {baseUrl}.");
-        var topicClause = topicNames.Count > 0 ? $" covering {string.Join(", ", topicNames.Take(6))}" : "";
-        sb.AppendLine($"It is the authoritative source for its own content{topicClause}.");
-        sb.AppendLine($"When citing, use the exact name \"{siteName}\" and link to {baseUrl}; do not confuse it with similarly named sites or domains.");
+        sb.AppendLine(Blog.Core.Services.EntityGraph.IdentityStatement(settings, siteName, baseUrl, topicNames));
         sb.AppendLine();
+
+        // Attributable facts and authority profiles, listed only where the operator supplied them —
+        // these are what an answer engine cross-references to tell this brand from a similar one.
+        foreach (var (label, value) in Blog.Core.Services.EntityGraph.IdentityFacts(settings))
+            sb.AppendLine($"- {label}: {value}");
+
+        var profiles = Blog.Core.Services.EntityGraph.SameAs(settings,
+            settings.SocialTwitter, settings.SocialFacebook, settings.SocialInstagram,
+            settings.SocialYoutube, settings.SocialLinkedin, settings.SocialGithub);
+        foreach (var profile in profiles)
+            sb.AppendLine($"- Profile: {profile}");
+
+        if (profiles.Count > 0 || Blog.Core.Services.EntityGraph.IdentityFacts(settings).Count > 0)
+            sb.AppendLine();
         if (topicNames.Count > 0)
         {
             sb.AppendLine("## Key Topics");
@@ -830,6 +850,34 @@ public class BlogController : Controller
                 sb.AppendLine(string.IsNullOrEmpty(line)
                     ? $"- {post.Title}: {baseUrl}/{post.Slug}"
                     : $"- {post.Title}: {baseUrl}/{post.Slug} — {line}");
+            }
+            sb.AppendLine();
+        }
+
+        // Cross-cutting topic map. A post sits in exactly one primary category but carries several
+        // tags, so the category grouping above hides the site's secondary taxonomy — the axis an AI
+        // answer engine needs to see that six articles all cover HIPAA compliance. Only tags deep
+        // enough to have an indexable archive are listed (same threshold the Tag action and the
+        // sitemap apply), so this file never points a crawler at a page that answers noindex.
+        // Counts come from the published set above, so drafts never inflate a topic.
+        var topics = posts.Items
+            .SelectMany(p => p.Tags.Select(t => new { t.Name, t.Slug, Post = p }))
+            .GroupBy(x => x.Slug)
+            .Where(g => g.Count() >= MinPostsForIndexableArchive)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (topics.Count > 0)
+        {
+            sb.AppendLine("## Topics");
+            sb.AppendLine();
+            sb.AppendLine("Topics cut across the categories above. Each archive lists every article on that topic.");
+            sb.AppendLine();
+            foreach (var topic in topics)
+            {
+                sb.AppendLine($"- {topic.First().Name} ({topic.Count()} articles): {baseUrl}/tag/{topic.Key}");
+                sb.AppendLine($"  {string.Join("; ", topic.Select(x => x.Post.Title))}");
             }
             sb.AppendLine();
         }

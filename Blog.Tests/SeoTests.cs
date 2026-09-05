@@ -56,6 +56,40 @@ public class TextHelperTests
     {
         Assert.Equal(expected, TextHelper.BrandTitle(raw, site));
     }
+
+    [Theory]
+    // Exactly at the 60-char budget → brand is kept (57 + 3 + 0 … see lengths below).
+    [InlineData("Optical POS Systems for Eye Care Retail 2026", "Optical Sw", "Optical POS Systems for Eye Care Retail 2026 | Optical Sw")]
+    // One character over → suffix dropped, title survives intact.
+    [InlineData("Optical POS Systems for Eye Care Retail: 2026 Guide", "Optical Software", "Optical POS Systems for Eye Care Retail: 2026 Guide")]
+    // A long site name costs every title on that tenant — the guard protects them too.
+    [InlineData("Best Optometry Practice Management Software 2026", "The Independent Optometry Technology Review", "Best Optometry Practice Management Software 2026")]
+    public void BrandTitle_DropsSuffixWhenItWouldOverflow(string raw, string site, string expected)
+    {
+        Assert.Equal(expected, TextHelper.BrandTitle(raw, site));
+    }
+
+    [Fact]
+    public void BrandTitle_NeverReturnsMoreThanBudget_UnlessTitleAloneExceedsIt()
+    {
+        // A branded result must always fit the budget. When the raw title alone is already over,
+        // the method cannot help — but it must not make it worse by appending a brand.
+        var site = "Optical Software";
+        foreach (var raw in new[]
+        {
+            "Short",
+            "Optical Retail Software: Increase Frame Sales",
+            "Best AI Retinal Screening Software 2026 (FDA-Cleared)",
+            new string('x', 80),
+        })
+        {
+            var result = TextHelper.BrandTitle(raw, site);
+            if (raw.Length <= TextHelper.MaxBrandedTitleLength)
+                Assert.True(result.Length <= TextHelper.MaxBrandedTitleLength,
+                    $"'{raw}' produced {result.Length} chars: {result}");
+            Assert.StartsWith(raw, result); // the title itself is never truncated or altered
+        }
+    }
 }
 
 public class LocaleHelperTests

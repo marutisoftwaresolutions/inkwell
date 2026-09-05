@@ -67,6 +67,10 @@
         <div class="text-2xl font-bold @(summary.StaleYearStamps > 0 ? "text-red-600" : "text-foreground")">@summary.StaleYearStamps</div>
         <div class="text-xs text-muted-foreground mt-1">Stale year in title</div>
     </a>
+    <a href="?filter=weakaeo" class="@TileClass("weakaeo")" title="Average across all published posts: @summary.AverageAeoScore/100">
+        <div class="text-2xl font-bold @(summary.WeakAeo > 0 ? "text-amber-600" : "text-foreground")">@summary.WeakAeo</div>
+        <div class="text-xs text-muted-foreground mt-1">Weak AEO (avg @summary.AverageAeoScore)</div>
+    </a>
 </div>
 
 @if (filter != "attention")
@@ -84,13 +88,14 @@
                 <th class="px-4 py-2 font-medium">Review</th>
                 <th class="px-4 py-2 font-medium">Blocks</th>
                 <th class="px-4 py-2 font-medium">Snippet</th>
+                <th class="px-4 py-2 font-medium text-right">AEO</th>
                 <th class="px-4 py-2 font-medium text-right">Open</th>
             </tr>
         </thead>
         <tbody>
             @if (items.Count == 0)
             {
-                <tr><td colspan="6" class="px-4 py-10 text-center text-muted-foreground">Nothing needs attention here. 🎉</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">Nothing needs attention here. 🎉</td></tr>
             }
             @foreach (var i in items)
             {
@@ -124,6 +129,10 @@
                         {
                             <span>@i.MetaLength chars@(i.MetaTooLong ? " · truncates" : "")</span>
                         }
+                    </td>
+                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold @(i.AeoScore >= 85 ? "bg-emerald-100 text-emerald-700" : i.AeoScore >= 70 ? "bg-emerald-50 text-emerald-700" : i.AeoScore >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")"
+                              title="Answer-engine readiness. Open the post to see what is missing.">@i.AeoScore</span>
                     </td>
                     <td class="px-4 py-2 text-right whitespace-nowrap">
                         <a href="/admin/posts/edit/@i.Id" class="h-7 px-2 rounded border border-input text-xs text-foreground hover:bg-muted inline-flex items-center">Edit</a>

@@ -47,6 +47,11 @@ public class PageViewMiddleware
     {
         await _next(context);
 
+        // Crawler traffic is excluded from human analytics below, but it is not worthless: it is the
+        // only way to see whether AI answer engines are actually reading the site. Record it first,
+        // to its own table, before ShouldTrack discards it.
+        TrackCrawler(context);
+
         // Only track successful GET requests to public pages
         if (!ShouldTrack(context)) return;
 
@@ -64,6 +69,62 @@ public class PageViewMiddleware
         var content  = context.Request.Query.TryGetValue("utm_content",  out var ct) ? ct.ToString() : null;
 
         _ = TrackAsync(path, referrer, userAgent, ip, source, medium, campaign, term, content);
+    }
+
+    /// <summary>
+    /// Records an identified crawler request. Fire-and-forget and self-swallowing: crawler
+    /// visibility must never slow or break a page, and a request the identifier cannot name is
+    /// simply not recorded rather than guessed at.
+    /// </summary>
+    private void TrackCrawler(HttpContext context)
+    {
+        try
+        {
+            if (!HttpMethods.IsGet(context.Request.Method)) return;
+            if (context.Items.ContainsKey(HeadRequestMiddleware.OriginalMethodWasHeadKey)) return;
+
+            var ua = context.Request.Headers.UserAgent.ToString();
+            var identity = Blog.Core.Services.CrawlerIdentifier.Identify(ua);
+            if (identity is null) return;
+
+            var path = context.Request.Path.Value ?? "/";
+            if (SkippedExtensions.Contains(Path.GetExtension(path))) return;   // assets, not content
+
+            var status = context.Response.StatusCode;
+            _ = RecordCrawlerAsync(identity, path, status, ua);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Crawler tracking skipped (non-fatal).");
+        }
+    }
+
+    private async Task RecordCrawlerAsync(Blog.Core.Services.CrawlerIdentity identity, string path, int status, string ua)
+    {
+        try
+        {
+            using var scope = _rootServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<ICrawlerVisitRepository>();
+
+            var tenantCtx = scope.ServiceProvider.GetService<ITenantContext>();
+            var ownerId = (tenantCtx?.IsResolved == true) ? tenantCtx.UserId : Guid.Empty;
+
+            await repo.RecordAsync(new CrawlerVisit
+            {
+                OwnerId    = ownerId,
+                Crawler    = identity.Name,
+                Operator   = identity.Operator,
+                IsAi       = identity.IsAi,
+                Path       = path.Length > 1024 ? path[..1024] : path,
+                StatusCode = status,
+                UserAgent  = ua.Length > 512 ? ua[..512] : ua,
+                VisitedAt  = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Crawler visit not recorded (non-fatal).");
+        }
     }
 
     private static bool ShouldTrack(HttpContext context)

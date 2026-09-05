@@ -22,6 +22,26 @@ public class TagRepository : ITagRepository
         return (await conn.QueryAsync<Tag>(sql, new { AuthorId = authorId })).ToList();
     }
 
+    /// <summary>
+    /// Tags carrying at least one PUBLISHED post, with that published count. Backs the public
+    /// filter chips and any other reader-facing tag list. <see cref="GetAllAsync"/> is the admin
+    /// view: it keeps zero-post tags and counts drafts, so using it publicly links readers — and
+    /// crawlers — to archives that render empty.
+    /// </summary>
+    public async Task<List<Tag>> GetPublicAsync(Guid authorId)
+    {
+        using var conn = _ctx.CreateConnection();
+        var sql = @"
+            SELECT t.Id, t.Name, t.Slug, t.AuthorId, COUNT(p.Id) as PostCount
+            FROM Tags t
+            INNER JOIN PostTags pt ON pt.TagId = t.Id
+            INNER JOIN Posts p ON p.Id = pt.PostId AND p.Status = 'Published'
+            " + (authorId == Guid.Empty ? "" : "WHERE t.AuthorId = @AuthorId ") + @"
+            GROUP BY t.Id, t.Name, t.Slug, t.AuthorId
+            ORDER BY t.Name";
+        return (await conn.QueryAsync<Tag>(sql, new { AuthorId = authorId })).ToList();
+    }
+
     public async Task<Tag?> GetByIdAsync(Guid id, Guid authorId)
     {
         using var conn = _ctx.CreateConnection();

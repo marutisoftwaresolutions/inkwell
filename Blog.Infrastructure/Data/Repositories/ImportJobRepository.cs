@@ -145,4 +145,12 @@ public class ImportJobRepository : IImportJobRepository
                 UpdatedAt     = GETUTCDATE()
             WHERE Id=@JobId", new { JobId = jobId });
     }
+
+    public async Task<ISet<string>> GetExistingSlugsAsync()
+    {
+        using var conn = _ctx.CreateConnection();
+        var slugs = await conn.QueryAsync<string>(
+            "SELECT Slug FROM Posts UNION SELECT Slug FROM Pages;");
+        return new HashSet<string>(slugs.Where(s => !string.IsNullOrWhiteSpace(s)), StringComparer.OrdinalIgnoreCase);
+    }
 }

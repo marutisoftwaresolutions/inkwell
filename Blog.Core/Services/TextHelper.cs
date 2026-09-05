@@ -22,9 +22,24 @@ public static class TextHelper
     }
 
     /// <summary>
+    /// Longest &lt;title&gt; worth rendering. Google lays out roughly 580px of title text before
+    /// cutting to an ellipsis, which is about 60 characters at typical width. Titles are measured
+    /// in pixels, not characters, so this is a good-enough budget rather than an exact limit.
+    /// </summary>
+    public const int MaxBrandedTitleLength = 60;
+
+    /// <summary>
     /// Applies a single " | {siteName}" brand suffix to a page title: empty title → site name;
     /// a title that already contains the site name is left untouched (no double brand); otherwise
-    /// the suffix is appended. Keeps every page's &lt;title&gt; consistent.
+    /// the suffix is appended — but only when the result still fits inside
+    /// <see cref="MaxBrandedTitleLength"/>.
+    ///
+    /// The length guard matters because the suffix is pure overhead in a SERP: when a branded title
+    /// overflows, the part Google cuts is the tail, and the tail is where the differentiator lives
+    /// ("2026", "Compared", "FDA-Cleared"). Dropping the brand keeps the words that earn the click,
+    /// and search engines display the site name separately anyway. It also keeps the platform
+    /// multi-tenant-safe: a tenant with a long site name would otherwise lose the end of every
+    /// title on the site, and the longer the name the more it costs.
     /// </summary>
     public static string BrandTitle(string? rawTitle, string? siteName)
     {
@@ -32,8 +47,9 @@ public static class TextHelper
         siteName = siteName?.Trim();
         if (string.IsNullOrWhiteSpace(rawTitle)) return siteName ?? string.Empty;
         if (string.IsNullOrWhiteSpace(siteName)) return rawTitle;
-        return rawTitle.Contains(siteName, StringComparison.OrdinalIgnoreCase)
-            ? rawTitle
-            : $"{rawTitle} | {siteName}";
+        if (rawTitle.Contains(siteName, StringComparison.OrdinalIgnoreCase)) return rawTitle;
+
+        var branded = $"{rawTitle} | {siteName}";
+        return branded.Length <= MaxBrandedTitleLength ? branded : rawTitle;
     }
 }

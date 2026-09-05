@@ -45,6 +45,9 @@
         ["publisher"] = publisher,
         ["inLanguage"] = (string?)(ViewData["SiteLanguage"]) is { Length: > 0 } lang ? lang : "en"
     };
+    // The capsule is the passage written to be quoted, so name it explicitly rather than leaving an
+    // answer engine to guess which sentence carries the answer.
+    if (Model.HasAnswerCapsule) article["abstract"] = Model.AnswerCapsule!;
     if (imageUrl is not null) article["image"] = imageUrl;
     if (Model.Categories.Any()) article["articleSection"] = Model.Categories.First().Name;
     if (Model.Tags.Any()) article["keywords"] = string.Join(", ", Model.Tags.Select(t => t.Name));

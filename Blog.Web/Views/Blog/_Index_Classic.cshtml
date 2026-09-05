@@ -26,12 +26,26 @@
             else currentTags.Add(slug);
         }
 
+        // A single-value filter has a canonical archive route, and the controller 301-redirects
+        // ?tags={slug} / ?category={slug} onto it. Emit that route directly so an in-page link
+        // never spends a redirect hop. Multi-value combinations (?tags=a,b) have no canonical
+        // equivalent and stay as query URLs, exactly as before.
+        if (string.IsNullOrEmpty(searchTerm))
+        {
+            if (currentCats.Count == 0 && currentTags.Count == 1) return $"/tag/{currentTags[0]}";
+            if (currentTags.Count == 0 && currentCats.Count == 1) return $"/category/{currentCats[0]}";
+        }
+
         var queryParts = new List<string>();
         if (!string.IsNullOrEmpty(searchTerm)) queryParts.Add("search=" + Uri.EscapeDataString(searchTerm));
         if (currentCats.Any()) queryParts.Add("category=" + string.Join(",", currentCats));
         if (currentTags.Any()) queryParts.Add("tags=" + string.Join(",", currentTags));
 
-        return queryParts.Any() ? "?" + string.Join("&", queryParts) : "/";
+        // Root the multi-value URL at the home feed. A bare "?tags=a,b" is RELATIVE, so from
+        // /tag/{slug} it resolved to /tag/{slug}?tags=a,b — the archive route ignores the query,
+        // silently dropping the second tag and minting a crawlable duplicate of the archive for
+        // every chip (GSC 2026-09-04 caught one indexed at position 6).
+        return queryParts.Any() ? "/?" + string.Join("&", queryParts) : "/";
     }
 }
 
@@ -185,8 +199,8 @@
             {
                 var qParts = new List<string>();
                 if (!string.IsNullOrEmpty(searchTerm)) qParts.Add("search=" + Uri.EscapeDataString(searchTerm));
-                if (selectedCategories.Any()) qParts.Add("category=" + string.Join(",", selectedCategories));
-                if (selectedTags.Any()) qParts.Add("tags=" + string.Join(",", selectedTags));
+                if (selectedCategories.Any() && ViewBag.CurrentCategory == null) qParts.Add("category=" + string.Join(",", selectedCategories));
+                if (selectedTags.Any() && ViewBag.CurrentTag == null) qParts.Add("tags=" + string.Join(",", selectedTags));
                 var baseQuery = qParts.Any() ? "&" + string.Join("&", qParts) : "";
 
                 <div class="flex items-center justify-between gap-3 py-4 border-t border-solid shadow-sm rounded" style="border-color: var(--border);">

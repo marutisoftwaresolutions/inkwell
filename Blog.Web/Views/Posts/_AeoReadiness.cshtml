@@ -1,0 +1,66 @@
+@using Blog.Core.Services
+@model Blog.Core.Domain.Post
+@{
+    var result = AeoReadiness.Score(Model);
+    var next = result.NextBestAction;
+
+    var ring = result.Score switch
+    {
+        >= 85 => "text-emerald-600",
+        >= 70 => "text-emerald-600",
+        >= 50 => "text-amber-600",
+        _     => "text-red-600"
+    };
+}
+
+<div x-data="{ aeoOpen: false }" class="border-t border-border pt-4 mt-4">
+    <button type="button" @@click="aeoOpen = !aeoOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
+        <span class="flex items-center gap-2">
+            Answer-engine readiness
+            <span class="px-1.5 py-0.5 rounded text-[11px] font-semibold @ring bg-muted">@result.Score</span>
+        </span>
+        <svg :class="aeoOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </button>
+
+    @if (next is not null)
+    {
+        <p class="text-[11px] text-muted-foreground mt-1">
+            Biggest gap: <span class="text-foreground">@next.Name</span> — @next.Advice
+        </p>
+    }
+    else
+    {
+        <p class="text-[11px] text-emerald-700 mt-1">Every signal is complete.</p>
+    }
+
+    <div x-show="aeoOpen" x-transition class="pt-3 space-y-1.5">
+        <div class="flex items-baseline justify-between text-xs mb-2">
+            <span class="text-muted-foreground">@result.Grade</span>
+            <span class="text-muted-foreground">@result.Score / 100</span>
+        </div>
+
+        @foreach (var s in result.Signals)
+        {
+            <div class="flex items-start gap-2 text-xs">
+                <span class="mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 @(s.IsComplete ? "bg-emerald-500" : s.IsMissing ? "bg-red-400" : "bg-amber-400")"></span>
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between gap-2">
+                        <span class="text-foreground">@s.Name</span>
+                        <span class="text-muted-foreground whitespace-nowrap">@s.Detail</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(s.Advice))
+                    {
+                        <p class="text-[11px] text-muted-foreground mt-0.5">@s.Advice</p>
+                    }
+                </div>
+                <span class="text-[11px] text-muted-foreground whitespace-nowrap">@s.Earned/@s.Possible</span>
+            </div>
+        }
+
+        <p class="text-[11px] text-muted-foreground pt-2 border-t border-border mt-2">
+            Advisory only — it never blocks a publish. A short note that scores low may be exactly
+            right; forcing every post into the same shape would produce filler. The score reflects the
+            saved version, so it updates after you save.
+        </p>
+    </div>
+</div>

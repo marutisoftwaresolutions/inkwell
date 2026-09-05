@@ -1,0 +1,242 @@
+@using Blog.Core.Domain
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Redirects";
+
+    var rules     = (IReadOnlyList<RedirectRule>)ViewBag.Rules;
+    var notFounds = (IReadOnlyList<NotFoundCandidate>)ViewBag.NotFounds;
+    var tab       = (string)ViewBag.Tab;
+    int actionable = ViewBag.Actionable, nearMisses = ViewBag.NearMisses, goneCount = ViewBag.GoneCount;
+
+    var worklist = notFounds.Where(n => n.Kind != NotFoundKind.Unmatched).ToList();
+    var noise    = notFounds.Where(n => n.Kind == NotFoundKind.Unmatched).ToList();
+
+    string Ago(DateTime utc)
+    {
+        var d = DateTime.UtcNow - utc;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
+        return $"{(int)d.TotalDays}d ago";
+    }
+
+    string StatusChip(int code) => code switch
+    {
+        RedirectStatus.Gone  => "bg-red-50 text-red-700 border-red-200",
+        RedirectStatus.Found => "bg-amber-50 text-amber-700 border-amber-200",
+        _                    => "bg-emerald-50 text-emerald-700 border-emerald-200"
+    };
+}
+
+<div class="mb-5">
+    <h2 class="text-lg font-semibold text-foreground">Redirects</h2>
+    <p class="text-xs text-muted-foreground mt-0.5">
+        Move a URL (301/302) or retire it for good (410 Gone), and turn logged 404s into rules.
+        Renaming a post already writes its own redirect — those rules appear here too.
+    </p>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">@TempData["Error"]</div>
+}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@rules.Count</div>
+        <div class="text-xs text-muted-foreground mt-1">Rules</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@goneCount</div>
+        <div class="text-xs text-muted-foreground mt-1">Retired (410)</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold @(actionable > 0 ? "text-amber-600" : "text-foreground")">@actionable</div>
+        <div class="text-xs text-muted-foreground mt-1">404s worth fixing</div>
+    </div>
+    <div class="rounded-xl border border-border bg-card p-4">
+        <div class="text-2xl font-bold text-foreground">@nearMisses</div>
+        <div class="text-xs text-muted-foreground mt-1">Near-miss slugs</div>
+    </div>
+</div>
+
+<div class="flex gap-2 mb-5 text-xs">
+    <a href="?tab=rules" class="h-8 px-3 rounded border inline-flex items-center @(tab == "rules" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-input text-foreground hover:bg-muted")">
+        Rules (@rules.Count)
+    </a>
+    <a href="?tab=notfound" class="h-8 px-3 rounded border inline-flex items-center @(tab == "notfound" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-input text-foreground hover:bg-muted")">
+        404 log (@actionable actionable)
+    </a>
+</div>
+
+@* ── Add / edit form ─────────────────────────────────────────────────────── *@
+<form method="post" action="/admin/redirects/save" class="rounded-xl border border-border bg-card p-4 mb-6">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="tab" value="@tab" />
+    <div class="text-sm font-medium text-foreground mb-3">Add or update a rule</div>
+    <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
+        <div>
+            <label class="block text-xs text-muted-foreground mb-1" for="rf-from">From (path on this site)</label>
+            <input id="rf-from" name="from" required placeholder="/old-slug"
+                   class="w-full h-9 px-3 rounded border border-input bg-background text-sm text-foreground" />
+        </div>
+        <div>
+            <label class="block text-xs text-muted-foreground mb-1" for="rf-to">To (leave empty for 410)</label>
+            <input id="rf-to" name="to" placeholder="/new-slug"
+                   class="w-full h-9 px-3 rounded border border-input bg-background text-sm text-foreground" />
+        </div>
+        <div>
+            <label class="block text-xs text-muted-foreground mb-1" for="rf-status">Status</label>
+            <select id="rf-status" name="statusCode"
+                    class="h-9 px-3 rounded border border-input bg-background text-sm text-foreground">
+                <option value="301">301 Moved permanently</option>
+                <option value="302">302 Temporary</option>
+                <option value="410">410 Gone (retire)</option>
+            </select>
+        </div>
+        <button type="submit" class="h-9 px-4 rounded bg-primary text-primary-foreground text-sm font-medium">Save</button>
+    </div>
+    <p class="text-[11px] text-muted-foreground mt-3">
+        410 tells search engines the URL was removed on purpose, which drops it from the index far
+        faster than a 404. Rules that would loop, or that point at a URL which redirects again, are refused.
+    </p>
+</form>
+
+@if (tab == "rules")
+{
+    <div class="rounded-xl border border-border bg-card overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <th class="px-4 py-2 font-medium">From</th>
+                    <th class="px-4 py-2 font-medium">To</th>
+                    <th class="px-4 py-2 font-medium">Status</th>
+                    <th class="px-4 py-2 font-medium">Created</th>
+                    <th class="px-4 py-2 font-medium text-right">Remove</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (rules.Count == 0)
+            {
+                <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-muted-foreground">
+                    No redirect rules yet. Renaming a published post adds one automatically.
+                </td></tr>
+            }
+            @foreach (var r in rules)
+            {
+                <tr class="border-b border-border/50 hover:bg-muted/40">
+                    <td class="px-4 py-2 font-mono text-xs text-foreground break-all">@r.From</td>
+                    <td class="px-4 py-2 font-mono text-xs text-muted-foreground break-all">
+                        @(r.IsGone ? "—" : r.To)
+                    </td>
+                    <td class="px-4 py-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-medium @StatusChip(r.StatusCode)">@r.StatusCode</span>
+                    </td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(r.CreatedAt)</td>
+                    <td class="px-4 py-2 text-right">
+                        <form method="post" action="/admin/redirects/delete"
+                              onsubmit="return confirm('Remove the rule for @r.From? The URL will go back to serving a 404.');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="from" value="@r.From" />
+                            <input type="hidden" name="tab" value="rules" />
+                            <button type="submit" class="text-xs text-red-600 hover:underline">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
+        <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">
+            Worth fixing
+        </div>
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <th class="px-4 py-2 font-medium">Requested</th>
+                    <th class="px-4 py-2 font-medium">Why it matters</th>
+                    <th class="px-4 py-2 font-medium text-right">Hits</th>
+                    <th class="px-4 py-2 font-medium">Last seen</th>
+                    <th class="px-4 py-2 font-medium text-right">Fix</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (worklist.Count == 0)
+            {
+                <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-muted-foreground">
+                    No 404 is linked from anywhere or close to a real slug. The rest is scanner traffic.
+                </td></tr>
+            }
+            @foreach (var n in worklist)
+            {
+                <tr class="border-b border-border/50 hover:bg-muted/40">
+                    <td class="px-4 py-2 font-mono text-xs text-foreground break-all">@n.Path</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground">
+                        @if (n.Kind == NotFoundKind.NearMiss)
+                        {
+                            <span>Looks like <span class="font-mono text-foreground">/@n.SuggestedSlug</span> (@((int)Math.Round(n.Similarity * 100))% match)</span>
+                        }
+                        else
+                        {
+                            <span class="break-all">Linked from @n.Referer</span>
+                        }
+                    </td>
+                    <td class="px-4 py-2 text-right font-semibold text-foreground">@n.Hits.ToString("N0")</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(n.LastSeenAt)</td>
+                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                        @if (n.SuggestedSlug is not null)
+                        {
+                            <form method="post" action="/admin/redirects/save" class="inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="from" value="@n.Path" />
+                                <input type="hidden" name="to" value="/@n.SuggestedSlug" />
+                                <input type="hidden" name="statusCode" value="301" />
+                                <input type="hidden" name="tab" value="notfound" />
+                                <button type="submit" class="text-xs text-emerald-700 hover:underline">301 &rarr;</button>
+                            </form>
+                            <span class="text-border mx-1">|</span>
+                        }
+                        <form method="post" action="/admin/redirects/save" class="inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="from" value="@n.Path" />
+                            <input type="hidden" name="statusCode" value="410" />
+                            <input type="hidden" name="tab" value="notfound" />
+                            <button type="submit" class="text-xs text-red-600 hover:underline">410</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <details class="rounded-xl border border-border bg-card">
+        <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">
+            Unmatched 404s (@noise.Count) — almost all scanner traffic
+        </summary>
+        <table class="w-full text-sm border-t border-border">
+            <tbody>
+            @foreach (var n in noise)
+            {
+                <tr class="border-b border-border/50">
+                    <td class="px-4 py-2 font-mono text-[11px] text-muted-foreground break-all">@n.Path</td>
+                    <td class="px-4 py-2 text-right text-xs text-muted-foreground">@n.Hits.ToString("N0")</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(n.LastSeenAt)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <p class="px-4 py-3 text-[11px] text-muted-foreground border-t border-border">
+            Nothing links to these and none resembles a published slug. They need no redirect — repeated
+            probing is the IP firewall's business, not this screen's.
+        </p>
+    </details>
+}

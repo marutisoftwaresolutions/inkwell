@@ -65,6 +65,37 @@ public class UserSettings
     /// <summary>Email the error-notification recipients whenever an address is auto-blocked.</summary>
     public bool   FirewallNotifyOnBlock           { get; set; } = false;
 
+    // ── Entity / knowledge graph ──────────────────────────────────────────────
+    // Who this publication *is*, as an entity rather than a website. Search engines and answer
+    // engines resolve a brand by cross-referencing authoritative profiles; without them a domain
+    // that once published something else keeps answering to its former identity.
+
+    /// <summary>Whether the publisher is an organisation or an individual. "Organization" or "Person".</summary>
+    public string EntityType { get; set; } = "Organization";
+
+    /// <summary>Registered or formal name, when it differs from the site name.</summary>
+    public string EntityLegalName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Authoritative profile URLs beyond the social links — Wikipedia, Wikidata, Crunchbase, a
+    /// company register, an ORCID. One per line. These are what an engine cross-references to decide
+    /// two mentions are the same entity.
+    /// </summary>
+    public string EntitySameAs { get; set; } = string.Empty;
+
+    /// <summary>Founder or the person behind the publication.</summary>
+    public string EntityFounder { get; set; } = string.Empty;
+
+    /// <summary>ISO-8601 date (YYYY-MM-DD or YYYY) the publication began.</summary>
+    public string EntityFoundingDate { get; set; } = string.Empty;
+
+    /// <summary>
+    /// A plain-language statement of what this publication is and is not, written for answer
+    /// engines. Emitted verbatim in llms.txt's Identity section. Left empty, the generated default
+    /// stands.
+    /// </summary>
+    public string EntityIdentityStatement { get; set; } = string.Empty;
+
     // Social Links
     public string SocialTwitter { get; set; } = string.Empty;
     public string SocialFacebook { get; set; } = string.Empty;

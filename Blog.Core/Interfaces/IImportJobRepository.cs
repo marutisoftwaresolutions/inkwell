@@ -27,6 +27,9 @@ public interface IImportJobRepository
     /// <summary>Counts of items in the job grouped by type (for the preview), only counting a status if given.</summary>
     Task<Dictionary<ImportItemType, int>> GetTypeCountsAsync(Guid jobId, ImportItemStatus? status = null);
 
+    /// <summary>Slugs already used by posts and pages, so the preview can predict clashes.</summary>
+    Task<ISet<string>> GetExistingSlugsAsync();
+
     /// <summary>Recomputes and persists the job's Total/Imported/Failed/Skipped from its items.</summary>
     Task RecomputeJobCountsAsync(Guid jobId);
 }

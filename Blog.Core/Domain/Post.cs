@@ -54,6 +54,21 @@ public class Post
 
     // "Key Facts / At a glance" — a short list of quotable label/value facts rendered as a definition
     // list. Highly extractable by AI answer engines. Malformed JSON degrades to empty, never throws.
+    /// <summary>
+    /// A short direct answer shown before the article body. Answer engines and featured snippets
+    /// quote passages rather than pages, so this is the sentence written to be quoted. Rendered as
+    /// visible copy and emitted as schema.org <c>abstract</c>; 40-60 words is the target.
+    /// </summary>
+    public string? AnswerCapsule { get; set; }
+
+    public bool HasAnswerCapsule => !string.IsNullOrWhiteSpace(AnswerCapsule);
+
+    /// <summary>Word count of the capsule, for the editor hint and the linter.</summary>
+    public int AnswerCapsuleWordCount =>
+        string.IsNullOrWhiteSpace(AnswerCapsule)
+            ? 0
+            : AnswerCapsule.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+
     public string? KeyFactsJson { get; set; }
 
     [System.Text.Json.Serialization.JsonIgnore]

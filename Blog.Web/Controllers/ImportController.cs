@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Blog.Core.Domain;
+using Blog.Core.Services;
 using Blog.Core.Interfaces;
 using Blog.Web.Services;
 using Blog.Web.Services.Import;
@@ -139,7 +140,7 @@ public class ImportController : Controller
 
     [HttpPost("configure/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Configure(Guid id, ImportOptions options)
+    public async Task<IActionResult> Configure(Guid id, ImportOptions options, string? action = null)
     {
         var job = await _jobs.GetJobAsync(id, CurrentUserId());
         if (job == null) return NotFound();
@@ -147,10 +148,60 @@ public class ImportController : Controller
         // Attribute imported posts to the current admin (guarantees public visibility under owner scoping).
         options.DefaultAuthorId = CurrentUserId();
         job.OptionsJson = System.Text.Json.JsonSerializer.Serialize(options);
+
+        // Preview saves the options and reports; only the run marks the job ready and audits a start.
+        if (string.Equals(action, "preview", StringComparison.OrdinalIgnoreCase))
+        {
+            await _jobs.UpdateJobAsync(job);
+            return RedirectToAction("Preview", new { id });
+        }
+
         job.Status = ImportJobStatus.Analyzed;
         await _jobs.UpdateJobAsync(job);
         await _audit.LogAsync(AuditActions.ImportStarted, "Import", id.ToString(), $"{job.Source} — {job.FileName}");
         return RedirectToAction("Run", new { id });
+    }
+
+    /// <summary>
+    /// Predicts the outcome of the import without writing anything. Deliberately read-only: it uses
+    /// the analyzer rather than the processor, so a preview has no code path that could persist.
+    /// </summary>
+    [HttpGet("preview/{id}")]
+    public async Task<IActionResult> Preview(Guid id)
+    {
+        var job = await _jobs.GetJobAsync(id, CurrentUserId());
+        if (job == null) return NotFound();
+
+        var items = await _jobs.GetItemsAsync(id);
+        var staged = new List<StagedItem>();
+
+        foreach (var item in items)
+        {
+            string? slug = null, html = null;
+            var published = true;
+
+            if (item.ItemType is ImportItemType.Post or ImportItemType.Page && !string.IsNullOrWhiteSpace(item.DataJson))
+            {
+                try
+                {
+                    var parsed = System.Text.Json.JsonSerializer.Deserialize<ParsedPost>(item.DataJson!,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    slug = parsed?.Slug;
+                    html = parsed?.Html;
+                    published = string.Equals(parsed?.Status ?? "publish", "publish", StringComparison.OrdinalIgnoreCase);
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    // A staged item we cannot read is reported as-is rather than silently dropped.
+                }
+            }
+
+            staged.Add(new StagedItem(item.ItemType, item.Title ?? "(untitled)", slug, html, published));
+        }
+
+        var existing = await _jobs.GetExistingSlugsAsync();
+        ViewBag.Preview = ImportPreviewAnalyzer.Analyze(staged, job.Options, existing);
+        return View(job);
     }
 
     // ── Stage 4: run (batched) ───────────────────────────────────────────────

@@ -1,0 +1,10 @@
+@model Blog.Core.Domain.Post
+@* The post's direct answer, placed before the article body. Visible copy, never hidden text — the
+   same sentence serves the reader and the answer engine that quotes it. *@
+@if (Model.HasAnswerCapsule)
+{
+    <div class="ink-answer" role="doc-abstract" aria-label="In short"
+         style="border-left:3px solid var(--link,var(--primary)); padding:0.85rem 0 0.85rem 1.1rem; margin:1.25rem 0 1.75rem; background:transparent;">
+        <p style="margin:0; font-size:1.08rem; line-height:1.6; color:var(--fg,var(--foreground));">@Model.AnswerCapsule</p>
+    </div>
+}

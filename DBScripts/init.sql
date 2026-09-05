@@ -1,6 +1,6 @@
 -- =============================================================================
 -- init.sql  —  Blogfront / Inkwell Complete Database Schema
--- Version : 1.0.1 (2026-06-27)
+-- Version : 1.0.5 (2026-09-05)
 -- Target  : SQL Server 2019+ / Azure SQL
 -- Usage   : Run once on a fresh database. Every block is idempotent (IF NOT
 --           EXISTS) so it is safe to re-run against an existing database.
@@ -9,7 +9,7 @@
 -- =============================================================================
 
 PRINT '==========================================================';
-PRINT 'Blogfront / Inkwell — Full Schema Init v1.0.1';
+PRINT 'Blogfront / Inkwell — Full Schema Init v1.0.5';
 PRINT 'Started: ' + CONVERT(NVARCHAR, GETUTCDATE(), 120) + ' UTC';
 PRINT '==========================================================';
 
@@ -678,10 +678,143 @@ END
 ELSE
     PRINT '  [=] AuditLogs already exists — skipped.';
 
+
+-- =============================================================================
+-- 30. ErrorLogs  —  grouped 4xx/5xx error signatures behind Admin → Error Monitor
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ErrorLogs')
+BEGIN
+    CREATE TABLE ErrorLogs (
+        Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+        Fingerprint     NVARCHAR(64)   NOT NULL,
+        StatusCode      INT            NOT NULL,
+        Method          NVARCHAR(10)   NOT NULL DEFAULT 'GET',
+        Path            NVARCHAR(1024) NOT NULL,
+        ExceptionType   NVARCHAR(256)  NULL,
+        Message         NVARCHAR(2048) NULL,
+        StackTrace      NVARCHAR(MAX)  NULL,
+        UserAgent       NVARCHAR(512)  NULL,
+        Referer         NVARCHAR(1024) NULL,
+        LastIpAddress   NVARCHAR(45)   NULL,
+        OccurrenceCount INT            NOT NULL DEFAULT 1,
+        FirstSeenAt     DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
+        LastSeenAt      DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+    CREATE UNIQUE INDEX UX_ErrorLogs_Fingerprint ON ErrorLogs (Fingerprint);
+    CREATE INDEX        IX_ErrorLogs_LastSeenAt  ON ErrorLogs (LastSeenAt DESC);
+    PRINT '  [+] ErrorLogs table + indexes created.';
+END
+ELSE
+BEGIN
+    -- LastIpAddress arrived with the one-click "block this address" action.
+    IF COL_LENGTH('ErrorLogs', 'LastIpAddress') IS NULL
+    BEGIN
+        ALTER TABLE ErrorLogs ADD LastIpAddress NVARCHAR(45) NULL;
+        PRINT '  [+] ErrorLogs.LastIpAddress added.';
+    END
+    PRINT '  [=] ErrorLogs already exists — skipped.';
+END
+
+-- =============================================================================
+-- 31. IpFirewallRules  —  blocked / allowlisted addresses (Admin → Security)
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'IpFirewallRules')
+BEGIN
+    CREATE TABLE IpFirewallRules (
+        Id            BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        IpAddress     NVARCHAR(45)   NOT NULL,
+        Kind          NVARCHAR(10)   NOT NULL DEFAULT 'Block',
+        Source        NVARCHAR(10)   NOT NULL DEFAULT 'Auto',
+        Reason        NVARCHAR(500)  NULL,
+        Score         INT            NOT NULL DEFAULT 0,
+        OffenseCount  INT            NOT NULL DEFAULT 1,
+        HitCount      INT            NOT NULL DEFAULT 0,
+        LastPath      NVARCHAR(1024) NULL,
+        LastUserAgent NVARCHAR(512)  NULL,
+        CreatedBy     NVARCHAR(200)  NULL,
+        CreatedAt     DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
+        ExpiresAt     DATETIME2      NULL,
+        LastHitAt     DATETIME2      NULL,
+        CONSTRAINT UQ_IpFirewallRules_IpAddress UNIQUE (IpAddress)
+    );
+    CREATE INDEX IX_IpFirewallRules_Kind_ExpiresAt ON IpFirewallRules (Kind, ExpiresAt);
+    CREATE INDEX IX_IpFirewallRules_CreatedAt      ON IpFirewallRules (CreatedAt DESC);
+    PRINT '  [+] IpFirewallRules table + indexes created.';
+END
+ELSE
+    PRINT '  [=] IpFirewallRules already exists — skipped.';
+
+-- =============================================================================
+-- 32. CrawlerVisits  —  identified AI / search crawler requests (Admin → AI Crawlers)
+--     Kept apart from PageViews, which is human analytics: mixing crawler hits
+--     into it would silently inflate every visitor number.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'CrawlerVisits')
+BEGIN
+    CREATE TABLE CrawlerVisits (
+        Id         BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        OwnerId    UNIQUEIDENTIFIER NOT NULL,
+        Crawler    NVARCHAR(60)     NOT NULL,
+        Operator   NVARCHAR(60)     NOT NULL,
+        IsAi       BIT              NOT NULL,
+        Path       NVARCHAR(1024)   NOT NULL,
+        StatusCode INT              NOT NULL,
+        UserAgent  NVARCHAR(512)    NULL,
+        VisitedAt  DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+    CREATE INDEX IX_CrawlerVisits_Owner_VisitedAt ON CrawlerVisits (OwnerId, VisitedAt DESC);
+    CREATE INDEX IX_CrawlerVisits_Owner_Crawler   ON CrawlerVisits (OwnerId, Crawler, VisitedAt DESC);
+    CREATE INDEX IX_CrawlerVisits_Owner_Path      ON CrawlerVisits (OwnerId, Path);
+    PRINT '  [+] CrawlerVisits table + indexes created.';
+END
+ELSE
+    PRINT '  [=] CrawlerVisits already exists — skipped.';
+
+-- =============================================================================
+-- 33. Column top-ups on tables created above
+--     These arrived after their table did, so a database created by an older
+--     copy of this file needs them added rather than the table recreated.
+-- =============================================================================
+
+-- Posts: AI-extractable content blocks.
+IF COL_LENGTH('Posts', 'KeyFactsJson') IS NULL
+BEGIN
+    ALTER TABLE Posts ADD KeyFactsJson NVARCHAR(MAX) NULL;
+    PRINT '  [+] Posts.KeyFactsJson added.';
+END
+ELSE
+    PRINT '  [=] Posts.KeyFactsJson already exists — skipped.';
+
+IF COL_LENGTH('Posts', 'HowToJson') IS NULL
+BEGIN
+    ALTER TABLE Posts ADD HowToJson NVARCHAR(MAX) NULL;
+    PRINT '  [+] Posts.HowToJson added.';
+END
+ELSE
+    PRINT '  [=] Posts.HowToJson already exists — skipped.';
+
+-- Answer capsule: the short direct answer rendered above the article and emitted
+-- as schema.org "abstract".
+IF COL_LENGTH('Posts', 'AnswerCapsule') IS NULL
+BEGIN
+    ALTER TABLE Posts ADD AnswerCapsule NVARCHAR(1000) NULL;
+    PRINT '  [+] Posts.AnswerCapsule added.';
+END
+ELSE
+    PRINT '  [=] Posts.AnswerCapsule already exists — skipped.';
+
+-- Redirects: 301 (default) / 302 / 410 Gone.
+IF COL_LENGTH('Redirects', 'StatusCode') IS NULL
+BEGIN
+    ALTER TABLE Redirects ADD StatusCode INT NOT NULL CONSTRAINT DF_Redirects_StatusCode DEFAULT 301;
+    PRINT '  [+] Redirects.StatusCode added (default 301).';
+END
+ELSE
+    PRINT '  [=] Redirects.StatusCode already exists — skipped.';
 -- =============================================================================
 
 PRINT '';
 PRINT '==========================================================';
 PRINT 'Schema init complete: ' + CONVERT(NVARCHAR, GETUTCDATE(), 120) + ' UTC';
-PRINT 'All 21 tables verified. Safe to run multiple times.';
+PRINT 'All tables verified. Safe to run multiple times.';
 PRINT '==========================================================';

@@ -198,6 +198,62 @@
                 </div>
             </div>
 
+
+            <div class="space-y-4 pt-6 border-t border-border">
+                <div>
+                    <h3 class="text-sm font-medium text-foreground">Publisher identity (knowledge graph)</h3>
+                    <p class="text-xs text-muted-foreground mt-1">
+                        Who this publication <em>is</em>, as an entity rather than a website. Search and answer engines
+                        resolve a brand by cross-referencing authoritative profiles — this is how they tell you apart
+                        from a similarly named site, or from whatever your domain published before. Every field is
+                        optional; blanks are omitted from structured data rather than guessed at.
+                    </p>
+                </div>
+
+                <div class="grid gap-6 md:grid-cols-2">
+                    <div class="space-y-2">
+                        <label asp-for="EntityType" class="text-sm font-medium leading-none">Publisher type</label>
+                        <select asp-for="EntityType" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <option value="Organization">Organization</option>
+                            <option value="Person">Person (a personal publication)</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">Sets the schema.org type of the publisher node.</p>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="EntityLegalName" class="text-sm font-medium leading-none">Legal name</label>
+                        <input asp-for="EntityLegalName" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Registered name, if different from the site name" />
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="EntityFounder" class="text-sm font-medium leading-none">Founder</label>
+                        <input asp-for="EntityFounder" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Full name" />
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="EntityFoundingDate" class="text-sm font-medium leading-none">Founded</label>
+                        <input asp-for="EntityFoundingDate" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="2019 or 2019-04-01" />
+                        <p class="text-xs text-muted-foreground">A year or a full date. Anything else is left out rather than reshaped.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label asp-for="EntitySameAs" class="text-sm font-medium leading-none">Authority profiles</label>
+                    <textarea asp-for="EntitySameAs" rows="4" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://en.wikipedia.org/wiki/Your_Publication&#10;https://www.wikidata.org/wiki/Q123456&#10;https://www.crunchbase.com/organization/your-company"></textarea>
+                    <p class="text-xs text-muted-foreground">
+                        One URL per line — Wikipedia, Wikidata, a company register, Crunchbase, an ORCID. These join your
+                        social links in <code>sameAs</code>. Only absolute http(s) URLs are used; a bare handle would
+                        invalidate the whole node.
+                    </p>
+                </div>
+
+                <div class="space-y-2">
+                    <label asp-for="EntityIdentityStatement" class="text-sm font-medium leading-none">Identity statement</label>
+                    <textarea asp-for="EntityIdentityStatement" rows="4" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Leave blank to use the generated wording."></textarea>
+                    <p class="text-xs text-muted-foreground">
+                        Written for answer engines and published verbatim in the Identity section of
+                        <code>llms.txt</code>. Say plainly what this publication is — and, if your domain previously
+                        published something else, what it is not. Blank keeps the generated wording.
+                    </p>
+                </div>
+            </div>
             <div class="pt-6 flex justify-end">
                 <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 shadow-sm">
                     Save Changes

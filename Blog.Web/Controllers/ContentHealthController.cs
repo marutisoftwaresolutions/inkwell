@@ -25,7 +25,7 @@ public class ContentHealthController : Controller
     }
 
     /// <param name="filter">
-    /// attention (default) · overdue · duesoon · unverified · nokeyfacts · nofaq · meta · staleyear · all
+    /// attention (default) · overdue · duesoon · unverified · nokeyfacts · nofaq · meta · staleyear · weakaeo · all
     /// </param>
     [HttpGet("")]
     public async Task<IActionResult> Index(string filter = "attention")
@@ -43,6 +43,7 @@ public class ContentHealthController : Controller
             "nofaq"      => all.Where(i => !i.HasFaq),
             "meta"       => all.Where(i => i.MetaMissing || i.MetaTooLong),
             "staleyear"  => all.Where(i => i.StaleYearStamp),
+        "weakaeo"    => all.Where(i => i.AeoWeak).OrderBy(i => i.AeoScore),
             "all"        => all,
             _            => all.Where(i => i.NeedsAttention)
         };

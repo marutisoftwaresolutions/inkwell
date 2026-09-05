@@ -1,0 +1,71 @@
+@using Blog.Core.Services
+@{
+    var status   = (LinkStatus)ViewBag.Status;
+    var outbound = (IReadOnlyList<LinkSuggestion>)ViewBag.Outbound;
+    var inbound  = (IReadOnlyList<LinkSuggestion>)ViewBag.Inbound;
+
+    string Chip(bool ok) => ok
+        ? "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700"
+        : "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700";
+}
+
+@* Where this post stands against the two-in / two-out minimum. *@
+<div class="flex flex-wrap gap-1.5 mb-3">
+    <span class="@Chip(!status.NeedsOutbound)">@status.Outbound outbound</span>
+    <span class="@Chip(!status.NeedsInbound)">@status.Inbound inbound</span>
+    @if (status.IsOrphan)
+    {
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">orphan</span>
+    }
+</div>
+
+@if (status.NeedsOutbound || status.NeedsInbound)
+{
+    <p class="text-[11px] text-muted-foreground mb-3">
+        Aim for at least two links in each direction. Add them in the prose, next to the sentence they belong to.
+    </p>
+}
+
+<div class="mb-4">
+    <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Link out to</div>
+    @if (outbound.Count == 0)
+    {
+        <p class="text-[11px] text-muted-foreground">No related published posts found.</p>
+    }
+    @foreach (var s in outbound)
+    {
+        <div class="mb-2 pb-2 border-b border-border/50 last:border-0">
+            <div class="flex items-start justify-between gap-2">
+                <span class="text-xs text-foreground leading-snug">@s.Title</span>
+                @if (s.Kind == SuggestionKind.UnlinkedMention)
+                {
+                    <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">mentioned</span>
+                }
+            </div>
+            <div class="text-[11px] text-muted-foreground mt-0.5">@s.Reason</div>
+            <code class="text-[10px] text-muted-foreground select-all">&lt;a href="/@s.Slug"&gt;</code>
+        </div>
+    }
+</div>
+
+<div>
+    <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Should link here</div>
+    @if (inbound.Count == 0)
+    {
+        <p class="text-[11px] text-muted-foreground">No candidates found.</p>
+    }
+    @foreach (var s in inbound)
+    {
+        <div class="mb-2 pb-2 border-b border-border/50 last:border-0">
+            <div class="flex items-start justify-between gap-2">
+                <a href="/admin/posts" class="text-xs text-foreground leading-snug hover:underline">@s.Title</a>
+                @if (s.Kind == SuggestionKind.UnlinkedMention)
+                {
+                    <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">mentioned</span>
+                }
+            </div>
+            <div class="text-[11px] text-muted-foreground mt-0.5">@s.Reason</div>
+            <div class="text-[10px] font-mono text-muted-foreground">/@s.Slug</div>
+        </div>
+    }
+</div>

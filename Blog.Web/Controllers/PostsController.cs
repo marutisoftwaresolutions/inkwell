@@ -20,10 +20,12 @@ public class PostsController : Controller
     private readonly PostService _postService;
     private readonly AuditService _audit;
     private readonly IndexNowService _indexNow;
+    private readonly ILinkSuggestionRepository _links;
+    private readonly ITenantContext _tenantContext;
 
     public PostsController(IPostRepository posts, ICategoryRepository categories,
         ITagRepository tags, IMediaRepository media, PostService postService, AuditService audit,
-        IndexNowService indexNow)
+        IndexNowService indexNow, ILinkSuggestionRepository links, ITenantContext tenantContext)
     {
         _posts = posts;
         _categories = categories;
@@ -32,6 +34,8 @@ public class PostsController : Controller
         _postService = postService;
         _audit = audit;
         _indexNow = indexNow;
+        _links = links;
+        _tenantContext = tenantContext;
     }
 
     // Ping IndexNow with a freshly published/updated post's public URL (best-effort, non-throwing).
@@ -107,6 +111,8 @@ public class PostsController : Controller
         {
             post.Status = PostStatus.Draft;
         }
+
+        ApplyStructuredDataGate(post);
 
         var tags = (tagNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
                                    .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
@@ -190,6 +196,8 @@ public class PostsController : Controller
             post.Status = PostStatus.Draft;
         }
 
+        ApplyStructuredDataGate(post);
+
         var tags = (tagNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
                                    .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
 
@@ -249,5 +257,61 @@ public class PostsController : Controller
         post.Plaintext = content; // autosave sets both temporarily or simplistic
         await _posts.UpdateAsync(post);
         return Content("Saved", "text/plain");
+    }
+
+
+    /// <summary>
+    /// Link suggestions for the post being edited, in both directions, plus how it stands against
+    /// the two-in / two-out minimum. Loaded into the editor sidebar on demand — the corpus scan is
+    /// not worth doing on every page load.
+    /// </summary>
+    [HttpGet("link-suggestions/{id:guid}")]
+    public async Task<IActionResult> LinkSuggestions(Guid id)
+    {
+        var post = await _posts.GetByIdAsync(id, null);
+        if (post is null) return NotFound();
+
+        var ownerId = _tenantContext.IsCloudMode && _tenantContext.IsResolved ? _tenantContext.UserId : (Guid?)null;
+        var candidates = await _links.GetCandidatesAsync(ownerId);
+
+        var current = candidates.FirstOrDefault(c => c.Id == id)
+            ?? new LinkCandidate(post.Id, post.Slug ?? "", post.Title ?? "", post.Html ?? "", [], []);
+        var others = candidates.Where(c => c.Id != id).ToList();
+
+        ViewBag.Status   = LinkSuggester.Status(current, others);
+        ViewBag.Outbound = LinkSuggester.SuggestOutbound(current, others);
+        ViewBag.Inbound  = LinkSuggester.SuggestInbound(current, others);
+
+        return PartialView("_LinkSuggestions");
+    }
+
+    /// <summary>
+    /// Structured data that would not validate never reaches the live site. A post being published
+    /// or scheduled is linted first; on any error it is saved as a draft instead, so the author
+    /// keeps their work but invalid or self-serving schema does not ship. Warnings are surfaced and
+    /// allowed through - they are judgement calls, not defects.
+    /// </summary>
+    private void ApplyStructuredDataGate(Post post)
+    {
+        if (post.Status != PostStatus.Published && post.Status != PostStatus.Scheduled) return;
+
+        var findings = StructuredDataLinter.Lint(post);
+        if (findings.Count == 0) return;
+
+        if (!StructuredDataLinter.CanPublish(findings))
+        {
+            var errors = findings.Where(f => f.Severity == LintSeverity.Error)
+                                 .Select(f => $"{f.Where}: {f.Message}");
+            TempData["Error"] = "Saved as a draft - the structured data has to be fixed before this can publish. "
+                              + string.Join(" ", errors);
+            post.Status = PostStatus.Draft;
+            return;
+        }
+
+        var warnings = findings.Where(f => f.Severity == LintSeverity.Warning)
+                               .Select(f => $"{f.Where}: {f.Message}")
+                               .ToList();
+        if (warnings.Count > 0)
+            TempData["Warning"] = "Published with structured-data warnings. " + string.Join(" ", warnings);
     }
 }

@@ -23,6 +23,24 @@ public class CategoryRepository : ICategoryRepository
         return (await conn.QueryAsync<Category>(sql, new { AuthorId = authorId })).ToList();
     }
 
+    /// <summary>
+    /// Categories carrying at least one PUBLISHED post, with that published count. Reader-facing
+    /// counterpart to <see cref="GetAllAsync"/>, which keeps empty categories and counts drafts.
+    /// </summary>
+    public async Task<List<Category>> GetPublicAsync(Guid authorId)
+    {
+        using var conn = _ctx.CreateConnection();
+        var sql = @"
+            SELECT c.Id, c.Name, c.Slug, c.AuthorId, COUNT(p.Id) as PostCount
+            FROM Categories c
+            INNER JOIN PostCategories pc ON pc.CategoryId = c.Id
+            INNER JOIN Posts p ON p.Id = pc.PostId AND p.Status = 'Published'
+            " + (authorId == Guid.Empty ? "" : "WHERE c.AuthorId = @AuthorId ") + @"
+            GROUP BY c.Id, c.Name, c.Slug, c.AuthorId
+            ORDER BY c.Name";
+        return (await conn.QueryAsync<Category>(sql, new { AuthorId = authorId })).ToList();
+    }
+
     public async Task<Category?> GetByIdAsync(Guid id, Guid authorId)
     {
         using var conn = _ctx.CreateConnection();

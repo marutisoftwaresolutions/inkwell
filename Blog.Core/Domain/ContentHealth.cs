@@ -20,6 +20,16 @@ public class ContentHealthItem
     public bool      HasFaq         { get; set; }
     public int       MetaLength     { get; set; }
 
+    // ── AEO readiness inputs ──────────────────────────────────────────────────
+    // Counted in SQL rather than by loading article bodies; see ContentHealthRepository.
+    public string?   AnswerCapsule   { get; set; }
+    public string?   KeyFactsJson    { get; set; }
+    public string?   FaqJson         { get; set; }
+    public bool      HasFeatureImage { get; set; }
+    public int       H2Count         { get; set; }
+    public int       InternalLinks   { get; set; }
+    public int       HtmlLength      { get; set; }
+
     /// <summary>Longest meta description Google reliably shows before truncating.</summary>
     public const int MetaDescriptionLimit = 155;
 
@@ -47,6 +57,18 @@ public class ContentHealthItem
         }
     }
 
+    /// <summary>
+    /// AEO readiness for this post, 0–100. Computed on first access so a caller that only wants the
+    /// maintenance view does not pay for it.
+    /// </summary>
+    public int AeoScore => _aeo ??= Services.AeoReadiness.Score(this).Score;
+    private int? _aeo;
+
+    /// <summary>Below this, a post is unlikely to be the source an answer engine quotes.</summary>
+    public const int WeakAeoScore = 50;
+
+    public bool AeoWeak => AeoScore < WeakAeoScore;
+
     /// <summary>True when anything needs attention — drives the default filter.</summary>
     public bool NeedsAttention =>
         NeverVerified || ReviewOverdue || NoReviewDate || !HasKeyFacts || MetaMissing || MetaTooLong || StaleYearStamp;
@@ -66,6 +88,8 @@ public class ContentHealthSummary
     public int MissingFaq       { get; set; }
     public int MetaIssues       { get; set; }
     public int StaleYearStamps  { get; set; }
+    public int WeakAeo          { get; set; }
+    public int AverageAeoScore  { get; set; }
     public int Healthy          { get; set; }
 
     public static ContentHealthSummary From(IReadOnlyList<ContentHealthItem> items) => new()
@@ -78,6 +102,8 @@ public class ContentHealthSummary
         MissingFaq      = items.Count(i => !i.HasFaq),
         MetaIssues      = items.Count(i => i.MetaMissing || i.MetaTooLong),
         StaleYearStamps = items.Count(i => i.StaleYearStamp),
+        WeakAeo         = items.Count(i => i.AeoWeak),
+        AverageAeoScore = items.Count == 0 ? 0 : (int)Math.Round(items.Average(i => i.AeoScore)),
         Healthy         = items.Count(i => !i.NeedsAttention)
     };
 }

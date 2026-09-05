@@ -34,6 +34,9 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IImportJobRepository, ImportJobRepository>();
         services.AddScoped<IIpFirewallRepository, IpFirewallRepository>();
         services.AddScoped<IContentHealthRepository, ContentHealthRepository>();
+        services.AddScoped<ILinkAuditRepository, LinkAuditRepository>();
+        services.AddScoped<ILinkSuggestionRepository, LinkSuggestionRepository>();
+        services.AddScoped<ICrawlerVisitRepository, CrawlerVisitRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
         services.AddScoped<OptometryTaxonomySeeder>();

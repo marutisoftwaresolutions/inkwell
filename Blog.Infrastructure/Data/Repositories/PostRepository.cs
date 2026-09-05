@@ -200,13 +200,13 @@ public class PostRepository : IPostRepository
                                MetaTitle, MetaDescription, CanonicalUrl, OgImage, OgTitle, OgDescription,
                                TwitterImage, TwitterTitle, TwitterDescription,
                                AuthorId, Status, PublishedAt, LastVerifiedAt, NextReviewAt, ScheduledAt,
-                               AllowComments, FaqJson, RoundupJson, KeyFactsJson, HowToJson, CreatedAt, UpdatedAt)
+                               AllowComments, FaqJson, RoundupJson, KeyFactsJson, HowToJson, AnswerCapsule, CreatedAt, UpdatedAt)
             OUTPUT INSERTED.Id
             VALUES (@Id, @Uuid, @Title, @Slug, @Html, @Plaintext, @Type, @Visibility, @FeatureImage,
                     @MetaTitle, @MetaDescription, @CanonicalUrl, @OgImage, @OgTitle, @OgDescription,
                     @TwitterImage, @TwitterTitle, @TwitterDescription,
                     @AuthorId, @Status, @PublishedAt, @LastVerifiedAt, @NextReviewAt, @ScheduledAt,
-                    @AllowComments, @FaqJson, @RoundupJson, @KeyFactsJson, @HowToJson, @CreatedAt, @UpdatedAt)",
+                    @AllowComments, @FaqJson, @RoundupJson, @KeyFactsJson, @HowToJson, @AnswerCapsule, @CreatedAt, @UpdatedAt)",
             new
             {
                 post.Id, post.Uuid, post.Title, post.Slug, post.Html, post.Plaintext, post.Type, post.Visibility, post.FeatureImage,
@@ -214,7 +214,7 @@ public class PostRepository : IPostRepository
                 post.TwitterImage, post.TwitterTitle, post.TwitterDescription,
                 post.AuthorId, Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
-                post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson,
+                post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson, post.AnswerCapsule,
                 CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now
             });
     }
@@ -231,7 +231,7 @@ public class PostRepository : IPostRepository
                 TwitterImage = @TwitterImage, TwitterTitle = @TwitterTitle, TwitterDescription = @TwitterDescription,
                 Status = @Status, PublishedAt = @PublishedAt, LastVerifiedAt = @LastVerifiedAt,
                 NextReviewAt = @NextReviewAt, ScheduledAt = @ScheduledAt,
-                AllowComments = @AllowComments, FaqJson = @FaqJson, RoundupJson = @RoundupJson, KeyFactsJson = @KeyFactsJson, HowToJson = @HowToJson,
+                AllowComments = @AllowComments, FaqJson = @FaqJson, RoundupJson = @RoundupJson, KeyFactsJson = @KeyFactsJson, HowToJson = @HowToJson, AnswerCapsule = @AnswerCapsule,
                 UpdatedAt = @UpdatedAt
             WHERE Id = @Id AND AuthorId = @AuthorId",
             new
@@ -241,7 +241,7 @@ public class PostRepository : IPostRepository
                 post.TwitterImage, post.TwitterTitle, post.TwitterDescription,
                 Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
-                post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson,
+                post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson, post.AnswerCapsule,
                 UpdatedAt = DateTime.Now, post.Id, post.AuthorId
             });
     }

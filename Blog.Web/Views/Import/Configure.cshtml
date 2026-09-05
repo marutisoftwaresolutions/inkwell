@@ -69,6 +69,11 @@
             Imported posts are attributed to you (the site owner) so they publish under your existing blog.
         </div>
 
-        <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Start import →</button>
+        <div class="flex gap-3">
+            <button type="submit" name="action" value="preview"
+                    class="px-4 py-2 border border-input rounded-md text-sm font-medium hover:bg-muted">Preview first</button>
+            <button type="submit" name="action" value="run"
+                    class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Start import →</button>
+        </div>
     </form>
 </div>

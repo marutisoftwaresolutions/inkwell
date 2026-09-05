@@ -5,6 +5,7 @@ namespace Blog.Core.Interfaces;
 public interface ITagRepository
 {
     Task<List<Tag>> GetAllAsync(Guid authorId);
+    Task<List<Tag>> GetPublicAsync(Guid authorId);
     Task<Tag?> GetByIdAsync(Guid id, Guid authorId);
     Task<Tag?> GetBySlugAsync(string slug, Guid authorId);
     Task<Tag> GetOrCreateAsync(string name, Guid authorId);

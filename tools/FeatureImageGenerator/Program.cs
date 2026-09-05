@@ -386,6 +386,24 @@ var posts = new[]
         "FDA-Approved AI Devices for Eye Care: Full List 2026",
         "REFERENCE GUIDE", "AI & Machine Learning in Optometry",
         "172554", "1e3a8a", "60a5fa", ShapeStyle.Grid),
+
+    new PostSpec(
+        "optometry-software-pricing-guide",
+        "Optometry Software Pricing: What It Really Costs",
+        "BUYER'S GUIDE", "Practice Management Software",
+        "064e3b", "047857", "34d399", ShapeStyle.Analytics),
+
+    new PostSpec(
+        "free-vs-paid-optometry-ehr",
+        "Free vs Paid Optometry EHR: What You Actually Get",
+        "BUYER'S GUIDE", "EHR & Electronic Records",
+        "1e3a8a", "2563eb", "93c5fd", ShapeStyle.Comparison),
+
+    new PostSpec(
+        "optometry-software-vendor-evaluation",
+        "How to Evaluate an Optometry Software Vendor",
+        "BUYER'S GUIDE", "Practice Management Software",
+        "3b0764", "6d28d9", "c4b5fd", ShapeStyle.Checklist),
 };
 
 // ── Verdict roundups always use the programmatic branded card, for a consistent
@@ -429,9 +447,25 @@ var pngMappings = new System.Collections.Generic.Dictionary<string, string>
     { "anti-reflective-lens-coating-track-upsell-optometry-software", "anti_reflective_coating_1779510299776.png" }
 };
 
+// ── --only=<slug>[,<slug>] ─────────────────────────────────────────────────────
+// Generate ONLY the named slugs and touch nothing else. Without this the tool
+// rewrites all feature images plus logo.png, favicon.ico, site-cover.jpg and two
+// SQL files - which silently replaces artwork that is already live. See the
+// "Feature Image Generation Rule" in CLAUDE.md: never regenerate an existing image.
+var onlyArg = args.FirstOrDefault(a => a.StartsWith("--only=", StringComparison.OrdinalIgnoreCase));
+System.Collections.Generic.HashSet<string>? onlySlugs = onlyArg is null
+    ? null
+    : new System.Collections.Generic.HashSet<string>(
+        onlyArg.Substring("--only=".Length)
+               .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        StringComparer.OrdinalIgnoreCase);
+if (onlySlugs is not null)
+    Console.WriteLine($"--only: restricted to {onlySlugs.Count} slug(s); no other file will be written.");
+
 for (int i = 0; i < posts.Length; i++)
 {
     var p = posts[i];
+    if (onlySlugs is not null && !onlySlugs.Contains(p.Slug)) continue;
     var outPath = IOPath.Combine(baseDir, $"{p.Slug}.jpg");
 
     // 0. Verdict roundups: photographic scene (default) or legacy flat card (--flat-cards)
@@ -487,6 +521,14 @@ for (int i = 0; i < posts.Length; i++)
 }
 
 Console.WriteLine($"\nDone — {posts.Length} images generated/processed.");
+
+if (onlySlugs is not null)
+{
+    Console.WriteLine("--only was set: skipping the SQL scripts and the logo/favicon/site-cover");
+    Console.WriteLine("regeneration, so no existing asset is overwritten. Set FeatureImage with a");
+    Console.WriteLine("dated DBScripts/*.sql instead.");
+    return;
+}
 
 // ── Write companion SQL script ─────────────────────────────────────────────────
 var sqlPath = IOPath.GetFullPath(

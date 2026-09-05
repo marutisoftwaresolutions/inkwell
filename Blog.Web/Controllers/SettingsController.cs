@@ -63,7 +63,14 @@ public class SettingsController : Controller
             SocialInstagram = globalSettings.SocialInstagram,
             SocialYoutube = globalSettings.SocialYoutube,
             SocialLinkedin = globalSettings.SocialLinkedin,
-            SocialGithub = globalSettings.SocialGithub
+            SocialGithub = globalSettings.SocialGithub,
+
+            EntityType              = globalSettings.EntityType,
+            EntityLegalName         = globalSettings.EntityLegalName,
+            EntitySameAs            = globalSettings.EntitySameAs,
+            EntityFounder           = globalSettings.EntityFounder,
+            EntityFoundingDate      = globalSettings.EntityFoundingDate,
+            EntityIdentityStatement = globalSettings.EntityIdentityStatement
         };
 
         ViewData["Title"] = "General Settings";
@@ -114,6 +121,14 @@ public class SettingsController : Controller
         globalSettings.SocialYoutube = model.SocialYoutube ?? string.Empty;
         globalSettings.SocialLinkedin = model.SocialLinkedin ?? string.Empty;
         globalSettings.SocialGithub = model.SocialGithub ?? string.Empty;
+
+        // An unknown publisher type falls back rather than emitting an invalid schema.org @type.
+        globalSettings.EntityType              = Blog.Core.Services.EntityGraph.ResolveType(model.EntityType);
+        globalSettings.EntityLegalName         = (model.EntityLegalName ?? string.Empty).Trim();
+        globalSettings.EntitySameAs            = (model.EntitySameAs ?? string.Empty).Trim();
+        globalSettings.EntityFounder           = (model.EntityFounder ?? string.Empty).Trim();
+        globalSettings.EntityFoundingDate      = (model.EntityFoundingDate ?? string.Empty).Trim();
+        globalSettings.EntityIdentityStatement = (model.EntityIdentityStatement ?? string.Empty).Trim();
 
         await _settings.SaveSettingsAsync(targetId, globalSettings);
         await _audit.LogAsync(AuditActions.SettingsUpdated, "Settings", targetId.ToString(), "Site Settings");

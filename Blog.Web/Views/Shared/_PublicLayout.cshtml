@@ -262,25 +262,41 @@
 		var orgData = new System.Collections.Generic.Dictionary<string, object>
 		{
 			["@context"] = "https://schema.org",
-			["@type"] = "Organization",
+			["@type"] = Blog.Core.Services.EntityGraph.ResolveType(globalSettings.EntityType),
 			["@id"] = $"{orgBaseUrl}/#organization",
 			["name"] = siteName,
 			["url"] = orgBaseUrl,
 			["description"] = siteDescription
 		};
+
+		// Entity identity — only what the operator actually supplied. An invented founder or
+		// founding date in structured data is worse than an absent property.
+		var orgLegalName = (globalSettings.EntityLegalName ?? "").Trim();
+		if (orgLegalName.Length > 0) orgData["legalName"] = orgLegalName;
+
+		var orgFounder = (globalSettings.EntityFounder ?? "").Trim();
+		if (orgFounder.Length > 0)
+			orgData["founder"] = new System.Collections.Generic.Dictionary<string, string>
+			{
+				["@type"] = "Person",
+				["name"] = orgFounder
+			};
+
+		var orgFounded = Blog.Core.Services.EntityGraph.FoundingDate(globalSettings.EntityFoundingDate);
+		if (orgFounded is not null) orgData["foundingDate"] = orgFounded;
 		if (!string.IsNullOrEmpty(globalSettings.SiteLogoUrl))
 			orgData["logo"] = new System.Collections.Generic.Dictionary<string, string>
 			{
 				["@type"] = "ImageObject",
 				["url"] = globalSettings.SiteLogoUrl
 			};
-		// sameAs — every configured social profile strengthens the entity graph for Google & AI answer engines.
-		var sameAs = new[]
-		{
+		// sameAs — social profiles plus the operator's authority profiles (Wikipedia, Wikidata, a
+		// company register). These are what an engine cross-references to decide two mentions are the
+		// same entity, which is how a brand is disambiguated from a similarly named one.
+		var sameAs = Blog.Core.Services.EntityGraph.SameAs(globalSettings,
 			globalSettings.SocialTwitter, globalSettings.SocialFacebook, globalSettings.SocialInstagram,
-			globalSettings.SocialYoutube, globalSettings.SocialLinkedin, globalSettings.SocialGithub
-		}.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-		if (sameAs.Length > 0)
+			globalSettings.SocialYoutube, globalSettings.SocialLinkedin, globalSettings.SocialGithub);
+		if (sameAs.Count > 0)
 			orgData["sameAs"] = sameAs;
 
 		// knowsAbout — the tenant's own categories describe the entity's topical expertise, which helps

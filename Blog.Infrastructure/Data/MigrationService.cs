@@ -384,6 +384,31 @@ public class MigrationService
                 BEGIN
                     ALTER TABLE Redirects ADD StatusCode INT NOT NULL CONSTRAINT DF_Redirects_StatusCode DEFAULT 301 WITH VALUES;
                 END
+                -- AI/search crawler visibility (DBScripts/2026-09-05_create-crawler-visits-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CrawlerVisits')
+                BEGIN
+                    CREATE TABLE CrawlerVisits (
+                        Id         BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        OwnerId    UNIQUEIDENTIFIER NOT NULL,
+                        Crawler    NVARCHAR(60)     NOT NULL,
+                        Operator   NVARCHAR(60)     NOT NULL,
+                        IsAi       BIT              NOT NULL,
+                        Path       NVARCHAR(1024)   NOT NULL,
+                        StatusCode INT              NOT NULL,
+                        UserAgent  NVARCHAR(512)    NULL,
+                        VisitedAt  DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME()
+                    );
+                    CREATE INDEX IX_CrawlerVisits_Owner_VisitedAt ON CrawlerVisits (OwnerId, VisitedAt DESC);
+                    CREATE INDEX IX_CrawlerVisits_Owner_Crawler   ON CrawlerVisits (OwnerId, Crawler, VisitedAt DESC);
+                    CREATE INDEX IX_CrawlerVisits_Owner_Path      ON CrawlerVisits (OwnerId, Path);
+                END
+
+
+                -- Answer capsule (DBScripts/2026-09-05_add-answercapsule-to-posts.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'AnswerCapsule')
+                BEGIN
+                    ALTER TABLE Posts ADD AnswerCapsule NVARCHAR(1000) NULL;
+                END
 
                 -- Offender IP on error signatures (DBScripts/2026-08-15_add-lastipaddress-to-errorlogs.sql)
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ErrorLogs') AND name = 'LastIpAddress')

@@ -5,6 +5,7 @@ namespace Blog.Core.Interfaces;
 public interface ICategoryRepository
 {
     Task<List<Category>> GetAllAsync(Guid authorId);
+    Task<List<Category>> GetPublicAsync(Guid authorId);
     Task<Category?> GetByIdAsync(Guid id, Guid authorId);
     Task<Category?> GetBySlugAsync(string slug, Guid authorId);
     Task<Guid> CreateAsync(Category category);

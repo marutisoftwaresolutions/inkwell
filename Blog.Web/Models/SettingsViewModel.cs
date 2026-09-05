@@ -72,4 +72,24 @@ public class SettingsViewModel
 
     [Display(Name = "GitHub URL")]
     public string? SocialGithub { get; set; }
+
+    // ── Publisher identity (knowledge graph) ─────────────────────────────────
+
+    [Display(Name = "Publisher type")]
+    public string? EntityType { get; set; }
+
+    [Display(Name = "Legal name")]
+    public string? EntityLegalName { get; set; }
+
+    [Display(Name = "Authority profiles")]
+    public string? EntitySameAs { get; set; }
+
+    [Display(Name = "Founder")]
+    public string? EntityFounder { get; set; }
+
+    [Display(Name = "Founded")]
+    public string? EntityFoundingDate { get; set; }
+
+    [Display(Name = "Identity statement")]
+    public string? EntityIdentityStatement { get; set; }
 }
