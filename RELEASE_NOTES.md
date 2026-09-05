@@ -158,12 +158,12 @@ tenant; blogs with no tags are unaffected.
 
 ## Upgrade notes
 
-- **Schema:** two changes, both applied automatically on startup by `MigrationService`:
-  the new `CrawlerVisits` table and the `Posts.AnswerCapsule` column. Dated scripts in `DBScripts/`
-  (`2026-09-05_create-crawler-visits-table.sql`, `2026-09-05_add-answercapsule-to-posts.sql`) mirror
-  them for manual or production application — run them with `sqlcmd -f 65001` (UTF-8; omitting it
-  corrupts em dashes and curly quotes). Publisher-identity fields live in the settings JSON blob and
-  need no migration.
+- **Schema:** two changes — the new `CrawlerVisits` table and the `Posts.AnswerCapsule` column.
+  Both are applied automatically on startup by `MigrationService`, so an existing installation needs
+  no manual step. For a fresh install, or to apply them by hand, run `DBScripts/init.sql` — it is
+  idempotent, carries the complete v1.0.5 schema, and adds missing columns to an existing database
+  without touching data. Run it with `sqlcmd -f 65001` (UTF-8; omitting it corrupts em dashes and
+  curly quotes). Publisher-identity fields live in the settings JSON blob and need no migration.
 - **Publishing can now be refused.** A post whose FAQ, Key Facts, How-To or roundup block fails
   validation is saved as a draft with the reason shown. Existing published posts are not re-validated
   until they are next saved; use Admin → Content Health to find posts worth revisiting.
