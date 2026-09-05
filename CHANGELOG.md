@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.5] — 2026-09-05
+
 ### Added
 
 - **Answer-engine readiness score** — every post now carries a 0–100 score for how ready it is to be *quoted* by an answer engine, shown in the editor sidebar with a per-signal breakdown and in Admin → Content Health as a column, a tile and a filter. The structured-data linter says what is *broken*; this says what is *absent*: the answer capsule, Key Facts, FAQ, meta description, section headings, internal links, freshness dates, depth and feature image, each weighted by how much it contributes to being cited and each carrying concrete advice rather than a bare number. The answer capsule carries the most weight because it is the passage an engine actually lifts. Advisory only — it never blocks a publish, because a short note that scores low may be exactly right and forcing every post into one shape would produce filler. Nothing unobservable is scored: there is no accuracy or authority judgement and no invented ranking prediction. The dashboard counts headings and links in SQL rather than loading article bodies, and the editor counts the same tokens, so the two screens cannot disagree about the same post.
