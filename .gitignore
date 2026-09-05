@@ -69,9 +69,6 @@ Blog.Web/local-admin-login-credentials.txt
 *-credentials.txt
 
 # Claude Code local settings (may contain server credentials in allow rules)
-.claude/settings.json
-.claude/settings.local.json
-.claude/worktrees/
 
 # Publish profiles (server-specific deployment config)
 Blog.Web/Properties/PublishProfiles/
@@ -84,10 +81,7 @@ deploy/2026-07-24_feature-images-manifest.txt
 deploy/2026-07-24_copy-feature-images.ps1
 tools/FeatureImageGenerator/Resources/optosoft-logo-light.png
 DBScripts/2026-07-24_DEPLOY-README.md
-CLAUDE.md
 SEO-AEO-PLAN.md
-CLAUDE.md
-.claude/commands/deploy-content.md
 Blog.Web/scratch/build_svgs.js
 Blog.Web/wwwroot/assets/optosoft-logo-dark.png
 Blog.Web/wwwroot/assets/optosoft-logo-light.png
@@ -102,8 +96,6 @@ DBScripts/2026-07-27_add-howto-steps-guides.sql
 Blog.Web/wwwroot/llms.txt
 Blog.Web/wwwroot/assets/logo-b64.txt
 Blog.Web/wwwroot/llms.txt
-CLAUDE.md
-CLAUDE.md
 
 # Search Console / analytics exports — business performance data, never publish
 Google Search Console Data/
@@ -127,19 +119,37 @@ DBScripts/2026-08-15_trim-truncated-meta-descriptions.sql
 deploy/2026-07-31_check-live-404.ps1
 deploy/2026-07-31_expected-live-slugs.txt
 deploy/2026-07-31_REDEPLOY-NOTE.md
-CLAUDE.md
-CLAUDE.md
 EXPORTER-PLAN.md
 IMPORTER-PLAN.md
-CLAUDE.md
-.claude/commands/ai-search-readiness.md
-.claude/commands/content-export.md
-.claude/commands/content-pipeline.md
-.claude/commands/content-refresh.md
-.claude/commands/cut-release.md
-.claude/commands/gsc-performance-review.md
-.claude/commands/internal-linking.md
-.claude/commands/security-hardening.md
 Blog.Web/page.html
 Blog.Web/pillar.html
 Blog.Web/sm.xml
+
+# ── Session scratch artifacts (never publish) ────────────────────────────────
+# Saved page dumps and API responses used to verify production during a session.
+# Named patterns kept accumulating one file at a time; these cover the class.
+# Blog.Web has no tracked .html of its own — Razor views are .cshtml, static
+# assets live under wwwroot — so ignoring the whole pattern is safe.
+Blog.Web/*.html
+Blog.Web/*.xml
+Blog.Web/scratch/
+/*.json
+!/global.json
+
+# ── Agent / assistant working files (never publish) ──────────────────────────
+# Blanket, deliberately. These were previously listed file by file, and a skill
+# added later (.claude/commands/open-next-version.md) slipped through unignored
+# — the enumeration is the bug, so the whole directory is excluded instead.
+CLAUDE.md
+.claude/
+DBScripts/2026-08-27_assign-post-tags-untagged.sql
+DBScripts/2026-08-27_trim-truncating-meta-titles.sql
+DBScripts/2026-09-05_add-answercapsule-to-posts.sql
+DBScripts/2026-09-05_add-entity-identity-settings.sql
+DBScripts/2026-09-05_create-crawler-visits-table.sql
+DBScripts/2026-09-05_deorphan-high-demand-posts.sql
+DBScripts/2026-09-05_pos-cluster-consolidation-links.sql
+DBScripts/2026-09-05_publish-buyer-stage-cluster.sql
+DBScripts/2026-09-05_publish-optometry-software-pricing-guide.sql
+DBScripts/2026-09-05_redirects-admin-no-schema-change.sql
+DBScripts/2026-09-05_set-pillar-answer-capsule.sql
