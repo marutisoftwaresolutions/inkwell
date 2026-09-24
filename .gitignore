@@ -1,5 +1,10 @@
+# Visual Studio and .NET build folders
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
 
-<<<<<<< HEAD
 # Application Configuration and Secrets
 appsettings.json
 appsettings.Development.json
@@ -185,5 +190,3 @@ tools/FeatureImageGenerator/Resources/optometry_rcm_illustration.jpg
 tools/FeatureImageGenerator/Program.cs
 tools/FeatureImageGenerator/Program.cs
 docs/adr/0011-docker-deployment-behind-an-optional-reverse-proxy.md
-=======
->>>>>>> 3fe284fa533bc5dde82eadb10ad9c41a9b823633
