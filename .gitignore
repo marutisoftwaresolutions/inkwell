@@ -11,6 +11,9 @@ appsettings.Development.json
 appsettings.*.json
 !appsettings.example.json
 !Blog.Web/appsettings.example.json
+# Docker Compose secrets (SA password, domain) — same treatment as appsettings.json.
+.env
+!.env.example
 *.sqlite
 *.sqlite3
 *.db
@@ -21,10 +24,9 @@ appsettings.*.json
 .gsd/
 .agent/
 .gemini/
-GSD-STYLE.md
-PROJECT_RULES.md
-adapters/
-docs/
+# planning docs (docs/plans), GSD toolkit (docs/gsd) and ADRs (docs/adr) all sit under docs/
+docs/*
+!docs/adr/
 scripts/
 model_capabilities.yaml
 
@@ -43,7 +45,11 @@ Blog.Web/wwwroot/uploads/**/*
 Blog.Web/wwwroot/og-cache/**/*
 !Blog.Web/wwwroot/og-cache/.gitkeep
 
-# DBScripts — data/content files (site-specific, not schema migrations)
+# DBScripts — data/content files (site-specific, not schema migrations).
+# By convention every content-publishing script is named DBScripts/YYYY-MM-DD_publish-<slug>.sql —
+# ignore that whole naming convention, not each slug as it appears (2026-09-05: the .claude/
+# enumeration-by-filename mistake happened here too, once, before this pattern existed).
+DBScripts/*_publish-*.sql
 DBScripts/*content*.sql
 DBScripts/*content-calendar*.sql
 DBScripts/*set-feature-images*.sql
@@ -58,8 +64,11 @@ DBScripts/*optosoft-india*.sql
 DBScripts/branding-settings-update.sql
 DBScripts/update-2025-to-2026.sql
 
-# Site-specific planning docs and loose data scripts (not engine code)
-CONTENT_PLAN.md
+# Operational artifacts for the LIVE deployment (surface #3, opticalsoftware.org) — redeploy notes,
+# live-slug lists, submission payloads. Site operations, not platform product code; never publish.
+deploy/
+
+# Loose site-specific data scripts (not engine code); planning docs live in docs/plans (ignored above)
 branding-settings-update.sql
 feature-images-update.sql
 
@@ -81,7 +90,6 @@ deploy/2026-07-24_feature-images-manifest.txt
 deploy/2026-07-24_copy-feature-images.ps1
 tools/FeatureImageGenerator/Resources/optosoft-logo-light.png
 DBScripts/2026-07-24_DEPLOY-README.md
-SEO-AEO-PLAN.md
 Blog.Web/scratch/build_svgs.js
 Blog.Web/wwwroot/assets/optosoft-logo-dark.png
 Blog.Web/wwwroot/assets/optosoft-logo-light.png
@@ -119,8 +127,6 @@ DBScripts/2026-08-15_trim-truncated-meta-descriptions.sql
 deploy/2026-07-31_check-live-404.ps1
 deploy/2026-07-31_expected-live-slugs.txt
 deploy/2026-07-31_REDEPLOY-NOTE.md
-EXPORTER-PLAN.md
-IMPORTER-PLAN.md
 Blog.Web/page.html
 Blog.Web/pillar.html
 Blog.Web/sm.xml
@@ -153,3 +159,34 @@ DBScripts/2026-09-05_publish-buyer-stage-cluster.sql
 DBScripts/2026-09-05_publish-optometry-software-pricing-guide.sql
 DBScripts/2026-09-05_redirects-admin-no-schema-change.sql
 DBScripts/2026-09-05_set-pillar-answer-capsule.sql
+
+# Data Protection key ring (comment tokens, preview links, Search Console credential) — a secret, never publish
+Blog.Web/App_Data/
+DBScripts/2026-09-15_add-crawler-visit-retention-setting.sql
+DBScripts/2026-09-15_add-display-timezone-and-revisions-settings.sql
+DBScripts/2026-09-15_add-search-console-settings.sql
+DBScripts/2026-09-15_convert-local-timestamps-to-utc.sql
+DBScripts/2026-09-15_create-jobs-table.sql
+DBScripts/2026-09-15_create-revisions-table.sql
+DBScripts/2026-09-15_create-search-performance-table.sql
+DBScripts/2026-09-17_convert-remaining-local-timestamps-to-utc.sql
+DBScripts/2026-09-19_add-index-comments-createdat.sql
+DBScripts/2026-09-19_add-unique-index-revisions-number.sql
+DBScripts/2026-09-19_ensure-comments-memberid-column.sql
+docs/adr/0000-template.md
+docs/adr/0001-in-process-job-scheduler.md
+docs/adr/0002-data-protection-key-ring-on-disk.md
+docs/adr/0003-search-console-service-account-and-row-level-store.md
+docs/adr/0004-revisions-keyed-by-entity-without-owner.md
+docs/adr/0005-password-reset-tokens-hashed.md
+docs/adr/0006-all-timestamps-utc.md
+docs/adr/0007-conditional-get-on-post-pages.md
+docs/adr/0008-structural-comment-spam-filter.md
+docs/adr/0009-stateless-signed-preview-links.md
+docs/adr/0010-startup-removes-static-files-that-shadow-routes.md
+docs/adr/README.md
+tools/FeatureImageGenerator/Program.cs
+tools/FeatureImageGenerator/Resources/optometry_rcm_illustration.jpg
+tools/FeatureImageGenerator/Program.cs
+tools/FeatureImageGenerator/Program.cs
+docs/adr/0011-docker-deployment-behind-an-optional-reverse-proxy.md
