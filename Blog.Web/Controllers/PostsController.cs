@@ -22,11 +22,23 @@ public class PostsController : Controller
     private readonly IndexNowService _indexNow;
     private readonly ILinkSuggestionRepository _links;
     private readonly ITenantContext _tenantContext;
+    private readonly Blog.Web.Services.SearchConsole.SearchPerformanceService _search;
+    private readonly RevisionService _revisions;
+    private readonly ISettingRepository _settings;
+    private readonly IUserRepository _users;
+    private readonly IWebHostEnvironment _env;
 
     public PostsController(IPostRepository posts, ICategoryRepository categories,
         ITagRepository tags, IMediaRepository media, PostService postService, AuditService audit,
-        IndexNowService indexNow, ILinkSuggestionRepository links, ITenantContext tenantContext)
+        IndexNowService indexNow, ILinkSuggestionRepository links, ITenantContext tenantContext,
+        Blog.Web.Services.SearchConsole.SearchPerformanceService search, RevisionService revisions,
+        ISettingRepository settings, IUserRepository users, IWebHostEnvironment env)
     {
+        _env = env;
+        _settings = settings;
+        _users = users;
+        _search = search;
+        _revisions = revisions;
         _posts = posts;
         _categories = categories;
         _tags = tags;
@@ -36,6 +48,30 @@ public class PostsController : Controller
         _indexNow = indexNow;
         _links = links;
         _tenantContext = tenantContext;
+    }
+
+    /// <summary>
+    /// The zone an operator types schedule times in (Admin → Settings → Display). Stored values are
+    /// UTC; the editor shows and reads the display zone so "15:00" means 15:00 on the operator's clock.
+    /// Falls back to UTC when settings cannot be resolved, which is also the pre-1.0.6 behaviour.
+    /// </summary>
+    private async Task<string?> DisplayTimeZoneAsync()
+    {
+        try
+        {
+            Guid ownerId;
+            if (_tenantContext.IsCloudMode) ownerId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            else ownerId = (await _users.GetFirstAdminAsync())?.Id ?? Guid.Empty;
+            var s = await _settings.GetSettingsAsync(ownerId);
+            return string.IsNullOrWhiteSpace(s.DisplayTimeZoneId) ? null : s.DisplayTimeZoneId;
+        }
+        catch { return null; }
+    }
+
+    private async Task NormaliseScheduleAsync(Post post)
+    {
+        if (post.ScheduledAt.HasValue)
+            post.ScheduledAt = TimeZoneHelper.FromDisplay(post.ScheduledAt.Value, await DisplayTimeZoneAsync());
     }
 
     // Ping IndexNow with a freshly published/updated post's public URL (best-effort, non-throwing).
@@ -92,6 +128,7 @@ public class PostsController : Controller
 
         var userEmail = User.FindFirstValue(ClaimTypes.Email)!;
         post.AuthorId = userId;
+        await NormaliseScheduleAsync(post);
 
         if (submitAction == "publish") 
         {
@@ -102,7 +139,7 @@ public class PostsController : Controller
             }
             else
             {
-                post.Status = post.ScheduledAt.HasValue && post.ScheduledAt.Value > DateTime.Now 
+                post.Status = post.ScheduledAt.HasValue && post.ScheduledAt.Value > DateTime.UtcNow 
                     ? PostStatus.Scheduled 
                     : PostStatus.Published;
             }
@@ -130,12 +167,14 @@ public class PostsController : Controller
             : post.Status == PostStatus.Published ? AuditActions.PostPublished
             : AuditActions.PostCreated;
         await _audit.LogAsync(auditAction, "Post", id.ToString(), post.Title);
+        post.Id = id;
+        await _revisions.RecordAsync(post, "Created", User);
         await PingIndexNowAsync(id);
 
         if (post.Status == PostStatus.Scheduled)
-            TempData["Success"] = "Post scheduled!";
+            TempData["Success"] = "Post scheduled.";
         else
-            TempData["Success"] = submitAction == "publish" && post.Status == PostStatus.Published ? "Post published! 🎉" : "Draft saved.";
+            TempData["Success"] = submitAction == "publish" && post.Status == PostStatus.Published ? "Post published." : "Draft saved.";
 
         return RedirectToAction("Index");
     }
@@ -157,6 +196,8 @@ public class PostsController : Controller
         ViewBag.Tags = await _tags.GetAllAsync(userId);
         ViewBag.SelectedCategoryIds = post.Categories.Select(c => c.Id).ToList();
         ViewBag.SelectedTagNames = string.Join(", ", post.Tags.Select(t => t.Name));
+        if (post.ScheduledAt.HasValue) // the editor shows and reads the display zone; storage is UTC
+            post.ScheduledAt = TimeZoneHelper.ToDisplay(post.ScheduledAt.Value, await DisplayTimeZoneAsync());
         return View(post);
     }
 
@@ -176,6 +217,7 @@ public class PostsController : Controller
 
         var userEmail = User.FindFirstValue(ClaimTypes.Email)!;
         post.Id = id;
+        await NormaliseScheduleAsync(post);
 
         if (submitAction == "publish") 
         {
@@ -186,7 +228,7 @@ public class PostsController : Controller
             }
             else
             {
-                post.Status = post.ScheduledAt.HasValue && post.ScheduledAt.Value > DateTime.Now 
+                post.Status = post.ScheduledAt.HasValue && post.ScheduledAt.Value > DateTime.UtcNow 
                     ? PostStatus.Scheduled 
                     : PostStatus.Published;
             }
@@ -209,17 +251,22 @@ public class PostsController : Controller
             ViewBag.Tags = await _tags.GetAllAsync(userId);
             return View(post);
         }
+        // The generated social card carries the title; drop the cached PNG so the next request rebuilds it.
+        Blog.Web.Services.OgImageCache.Invalidate(_env, post.Slug);
+        if (!string.Equals(existingPost.Slug, post.Slug, StringComparison.OrdinalIgnoreCase)) Blog.Web.Services.OgImageCache.Invalidate(_env, existingPost.Slug);
 
         var editAuditAction = post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
             : post.Status == PostStatus.Published ? AuditActions.PostPublished
             : AuditActions.PostUpdated;
         await _audit.LogAsync(editAuditAction, "Post", id.ToString(), post.Title);
+        await _revisions.RecordAsync(post,
+            post.Status == PostStatus.Published ? "Published" : post.Status == PostStatus.Scheduled ? "Scheduled" : "Saved", User);
         await PingIndexNowAsync(id);
 
         if (post.Status == PostStatus.Scheduled)
-            TempData["Success"] = "Post scheduled!";
+            TempData["Success"] = "Post scheduled.";
         else
-            TempData["Success"] = submitAction == "publish" && post.Status == PostStatus.Published ? "Post published! 🎉" : "Saved.";
+            TempData["Success"] = submitAction == "publish" && post.Status == PostStatus.Published ? "Post published." : "Saved.";
 
         return RedirectToAction("Index");
     }
@@ -240,6 +287,7 @@ public class PostsController : Controller
         }
 
         await _posts.DeleteAsync(id, isPrivileged ? null : userId);
+        Blog.Web.Services.OgImageCache.Invalidate(_env, existingPost.Slug);
         await _audit.LogAsync(AuditActions.PostDeleted, "Post", id.ToString(), existingPost.Title);
 
         TempData["Success"] = "Post permanently deleted.";
@@ -283,6 +331,128 @@ public class PostsController : Controller
         ViewBag.Inbound  = LinkSuggester.SuggestInbound(current, others);
 
         return PartialView("_LinkSuggestions");
+    }
+
+    /// <summary>
+    /// Bulk actions from the Posts list: publish, move to draft, delete, or add a tag to every
+    /// selected post. Each post is checked and audited individually — the same ownership and
+    /// permission rules as the single-post actions — and one refused post never stops the rest.
+    /// Status changes go through the repository directly; a status-only change writes no revision
+    /// (the revision service already skips identical content).
+    /// </summary>
+    [HttpPost("bulk")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Bulk(string action, List<Guid> ids, string? tag)
+    {
+        ids = ids?.Distinct().ToList() ?? new List<Guid>();
+        if (ids.Count == 0) { TempData["Error"] = "Select at least one post."; return RedirectToAction("Index"); }
+
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Editor");
+        var canPublish = User.HasClaim("Permission", "posts.publish");
+        action = (action ?? string.Empty).Trim().ToLowerInvariant();
+        tag = (tag ?? string.Empty).Trim();
+
+        if (action == "tag" && tag.Length == 0) { TempData["Error"] = "Enter the tag to add."; return RedirectToAction("Index"); }
+        if (action == "publish" && !canPublish) { TempData["Error"] = "You do not have permission to publish posts."; return RedirectToAction("Index"); }
+        if (action is not ("publish" or "draft" or "delete" or "tag")) { TempData["Error"] = "Unknown bulk action."; return RedirectToAction("Index"); }
+
+        int done = 0, refused = 0;
+        var publishedUrls = new List<string>();
+        Tag? tagEntity = action == "tag" ? await _tags.GetOrCreateAsync(tag, userId) : null;
+
+        foreach (var id in ids)
+        {
+            var post = await _posts.GetByIdAsync(id, null);
+            if (post is null) { refused++; continue; }
+            if (post.AuthorId != userId && !isPrivileged) { refused++; continue; }
+
+            switch (action)
+            {
+                case "publish":
+                    if (post.Status == PostStatus.Published) { done++; break; }
+                    post.Status = PostStatus.Published;
+                    post.PublishedAt ??= DateTime.UtcNow;
+                    post.ScheduledAt = null;
+                    await _posts.UpdateAsync(post);
+                    await _audit.LogAsync(AuditActions.PostPublished, "Post", id.ToString(), post.Title + " (bulk)");
+                    if (!string.IsNullOrEmpty(post.Slug)) publishedUrls.Add($"{Request.Scheme}://{Request.Host}/{post.Slug}");
+                    done++;
+                    break;
+                case "draft":
+                    if (post.Status == PostStatus.Draft) { done++; break; }
+                    post.Status = PostStatus.Draft;
+                    await _posts.UpdateAsync(post);
+                    await _audit.LogAsync(AuditActions.PostUnpublished, "Post", id.ToString(), post.Title + " (bulk)");
+                    done++;
+                    break;
+                case "delete":
+                    await _posts.DeleteAsync(id, null);
+                    Blog.Web.Services.OgImageCache.Invalidate(_env, post.Slug);
+                    await _audit.LogAsync(AuditActions.PostDeleted, "Post", id.ToString(), post.Title + " (bulk)");
+                    done++;
+                    break;
+                case "tag":
+                    var current = await _tags.GetForPostAsync(id);
+                    var tagIds = current.Select(t => t.Id).ToList();
+                    if (!tagIds.Contains(tagEntity!.Id)) tagIds.Add(tagEntity.Id);
+                    await _posts.AssignTagsAsync(id, tagIds);
+                    await _audit.LogAsync(AuditActions.PostUpdated, "Post", id.ToString(), $"{post.Title} — tag “{tagEntity.Name}” added (bulk)");
+                    done++;
+                    break;
+            }
+        }
+
+        // One IndexNow submission for the whole batch instead of one request per post inside the loop.
+        if (publishedUrls.Count > 0)
+        {
+            try { await _indexNow.SubmitAsync(publishedUrls); } catch { /* best-effort, never fails the action */ }
+        }
+
+        var verb = action switch { "publish" => "published", "draft" => "moved to draft", "delete" => "deleted", _ => $"tagged “{tagEntity?.Name}”" };
+        TempData[refused == 0 ? "Success" : "Warning"] = $"{done} post{(done == 1 ? "" : "s")} {verb}." + (refused > 0 ? $" {refused} skipped: not yours to change." : "");
+        return RedirectToAction("Index");
+    }
+
+    /// <summary>
+    /// A signed preview link for the post being edited, valid for seven days, for reviewers without
+    /// an account. Nothing is stored; the link stops working when it expires or the key ring rotates.
+    /// </summary>
+    [HttpGet("preview-link/{id:guid}")]
+    public async Task<IActionResult> PreviewLink(Guid id, [FromServices] Blog.Web.Services.PreviewLinkService previewLinks)
+    {
+        var post = await _posts.GetByIdAsync(id, null);
+        if (post is null) return NotFound();
+
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Editor");
+        if (post.AuthorId != userId && !isPrivileged) return Forbid();
+
+        var token = previewLinks.Issue(id);
+        ViewBag.Url = $"{Request.Scheme}://{Request.Host}/preview/{Uri.EscapeDataString(token)}";
+        ViewBag.Expires = DateTime.UtcNow + Blog.Web.Services.PreviewLinkService.Lifetime;
+        return PartialView("_PreviewLink");
+    }
+
+    /// <summary>
+    /// Search Console performance for the post being edited — its last 28 days against the 28
+    /// before, and the queries that brought it impressions. Loaded on demand like the link
+    /// suggestions; read-only and fail-open, so the editor never waits on or breaks for it.
+    /// </summary>
+    [HttpGet("search-performance/{id:guid}")]
+    public async Task<IActionResult> SearchPerformance(Guid id)
+    {
+        var post = await _posts.GetByIdAsync(id, null);
+        if (post is null) return NotFound();
+
+        var ownerId = await _search.ResolveOwnerAsync();
+        var (state, summary, queries) = await _search.GetForSlugAsync(ownerId, post.Slug ?? string.Empty);
+
+        ViewBag.State   = state;
+        ViewBag.Summary = summary;
+        ViewBag.Queries = queries;
+        ViewBag.IsPublished = post.Status == PostStatus.Published;
+        return PartialView("_SearchPerformance");
     }
 
     /// <summary>

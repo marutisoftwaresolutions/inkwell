@@ -1,16 +1,31 @@
+@inject Blog.Core.Interfaces.IUserRepository UsersRepo
+@inject Blog.Core.Interfaces.ISettingRepository SettingsRepo
 @{
     Layout = null;
-    ViewData["Title"] = "Login – Admin";
+    ViewData["Title"] = "Sign in – Admin";
+    // Colour scheme resolves the same way as _AdminLayout (owner's Settings → Colour scheme); fails open to "system".
+    var colorScheme = "system";
+    try
+    {
+        var primaryAdmin = await UsersRepo.GetFirstAdminAsync();
+        var settings = await SettingsRepo.GetSettingsAsync(primaryAdmin?.Id ?? Guid.Empty);
+        if (settings?.Theme is "light" or "dark") colorScheme = settings.Theme;
+    }
+    catch { }
+    var hasError = ViewBag.Error != null;
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="@colorScheme">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"]</title>
-    
+    <meta name="robots" content="noindex,nofollow" />
+
     <!-- Fonts (self-hosted) -->
     <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true">
+    <!-- Desk tokens (light + dark scheme) -->
+    <link rel="stylesheet" href="~/css/desk-tokens.css" asp-append-version="true">
 
     <!-- Tailwind CSS (self-hosted) -->
     <script src="~/lib/tailwindcss/tailwind.js"></script>
@@ -25,13 +40,18 @@
                         'card-foreground': 'var(--card-foreground)',
                         primary: 'var(--primary)',
                         'primary-foreground': 'var(--primary-foreground)',
-                        input: 'var(--input)',
-                        ring: 'var(--ring)',
                         muted: 'var(--muted)',
                         'muted-foreground': 'var(--muted-foreground)',
+                        accent: 'var(--accent)',
+                        'accent-foreground': 'var(--accent-foreground)',
+                        destructive: 'var(--destructive)',
+                        'destructive-foreground': 'var(--destructive-foreground)',
+                        border: 'var(--border)',
+                        input: 'var(--input)',
+                        ring: 'var(--ring)',
                     },
                     fontFamily: {
-                        sans: ['Alexandria', 'sans-serif'],
+                        sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
                     },
                     borderRadius: {
                         DEFAULT: 'var(--radius)',
@@ -40,138 +60,67 @@
             }
         }
     </script>
-    <style>
-        :root {
-            --background: #f8f5f0;
-            --foreground: #3e2723;
-            --card: #f8f5f0;
-            --card-foreground: #3e2723;
-            --primary: #2e7d32;
-            --primary-foreground: #ffffff;
-            --muted: #f0e9e0;
-            --muted-foreground: #6d4c41;
-            --input: #e0d6c9;
-            --ring: #2e7d32;
-            --radius: 0.5rem;
-        }
-
-        body {
-            background-color: var(--background);
-            color: var(--foreground);
-            font-family: 'Alexandria', sans-serif;
-        }
-    </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-card border border-input rounded-lg shadow-lg p-8">
+    <main class="w-full max-w-md bg-card text-card-foreground border border-border rounded-lg shadow-lg p-8">
         <div class="text-center mb-8">
-            <div class="w-12 h-12 bg-primary text-primary-foreground rounded mx-auto flex items-center justify-center mb-4">
+            <div class="w-12 h-12 bg-primary text-primary-foreground rounded mx-auto flex items-center justify-center mb-4" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
             <h1 class="text-2xl font-bold">Welcome Back</h1>
             <p class="text-muted-foreground text-sm mt-1">Sign in to your dashboard</p>
         </div>
 
-        @if (ViewBag.Error != null)
+        @if (hasError)
         {
-            <div id="toast-error" class="fixed bottom-6 right-6 z-50 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-center gap-2 shadow-lg animate-slide-in-right max-w-sm">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-red-600 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                <span>@ViewBag.Error</span>
-                <button onclick="document.getElementById('toast-error').remove()" class="ml-4 text-red-600 hover:text-red-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <script>setTimeout(() => document.getElementById('toast-error')?.remove(), 5000);</script>
+            <p id="form-error" role="alert" class="mb-6 p-3 rounded border border-destructive text-destructive text-sm">@ViewBag.Error</p>
+        }
+
+        @if (TempData["Success"] is string loginSuccess)
+        {
+            <p role="status" class="mb-6 p-3 rounded bg-muted border border-border text-sm">@loginSuccess</p>
         }
 
         <form method="post" action="/account/login" class="space-y-6">
             @Html.AntiForgeryToken()
             <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
-            
+
             <div>
-                <label class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Email</label>
-                <input type="email" name="email" value="@ViewBag.Email" placeholder="you@example.com" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required autofocus />
+                <label for="email" class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Email</label>
+                <input type="email" name="email" id="email" value="@ViewBag.Email" placeholder="you@example.com" autocomplete="username" aria-describedby="@(hasError ? "form-error" : null)" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required autofocus />
             </div>
-            
+
             <div>
-                 <label class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Password</label>
-                <input type="hidden" id="login-password-real" name="password" />
-                <input type="text" id="login-password-display" placeholder="••••••••" autocomplete="new-password" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
+                <label for="password" class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Password</label>
+                <div class="relative">
+                    <input type="password" name="password" id="password" autocomplete="current-password" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
+                    <button type="button" data-toggle-password="password" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Show</button>
+                </div>
             </div>
-            <script>
-            (function(){
-                var real = document.getElementById('login-password-real');
-                var disp = document.getElementById('login-password-display');
-                var pwd = '';
-                var peekTimer;
-                var DOT = '•';
 
-                function mask(str) { return DOT.repeat(str.length); }
-
-                disp.addEventListener('input', function(e) {
-                    clearTimeout(peekTimer);
-                    var cursorPos = disp.selectionStart;
-                    var displayVal = disp.value;
-                    // Count existing dots before cursor to figure out what changed
-                    var oldLen = pwd.length;
-                    var newLen = displayVal.length;
-
-                    if (newLen > oldLen) {
-                        // Characters added — extract the new chars from display value
-                        var addedCount = newLen - oldLen;
-                        var insertPos = cursorPos - addedCount;
-                        var addedChars = '';
-                        for (var i = insertPos; i < cursorPos; i++) {
-                            addedChars += displayVal[i];
-                        }
-                        pwd = pwd.substring(0, insertPos) + addedChars + pwd.substring(insertPos);
-                    } else if (newLen < oldLen) {
-                        // Characters removed (backspace/delete)
-                        var removedCount = oldLen - newLen;
-                        pwd = pwd.substring(0, cursorPos) + pwd.substring(cursorPos + removedCount);
-                    }
-
-                    real.value = pwd;
-
-                    // Show dots + last typed char visible
-                    if (newLen >= oldLen && pwd.length > 0 && cursorPos > 0) {
-                        var before = mask(pwd.substring(0, cursorPos - 1));
-                        var peeked = pwd[cursorPos - 1];
-                        var after = mask(pwd.substring(cursorPos));
-                        disp.value = before + peeked + after;
-                        disp.setSelectionRange(cursorPos, cursorPos);
-
-                        peekTimer = setTimeout(function() {
-                            var cp = disp.selectionStart;
-                            disp.value = mask(pwd);
-                            disp.setSelectionRange(cp, cp);
-                        }, 500);
-                    } else {
-                        disp.value = mask(pwd);
-                        disp.setSelectionRange(cursorPos, cursorPos);
-                    }
-                });
-
-                // Handle paste
-                disp.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    var pasted = (e.clipboardData || window.clipboardData).getData('text');
-                    var cursorPos = disp.selectionStart;
-                    var selEnd = disp.selectionEnd;
-                    pwd = pwd.substring(0, cursorPos) + pasted + pwd.substring(selEnd);
-                    real.value = pwd;
-                    disp.value = mask(pwd);
-                    var newPos = cursorPos + pasted.length;
-                    disp.setSelectionRange(newPos, newPos);
-                });
-            })();
-            </script>
-            
-            <button type="submit" class="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded hover:bg-primary/90 transition-colors shadow-sm">
-                Sign In
+            <button type="submit" class="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded hover:opacity-90 transition-opacity shadow-sm">
+                Sign in
             </button>
             <div class="text-center text-sm mt-5 text-muted-foreground">
-                Don't have an account? <a href="/account/register" class="text-primary hover:underline font-medium">Register</a>
+                <a href="/account/forgot-password" class="text-foreground hover:underline font-medium">Forgot your password?</a>
+            </div>
+            <div class="text-center text-sm mt-2 text-muted-foreground">
+                Don't have an account? <a href="/account/register" class="text-foreground hover:underline font-medium">Register</a>
             </div>
         </form>
-    </div>
+    </main>
+    <script>
+        document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var input = document.getElementById(btn.getAttribute('data-toggle-password'));
+                if (!input) return;
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                btn.textContent = show ? 'Hide' : 'Show';
+            });
+        });
+    </script>
 </body>
 </html>

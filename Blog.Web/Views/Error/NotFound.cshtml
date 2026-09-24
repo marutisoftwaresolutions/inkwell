@@ -1,29 +1,46 @@
 @{
     Layout = "_PublicLayout";
     ViewData["Title"] = "404 - Page Not Found";
+    ViewData["Robots"] = "noindex,follow";
+    var requested = ViewBag.RequestedPath as string ?? "";
+    var popular = ViewBag.PopularPosts as List<Blog.Core.Domain.Post> ?? new List<Blog.Core.Domain.Post>();
+    // A guess at what they meant: the last path segment, de-slugged, seeds the search box.
+    var seed = System.Text.RegularExpressions.Regex.Replace(requested.Trim('/').Split('/').LastOrDefault() ?? "", @"[-_]+", " ").Trim();
+    if (seed.Length > 60) seed = seed[..60];
 }
 
-<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-    <div class="mb-8">
-        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-primary/20 mx-auto">
-            <path d="m15 9-6 6"/><path d="m9 9 6 6"/><circle cx="12" cy="12" r="10"/>
-        </svg>
-    </div>
-    
-    <h1 class="text-6xl font-black text-foreground mb-4 tabular-nums tracking-tighter">404</h1>
-    <h2 class="text-2xl font-bold text-foreground mb-4">Page not found</h2>
-    <p class="text-muted-foreground max-w-md mx-auto mb-8">
-        Sorry, we couldn't find the page you're looking for. It might have been moved or doesn't exist anymore.
+@* A 404 is not the reader's fault and should not be a dead end: say what was asked for, offer
+   search seeded with it, and show what other readers open most. *@
+<section class="ink-404">
+    <p class="ink-404__code" aria-hidden="true">404</p>
+    <h1>That page isn't here</h1>
+    <p>
+        Nothing lives at <code>@requested</code>. It may have moved, the link may be out of date, or there may be a typo.
     </p>
 
-    <div class="flex flex-col sm:flex-row gap-4 items-center justify-center">
-        <button onclick="window.history.back()" class="px-6 py-2.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md font-medium transition-colors flex items-center gap-2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            Go Back
-        </button>
-        <a href="/" class="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium shadow-sm transition-colors flex items-center gap-2">
-            Home Page
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </a>
-    </div>
-</div>
+    <form method="get" action="/search" role="search">
+        <input type="search" name="q" value="@seed" placeholder="Search articles…" aria-label="Search articles" required minlength="2" />
+        <button type="submit">Search</button>
+    </form>
+
+    @if (popular.Count > 0)
+    {
+        <div class="ink-404__popular">
+            <h2>Most read</h2>
+            <ul>
+                @foreach (var p in popular)
+                {
+                    <li><a href="/@p.Slug">@p.Title</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <p class="ink-404__links">
+        <a href="/">Home</a> · <a href="/feed">RSS</a><span id="ink-404-back" hidden> · <button type="button" class="ink-404__back" onclick="history.back()">Go back</button></span>
+    </p>
+</section>
+<script>
+    // "Go back" only means something when there is somewhere to go back to; without JavaScript it stays hidden.
+    (function () { if (window.history.length > 1) { var b = document.getElementById('ink-404-back'); if (b) b.hidden = false; } })();
+</script>

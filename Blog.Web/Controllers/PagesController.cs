@@ -17,21 +17,36 @@ public class PagesController : Controller
     private readonly IMediaRepository _media;
     private readonly IUserRepository _users;
     private readonly AuditService _audit;
+    private readonly RevisionService _revisions;
+    private readonly IndexNowService _indexNow;
 
-    public PagesController(IPageRepository pages, IMediaRepository media, IUserRepository users, AuditService audit)
+    public PagesController(IPageRepository pages, IMediaRepository media, IUserRepository users, AuditService audit,
+        RevisionService revisions, IndexNowService indexNow)
     {
         _pages = pages;
         _media = media;
         _users = users;
         _audit = audit;
+        _revisions = revisions;
+        _indexNow = indexNow;
+    }
+
+    // Ping IndexNow with a freshly published/updated page's public URL (best-effort, non-throwing).
+    // Mirrors PostsController.PingIndexNowAsync - Pages had no equivalent call until 2026-09-24.
+    private async Task PingIndexNowAsync(Guid pageId, Guid userId)
+    {
+        var saved = await _pages.GetByIdAsync(pageId, userId);
+        if (saved is { IsPublished: true } && !string.IsNullOrEmpty(saved.Slug))
+            await _indexNow.SubmitAsync($"{Request.Scheme}://{Request.Host}/{saved.Slug}");
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var pages = await _pages.GetAllAsync(userId);
-        return View(pages);
+        ViewData["ListSearchPlaceholder"] = "Search pages by title or slug";
+        return View(Blog.Web.Models.ListPaging.Apply(this, pages, q, page, p => new[] { p.Title, p.Slug }));
     }
 
     [HttpGet("create")]
@@ -79,6 +94,7 @@ public class PagesController : Controller
             var id = await _pages.CreateAsync(page);
             await _audit.LogAsync(page.IsPublished ? AuditActions.PageCreated : AuditActions.PageCreated,
                 "Page", id.ToString(), page.Title);
+            if (page.IsPublished) await PingIndexNowAsync(id, userId);
             TempData["Success"] = page.IsPublished ? "Page published!" : "Draft saved.";
             return RedirectToAction("Edit", new { id });
         }
@@ -145,6 +161,8 @@ public class PagesController : Controller
 
             await _pages.UpdateAsync(existing);
             await _audit.LogAsync(AuditActions.PageUpdated, "Page", id.ToString(), existing.Title);
+            await _revisions.RecordAsync(existing, action == "publish" ? "Published" : "Saved", User);
+            if (existing.IsPublished) await PingIndexNowAsync(id, userId);
             TempData["Success"] = "Page updated.";
             return RedirectToAction("Edit", new { id });
         }

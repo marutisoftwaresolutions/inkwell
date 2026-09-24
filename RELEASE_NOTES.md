@@ -1,176 +1,151 @@
-# Inkwell v1.0.5
+# Inkwell v1.0.6
 
-**Release date:** 2026-09-05
+**Release date:** 2026-09-24
 **Type:** Feature release (backward-compatible — existing tenants keep their layout, theme, content and settings)
 
-v1.0.4 gave operators *visibility* into content that needs work. v1.0.5 turns that into
-*prevention*: the platform now stops broken structured data from shipping, tells you what a post
-is missing before an answer engine passes it over, proposes the internal links it should carry, and
-shows which AI crawlers are actually reading the site. It also adds the **Redirects manager** that
-v1.0.4's 301/302/410 support was missing, **publisher identity** settings for the knowledge graph,
-an **import dry-run**, and a set of indexation fixes for category and tag archives.
+v1.0.6 — **"Measure what matters."** The core of the release is real measurement: Inkwell now reads
+your own Google Search Console data into the Desk, keeps a revision history you can compare and
+restore, and runs its own nightly housekeeping instead of asking you to wire up cron. Alongside that
+committed scope, a UI/UX audit of the whole Desk and the reader site turned up a long list of real
+defects — native browser popups, no phone navigation, no dark scheme, unlabeled controls, a stray
+schedule-time bug — and this release fixes all of it. It is the largest release yet by change count,
+and every part of it is backward-compatible: a tenant who opens nothing new keeps working exactly as
+before.
 
 ## Highlights
 
-### ✅ Pre-publish structured-data linter
+### 📊 Search Console, wired into the Desk
 
-Every post is validated before it goes live. A post whose structured data would not validate is
-saved as a **draft instead of published**, with the reason shown in the editor.
+Connect your own Google Search Console property with a service-account key — no platform-owned
+OAuth, no third party in the middle — and a nightly job pulls clicks, impressions, CTR and position
+straight into the product.
 
-- Catches the failure that used to be invisible: a malformed FAQ, Key Facts, How-To or roundup
-  block was silently swallowed by the renderer, so a broken block looked identical to a missing one.
-- Enforces the rules that matter for search: every roundup entry must link the vendor's real site
-  with an absolute URL, the internal review path stays in `ctaUrl`, scores sit on the 0–10 scale,
-  and a first-party product may be featured but never carries a self-authored score.
-- Advisory issues (a thin FAQ answer, a duplicate label, a single-step How-To, duplicate ranks)
-  surface as warnings and never block publishing.
+- The post editor gains a **Search performance** panel: 28-day clicks/impressions/CTR/position with
+  the change against the previous 28 days, the queries actually bringing traffic, and a plain flag
+  when a post is in striking distance (position 8–20 with real demand), losing impressions, or
+  ranking on page one with almost no clicks.
+- **Content Health** gets the same three flags as filter tiles; the **dashboard** shows 28-day
+  clicks, impressions and the striking-distance count.
+- The key is Data-Protection-encrypted, never logged, audited or exported; the job is fail-open per
+  property and reports its result on the dashboard. Summaries are cached five minutes per site.
 
-### 📊 Answer-engine readiness score
+### 🗂️ Revision history for posts and pages
 
-Every post now carries a **0–100 score** for how ready it is to be *quoted* by an answer engine,
-shown in the editor sidebar with a per-signal breakdown and in **Admin → Content Health** as a
-column, a tile and a filter.
+Every save with changed content now writes a revision, tagged with why (Created, Saved, Published,
+Scheduled, Restored) and by whom. The editor sidebar lists them; **Compare** shows a line-level diff
+against the current version; **Restore** puts the content back after recording the current state as
+a revision first, so a restore is itself undoable. Slug and publish state are never touched by a
+restore. Kept per item is configurable (default 25); restores are audited and tenant-scoped.
 
-- The linter says what is *broken*; this says what is *absent*: answer capsule, Key Facts, FAQ,
-  meta description, section headings, internal links, freshness dates, depth and feature image,
-  each weighted by how much it contributes to being cited and each carrying concrete advice.
-- The answer capsule carries the most weight, because it is the passage an engine actually lifts.
-- **Advisory only** — it never blocks a publish. A short note that scores low may be exactly
-  right, and forcing every post into one shape would produce filler.
-- Nothing unobservable is scored: no accuracy or authority judgement, no invented ranking prediction.
+### 🔐 Self-service password reset and a structural comment-spam gate
 
-### 💬 Answer capsules
+- **"Forgot your password?"** on the sign-in page issues a single-use, 30-minute link; only its hash
+  is stored, the response is identical for a known or unknown address, requests are capped at three
+  an hour, and a site without SMTP configured says so rather than pretending to send.
+- **Public comments now pass a spam gate before anything is stored**: a honeypot field, a signed
+  form-timing token bound to the specific post, rejection of markup links and link-only comments,
+  repeat-comment detection, and a per-address rate limit. No word list, no external service, and it
+  fails open — no rule can turn a comment into a server error. Each discard is reported to the IP
+  Firewall so a repeat offender blocks itself.
 
-A post can now carry a short direct answer, written to be quoted, shown **above the article body**
-and emitted as schema.org `abstract` on the `BlogPosting`. Answer engines and featured snippets lift
-passages rather than pages; the capsule is the sentence they take. It is visible copy, never hidden
-text, so the same words serve the reader. Authored in the editor sidebar with a 40–60 word target;
-the linter warns when a capsule is too short to be an answer or too long to be quoted whole. Posts
-without one are unaffected.
+### ⏱️ A real job scheduler, no cron required
 
-### 🔗 Internal-link suggester and Link Audit
+One in-process scheduler wakes every minute and runs due work in a fresh scope: AI-crawler visit
+retention, expired password-reset token pruning, the Search Console sync, and Open Graph card
+cleanup. Runs are claimed atomically against a ledger table, so two application instances sharing a
+database can never run the same job twice; a job that fails is recorded and the next tick carries on.
+Admin → Dashboard shows every job's last run, result and message.
 
-- **In the editor:** the sidebar proposes links in both directions while you write — published
-  posts this one should link to, and posts that should link back to it — with the reason for each
-  suggestion (a product this post names but has not linked, or a shared topic). It shows how the
-  post stands against the two-in / two-out minimum and flags it as an orphan when nothing links to
-  it. Suggestions are ranked, never applied, and loaded on demand.
-- **Admin → Link Audit** scans every published post and page for internal links that dead-end,
-  point at a URL retired with 410, or take an avoidable redirect hop. Dead ends and retired targets
-  are separated from redirect hops because they cost different things; multi-hop chains are called
-  out so the final destination can be linked directly. Generated routes and external links are out
-  of scope, so the report contains faults rather than false positives. Read-only; Editor and Admin.
+### 🖥️ The Desk rebuilt on five shared primitives
 
-### ↪️ Redirects manager with a triaged 404 worklist
+A ground-up UX pass replaced sixteen native browser confirm/alert/prompt popups with one styled
+dialog that states the consequence in a sentence; added an unsaved-changes guard to every editor;
+added a busy indicator to every long-running action; added search and paging to every list that can
+grow (Pages, Categories, Tags, Series, Users, Media, Import, Redirects, Link Audit, Content Health);
+and gave the Desk and the reader site a genuine dark colour scheme. Settings is now seven tabs
+instead of one long form. Bulk actions (publish, draft, tag, delete; approve, spam, delete) replace
+one-row-at-a-time work in the Posts list and Comments queue, both with a typed guard above five items.
 
-v1.0.4 shipped 301/302/410 redirect rules with no way to manage them except SQL. **Admin →
-Redirects** now lists, creates, edits and removes rules — including the ones written automatically
-by post renames and imports, which were previously invisible.
+### ♿ An accessibility pass across the whole product
 
-Alongside it, the 404 log becomes a **worklist**. Most 404s on a public site are vulnerability
-scanners, so instead of listing all of them the screen asks for evidence a 404 is reader-facing:
-another page links to it, or it is close enough to a real published slug to be a rename, a typo or a
-stale external link. Those rank first with a one-click **301 to the suggested post** or **410 to
-retire it**; everything else is collapsed away, since repeated probing is the IP Firewall's business.
-Rules that would loop, chain into another redirect, or target an already-retired URL are refused with
-the real destination named. Admin-only, anti-forgery protected, every change audited.
+The Desk had no phone navigation below 768 px, several screens used the wrong password-field type
+(defeating password managers), and dozens of icon-only controls and filter inputs had no name for a
+screen reader. All of it is fixed: real `<input type="password">` fields with correct `autocomplete`,
+inline announced errors instead of a five-second toast, a labelled and keyboard-operable mobile menu,
+a skip-to-content link and visible focus rings on the public site, `aria-current` on active nav items,
+and accessible names on every icon-only action across Media, Users, Theme, Comments, the editors, the
+Dashboard, Audit Trail, Analytics, Security and AI Crawlers.
 
-### 🤖 AI-crawler analytics
+## Also in this release
 
-**Admin → AI Crawlers** reports which AI answer engines and search crawlers actually fetch the site,
-how often, and which pages they read. This traffic passed through the site every day and was
-discarded, because bot hits must not pollute human analytics; it is now recorded to its own
-`CrawlerVisits` table, so existing visitor numbers are untouched.
+**Added:** CMS pages now appear in `llms.txt`/`llms-full.txt`; a shared reading-time helper across
+all three post layouts; a "Needs attention on this server" dashboard panel for a shadowed static
+file or a Data Protection key ring that could not be persisted; generated invite passwords for new
+Desk users, shown once and never emailed.
 
-- Shows a daily trend, the pages drawing the most AI attention, and GPTBot, ClaudeBot,
-  PerplexityBot, Google-Extended, Applebot-Extended, CCBot, Bytespider and the rest, with each
-  operator's published purpose, separating AI engines from ordinary search crawlers.
-- Every engine Inkwell can name is listed **including those with zero visits** — "no AI engine has
-  read this site" is the most useful finding the page can report.
-- A user-agent is self-asserted; the report says it shows claimed identity and is never used to
-  allow or deny a request.
-
-### 🏛️ Publisher identity for the knowledge graph
-
-**Admin → Settings** gains the entity fields search and answer engines use to work out *who* a
-publication is: publisher type (Organization or Person), legal name, founder, founding date,
-authority profiles (Wikipedia, Wikidata, a company register, an ORCID) and an identity statement
-written for answer engines. Profiles join the existing social links in `sameAs`; the facts become
-`legalName` / `founder` / `foundingDate` on the publisher node; the statement is published verbatim in
-the Identity section of `llms.txt`. This matters most on a domain that previously published
-something else. Every field is optional and nothing is inferred — an unparseable date or a
-non-absolute profile URL is dropped rather than guessed at. Blogs that never open Settings are
-unchanged.
-
-### 🔍 Import dry-run
-
-The import wizard now offers **Preview first** alongside Start import. It shows exactly what a
-WordPress or Ghost file would do before anything is written: posts and pages to be created, slugs
-that would be suffixed because of a clash, content that would be **overwritten**, items skipped and
-why, images to be fetched, and internal links that would not resolve. Overwrites are called out
-prominently. The preview is read-only by construction — it uses a separate analyzer with no write
-path — and it predicts rather than simulates: images are counted, not downloaded.
-
-### 🗂️ Topic index in `llms-full.txt`
-
-The AI content index now carries a `## Topics` section alongside the category grouping, listing each
-tag with its archive URL, article count and the titles it covers. Only topics deep enough to have an
-indexable archive are listed, so the file never points a crawler at a `noindex` page. Generated per
-tenant; blogs with no tags are unaffected.
-
-## Changed
-
-- **Page titles no longer overflow the search-result budget.** The `" | Site Name"` suffix is now
-  appended only when the finished title still fits inside roughly 60 characters. Previously it was
-  added unconditionally, so search engines cut off the part that distinguished the page while keeping
-  boilerplate they already show as the site name. Titles that already contain the site name, and
-  category/tag/series archives, are unchanged.
-- **Category and tag links go straight to the canonical archive.** Selecting a single category or
-  tag from the home-feed filters links directly to `/category/{slug}` or `/tag/{slug}` instead of a
-  query-string URL that 301s there.
-- **Multi-tag filter links from an archive no longer mint duplicate URLs.** Selecting a second tag
-  while on `/tag/{slug}` built a relative link the archive route ignored, silently dropping the
-  second selection and generating a crawlable near-duplicate per chip. Those links are now rooted at
-  the home feed, where multi-value filtering actually runs.
+**Changed:** the Media library, Theme settings, Import wizard, and post/page editors were each
+reworked for the same five primitives above; Open Graph cards are pruned after 30 days and discarded
+on save/delete; account pages (sign in, register, forgot/reset password, first-run setup) share one
+token stylesheet with the rest of the Desk; calmer copy throughout — no exclamation marks, no emoji,
+no "Invalid X" phrasing; `robots.txt` now disallows `/search` and `/preview/`; landing-page fonts are
+self-hosted (they had been loading from Google Fonts); the example configuration no longer suggests
+SQLite, which the data layer has never actually supported.
 
 ## Fixed
 
-- **Unknown category and tag URLs return 404.** `/category/{slug}` and `/tag/{slug}` answered 200
-  for any slug, rendering an empty archive titled from the raw slug — an unbounded soft-404 surface.
-  Both routes now check the taxonomy exists first, as `/author/{slug}` already did.
-- **Empty categories and tags are no longer offered as filters.** The public filter chips listed
-  every category and tag in the database, including those with no published posts. Reader-facing
-  lists now count published posts only; admin screens still show drafts and empty taxonomies.
-- **Tag archives held up only by drafts no longer reach the sitemap.** The indexability test
-  counted unpublished posts, so a tag with three drafts could be advertised while its archive
-  answered `noindex`.
-- **Archive pagination no longer repeats the facet in the query string.** Page 2 of `/tag/{slug}`
-  linked to `?page=2&tags={slug}`; archive pagers now emit `?page=2` alone.
-- **A fresh install from `DBScripts/init.sql` now produces a complete schema.** The file was
-  stamped v1.0.1 and was missing three tables (`ErrorLogs`, `IpFirewallRules`, `CrawlerVisits`) and
-  four columns (`Posts.KeyFactsJson`, `Posts.HowToJson`, `Posts.AnswerCapsule`,
-  `Redirects.StatusCode`). Existing installations never noticed because `MigrationService` repairs
-  the schema on startup; only first-time installs were affected. Verified by building a database from
-  `init.sql` alone and diffing `sys.columns` against a working installation in both directions.
-- **README no longer claims revision history.** The advertised "Page Revisions" capability had no
-  callers, no table and no UI. The claim has been removed; revision history stays a separately
-  scoped roadmap item.
+The largest single group in this release. Selected items with real consequence:
+
+- **A typed schedule time is now read in your display time zone** and converted to UTC on save — it
+  had been bound straight to UTC, so a non-UTC operator's scheduled post went live hours off.
+- **Every timestamp now runs in UTC end to end** — publish stamps, "is it live yet" checks and several
+  entity timestamps had been written in the host's local time, so a freshly published post could
+  answer 200 at its own URL while missing from the homepage, feed and sitemap until the clock caught
+  up. A source-scanning test now fails the build on a regression; a one-time conversion script shifts
+  existing rows once an operator supplies the host's historical offset.
+- **The Desk had no phone navigation** — the sidebar was `display:none` below 768 px; it now slides in
+  from a named, keyboard-reachable toggle.
+- **Password fields on sign-in and register were plain text boxes** driven by a hand-rolled masking
+  script, so password managers could neither fill nor save credentials. Replaced with real password
+  inputs on every account page.
+- **A scripted edit briefly shipped four Save buttons as raw text** on Settings and the Posts/Pages
+  editors — restored, with a test that fails the build if it recurs.
+- **Revisions are now tenant-scoped**, **comment-form tokens are bound to their post**, **the
+  duplicate-comment check is scoped to the post's owner**, **Search Console rows are pruned on
+  disconnect**, and **the scheduler can no longer run a job twice across two application instances**.
+- CMS pages now carry their own meta title, description and canonical instead of a blank one, and now
+  ping IndexNow on publish the way posts already did; Admin → AI Crawlers no longer runs a full table
+  scan on a self-hosted install.
+- Roughly twenty further UI defects: mis-encoded dashes, a white-on-dark button, a duplicated link
+  attribute, non-scrolling Import tables, an autofocus that stole the 404 announcement, and more —
+  see `CHANGELOG.md` for the complete, itemized list.
+
+## Security
+
+- **Comment spam protection** (described above under Highlights).
+- **Media upload's anti-forgery check is restored** — it had been commented out; upload failures no
+  longer return an exception stack trace to the browser.
+- **Users screen:** an administrator can no longer disable their own account, and role changes require
+  an explicit confirmed action rather than firing on every keystroke through a dropdown.
 
 ## Upgrade notes
 
-- **Schema:** two changes — the new `CrawlerVisits` table and the `Posts.AnswerCapsule` column.
-  Both are applied automatically on startup by `MigrationService`, so an existing installation needs
-  no manual step. For a fresh install, or to apply them by hand, run `DBScripts/init.sql` — it is
-  idempotent, carries the complete v1.0.5 schema, and adds missing columns to an existing database
-  without touching data. Run it with `sqlcmd -f 65001` (UTF-8; omitting it corrupts em dashes and
-  curly quotes). Publisher-identity fields live in the settings JSON blob and need no migration.
-- **Publishing can now be refused.** A post whose FAQ, Key Facts, How-To or roundup block fails
-  validation is saved as a draft with the reason shown. Existing published posts are not re-validated
-  until they are next saved; use Admin → Content Health to find posts worth revisiting.
-- **AI-crawler recording is on by default** and writes only to the new `CrawlerVisits` table.
-  Human page-view analytics are unchanged.
-- **Backward-compatible:** existing redirect rules, archives, filters and settings keep working
-  without any action. A tenant that never opens the new screens is unaffected. The readiness score,
-  link suggestions and identity fields are additive and optional.
+- **Schema is fully automatic.** Every new table and index in this release (`Jobs`,
+  `PasswordResetTokens`, `SearchPerformance`, `Revisions`, a unique index on revision numbers, an
+  index on comment timestamps) is applied on startup by `MigrationService`. A fresh install gets the
+  same schema from `DBScripts/init.sql` alone — verified by diffing `sys.columns` against a live
+  database in both directions before this release was cut. No manual step is required for schema.
+- **One manual step is required: the UTC conversion.** If your host's clock was ever running in a
+  zone other than UTC, run `DBScripts/2026-09-15_convert-local-timestamps-to-utc.sql` and
+  `DBScripts/2026-09-17_convert-remaining-local-timestamps-to-utc.sql` once each, with
+  `@OffsetMinutes` set to that host's historical offset. Both are no-ops at offset 0 and guarded by a
+  marker row against a second run.
+- **Set `DataProtection:KeysPath`** to a folder outside the web root that survives a redeploy (default
+  `App_Data/keys`). Without it, comment-form tokens and preview links are silently invalidated on
+  every app-pool recycle; the dashboard now warns if the folder cannot be written.
+- **New settings default off or to today's behaviour.** Colour scheme defaults to System; comment
+  spam protection, the job scheduler and revision history are always on and need no configuration;
+  Search Console and IndexNow stay inert until a key is entered.
+- **Backward-compatible.** A tenant who never opens Settings, Theme, or any of the new screens sees no
+  change in behaviour, layout or content.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete list.

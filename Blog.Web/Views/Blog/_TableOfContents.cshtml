@@ -1,0 +1,18 @@
+@model IReadOnlyList<Blog.Core.Services.TocEntry>
+@*
+    "On this page" for long posts. Rendered only when the body has enough headings to be worth it
+    (TableOfContents.Worthwhile). Collapsible on small screens via <details>, always open on wide
+    ones (CSS). Layout-independent: styles live in inkwell.css under .ink-toc.
+*@
+@if (Blog.Core.Services.TableOfContents.Worthwhile(Model))
+{
+    <details class="ink-toc" open>
+        <summary class="ink-toc__title">On this page</summary>
+        <ol class="ink-toc__list">
+            @foreach (var e in Model)
+            {
+                <li class="ink-toc__item ink-toc__item--h@(e.Level)"><a href="#@e.Id">@e.Text</a></li>
+            }
+        </ol>
+    </details>
+}

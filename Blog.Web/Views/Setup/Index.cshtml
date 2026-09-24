@@ -1,21 +1,22 @@
 @{
     Layout = "_SetupLayout";
-    ViewData["Title"] = "Welcome to BLGFRNT";
+    ViewData["Title"] = "Welcome to Inkwell";
 }
 
 <div class="setup-container">
     <div class="setup-card">
         <div class="setup-logo">
-            <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="28" fill="#6366f1"/><path d="M16 28l8 8 16-16" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="setup-mark" width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true" focusable="false"><circle cx="28" cy="28" r="28"/><path d="M16 28l8 8 16-16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <h1 class="setup-title">Welcome to BLGFRNT</h1>
-        <p class="setup-subtitle">Your plug-and-play blogging CMS. Let's get you set up in just a few steps.</p>
-        <div class="setup-steps-preview">
+        <div class="setup-step-badge">Step 1 of 4</div>
+        <h1 class="setup-title">Welcome to Inkwell</h1>
+        <p class="setup-subtitle">Set up your blog in four short steps: name it, create the admin account, review, launch.</p>
+        <div class="setup-steps-preview" aria-hidden="true">
             <div class="step-dot active"></div>
             <div class="step-dot"></div>
             <div class="step-dot"></div>
             <div class="step-dot"></div>
         </div>
-        <a href="/setup/step2" class="btn btn-primary btn-lg">Get Started →</a>
+        <a href="/setup/step2" class="btn btn-primary btn-lg">Get started</a>
     </div>
 </div>

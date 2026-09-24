@@ -1,0 +1,81 @@
+@using Blog.Core.Domain
+@using Blog.Core.Services
+@{
+    Layout = "_AdminLayout";
+    var revision = (Revision)ViewBag.Revision;
+    var current = ((string Title, string Html))ViewBag.Current;
+    var diff = (IReadOnlyList<DiffLine>)ViewBag.BodyDiff;
+    var (added, removed) = TextDiff.Count(diff);
+    var type = ((string)ViewBag.EntityType).ToLowerInvariant();
+    var entityId = (Guid)ViewBag.EntityId;
+    var editUrl = (string)ViewBag.EditUrl;
+    var titleChanged = !string.Equals(revision.Title, current.Title, StringComparison.Ordinal);
+}
+
+<div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div>
+        <h2 class="text-lg font-semibold text-foreground">Revision #@revision.Number <span class="text-muted-foreground font-normal">vs current</span></h2>
+        <p class="text-xs text-muted-foreground mt-0.5">
+            @revision.Reason · @revision.CreatedAt.ToString("d MMM yyyy HH:mm") UTC@(string.IsNullOrEmpty(revision.AuthorName) ? "" : " · " + revision.AuthorName) · was @revision.Status
+            · <span class="text-emerald-700">+@added</span> <span class="text-red-700">−@removed</span> lines from this revision to now
+        </p>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="@editUrl" class="h-9 px-3 rounded border border-input text-sm inline-flex items-center hover:bg-muted">Back to editor</a>
+        <form method="post" action="/admin/revisions/@type/@entityId/@revision.Id/restore"
+              data-confirm-title="Restore revision #@revision.Number?"
+              data-confirm-body="The current title, body, meta and structured blocks are replaced with revision #@revision.Number. The current content is saved as a new revision first, so this can be undone. Slug and publish state do not change."
+              data-confirm-action="Restore revision"
+              data-confirm-tone="warning">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm font-medium inline-flex items-center hover:opacity-90">Restore this revision</button>
+        </form>
+    </div>
+</div>
+
+<div class="grid md:grid-cols-2 gap-4 mb-4">
+    <div class="rounded-lg border border-border bg-card p-4">
+        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Title — revision #@revision.Number</div>
+        <div class="text-sm @(titleChanged ? "text-red-700" : "text-foreground")">@revision.Title</div>
+    </div>
+    <div class="rounded-lg border border-border bg-card p-4">
+        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Title — current</div>
+        <div class="text-sm @(titleChanged ? "text-emerald-700" : "text-foreground")">@current.Title</div>
+    </div>
+</div>
+
+@if (revision.MetaTitle is not null || revision.MetaDescription is not null)
+{
+    <div class="rounded-lg border border-border bg-card p-4 mb-4 text-xs">
+        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Meta at revision #@revision.Number</div>
+        <div><span class="text-muted-foreground">Title:</span> @(revision.MetaTitle ?? "—")</div>
+        <div><span class="text-muted-foreground">Description:</span> @(revision.MetaDescription ?? "—")</div>
+    </div>
+}
+
+<div class="rounded-lg border border-border bg-card overflow-hidden">
+    <div class="px-4 py-2 border-b border-border text-xs text-muted-foreground">
+        Body, revision #@revision.Number → current. <span class="text-red-700">Red</span> lines existed then and are gone now; <span class="text-emerald-700">green</span> lines are new since. HTML shown as stored.
+    </div>
+    @if (diff.Count == 0)
+    {
+        <p class="px-4 py-6 text-sm text-muted-foreground">Both bodies are empty.</p>
+    }
+    else if (added == 0 && removed == 0)
+    {
+        <p class="px-4 py-6 text-sm text-muted-foreground">The body is identical to the current one; only the title or meta differ.</p>
+    }
+    else
+    {
+        <pre class="text-[11px] leading-5 overflow-x-auto p-3 font-mono whitespace-pre-wrap break-words">@foreach (var line in diff)
+{
+    var cls = line.Kind switch
+    {
+        DiffKind.Added => "bg-emerald-50 text-emerald-900",
+        DiffKind.Removed => "bg-red-50 text-red-900 line-through decoration-red-300",
+        _ => "text-muted-foreground",
+    };
+    var mark = line.Kind switch { DiffKind.Added => "+ ", DiffKind.Removed => "− ", _ => "  " };
+<span class="block px-1 @cls">@mark@line.Text</span>}</pre>
+    }
+</div>

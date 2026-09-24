@@ -50,7 +50,7 @@ public class PostsApiController : ControllerBase
     public async Task<IActionResult> GetPost(string slug)
     {
         var post = await _posts.GetBySlugAsync(slug);
-        if (post == null || (post.Status != PostStatus.Published && !(post.Status == PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now)))
+        if (post == null || (post.Status != PostStatus.Published && !(post.Status == PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)))
             return NotFound(ApiError(404, "Post not found."));
         await _posts.IncrementViewCountAsync(post.Id);
         return Ok(new { data = post });

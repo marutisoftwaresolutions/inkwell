@@ -16,6 +16,9 @@ public class DashboardController : Controller
     private readonly IUserRepository _users;
     private readonly IMediaRepository _media;
     private readonly ApplicationDbSeeder _seeder;
+    private readonly Blog.Web.Services.Jobs.JobScheduler _jobs;
+    private readonly Blog.Web.Services.StartupWarnings _warnings;
+    private readonly Blog.Web.Services.SearchConsole.SearchPerformanceService _search;
 
     public DashboardController(
         IPostRepository posts,
@@ -23,14 +26,20 @@ public class DashboardController : Controller
         ISettingRepository settings,
         IUserRepository users,
         IMediaRepository media,
-        ApplicationDbSeeder seeder)
+        ApplicationDbSeeder seeder,
+        Blog.Web.Services.Jobs.JobScheduler jobs,
+        Blog.Web.Services.StartupWarnings warnings,
+        Blog.Web.Services.SearchConsole.SearchPerformanceService search)
     {
+        _search = search;
         _posts = posts;
         _comments = comments;
         _settings = settings;
         _users = users;
         _media = media;
         _seeder = seeder;
+        _jobs = jobs;
+        _warnings = warnings;
     }
 
     private Guid GetCurrentUserId()
@@ -52,6 +61,18 @@ public class DashboardController : Controller
         
         var userSettings = await _settings.GetSettingsAsync(userId);
         ViewBag.SiteName = userSettings?.SiteName;
+
+        // Operational state that nobody would otherwise notice: startup findings and the job ledger.
+        ViewBag.StartupWarnings = _warnings.All;
+        ViewBag.Jobs = User.IsInRole("Admin") ? await _jobs.GetStatusAsync() : Array.Empty<Blog.Web.Services.Jobs.JobStatus>();
+
+        // Site-wide search tile: totals over the last 28 days plus how many posts sit in striking distance.
+        var (searchState, pages) = await _search.GetPageSummariesAsync(await _search.ResolveOwnerAsync());
+        ViewBag.SearchState = searchState;
+        ViewBag.SearchClicks = pages.Sum(p => p.Clicks);
+        ViewBag.SearchImpressions = pages.Sum(p => p.Impressions);
+        ViewBag.SearchPrevClicks = pages.Sum(p => p.PrevClicks);
+        ViewBag.SearchStriking = pages.Count(p => p.StrikingDistance);
 
         // ── Onboarding state ────────────────────────────────────────────────
         if (userSettings != null && !userSettings.OnboardingDismissed)
@@ -133,7 +154,7 @@ public class DashboardController : Controller
         try
         {
             await _seeder.SeedAsync();
-            TempData["Success"] = "Database seeded successfully! 🌱";
+            TempData["Success"] = "Sample data seeded.";
         }
         catch (Exception ex)
         {

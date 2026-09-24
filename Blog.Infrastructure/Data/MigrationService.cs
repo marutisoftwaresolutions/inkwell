@@ -403,6 +403,108 @@ public class MigrationService
                     CREATE INDEX IX_CrawlerVisits_Owner_Path      ON CrawlerVisits (OwnerId, Path);
                 END
 
+                -- Scheduled-job ledger (DBScripts/2026-09-15_create-jobs-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Jobs')
+                BEGIN
+                    CREATE TABLE Jobs (
+                        Name           NVARCHAR(100)  NOT NULL PRIMARY KEY,
+                        LastStartedAt  DATETIME2      NULL,
+                        LastFinishedAt DATETIME2      NULL,
+                        LastSucceeded  BIT            NOT NULL CONSTRAINT DF_Jobs_LastSucceeded DEFAULT 0,
+                        LastMessage    NVARCHAR(1000) NULL,
+                        RunCount       INT            NOT NULL CONSTRAINT DF_Jobs_RunCount DEFAULT 0
+                    );
+                END
+
+                -- Self-service password reset (DBScripts/2026-09-15_create-password-reset-tokens-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordResetTokens')
+                BEGIN
+                    CREATE TABLE PasswordResetTokens (
+                        Id        UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        UserId    UNIQUEIDENTIFIER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                        TokenHash NVARCHAR(128)    NOT NULL,
+                        ExpiresAt DATETIME2        NOT NULL,
+                        UsedAt    DATETIME2        NULL,
+                        CreatedAt DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+                        RequestIp NVARCHAR(45)     NULL
+                    );
+                    CREATE UNIQUE INDEX UX_PasswordResetTokens_TokenHash ON PasswordResetTokens (TokenHash);
+                    CREATE INDEX IX_PasswordResetTokens_User_CreatedAt ON PasswordResetTokens (UserId, CreatedAt DESC);
+                END
+
+                -- Search Console daily rows (DBScripts/2026-09-15_create-search-performance-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SearchPerformance')
+                BEGIN
+                    CREATE TABLE SearchPerformance (
+                        Id          BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        OwnerId     UNIQUEIDENTIFIER NOT NULL,
+                        [Date]      DATE             NOT NULL,
+                        Page        NVARCHAR(1024)   NOT NULL,
+                        Query       NVARCHAR(512)    NOT NULL,
+                        Clicks      INT              NOT NULL,
+                        Impressions INT              NOT NULL,
+                        Ctr         FLOAT            NOT NULL,
+                        Position    FLOAT            NOT NULL
+                    );
+                    CREATE INDEX IX_SearchPerformance_Owner_Date      ON SearchPerformance (OwnerId, [Date]);
+                    CREATE INDEX IX_SearchPerformance_Owner_Page_Date ON SearchPerformance (OwnerId, Page, [Date]);
+                END
+
+                -- Post/page revision history (DBScripts/2026-09-15_create-revisions-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Revisions')
+                BEGIN
+                    CREATE TABLE Revisions (
+                        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        EntityType      NVARCHAR(20)     NOT NULL,
+                        EntityId        UNIQUEIDENTIFIER NOT NULL,
+                        Number          INT              NOT NULL,
+                        Title           NVARCHAR(500)    NOT NULL,
+                        Slug            NVARCHAR(500)    NOT NULL,
+                        Html            NVARCHAR(MAX)    NOT NULL,
+                        MetaTitle       NVARCHAR(500)    NULL,
+                        MetaDescription NVARCHAR(1000)   NULL,
+                        StructuredJson  NVARCHAR(MAX)    NULL,
+                        Status          NVARCHAR(50)     NOT NULL,
+                        Reason          NVARCHAR(100)    NOT NULL,
+                        AuthorId        UNIQUEIDENTIFIER NOT NULL,
+                        AuthorName      NVARCHAR(200)    NULL,
+                        CreatedAt       DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME()
+                    );
+                    CREATE INDEX IX_Revisions_Entity_CreatedAt ON Revisions (EntityType, EntityId, CreatedAt DESC);
+                END
+
+                -- Revision numbers unique per entity (DBScripts/2026-09-19_add-unique-index-revisions-number.sql).
+                -- Any duplicates a pre-index install produced are renumbered first, only for the entities that
+                -- carry one, in a deterministic order.
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('Revisions') AND name = 'UX_Revisions_Entity_Number')
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM Revisions GROUP BY EntityType, EntityId, Number HAVING COUNT(*) > 1)
+                    BEGIN
+                        ;WITH d AS (
+                            SELECT r.Number,
+                                   NewNumber = ROW_NUMBER() OVER (PARTITION BY r.EntityType, r.EntityId ORDER BY r.Number, r.CreatedAt, r.Id)
+                            FROM Revisions r
+                            WHERE EXISTS (SELECT 1 FROM Revisions x
+                                          WHERE x.EntityType = r.EntityType AND x.EntityId = r.EntityId
+                                          GROUP BY x.Number HAVING COUNT(*) > 1)
+                        )
+                        UPDATE d SET Number = NewNumber WHERE Number <> NewNumber;
+                    END
+                    CREATE UNIQUE INDEX UX_Revisions_Entity_Number ON Revisions (EntityType, EntityId, Number);
+                END
+
+                -- Comment spam-window lookups seek CreatedAt (DBScripts/2026-09-19_add-index-comments-createdat.sql)
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('Comments') AND name = 'IX_Comments_CreatedAt')
+                BEGIN
+                    CREATE INDEX IX_Comments_CreatedAt ON Comments (CreatedAt) INCLUDE (AuthorIp);
+                END
+
+                -- Desk replies record who wrote them (DBScripts/2026-09-19_ensure-comments-memberid-column.sql);
+                -- present since 001_CMS_Schema.sql, topped up here for a database built from an older script.
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Comments') AND name = 'MemberId')
+                BEGIN
+                    ALTER TABLE Comments ADD MemberId UNIQUEIDENTIFIER NULL;
+                END
 
                 -- Answer capsule (DBScripts/2026-09-05_add-answercapsule-to-posts.sql)
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'AnswerCapsule')

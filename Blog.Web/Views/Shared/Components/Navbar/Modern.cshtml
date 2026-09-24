@@ -1,13 +1,10 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
     var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
-    var logoUrl = !string.IsNullOrEmpty(Model.SiteLogoUrl)
-        ? Model.SiteLogoUrl
-        : $"https://placehold.co/400x120/171717/FFFFFF?text={Uri.EscapeDataString(Model.SiteName.ToUpper())}";
 }
 
 @* MODERN (Professional) — sharp single bar, solid primary left border accent, no rounded, no gradients *@
-<header x-data="{ searchOpen: false, mobileOpen: false }"
+<header x-data="{ mobileOpen: false }"
         class="sticky top-0 z-50 w-full border-b border-l-4"
         style="background: var(--background); border-bottom-color: var(--border); border-left-color: var(--primary);">
 
@@ -26,10 +23,13 @@
                 }
             </a>
 
-            @* Center: Logo *@
-            <a href="/" class="absolute left-1/2 -translate-x-1/2 hidden md:flex">
-                <img src="@logoUrl" alt="@Model.SiteName" class="h-9 w-auto object-contain" />
-            </a>
+            @* Center: Logo — only when the site has one; the name is already the brand on the left *@
+            @if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
+            {
+                <a href="/" class="absolute left-1/2 -translate-x-1/2 hidden md:flex">
+                    <img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-9 w-auto object-contain" />
+                </a>
+            }
 
             @* Right: Icon cluster — all square, no rounding *@
             <div class="flex items-center gap-0 shrink-0">
@@ -63,13 +63,7 @@
                     </div>
                 </div>
 
-                @* Search *@
-                <button @@click="searchOpen = !searchOpen"
-                        class="w-10 h-10 flex items-center justify-center border-l hover:opacity-60 transition-opacity"
-                        style="border-color: var(--border); color: var(--foreground);">
-                    <i class="bi bi-search text-base"></i>
-                </button>
-
+                @* Search: the shared _NavSearch control at the end of the header *@
                 @* Dashboard *@
                 @if (User.Identity != null && User.Identity.IsAuthenticated)
                 {
@@ -81,10 +75,10 @@
                 }
 
                 @* Mobile *@
-                <button @@click="mobileOpen = !mobileOpen"
+                <button @@click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen" aria-label="Open menu"
                         class="md:hidden w-10 h-10 flex items-center justify-center border-l"
                         style="border-color: var(--border); color: var(--foreground);">
-                    <i class="bi bi-list text-xl"></i>
+                    <i class="bi bi-list text-xl" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -105,28 +99,5 @@
         </div>
     </div>
 
-    @* Search flyout — drops inline below header *@
-    <div x-show="searchOpen"
-         x-transition:enter="transition ease-out duration-150"
-         x-transition:enter-start="opacity-0 -translate-y-1"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-100"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         style="display:none; background: var(--background); border-bottom: 3px solid var(--primary);"
-         class="absolute top-full left-0 right-0 z-40 px-4 py-4 border-b"
-         style="border-color: var(--border);">
-        <div class="container xl:max-w-6xl mx-auto">
-            <form action="/" method="get" class="flex items-center gap-4">
-                <div class="w-1 h-6" style="background: var(--primary);"></div>
-                <span class="text-xs uppercase tracking-widest font-bold shrink-0" style="color: var(--muted-foreground);">Search</span>
-                <input type="text" name="search" placeholder="Type and press enter…"
-                       class="flex-1 bg-transparent border-0 border-b text-sm outline-none py-1"
-                       style="border-color: var(--foreground); color: var(--foreground);" />
-                <button type="button" @@click="searchOpen = false"
-                        class="text-xl hover:opacity-50 transition-opacity shrink-0">&times;</button>
-            </form>
-        </div>
-    </div>
-
+    <partial name="_NavSearch" />
 </header>

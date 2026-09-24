@@ -90,8 +90,8 @@ public class RedirectRepository : IRedirectRepository
         var rows = await conn.QueryAsync<string>(@"
             SELECT Slug FROM Posts
              WHERE Slug IS NOT NULL AND LEN(Slug) > 0
-               AND ((Status = 'Published' AND PublishedAt <= GETDATE())
-                 OR (Status = 'Scheduled' AND ScheduledAt <= GETDATE()));");
+               AND ((Status = 'Published' AND PublishedAt <= GETUTCDATE())
+                 OR (Status = 'Scheduled' AND ScheduledAt <= GETUTCDATE()));");
 
         return rows.ToList();
     }

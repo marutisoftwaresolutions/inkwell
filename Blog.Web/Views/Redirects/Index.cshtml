@@ -22,9 +22,9 @@
 
     string StatusChip(int code) => code switch
     {
-        RedirectStatus.Gone  => "bg-red-50 text-red-700 border-red-200",
-        RedirectStatus.Found => "bg-amber-50 text-amber-700 border-amber-200",
-        _                    => "bg-emerald-50 text-emerald-700 border-emerald-200"
+        RedirectStatus.Gone  => "pill-bad",
+        RedirectStatus.Found => "pill-warn",
+        _                    => "pill-ok"
     };
 }
 
@@ -38,11 +38,11 @@
 
 @if (TempData["Success"] != null)
 {
-    <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">@TempData["Success"]</div>
+    <div class="mb-4 rounded-lg border pill-ok px-4 py-2 text-sm">@TempData["Success"]</div>
 }
 @if (TempData["Error"] != null)
 {
-    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">@TempData["Error"]</div>
+    <div class="mb-4 rounded-lg border pill-bad px-4 py-2 text-sm">@TempData["Error"]</div>
 }
 
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -55,7 +55,7 @@
         <div class="text-xs text-muted-foreground mt-1">Retired (410)</div>
     </div>
     <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold @(actionable > 0 ? "text-amber-600" : "text-foreground")">@actionable</div>
+        <div class="text-2xl font-bold @(actionable > 0 ? "tone-warn" : "text-foreground")">@actionable</div>
         <div class="text-xs text-muted-foreground mt-1">404s worth fixing</div>
     </div>
     <div class="rounded-xl border border-border bg-card p-4">
@@ -65,10 +65,10 @@
 </div>
 
 <div class="flex gap-2 mb-5 text-xs">
-    <a href="?tab=rules" class="h-8 px-3 rounded border inline-flex items-center @(tab == "rules" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-input text-foreground hover:bg-muted")">
+    <a href="?tab=rules" aria-current="@(tab == "rules" ? "page" : null)" class="h-8 px-3 rounded border inline-flex items-center @(tab == "rules" ? "border-primary bg-primary text-primary-foreground" : "border-input text-foreground hover:bg-muted")">
         Rules (@rules.Count)
     </a>
-    <a href="?tab=notfound" class="h-8 px-3 rounded border inline-flex items-center @(tab == "notfound" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-input text-foreground hover:bg-muted")">
+    <a href="?tab=notfound" aria-current="@(tab == "notfound" ? "page" : null)" class="h-8 px-3 rounded border inline-flex items-center @(tab == "notfound" ? "border-primary bg-primary text-primary-foreground" : "border-input text-foreground hover:bg-muted")">
         404 log (@actionable actionable)
     </a>
 </div>
@@ -109,7 +109,8 @@
 @if (tab == "rules")
 {
     <div class="rounded-xl border border-border bg-card overflow-hidden">
-        <table class="w-full text-sm">
+        <partial name="_ListSearch" />
+<div class="table-scroll"><table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
                     <th class="px-4 py-2 font-medium">From</th>
@@ -139,17 +140,18 @@
                     <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(r.CreatedAt)</td>
                     <td class="px-4 py-2 text-right">
                         <form method="post" action="/admin/redirects/delete"
-                              onsubmit="return confirm('Remove the rule for @r.From? The URL will go back to serving a 404.');">
+                              data-confirm-title="Remove this redirect?" data-confirm-body="@r.From stops redirecting and returns 404 again. If search engines still index the old URL, keep the rule or retire the URL with 410 instead." data-confirm-action="Remove rule" data-confirm-tone="warning">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="from" value="@r.From" />
                             <input type="hidden" name="tab" value="rules" />
-                            <button type="submit" class="text-xs text-red-600 hover:underline">Remove</button>
+                            <button type="submit" aria-label="Remove redirect for @r.From" class="text-xs text-destructive hover:underline">Remove</button>
                         </form>
                     </td>
                 </tr>
             }
             </tbody>
-        </table>
+        </table></div>
+<partial name="_ListPager" />
     </div>
 }
 else
@@ -158,7 +160,7 @@ else
         <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">
             Worth fixing
         </div>
-        <table class="w-full text-sm">
+        <div class="table-scroll"><table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
                     <th class="px-4 py-2 font-medium">Requested</th>
@@ -200,29 +202,30 @@ else
                                 <input type="hidden" name="to" value="/@n.SuggestedSlug" />
                                 <input type="hidden" name="statusCode" value="301" />
                                 <input type="hidden" name="tab" value="notfound" />
-                                <button type="submit" class="text-xs text-emerald-700 hover:underline">301 &rarr;</button>
+                                <button type="submit" aria-label="Redirect @n.Path to /@n.SuggestedSlug with 301" class="text-xs tone-ok hover:underline">301 &rarr;</button>
                             </form>
                             <span class="text-border mx-1">|</span>
                         }
-                        <form method="post" action="/admin/redirects/save" class="inline">
+                        <form method="post" action="/admin/redirects/save" class="inline"
+                              data-confirm-title="Retire @n.Path with 410 Gone?" data-confirm-body="Search engines drop a 410 URL from their index faster than a 404 and stop re-crawling it. Use this only for pages that will never come back; use 301 if there is a replacement." data-confirm-action="Retire URL" data-confirm-tone="warning">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="from" value="@n.Path" />
                             <input type="hidden" name="statusCode" value="410" />
                             <input type="hidden" name="tab" value="notfound" />
-                            <button type="submit" class="text-xs text-red-600 hover:underline">410</button>
+                            <button type="submit" aria-label="Retire @n.Path with 410 Gone" class="text-xs text-destructive hover:underline">410</button>
                         </form>
                     </td>
                 </tr>
             }
             </tbody>
-        </table>
+        </table></div>
     </div>
 
     <details class="rounded-xl border border-border bg-card">
         <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">
             Unmatched 404s (@noise.Count) — almost all scanner traffic
         </summary>
-        <table class="w-full text-sm border-t border-border">
+        <div class="table-scroll"><table class="w-full text-sm border-t border-border">
             <tbody>
             @foreach (var n in noise)
             {
@@ -233,7 +236,7 @@ else
                 </tr>
             }
             </tbody>
-        </table>
+        </table></div>
         <p class="px-4 py-3 text-[11px] text-muted-foreground border-t border-border">
             Nothing links to these and none resembles a published slug. They need no redirect — repeated
             probing is the IP firewall's business, not this screen's.

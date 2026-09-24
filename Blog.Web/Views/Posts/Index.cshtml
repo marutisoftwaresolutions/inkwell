@@ -55,11 +55,27 @@
     }
     else
     {
+        @* Bulk actions: the row checkboxes belong to this form via form="bulkForm"; the toolbar shows once any is ticked. *@
+        <form id="bulkForm" method="post" action="/admin/posts/bulk" class="hidden items-center flex-wrap gap-2 p-3 rounded-lg border border-border bg-card text-sm" aria-live="polite">
+            @Html.AntiForgeryToken()
+            <span id="bulkCount" class="font-medium">0 selected</span>
+            <select name="action" id="bulkAction" class="h-8 px-2 rounded-md border border-input bg-background text-sm" aria-label="Bulk action">
+                <option value="publish">Publish</option>
+                <option value="draft">Move to draft</option>
+                <option value="tag">Add tag…</option>
+                <option value="delete">Delete</option>
+            </select>
+            <input type="text" name="tag" id="bulkTag" placeholder="Tag name" class="h-8 px-2 rounded-md border border-input bg-background text-sm hidden" aria-label="Tag to add" />
+            <button type="submit" class="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Apply</button>
+            <button type="button" id="bulkClear" class="h-8 px-3 rounded-md border border-input text-sm hover:bg-muted">Clear</button>
+        </form>
+
         <div class="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
+                <div class="table-scroll"><table class="w-full text-sm text-left">
                     <thead class="bg-muted text-muted-foreground font-medium border-b border-border">
                         <tr>
+                            <th class="px-3 py-3 w-8"><input type="checkbox" id="bulkAll" aria-label="Select all posts on this page" class="rounded border-input" /></th>
                             <th class="px-4 py-3">Title</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3 hidden md:table-cell">Author</th>
@@ -73,6 +89,7 @@
                         @foreach (var post in Model.Items)
                         {
                             <tr class="hover:bg-muted/30 transition-colors group">
+                                <td class="px-3 py-3 w-8"><input type="checkbox" name="ids" value="@post.Id" form="bulkForm" class="bulk-row rounded border-input" aria-label="Select “@post.Title”" /></td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
                                         @if (!string.IsNullOrEmpty(post.FeatureImage))
@@ -101,7 +118,7 @@
                                 <td class="px-4 py-3">
                                     @{
                                         var displayStatus = post.Status;
-                                        if (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now)
+                                        if (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)
                                         {
                                             displayStatus = Blog.Core.Domain.PostStatus.Published;
                                         }
@@ -148,7 +165,7 @@
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                             </a>
                                         }
-                                        @if (post.Status == Blog.Core.Domain.PostStatus.Published || (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now))
+                                        @if (post.Status == Blog.Core.Domain.PostStatus.Published || (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow))
                                         {
                                             <a href="/@post.Slug" target="_blank" class="p-2 text-muted-foreground hover:text-green-600 transition-colors" title="View">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -156,7 +173,7 @@
                                         }
                                         @if (post.AuthorId == ViewBag.CurrentUserId || ViewBag.IsAdmin || ViewBag.IsEditor)
                                         {
-                                            <form method="post" action="/admin/posts/delete/@post.Id" onsubmit="return confirm('Ensure to delete?')" class="inline">
+                                            <form method="post" action="/admin/posts/delete/@post.Id" data-confirm-title="Delete this post?" data-confirm-body="“@post.Title” will be removed permanently and /@post.Slug will return 404. If the page has inbound links or search traffic, add a redirect under Admin → Redirects first." data-confirm-action="Delete post" data-confirm-tone="danger" class="inline">
                                                 @Html.AntiForgeryToken()
                                                 <button type="submit" class="p-2 text-muted-foreground hover:text-destructive transition-colors" title="Delete">
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -168,7 +185,7 @@
                             </tr>
                         }
                     </tbody>
-                </table>
+                </table></div>
             </div>
 
             <!-- Pagination -->
@@ -195,3 +212,39 @@
         </div>
     }
 </div>
+
+<script>
+    // Bulk selection: toolbar appears when any row is ticked; the tag box appears for "Add tag";
+    // Delete goes through the Desk dialog by setting the confirm attributes just before submit.
+    (function () {
+        var form = document.getElementById('bulkForm'), all = document.getElementById('bulkAll');
+        if (!form || !all) return;
+        var rows = function () { return Array.from(document.querySelectorAll('input.bulk-row')); };
+        var count = document.getElementById('bulkCount'), action = document.getElementById('bulkAction'), tag = document.getElementById('bulkTag');
+        function refresh() {
+            var n = rows().filter(function (c) { return c.checked; }).length;
+            count.textContent = n + ' selected';
+            form.classList.toggle('hidden', n === 0);
+            form.classList.toggle('flex', n > 0);
+            all.indeterminate = n > 0 && n < rows().length;
+            all.checked = n > 0 && n === rows().length;
+            tag.classList.toggle('hidden', action.value !== 'tag');
+            tag.required = action.value === 'tag';
+            if (action.value === 'delete') {
+                form.dataset.confirmTitle = 'Delete ' + n + ' post' + (n === 1 ? '' : 's') + '?';
+                form.dataset.confirmBody = 'They are removed permanently and their URLs return 404. Add redirects first for any with inbound links or search traffic.';
+                form.dataset.confirmAction = 'Delete ' + n + ' post' + (n === 1 ? '' : 's');
+                form.dataset.confirmTone = 'danger';
+                if (n >= 5) form.dataset.confirmTyped = 'DELETE'; else delete form.dataset.confirmTyped;
+            } else {
+                ['confirmTitle', 'confirmBody', 'confirmAction', 'confirmTone', 'confirmTyped'].forEach(function (k) { delete form.dataset[k]; });
+            }
+        }
+        document.addEventListener('change', function (e) {
+            if (e.target === all) { rows().forEach(function (c) { c.checked = all.checked; }); }
+            if (e.target === all || e.target.classList.contains('bulk-row') || e.target === action) refresh();
+        });
+        document.getElementById('bulkClear').addEventListener('click', function () { rows().forEach(function (c) { c.checked = false; }); all.checked = false; refresh(); });
+        refresh();
+    })();
+</script>

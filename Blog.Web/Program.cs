@@ -5,6 +5,7 @@ using Blog.Infrastructure.Data;
 using Blog.Web.Middleware;
 using Blog.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +34,60 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Blog.Core.Interfaces.IEmailService, SmtpEmailService>();
 builder.Services.AddHttpClient<ReCaptchaService>();
+// Comment spam gate: signed form-timing tokens (Data Protection is registered by the web host).
+builder.Services.AddSingleton<Blog.Web.Services.CommentFormTokenService>();
+
+// ── Data Protection key ring ─────────────────────────────────────────────────
+// Everything protected with IDataProtector (comment-form tokens, and any secret a tenant stores)
+// is only readable while the key that protected it still exists. The framework default keeps keys
+// somewhere host-specific and, on IIS, sometimes nowhere durable — so a redeploy or app-pool
+// change silently invalidates every stored secret. Persist them to a folder that survives
+// deploys: DataProtection:KeysPath in appsettings, else App_Data/keys under the content root
+// (outside wwwroot; a file-copy deploy never prunes it).
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (string.IsNullOrWhiteSpace(keysPath))
+    keysPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "keys");
+builder.Services.AddSingleton<Blog.Web.Services.StartupWarnings>();
+try
+{
+    Directory.CreateDirectory(keysPath);
+    // A folder that exists but cannot be written (read-only ACL after a deploy) passes CreateDirectory
+    // and then fails on the first Protect(), turning every post page and the sign-in form into a 500.
+    // Prove writability now and fall back with a dashboard warning instead.
+    var probe = Path.Combine(keysPath, ".write-probe");
+    File.WriteAllText(probe, DateTime.UtcNow.ToString("O"));
+    File.Delete(probe);
+    builder.Services.AddDataProtection()
+        .SetApplicationName("Inkwell")
+        .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+}
+catch (Exception)
+{
+    // Fall back to the framework default rather than refuse to start; the dashboard warns.
+    builder.Services.AddDataProtection().SetApplicationName("Inkwell");
+    keysPath = null;
+}
+
+// ── Scheduled jobs ───────────────────────────────────────────────────────────
+// One in-process scheduler; jobs are scoped so they can take repositories like a controller.
+builder.Services.AddSingleton<Blog.Web.Services.Jobs.JobScheduler>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Blog.Web.Services.Jobs.JobScheduler>());
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.CrawlerVisitRetentionJob>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PasswordResetTokenPruneJob>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.OgCachePruneJob>();
+
+// ── Search Console ───────────────────────────────────────────────────────────
+// Per-tenant service-account credentials (Data-Protection-encrypted), a two-endpoint HTTP client,
+// a nightly sync job, and the read side the editor / Content Health / dashboard consume.
+builder.Services.AddSingleton<Blog.Web.Services.SearchConsole.SearchConsoleCredentialStore>();
+builder.Services.AddHttpClient<Blog.Web.Services.SearchConsole.SearchConsoleClient>(c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddScoped<Blog.Web.Services.SearchConsole.SearchPerformanceService>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.SearchConsole.SearchConsoleSyncJob>();
+
+// Revision history for posts and pages (written on save, pruned to Settings → RevisionsPerItem).
+builder.Services.AddScoped<Blog.Web.Services.RevisionService>();
+// Signed, expiring preview links for unpublished posts (nothing stored).
+builder.Services.AddSingleton<Blog.Web.Services.PreviewLinkService>();
 builder.Services.AddHttpClient<IndexNowService>(c => c.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddScoped<ErrorLogService>();
 
@@ -118,10 +173,18 @@ if (Directory.Exists(oldUploads))
 
 var app = builder.Build();
 
-// Self-heal stale static AI files: older deployments shipped a static wwwroot/llms.txt (and
-// wwwroot/llms-full.txt) that static-file middleware serves BEFORE the dynamic per-tenant
-// /llms.txt route — pinning every tenant to one hardcoded, often-wrong summary. Delete them on
-// startup so the dynamic, correct route always wins (they are regenerated per request). Non-fatal.
+var startupWarnings = app.Services.GetRequiredService<Blog.Web.Services.StartupWarnings>();
+if (keysPath is null)
+    startupWarnings.Add("Data Protection keys could not be persisted to disk, so stored secrets and comment-form tokens will not survive a restart. Set DataProtection:KeysPath in appsettings to a writable folder outside the web root.");
+else
+    app.Logger.LogInformation("Data Protection keys persisted at {Path}.", keysPath);
+
+// Deploy hygiene — shadowed routes. Static-file middleware runs BEFORE routing, so a file left in
+// wwwroot at the same path as a mapped endpoint silently replaces it: the route still exists,
+// still passes its tests, and is never reached. A stale llms.txt did this on a live site for
+// months. The four AI/SEO files that were once static are deleted outright (they are regenerated
+// per request); anything else that shadows a route is reported on Admin → Dashboard, not deleted,
+// because it may be a deliberate override. Non-fatal.
 try
 {
     var webRoot = app.Environment.WebRootPath
@@ -135,10 +198,21 @@ try
             app.Logger.LogInformation("Removed stale static {File} so the dynamic route serves it.", stale);
         }
     }
+
+    var patterns = app.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints
+        .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+        .Select(e => e.RoutePattern.RawText);
+    var shadowed = Blog.Core.Services.ShadowedRoutes.Find(patterns,
+        rel => File.Exists(Path.Combine(webRoot, rel.Replace('/', Path.DirectorySeparatorChar))));
+    foreach (var rel in shadowed)
+    {
+        app.Logger.LogWarning("wwwroot/{File} shadows a mapped route; the dynamic endpoint is never reached.", rel);
+        startupWarnings.Add($"wwwroot/{rel} shadows the /{rel} route — the file is served and the application code for that path never runs. Remove the file from the server if the route is the intended behaviour.");
+    }
 }
 catch (Exception ex)
 {
-    app.Logger.LogWarning(ex, "Stale llms.txt cleanup skipped (non-fatal).");
+    app.Logger.LogWarning(ex, "Shadowed-route check skipped (non-fatal).");
 }
 
 // Run migrations and taxonomy seeding on startup

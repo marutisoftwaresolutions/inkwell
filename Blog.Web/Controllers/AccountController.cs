@@ -18,14 +18,46 @@ public class AccountController : Controller
     private readonly Blog.Core.Interfaces.IRoleRepository _roles;
     private readonly AuditService _audit;
     private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
+    private readonly Blog.Core.Interfaces.IPasswordResetRepository _resets;
+    private readonly Blog.Core.Interfaces.IEmailService _email;
+    private readonly Blog.Core.Interfaces.ISettingRepository _settings;
+    private readonly Blog.Core.Services.AuthService _auth;
+    private readonly Blog.Core.Interfaces.ITenantContext _tenant;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
+    private readonly ILogger<AccountController> _log;
 
     public AccountController(Blog.Core.Interfaces.IUserRepository users, Blog.Core.Interfaces.IRoleRepository roles,
-        AuditService audit, Blog.Web.Services.Security.IpFirewallService firewall)
+        AuditService audit, Blog.Web.Services.Security.IpFirewallService firewall,
+        Blog.Core.Interfaces.IPasswordResetRepository resets, Blog.Core.Interfaces.IEmailService email,
+        Blog.Core.Interfaces.ISettingRepository settings, Blog.Core.Services.AuthService auth,
+        Blog.Core.Interfaces.ITenantContext tenant, IConfiguration config, IWebHostEnvironment env,
+        ILogger<AccountController> log)
     {
         _users = users;
         _roles = roles;
         _audit = audit;
         _firewall = firewall;
+        _resets = resets;
+        _email = email;
+        _settings = settings;
+        _auth = auth;
+        _tenant = tenant;
+        _config = config;
+        _env = env;
+        _log = log;
+    }
+
+    /// <summary>
+    /// The owner whose settings blob holds the site name — the same key Admin → Settings writes under:
+    /// the resolved tenant in cloud mode, else the first admin. Never <see cref="Guid.Empty"/>, which
+    /// holds nothing on a self-hosted install.
+    /// </summary>
+    private async Task<Guid> ResolveSettingsOwnerAsync()
+    {
+        if (_tenant.IsCloudMode && _tenant.IsResolved) return _tenant.UserId;
+        try { return (await _users.GetFirstAdminAsync())?.Id ?? Guid.Empty; }
+        catch { return Guid.Empty; }
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────
@@ -60,7 +92,7 @@ public class AccountController : Controller
 
         if (!IsValidEmail(email))
         {
-            ViewBag.Error = "Invalid email format.";
+            ViewBag.Error = "Enter a valid email address.";
             return View();
         }
 
@@ -71,7 +103,7 @@ public class AccountController : Controller
             // A rejected sign-in returns 200, so the firewall cannot see it from the status code —
             // report it explicitly so credential-stuffing runs block themselves.
             await _firewall.RegisterFailedLoginAsync(HttpContext);
-            ViewBag.Error = "Invalid email or password.";
+            ViewBag.Error = "That email and password don't match.";
             return View();
         }
 
@@ -79,7 +111,7 @@ public class AccountController : Controller
         {
             await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", user.Id.ToString(), email);
             await _firewall.RegisterFailedLoginAsync(HttpContext);
-            ViewBag.Error = "Account is disabled.";
+            ViewBag.Error = "This account is disabled. Ask an administrator to re-enable it.";
             return View();
         }
 
@@ -122,7 +154,7 @@ public class AccountController : Controller
 
         if (!IsValidEmail(email))
         {
-            ViewBag.Error = "Invalid email format.";
+            ViewBag.Error = "Enter a valid email address.";
             return View();
         }
 
@@ -203,7 +235,7 @@ public class AccountController : Controller
 
         await SignInUser(newUser);
 
-        TempData["Success"] = "Welcome to BLGFRNT! 🎉";
+        TempData["Success"] = "Welcome to Inkwell.";
         return RedirectToAction("Index", "Dashboard");
     }
 
@@ -218,8 +250,151 @@ public class AccountController : Controller
         return RedirectToAction("Login");
     }
 
+    // ── Self-service password reset ───────────────────────────────────────────
+    //
+    // The flow never reveals whether an address has an account: known and unknown addresses get
+    // the same page. Only the SHA-256 hash of a token is stored; the raw token lives in the email
+    // link for 30 minutes and is single-use. Requests per account are capped, and a page that
+    // cannot send mail says so instead of pretending.
+
+    [HttpGet("forgot-password")]
+    public IActionResult ForgotPassword()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+            return RedirectToAction("Index", "Dashboard");
+        if (!_email.IsConfigured)
+            ViewBag.EmailUnavailable = true;
+        return View();
+    }
+
+    [HttpPost("forgot-password")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ForgotPassword(string email)
+    {
+        if (!_email.IsConfigured)
+        {
+            ViewBag.EmailUnavailable = true;
+            return View();
+        }
+
+        email = (email ?? string.Empty).Trim();
+        if (email.Length > 0)
+        {
+            try
+            {
+                var user = await _users.GetByEmailAsync(email);
+                if (user != null && user.IsActive)
+                {
+                    var recent = await _resets.CountRecentForUserAsync(user.Id, Blog.Core.Services.PasswordResetTokens.RequestWindow);
+                    if (Blog.Core.Services.PasswordResetTokens.CanRequest(recent))
+                    {
+                        // A new link supersedes any outstanding one.
+                        await _resets.InvalidateForUserAsync(user.Id);
+
+                        var raw = Blog.Core.Services.PasswordResetTokens.Generate();
+                        await _resets.CreateAsync(new PasswordResetToken
+                        {
+                            UserId = user.Id,
+                            TokenHash = Blog.Core.Services.PasswordResetTokens.Hash(raw),
+                            ExpiresAt = DateTime.UtcNow + Blog.Core.Services.PasswordResetTokens.Lifetime,
+                            RequestIp = _firewall.ResolveClientIp(HttpContext)
+                        });
+
+                        // Behind a TLS-terminating proxy Request.Scheme is http and Request.Host may be the
+                        // internal name, so the configured canonical host wins outside Development — the same
+                        // condition the canonical-host redirect in Program.cs applies.
+                        var canonicalHost = _env.IsDevelopment() ? null : _config["CanonicalHost"];
+                        var linkBase = Blog.Core.Services.PasswordResetTokens.ResolveLinkBase(canonicalHost, Request.Scheme, Request.Host.Value ?? string.Empty);
+                        var link = $"{linkBase}/account/reset-password?token={Uri.EscapeDataString(raw)}";
+                        var siteName = (await _settings.GetSettingsAsync(await ResolveSettingsOwnerAsync())).SiteName;
+                        if (string.IsNullOrWhiteSpace(siteName))
+                            siteName = Uri.TryCreate(linkBase, UriKind.Absolute, out var origin) ? origin.Host : Request.Host.Value;
+                        Func<string?, string?> enc = s => System.Net.WebUtility.HtmlEncode(s);
+                        var body =
+                            $"<p>Someone asked to reset the password for <b>{enc(email)}</b> on {enc(siteName)}.</p>" +
+                            $"<p><a href=\"{enc(link)}\">Choose a new password</a></p>" +
+                            $"<p style='color:#666;font-size:12px'>The link works once and expires in {Blog.Core.Services.PasswordResetTokens.Lifetime.TotalMinutes:0} minutes. " +
+                            "If you did not ask for this, ignore this email — your password has not changed.</p>";
+                        await _email.SendAsync(email, user.DisplayName ?? email, $"Reset your {siteName} password", body);
+
+                        // Audited only for a real account — logging unknown addresses would leak them into the trail.
+                        await _audit.LogAsync(AuditActions.AuthPasswordResetRequested, "Auth", user.Id.ToString(), email);
+                    }
+                    else
+                    {
+                        _log.LogInformation("Password reset for {Email} suppressed: request cap reached.", email);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // The reader still sees the neutral page; the operator sees the log.
+                _log.LogWarning(ex, "Password reset request failed for {Email}.", email);
+            }
+        }
+
+        ViewBag.Sent = true;
+        return View();
+    }
+
+    [HttpGet("reset-password")]
+    public async Task<IActionResult> ResetPassword(string? token)
+    {
+        if (User.Identity?.IsAuthenticated == true)
+            return RedirectToAction("Index", "Dashboard");
+
+        var row = string.IsNullOrWhiteSpace(token) ? null
+            : await _resets.GetByHashAsync(Blog.Core.Services.PasswordResetTokens.Hash(token));
+        if (row == null || !Blog.Core.Services.PasswordResetTokens.IsUsable(row.UsedAt, row.ExpiresAt, DateTime.UtcNow))
+        {
+            ViewBag.Invalid = true;
+            return View();
+        }
+
+        ViewBag.Token = token;
+        return View();
+    }
+
+    [HttpPost("reset-password")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(string? token, string? password, string? confirmPassword)
+    {
+        var row = string.IsNullOrWhiteSpace(token) ? null
+            : await _resets.GetByHashAsync(Blog.Core.Services.PasswordResetTokens.Hash(token));
+        if (row == null || !Blog.Core.Services.PasswordResetTokens.IsUsable(row.UsedAt, row.ExpiresAt, DateTime.UtcNow))
+        {
+            ViewBag.Invalid = true;
+            return View();
+        }
+
+        var error = Blog.Core.Services.PasswordResetTokens.ValidateNewPassword(password, confirmPassword);
+        if (error != null)
+        {
+            ViewBag.Error = error;
+            ViewBag.Token = token;
+            return View();
+        }
+
+        var user = await _users.GetByIdAsync(row.UserId);
+        if (user == null || !user.IsActive)
+        {
+            ViewBag.Invalid = true;
+            return View();
+        }
+
+        user.PasswordHash = _auth.HashPassword(password!);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _users.UpdateAsync(user);
+        await _resets.MarkUsedAsync(row.Id);
+        await _resets.InvalidateForUserAsync(user.Id);
+        await _audit.LogAsync(AuditActions.AuthPasswordReset, "Auth", user.Id.ToString(), user.Email);
+
+        TempData["Success"] = "Your password has been changed. Sign in with the new one.";
+        return RedirectToAction("Login");
+    }
+
     // ── Access Denied ────────────────────────────────────────────────────────
-    
+
     [HttpGet("accessdenied")]
     public IActionResult AccessDenied()
     {
@@ -261,7 +436,7 @@ public class AccountController : Controller
 
         if (!IsValidEmail(email))
         {
-            ViewBag.Error = "Invalid email format.";
+            ViewBag.Error = "Enter a valid email address.";
             return View(user);
         }
 

@@ -50,33 +50,33 @@
                             #<span x-text="e.rank"></span> <span x-text="e.name || 'Untitled'"></span>
                         </span>
                         <div class="flex items-center gap-2">
-                            <button type="button" @@click="move(i, -1)" x-show="i > 0"
+                            <button type="button" @@click="move(i, -1)" x-show="i > 0" aria-label="Move up"
                                     class="text-xs text-muted-foreground hover:underline">↑</button>
-                            <button type="button" @@click="move(i, 1)" x-show="i < data.entries.length - 1"
+                            <button type="button" @@click="move(i, 1)" x-show="i < data.entries.length - 1" aria-label="Move down"
                                     class="text-xs text-muted-foreground hover:underline">↓</button>
                             <button type="button" @@click="removeEntry(i)" class="text-xs text-destructive hover:underline">Remove</button>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-1.5">
-                        <input type="text" x-model="e.name" @@input="serialize()" placeholder="Product name"
+                        <input type="text" x-model="e.name" @@input="serialize()" aria-label="Product name" placeholder="Product name"
                                class="px-2 py-1.5 bg-background border border-input rounded text-xs" />
-                        <input type="text" x-model="e.category" @@input="serialize()" placeholder="Category chip (e.g. optical-POS)"
+                        <input type="text" x-model="e.category" @@input="serialize()" aria-label="Category chip" placeholder="Category chip (e.g. optical-POS)"
                                class="px-2 py-1.5 bg-background border border-input rounded text-xs" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-1.5">
-                        <select x-model="e.badge" @@change="serialize()"
+                        <select x-model="e.badge" @@change="serialize()" aria-label="Badge"
                                 class="px-2 py-1.5 bg-background border border-input rounded text-xs">
                             <option value="">No badge</option>
                             <option value="Editor's pick">Editor's pick</option>
                             <option value="Runner-up">Runner-up</option>
                             <option value="Also great">Also great</option>
                         </select>
-                        <input type="url" x-model="e.website" @@input="serialize()" placeholder="Vendor website — https://vendor.com (required)"
+                        <input type="url" x-model="e.website" @@input="serialize()" aria-label="Vendor website" placeholder="Vendor website — https://vendor.com (required)"
                                class="px-2 py-1.5 bg-background border border-input rounded text-xs" />
                     </div>
-                    <input type="text" x-model="e.ctaUrl" @@input="serialize()" placeholder="Internal review path — /vendor-review (optional)"
+                    <input type="text" x-model="e.ctaUrl" @@input="serialize()" aria-label="Internal review path" placeholder="Internal review path — /vendor-review (optional)"
                            class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs" />
 
                     <!-- Sub-scores; overall is derived from the weights -->
@@ -102,17 +102,17 @@
                         </div>
                     </div>
 
-                    <input type="text" x-model="e.bestFor" @@input="serialize()" placeholder="Best for…"
+                    <input type="text" x-model="e.bestFor" @@input="serialize()" aria-label="Best for" placeholder="Best for…"
                            class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs" />
-                    <input type="text" x-model="e.standout" @@input="serialize()" placeholder="Standout feature…"
+                    <input type="text" x-model="e.standout" @@input="serialize()" aria-label="Standout feature" placeholder="Standout feature…"
                            class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs" />
-                    <textarea x-model="e.body" @@input="serialize()" placeholder="Review narrative…" rows="2"
+                    <textarea x-model="e.body" @@input="serialize()" aria-label="Review narrative" placeholder="Review narrative…" rows="2"
                               class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs resize-none"></textarea>
 
                     <div class="grid grid-cols-2 gap-1.5">
-                        <textarea x-model="e.prosText" @@input="serialize()" placeholder="Pros — one per line" rows="3"
+                        <textarea x-model="e.prosText" @@input="serialize()" aria-label="Pros, one per line" placeholder="Pros — one per line" rows="3"
                                   class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs resize-none"></textarea>
-                        <textarea x-model="e.consText" @@input="serialize()" placeholder="Cons — one per line" rows="3"
+                        <textarea x-model="e.consText" @@input="serialize()" aria-label="Cons, one per line" placeholder="Cons — one per line" rows="3"
                                   class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs resize-none"></textarea>
                     </div>
                 </div>

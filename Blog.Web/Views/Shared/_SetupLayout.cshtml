@@ -1,13 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+@* No tenant settings exist yet during setup, so the colour scheme follows the OS ("system"). *@
+<html lang="en" data-theme="system">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] – BLGFRNT</title>
+    <title>@ViewData["Title"] – Inkwell</title>
+    <meta name="robots" content="noindex,nofollow" />
     <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
+    <!-- Desk tokens: light palette plus the dark scheme (prefers-color-scheme: dark and data-theme="dark") -->
+    <link rel="stylesheet" href="~/css/desk-tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
-<body class="admin-body">
+<body class="admin-body setup-body">
     @RenderBody()
     <script src="~/lib/htmx/htmx.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)

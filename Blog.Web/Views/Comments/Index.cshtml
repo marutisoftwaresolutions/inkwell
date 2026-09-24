@@ -4,52 +4,106 @@
     Layout = "_AdminLayout";
     ViewData["Title"] = "Comments";
 
-    Func<string, string> GetTabClass = (status) => 
-        (ViewBag.StatusFilter as string) == status
-        ? "border-primary text-primary whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
-        : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm";
+    var tab = ViewBag.StatusFilter as string ?? "pending";
+    var q = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string ?? "";
+    var currentPage = ViewData[Blog.Web.Models.ListPaging.PageKey] as int? ?? 1;
+    var total = ViewData[Blog.Web.Models.ListPaging.TotalKey] as int? ?? Model.TotalItems;
+
+    // Tab links keep the search so switching tabs narrows the same query, never drops it.
+    string TabHref(string status) => "?status=" + status + (string.IsNullOrEmpty(q) ? "" : "&q=" + Uri.EscapeDataString(q));
+    string TabClass(string status) => tab == status
+        ? "border-primary text-primary whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm"
+        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm";
+
+    var emptyTitle = !string.IsNullOrEmpty(q) ? $"Nothing matches “{q}”."
+        : tab == "approved" ? "No approved comments yet."
+        : tab == "all" ? "No comments yet."
+        : "No comments waiting for review.";
+    var emptyHint = !string.IsNullOrEmpty(q)
+        ? (total == 0 && tab != "all" ? "Try the All tab, or clear the search." : "Clear the search to see the whole list.")
+        : tab == "approved" ? "Approve a comment from the Pending tab and it appears here."
+        : tab == "all" ? "Comments readers leave on your posts are listed here as they arrive."
+        : "New comments land here first. Approved ones are under the Approved tab.";
 }
 
 <div class="space-y-6">
-    <!-- Filter Tabs -->
+    <!-- Status tabs -->
     <div class="border-b border-border">
-        <nav class="-mb-px flex gap-6" aria-label="Tabs">
-            <a href="?status=pending" class="@GetTabClass("pending")">Pending</a>
-            <a href="?status=approved" class="@GetTabClass("approved")">Approved</a>
+        <nav class="-mb-px flex gap-6" aria-label="Comment status">
+            <a href="@TabHref("pending")" class="@TabClass("pending")" aria-current="@(tab == "pending" ? "page" : null)">Pending</a>
+            <a href="@TabHref("approved")" class="@TabClass("approved")" aria-current="@(tab == "approved" ? "page" : null)">Approved</a>
+            <a href="@TabHref("all")" class="@TabClass("all")" aria-current="@(tab == "all" ? "page" : null)">All</a>
         </nav>
     </div>
+
+    <partial name="_ListSearch" />
 
     @if (!Model.Items.Any())
     {
         <div class="bg-card rounded-lg border border-border p-12 text-center text-muted-foreground">
              <div class="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
-            <h3 class="text-lg font-medium text-foreground mb-1">No comments found</h3>
-            <p>This list is empty.</p>
+            <h3 class="text-lg font-medium text-foreground mb-1">@emptyTitle</h3>
+            <p>@emptyHint</p>
+            @if (!string.IsNullOrEmpty(q))
+            {
+                <a href="?status=@tab" class="inline-block mt-3 text-primary hover:underline font-medium">Clear the search</a>
+            }
         </div>
     }
     else
     {
+        @* Bulk moderation: the row checkboxes belong to this form via form="bulkForm"; the toolbar shows once any is ticked.
+           Delete and Spam set the Desk dialog attributes just before submit (typed DELETE at five or more). *@
+        <form id="bulkForm" method="post" action="/admin/comments/bulk" class="hidden items-center flex-wrap gap-2 p-3 rounded-lg border border-border bg-card text-sm" aria-live="polite">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="status" value="@tab" />
+            <input type="hidden" name="q" value="@q" />
+            <input type="hidden" name="page" value="@currentPage" />
+            <span id="bulkCount" class="font-medium">0 selected</span>
+            <select name="action" id="bulkAction" class="h-8 px-2 rounded-md border border-input bg-background text-sm" aria-label="Bulk action">
+                <option value="approve">Approve</option>
+                <option value="pending">Move to pending</option>
+                <option value="delete">Delete</option>
+                <option value="spam">Delete as spam</option>
+            </select>
+            <button type="submit" class="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Apply</button>
+            <button type="button" id="bulkClear" class="h-8 px-3 rounded-md border border-input text-sm hover:bg-muted">Clear</button>
+        </form>
+
+        <div class="flex items-center gap-3 text-sm text-muted-foreground px-1">
+            <input type="checkbox" id="bulkAll" aria-label="Select all comments on this page" class="rounded border-input" />
+            <label for="bulkAll">Select all on this page</label>
+        </div>
+
         <div class="space-y-4">
             @foreach (var comment in Model.Items)
             {
-                <div class="bg-card rounded-lg border border-border p-4 shadow-sm hover:shadow-md transition-shadow">
+                var who = string.IsNullOrWhiteSpace(comment.AuthorName) ? "Anonymous" : comment.AuthorName;
+                <div class="bg-card rounded-lg border border-border p-4 shadow-sm hover:shadow-md transition-shadow" x-data="{ replying: false }">
                     <div class="flex items-start gap-4">
-                        <div class="flex-shrink-0">
-                            <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-semibold">
+                        <div class="flex-shrink-0 flex items-start gap-3">
+                            <input type="checkbox" name="ids" value="@comment.Id" form="bulkForm" class="bulk-row rounded border-input mt-3" aria-label="Select comment by @who on “@comment.PostTitle”" />
+                            <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-semibold" aria-hidden="true">
                                 @(string.IsNullOrEmpty(comment.AuthorName) ? "?" : comment.AuthorName.Substring(0, 1))
                             </div>
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between flex-wrap gap-2">
                                 <div>
-                                    <h4 class="text-sm font-semibold text-foreground">@comment.AuthorName</h4>
+                                    <h4 class="text-sm font-semibold text-foreground">@who</h4>
                                     <p class="text-xs text-muted-foreground">@comment.AuthorEmail</p>
                                 </div>
-                                <span class="text-xs text-muted-foreground" title="@comment.CreatedAt">
-                                    @comment.CreatedAt.ToString("MMM d, yyyy HH:mm")
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    @if (tab == "all")
+                                    {
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium @(comment.Status == Blog.Core.Domain.CommentStatus.Approved ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800")">@comment.Status</span>
+                                    }
+                                    <span class="text-xs text-muted-foreground" title="@comment.CreatedAt">
+                                        @comment.CreatedAt.ToString("MMM d, yyyy HH:mm")
+                                    </span>
+                                </div>
                             </div>
 
                             <div class="mt-2 text-sm text-foreground prose-sm max-w-none">
@@ -57,7 +111,7 @@
                             </div>
 
                             <div class="mt-2 text-xs text-muted-foreground">
-                                on <a href="/@comment.PostSlug" target="_blank" class="hover:underline text-primary">@comment.PostTitle</a>
+                                on <a href="/@comment.PostSlug" target="_blank" rel="noopener" class="hover:underline text-primary">@comment.PostTitle</a>
                             </div>
 
                             <div class="mt-4 flex flex-wrap gap-2">
@@ -66,51 +120,108 @@
                                     <form method="post" action="/admin/comments/approve/@comment.Id">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded text-xs font-medium transition-colors">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                                             Approve
                                         </button>
                                     </form>
                                 }
-                                
+
                                 @if (comment.Status != Blog.Core.Domain.CommentStatus.Pending)
                                 {
                                     <form method="post" action="/admin/comments/pending/@comment.Id">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded text-xs font-medium transition-colors">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                            Pending
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                            Move to pending
                                         </button>
                                     </form>
                                 }
 
-                                <form method="post" action="/admin/comments/delete/@comment.Id" onsubmit="return confirm('Delete permanently?')">
+                                <form method="post" action="/admin/comments/delete/@comment.Id" data-confirm-title="Delete this comment?" data-confirm-body="The comment by @who on “@comment.PostTitle” is removed permanently. Spam is safe to delete; a genuine comment you only want to hide can be moved to pending instead." data-confirm-action="Delete comment" data-confirm-tone="danger">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-medium transition-colors">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                         Delete
                                     </button>
                                 </form>
+
+                                <form method="post" action="/admin/comments/spam/@comment.Id"
+                                      data-confirm-title="Delete as spam?"
+                                      data-confirm-body="The comment by @who is removed permanently@(string.IsNullOrWhiteSpace(comment.AuthorIp) ? "" : $" and {comment.AuthorIp} is reported to the IP Firewall, which blocks an address that keeps posting spam"). Use plain Delete for a comment that is merely unwanted."
+                                      data-confirm-action="Delete as spam" data-confirm-tone="danger">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded text-xs font-medium transition-colors" title="Delete and report the posting address to the firewall">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+                                        Spam
+                                    </button>
+                                </form>
+
+                                <button type="button" @@click="replying = !replying" :aria-expanded="replying" aria-controls="reply-form-@comment.Id" class="inline-flex items-center gap-1 px-3 py-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded text-xs font-medium transition-colors">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                                    Reply
+                                </button>
                             </div>
+
+                            @* The reply is tracked like any editor: typing a reply and then clicking Approve, Delete or a
+                               tab asks before the draft is lost, and the pill shows while there is unsent text. *@
+                            <form id="reply-form-@comment.Id" x-show="replying" x-transition x-cloak method="post" action="/admin/comments/reply/@comment.Id" class="mt-3 space-y-2" data-track-changes>
+                                @Html.AntiForgeryToken()
+                                <label for="reply-@comment.Id" class="block text-xs font-medium text-foreground">Reply to @who</label>
+                                <textarea id="reply-@comment.Id" name="content" rows="3" required placeholder="Reply as yourself. It is published immediately, threaded under this comment@(comment.Status != Blog.Core.Domain.CommentStatus.Approved ? ", and approves this comment" : "")." class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                                <div class="flex items-center gap-2">
+                                    <button type="submit" class="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">Post reply</button>
+                                    <button type="button" @@click="replying = false" class="h-8 px-3 rounded-md border border-input text-xs hover:bg-muted">Cancel</button>
+                                    <span data-dirty-indicator hidden class="text-xs text-muted-foreground">Unsaved changes</span>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
             }
         </div>
 
-        @if (Model.TotalPages > 1)
-        {
-            <div class="mt-6 flex justify-center gap-1">
-                @for (int i = 1; i <= Model.TotalPages; i++)
-                {
-                    <a href="?status=@ViewBag.StatusFilter&page=@i" 
-                       class="px-3 py-1 text-sm rounded-md border transition-colors
-                       @(i == Model.Page 
-                           ? "bg-primary text-primary-foreground border-primary" 
-                           : "bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground")">
-                        @i
-                    </a>
-                }
-            </div>
-        }
+        <partial name="_ListPager" />
     }
 </div>
+
+<script>
+    // Bulk selection: toolbar appears when any row is ticked. Delete and Spam go through the Desk
+    // dialog by setting the confirm attributes just before submit; Approve and Move to pending are
+    // reversible and need no dialog.
+    (function () {
+        var form = document.getElementById('bulkForm'), all = document.getElementById('bulkAll');
+        if (!form || !all) return;
+        var rows = function () { return Array.from(document.querySelectorAll('input.bulk-row')); };
+        var count = document.getElementById('bulkCount'), action = document.getElementById('bulkAction');
+        function refresh() {
+            var n = rows().filter(function (c) { return c.checked; }).length;
+            var noun = n === 1 ? ' comment' : ' comments';
+            count.textContent = n + ' selected';
+            form.classList.toggle('hidden', n === 0);
+            form.classList.toggle('flex', n > 0);
+            all.indeterminate = n > 0 && n < rows().length;
+            all.checked = n > 0 && n === rows().length;
+            if (action.value === 'delete') {
+                form.dataset.confirmTitle = 'Delete ' + n + noun + '?';
+                form.dataset.confirmBody = 'They are removed permanently. Spam is safe to delete; a genuine comment you only want to hide can be moved to pending instead.';
+                form.dataset.confirmAction = 'Delete ' + n + noun;
+                form.dataset.confirmTone = 'danger';
+                if (n >= 5) form.dataset.confirmTyped = 'DELETE'; else delete form.dataset.confirmTyped;
+            } else if (action.value === 'spam') {
+                form.dataset.confirmTitle = 'Delete ' + n + noun + ' as spam?';
+                form.dataset.confirmBody = 'They are removed permanently and each posting address is reported once to the IP Firewall, which blocks an address that keeps posting spam. Use plain Delete for comments that are merely unwanted.';
+                form.dataset.confirmAction = 'Delete as spam';
+                form.dataset.confirmTone = 'danger';
+                if (n >= 5) form.dataset.confirmTyped = 'DELETE'; else delete form.dataset.confirmTyped;
+            } else {
+                ['confirmTitle', 'confirmBody', 'confirmAction', 'confirmTone', 'confirmTyped'].forEach(function (k) { delete form.dataset[k]; });
+            }
+        }
+        document.addEventListener('change', function (e) {
+            if (e.target === all) { rows().forEach(function (c) { c.checked = all.checked; }); }
+            if (e.target === all || e.target.classList.contains('bulk-row') || e.target === action) refresh();
+        });
+        document.getElementById('bulkClear').addEventListener('click', function () { rows().forEach(function (c) { c.checked = false; }); all.checked = false; refresh(); });
+        refresh();
+    })();
+</script>

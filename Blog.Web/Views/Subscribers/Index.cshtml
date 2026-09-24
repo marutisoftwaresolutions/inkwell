@@ -52,7 +52,7 @@
     }
     else
     {
-        <table class="w-full text-sm">
+        <div class="table-scroll"><table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-border bg-muted/40">
                     <th class="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</th>
@@ -80,7 +80,7 @@
                         </td>
                         <td class="px-4 py-3 text-right">
                             <form method="post" action="/admin/subscribers/delete/@m.Id?status=@currentStatus&page=@(page)"
-                                  onsubmit="return confirm('Remove this subscriber?')">
+                                  data-confirm-title="Remove this subscriber?" data-confirm-body="@m.Email stops receiving newsletters and is removed from the list. They can subscribe again at any time." data-confirm-action="Remove subscriber" data-confirm-tone="danger">
                                 @Html.AntiForgeryToken()
                                 <button type="submit"
                                         class="text-xs text-destructive hover:underline">
@@ -91,7 +91,7 @@
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
     }
 </div>
 

@@ -67,7 +67,8 @@
     </script>
 
     <div class="bg-card rounded-lg border border-border overflow-hidden">
-        <table class="w-full text-left text-sm">
+        <partial name="_ListSearch" />
+<div class="table-scroll"><table class="w-full text-left text-sm">
             <thead>
                 <tr class="bg-muted text-muted-foreground border-b border-border">
                     <th class="px-4 py-3 font-medium">Source / file</th>
@@ -106,7 +107,7 @@
                                 {
                                     <a href="/admin/import/summary/@job.Id" class="text-primary hover:underline text-xs">Summary</a>
                                 }
-                                <form method="post" action="/admin/import/delete/@job.Id" onsubmit="return confirm('Delete this import record? Imported content is kept.');">
+                                <form method="post" action="/admin/import/delete/@job.Id" data-confirm-title="Delete this import record?" data-confirm-body="Only the history entry is removed. Everything the import created stays exactly as it is, and Undo is no longer available for it." data-confirm-action="Delete record" data-confirm-tone="neutral">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-destructive hover:underline text-xs">Delete</button>
                                 </form>
@@ -115,6 +116,7 @@
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
+<partial name="_ListPager" />
     </div>
 </div>

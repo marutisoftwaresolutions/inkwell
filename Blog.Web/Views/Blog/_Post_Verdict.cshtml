@@ -33,7 +33,8 @@ else
             <span style="color:var(--fg);">@Model.Title</span>
         </nav>
 
-        <article>
+        <partial name="_ReadingProgress" />
+        <article data-reading-body>
             @* ── Header ─────────────────────────────────────────── *@
             <header>
                 <h1 style="font-family:var(--sans);font-size:var(--fs-display);font-weight:700;line-height:var(--lh-tight);color:var(--fg);margin:0 0 var(--sp-4);">
@@ -64,10 +65,11 @@ else
 
                     @if (Model.PublishedAt.HasValue)
                     {
-                        <time datetime="@Model.PublishedAt.Value.ToString("yyyy-MM-dd")">
-                            @Model.PublishedAt.Value.ToString("d MMM yyyy")
+                        <time datetime="@Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt.Value, (string?)ViewBag.DisplayTimeZone).ToString("yyyy-MM-dd")">
+                            @Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt.Value, (string?)ViewBag.DisplayTimeZone).ToString("d MMM yyyy")
                         </time>
                     }
+                    <span class="vd-reading-time">@Blog.Core.Services.TextHelper.ReadingMinutes(Model.Plaintext, Model.Html) min read</span>
 
                     <span class="vd-trust-badge">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>

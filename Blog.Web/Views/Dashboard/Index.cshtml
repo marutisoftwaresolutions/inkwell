@@ -10,6 +10,23 @@
         @await Html.PartialAsync("_OnboardingChecklist", (HashSet<string>)ViewBag.OnboardingCompleted)
     }
 
+    @* ── Startup findings (shadowed routes, ephemeral keys) ─────── *@
+    @{
+        var startupWarnings = ViewBag.StartupWarnings as IReadOnlyList<string> ?? Array.Empty<string>();
+    }
+    @if (startupWarnings.Count > 0)
+    {
+        <div class="p-4 rounded-lg border pill-warn text-sm space-y-1" role="alert">
+            <p class="font-semibold">Needs attention on this server</p>
+            <ul class="list-disc pl-5 space-y-1">
+                @foreach (var w in startupWarnings)
+                {
+                    <li>@w</li>
+                }
+            </ul>
+        </div>
+    }
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Total Posts -->
@@ -19,29 +36,29 @@
             </div>
             <div>
                 <p class="text-sm font-medium text-muted-foreground">Total Posts</p>
-                <h3 class="text-2xl font-bold">@ViewBag.TotalPosts</h3>
+                <p class="text-2xl font-bold">@ViewBag.TotalPosts</p>
             </div>
         </div>
 
         <!-- Published -->
         <div class="p-6 bg-card text-card-foreground rounded-lg shadow-sm border border-border flex items-center gap-4">
-            <div class="p-3 bg-green-100 text-green-700 rounded-full">
+            <div class="p-3 pill-ok rounded-full">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
             <div>
                 <p class="text-sm font-medium text-muted-foreground">Published</p>
-                <h3 class="text-2xl font-bold">@ViewBag.PublishedPosts</h3>
+                <p class="text-2xl font-bold">@ViewBag.PublishedPosts</p>
             </div>
         </div>
 
         <!-- Drafts -->
         <div class="p-6 bg-card text-card-foreground rounded-lg shadow-sm border border-border flex items-center gap-4">
-            <div class="p-3 bg-yellow-100 text-yellow-700 rounded-full">
+            <div class="p-3 pill-warn rounded-full">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </div>
             <div>
                 <p class="text-sm font-medium text-muted-foreground">Drafts</p>
-                <h3 class="text-2xl font-bold">@ViewBag.DraftPosts</h3>
+                <p class="text-2xl font-bold">@ViewBag.DraftPosts</p>
             </div>
         </div>
 
@@ -52,15 +69,45 @@
                 <div class="absolute top-0 right-0 w-3 h-3 bg-destructive rounded-full mr-2 mt-2 animate-ping"></div>
                 <div class="absolute top-0 right-0 w-3 h-3 bg-destructive rounded-full mr-2 mt-2"></div>
             }
-            <div class="p-3 bg-blue-100 text-blue-700 rounded-full">
+            <div class="p-3 pill-info rounded-full">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
             <div>
                 <p class="text-sm font-medium text-muted-foreground">Pending Comments</p>
-                <h3 class="text-2xl font-bold">@ViewBag.PendingComments</h3>
+                <p class="text-2xl font-bold">@ViewBag.PendingComments</p>
             </div>
         </div>
     </div>
+
+    @* ── Search Console (28 days) ────────────────────────────────── *@
+    @{
+        var searchState = ViewBag.SearchState as Blog.Web.Services.SearchConsole.SearchDataState;
+    }
+    @if (searchState is { Ready: true })
+    {
+        <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-4 flex flex-wrap items-center gap-6">
+            <div>
+                <p class="text-xs font-medium text-muted-foreground">Search clicks · 28d</p>
+                <p class="text-2xl font-bold">@ViewBag.SearchClicks
+                    @{ int sc = ViewBag.SearchClicks, sp = ViewBag.SearchPrevClicks; }
+                    @if (sp > 0)
+                    {
+                        var d = (sc - sp) * 100.0 / sp;
+                        <span class="text-xs font-normal @(d >= 0 ? "tone-ok" : "tone-bad")">@(d >= 0 ? "+" : "")@d.ToString("0")% vs prior 28d</span>
+                    }
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-muted-foreground">Impressions · 28d</p>
+                <p class="text-2xl font-bold">@ViewBag.SearchImpressions</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-muted-foreground">Striking distance</p>
+                <p class="text-2xl font-bold">@ViewBag.SearchStriking <a href="/admin/content-health?filter=striking" class="text-xs font-normal text-primary hover:underline">see posts</a></p>
+            </div>
+            <p class="text-[11px] text-muted-foreground ml-auto">Google Search through @searchState.AsOf?.ToString("d MMM yyyy")</p>
+        </div>
+    }
 
     <!-- Quick Actions -->
     <div class="bg-card rounded-lg shadow-sm border border-border p-6">
@@ -101,14 +148,14 @@
                             <div class="flex items-center gap-3 text-xs text-muted-foreground">
                                 @{
                                     var displayStatus = post.Status;
-                                    if (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now)
+                                    if (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)
                                     {
                                         displayStatus = Blog.Core.Domain.PostStatus.Published;
                                     }
                                 }
                                 <span class="capitalize px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide
-                                    @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "bg-green-100 text-green-700" : 
-                                      displayStatus == Blog.Core.Domain.PostStatus.Draft ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700")">
+                                    @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "pill-ok" :
+                                      displayStatus == Blog.Core.Domain.PostStatus.Draft ? "pill-warn" : "pill-info")">
                                     @displayStatus
                                 </span>
                                 <span>@post.CreatedAt.ToString("MMM d, yyyy")</span>
@@ -116,13 +163,13 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                             @if (post.Status == Blog.Core.Domain.PostStatus.Published || (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now))
+                             @if (post.Status == Blog.Core.Domain.PostStatus.Published || (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow))
                             {
-                                <a href="/@post.Slug" target="_blank" class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="View">
+                                <a href="/@post.Slug" target="_blank" class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="View" aria-label="View @post.Title">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                                 </a>
                             }
-                            <a href="/admin/posts/edit/@post.Id" class="px-3 py-1.5 text-sm font-medium text-foreground bg-white border border-input rounded hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm">
+                            <a href="/admin/posts/edit/@post.Id" class="px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-input rounded hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm">
                                 Edit
                             </a>
                         </div>
@@ -139,4 +186,49 @@
             </div>
         }
     </div>
+
+    @* ── Scheduled jobs (Admin only) ────────────────────────────── *@
+    @{
+        var jobs = ViewBag.Jobs as IReadOnlyList<Blog.Web.Services.Jobs.JobStatus> ?? Array.Empty<Blog.Web.Services.Jobs.JobStatus>();
+    }
+    @if (jobs.Count > 0)
+    {
+        <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border">
+            <div class="p-4 border-b border-border flex items-baseline justify-between">
+                <h3 class="font-semibold">Scheduled jobs</h3>
+                <span class="text-xs text-muted-foreground">Nightly housekeeping runs inside the app; no external scheduler.</span>
+            </div>
+            <div class="table-scroll"><table class="w-full text-sm">
+                <thead class="text-xs text-muted-foreground">
+                    <tr>
+                        <th class="text-left px-4 py-2 font-medium">Job</th>
+                        <th class="text-left px-4 py-2 font-medium">Every</th>
+                        <th class="text-left px-4 py-2 font-medium">Last run (UTC)</th>
+                        <th class="text-left px-4 py-2 font-medium">Result</th>
+                        <th class="text-right px-4 py-2 font-medium">Runs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var j in jobs)
+                    {
+                        <tr class="border-t border-border">
+                            <td class="px-4 py-2 font-mono text-xs">@j.Name</td>
+                            <td class="px-4 py-2 text-muted-foreground">@j.Interval.TotalHours h</td>
+                            <td class="px-4 py-2 text-muted-foreground">
+                                @if (j.IsRunning) { <span class="tone-warn">running now</span> }
+                                else if (j.LastStartedAt is null) { <span>never — first run within a minute of startup</span> }
+                                else { @j.LastStartedAt.Value.ToString("yyyy-MM-dd HH:mm") }
+                            </td>
+                            <td class="px-4 py-2">
+                                @if (j.LastStartedAt is null) { <span class="text-muted-foreground">—</span> }
+                                else if (j.LastSucceeded) { <span class="tone-ok">OK</span> <span class="text-muted-foreground">@j.LastMessage</span> }
+                                else { <span class="tone-bad">Failed</span> <span class="text-muted-foreground">@j.LastMessage</span> }
+                            </td>
+                            <td class="px-4 py-2 text-right text-muted-foreground">@j.RunCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        </div>
+    }
 </div>

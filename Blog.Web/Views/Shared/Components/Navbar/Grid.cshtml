@@ -1,13 +1,10 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
     var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
-    var logoUrl = !string.IsNullOrEmpty(Model.SiteLogoUrl)
-        ? Model.SiteLogoUrl
-        : $"https://placehold.co/400x120/171717/FFFFFF?text={Uri.EscapeDataString(Model.SiteName.ToUpper())}";
 }
 
 @* GRID — Symmetric 3-column layout: [icons|name] · [logo] · [name|icons] *@
-<header x-data="{ searchOpen: false, mobileOpen: false }"
+<header x-data="{ mobileOpen: false }"
         class="sticky top-0 z-50 w-full border-b"
         style="background: var(--background); border-color: var(--border);">
 
@@ -27,9 +24,12 @@
 
             @* Column 2: logo (center) *@
             <div class="flex items-center justify-center">
-                <a href="/" class="hover:opacity-80 transition-opacity">
-                    <img src="@logoUrl" alt="@Model.SiteName" class="h-9 md:h-11 w-auto object-contain" />
-                </a>
+                @if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
+                {
+                    <a href="/" class="hover:opacity-80 transition-opacity">
+                        <img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-9 md:h-11 w-auto object-contain" />
+                    </a>
+                }
             </div>
 
             @* Column 3: icon cluster (right) *@
@@ -69,13 +69,7 @@
                     </div>
                 </div>
 
-                @* Search *@
-                <button @@click="searchOpen = !searchOpen"
-                        class="w-9 h-9 rounded-lg flex items-center justify-center hover:opacity-70 transition-opacity"
-                        style="background: var(--muted); color: var(--muted-foreground);">
-                    <i class="bi bi-search text-sm"></i>
-                </button>
-
+                @* Search: the shared _NavSearch control at the end of the header *@
                 @* Dashboard *@
                 @if (User.Identity != null && User.Identity.IsAuthenticated)
                 {
@@ -87,10 +81,10 @@
                 }
 
                 @* Mobile *@
-                <button @@click="mobileOpen = !mobileOpen"
+                <button @@click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen" aria-label="Open menu"
                         class="md:hidden w-9 h-9 rounded-lg flex items-center justify-center border"
                         style="border-color: var(--border); color: var(--foreground);">
-                    <i class="bi bi-list text-lg"></i>
+                    <i class="bi bi-list text-lg" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -111,29 +105,5 @@
         </div>
     </div>
 
-    @* Search modal *@
-    <div x-show="searchOpen"
-         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-[60] flex items-start justify-center pt-20" style="background: rgba(0,0,0,0.55);">
-        <div @@click.away="searchOpen = false"
-             class="w-full max-w-lg mx-4 rounded-xl shadow-2xl border overflow-hidden"
-             style="background: var(--card); border-color: var(--border);">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-base font-bold" style="color: var(--foreground);">Search Posts</h3>
-                    <button @@click="searchOpen = false" class="text-2xl leading-none hover:opacity-60">&times;</button>
-                </div>
-                <form action="/" method="get" class="flex gap-2">
-                    <input type="text" name="search" placeholder="Search posts…"
-                           class="flex-1 h-11 px-4 rounded-lg border text-sm outline-none"
-                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
-                    <button type="submit" class="h-11 px-4 rounded-lg text-sm font-semibold" style="background: var(--primary); color: var(--primary-foreground);">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
+    <partial name="_NavSearch" />
 </header>

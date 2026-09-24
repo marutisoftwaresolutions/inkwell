@@ -31,10 +31,10 @@ public class PostService
             post.Slug = GenerateSlug(post.Title);
 
         if (await _posts.SlugExistsAsync(post.Slug))
-            post.Slug = $"{post.Slug}-{DateTime.Now.Ticks % 10000}";
+            post.Slug = $"{post.Slug}-{DateTime.UtcNow.Ticks % 10000}";
 
         if (post.Status == PostStatus.Published && !post.PublishedAt.HasValue)
-            post.PublishedAt = DateTime.Now;
+            post.PublishedAt = DateTime.UtcNow;
 
         var id = await _posts.CreateAsync(post);
 
@@ -67,7 +67,7 @@ public class PostService
             return "Slug already in use by another post.";
 
         if (post.Status == PostStatus.Published && !post.PublishedAt.HasValue)
-            post.PublishedAt = existing.PublishedAt ?? DateTime.Now;
+            post.PublishedAt = existing.PublishedAt ?? DateTime.UtcNow;
 
         post.AuthorId = existing.AuthorId;
         post.CreatedAt = existing.CreatedAt;
@@ -123,7 +123,7 @@ public class PostService
         if (post == null) return "Post not found.";
 
         post.Status = PostStatus.Published;
-        post.PublishedAt ??= DateTime.Now;
+        post.PublishedAt ??= DateTime.UtcNow;
         await _posts.UpdateAsync(post);
 
         return null;

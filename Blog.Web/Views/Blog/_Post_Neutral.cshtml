@@ -37,7 +37,7 @@
                             var pAuthorImage = !string.IsNullOrEmpty(Model.AvatarUrl)
                                 ? Model.AvatarUrl
                                 : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
-                            var readingMinutes = Math.Max(1, (Model.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+                            var readingMinutes = Blog.Core.Services.TextHelper.ReadingMinutes(Model.Plaintext, Model.Html);
                         }
                         <img src="@pAuthorImage" alt="@Model.AuthorName" class="w-8 h-8 rounded-full object-cover" />
                         <span>
@@ -50,8 +50,8 @@
                         </span>
                     </div>
                     <span>•</span>
-                    <time datetime="@Model.PublishedAt?.ToString("yyyy-MM-dd")">
-                        <i class="bi bi-calendar me-1"></i>@Model.PublishedAt?.ToString("MMMM d, yyyy")
+                    <time datetime="@Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt, (string?)ViewBag.DisplayTimeZone)?.ToString("yyyy-MM-dd")">
+                        <i class="bi bi-calendar me-1"></i>@Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt, (string?)ViewBag.DisplayTimeZone)?.ToString("MMMM d, yyyy")
                     </time>
                     <span>•</span>
                     <span><i class="bi bi-clock me-1"></i>@readingMinutes min read</span>
@@ -93,10 +93,15 @@
             <partial name="_KeyFacts" model="Model" />
             <partial name="_HowTo" model="Model" />
 
-            <!-- Post Content -->
-            <div class="post-prose mb-8" style="font-family: var(--font-body); line-height: 1.8;">
-                @Html.Raw(Model.Html)
+            <!-- On this page + Post Content -->
+            @{ var toc = Blog.Core.Services.TableOfContents.Build(Model.Html); }
+            <partial name="_TableOfContents" model="toc.Entries" />
+            @* ink-measure-prose caps the line length (~65-70 characters) while the header, hero and
+               cards above keep the full article width. *@
+            <div class="post-prose ink-measure-prose mb-8" style="font-family: var(--font-body); line-height: 1.8;" data-reading-body>
+                @Html.Raw(toc.Html)
             </div>
+            <partial name="_ReadingProgress" />
 
             <!-- See Also (internal links) -->
             <partial name="_SeeAlso" view-data="ViewData" />

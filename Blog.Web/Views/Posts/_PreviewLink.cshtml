@@ -1,0 +1,12 @@
+@{
+    var url = (string)ViewBag.Url;
+    var expires = (DateTime)ViewBag.Expires;
+}
+<div class="space-y-2">
+    <input type="text" readonly value="@url" onclick="this.select()" class="w-full px-2 py-1.5 text-[11px] font-mono bg-background border border-input rounded" />
+    <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] text-muted-foreground">Works until @expires.ToString("d MMM yyyy HH:mm") UTC. Not indexed; comments closed; views not counted.</span>
+        <button type="button" class="shrink-0 h-6 px-2 rounded border border-input text-[10px] hover:bg-muted"
+                onclick="navigator.clipboard.writeText(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(url))).then(() => { this.textContent = 'Copied'; setTimeout(() => this.textContent = 'Copy', 1500); })">Copy</button>
+    </div>
+</div>

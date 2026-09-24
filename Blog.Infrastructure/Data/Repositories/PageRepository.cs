@@ -63,7 +63,7 @@ public class PageRepository : IPageRepository
                 page.MetaTitle, page.MetaDescription, page.CanonicalUrl,
                 page.OgImage, page.OgTitle, page.OgDescription,
                 page.TwitterImage, page.TwitterTitle, page.TwitterDescription,
-                CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now 
+                CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow 
             });
     }
 
@@ -83,7 +83,7 @@ public class PageRepository : IPageRepository
                 page.MetaTitle, page.MetaDescription, page.CanonicalUrl,
                 page.OgImage, page.OgTitle, page.OgDescription,
                 page.TwitterImage, page.TwitterTitle, page.TwitterDescription,
-                UpdatedAt = DateTime.Now, page.Id, page.AuthorId 
+                UpdatedAt = DateTime.UtcNow, page.Id, page.AuthorId 
             });
     }
 

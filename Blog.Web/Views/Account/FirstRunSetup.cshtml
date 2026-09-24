@@ -1,62 +1,60 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Complete Setup";
+    var hasError = !string.IsNullOrEmpty(ViewBag.Error as string);
 }
-<style>
-    .setup-card {
-        max-width: 500px;
-        margin: 60px auto;
-        background: #1a1d2e;
-        border: 1px solid #2a2d3e;
-        border-radius: 16px;
-        padding: 40px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    }
-    .setup-card h2 { color: #fff; font-size: 1.4rem; margin-bottom: 8px; }
-    .setup-card p { color: #8b8fa8; font-size: 0.9rem; margin-bottom: 28px; }
-    .form-group { margin-bottom: 18px; }
-    .form-group label { display: block; color: #9ca3af; font-size: 0.8rem; font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .form-group input { width: 100%; padding: 11px 14px; background: #0f1117; border: 1px solid #2a2d3e; border-radius: 8px; color: #fff; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
-    .form-group input:focus { border-color: #6366f1; }
-    .current-email { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 10px 14px; color: #a5b4fc; font-size: 0.875rem; margin-bottom: 24px; }
-    .btn-save { padding: 12px 28px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 8px; color: #fff; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
-    .btn-save:hover { opacity: 0.9; }
-    .btn-skip { padding: 12px 20px; background: transparent; border: 1px solid #2a2d3e; border-radius: 8px; color: #8b8fa8; font-size: 0.95rem; cursor: pointer; margin-left: 10px; text-decoration: none; display: inline-block; }
-    .error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; border-radius: 8px; padding: 12px 16px; font-size: 0.875rem; margin-bottom: 20px; }
-    .hint { color: #6b7280; font-size: 0.8rem; margin-top: 5px; }
-</style>
 
-<div class="setup-card">
-    <h2>🎉 You're in! Complete your setup</h2>
-    <p>You're logged in with temporary credentials. Set your permanent email and password below, or skip and do it later from Settings.</p>
+<div class="max-w-lg mx-auto mt-12 bg-card text-card-foreground border border-border rounded-lg shadow-sm p-8">
+    <h2 class="text-lg font-semibold text-foreground mb-1">Complete your setup</h2>
+    <p class="text-sm text-muted-foreground mb-6">You are signed in with temporary credentials. Set your permanent email and password now, or skip and do it later from your profile.</p>
 
-    @if (!string.IsNullOrEmpty(ViewBag.Error as string))
+    @if (hasError)
     {
-        <div class="error">@ViewBag.Error</div>
+        <p id="form-error" role="alert" class="mb-6 p-3 rounded border border-destructive text-destructive text-sm">@ViewBag.Error</p>
     }
 
-    <div class="current-email">
-        Current email: <strong>@ViewBag.CurrentEmail</strong>
+    <div class="mb-6 p-3 rounded bg-muted border border-border text-sm">
+        Current email: <strong class="font-medium">@ViewBag.CurrentEmail</strong>
     </div>
 
-    <form method="post">
+    <form method="post" data-track-changes class="space-y-5">
         @Html.AntiForgeryToken()
-        <div class="form-group">
-            <label>New Email</label>
-            <input type="email" name="email" value="@ViewBag.CurrentEmail" required />
+        <div>
+            <label for="email" class="block text-sm font-medium text-foreground mb-1">New email</label>
+            <input type="email" name="email" id="email" value="@ViewBag.CurrentEmail" required autocomplete="username" aria-describedby="@(hasError ? "form-error" : null)" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
         </div>
-        <div class="form-group">
-            <label>New Password</label>
-            <input type="password" name="password" placeholder="Minimum 8 characters" />
-            <div class="hint">Leave blank to keep the current password</div>
+        <div>
+            <label for="password" class="block text-sm font-medium text-foreground mb-1">New password</label>
+            <div class="relative">
+                <input type="password" name="password" id="password" autocomplete="new-password" minlength="8" aria-describedby="password-hint" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                <button type="button" data-toggle-password="password" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">Show</button>
+            </div>
+            <p id="password-hint" class="text-xs text-muted-foreground mt-1">At least 8 characters. Leave blank to keep the current password.</p>
         </div>
-        <div class="form-group">
-            <label>Confirm Password</label>
-            <input type="password" name="confirmPassword" placeholder="Repeat password" />
+        <div>
+            <label for="confirmPassword" class="block text-sm font-medium text-foreground mb-1">Confirm password</label>
+            <div class="relative">
+                <input type="password" name="confirmPassword" id="confirmPassword" autocomplete="new-password" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                <button type="button" data-toggle-password="confirmPassword" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">Show</button>
+            </div>
         </div>
-        <div style="margin-top: 24px;">
-            <button type="submit" class="btn-save">Save & Continue →</button>
-            <a href="/admin/dashboard" class="btn-skip">Skip for now</a>
+        <div class="pt-2 flex items-center gap-3 flex-wrap">
+            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save and continue</button>
+            <a href="/admin/dashboard" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Skip for now</a>
+            <span data-dirty-indicator hidden class="text-xs text-muted-foreground">Unsaved changes</span>
         </div>
     </form>
 </div>
+<script>
+    document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var input = document.getElementById(btn.getAttribute('data-toggle-password'));
+            if (!input) return;
+            var show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+            btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+            btn.textContent = show ? 'Hide' : 'Show';
+        });
+    });
+</script>

@@ -16,6 +16,8 @@ Disallow: /admin/
 Disallow: /account/
 Disallow: /setup/
 Disallow: /api/
+Disallow: /search
+Disallow: /preview/
 
 # AI answer engines & search assistants — explicitly permitted for citation and indexing
 User-agent: GPTBot

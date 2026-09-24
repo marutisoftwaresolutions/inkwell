@@ -18,4 +18,10 @@ public class DapperContext
         conn.Open();
         return conn;
     }
+
+    /// <summary>
+    /// An unopened <see cref="SqlConnection"/> for the few callers that need the provider type
+    /// (bulk copy, transactions) and want to open it asynchronously. The caller owns opening and disposal.
+    /// </summary>
+    public SqlConnection CreateSqlConnection() => new(_connectionString);
 }

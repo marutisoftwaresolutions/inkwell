@@ -1,68 +1,110 @@
 @{
     Layout = "_SetupLayout";
     ViewData["Title"] = "Admin Account";
+
+    // Errors come from SetupController as ModelState entries keyed by field name ("email", "password",
+    // "confirmPassword"). The email is re-shown from the binder's attempted value; passwords never are.
+    var ms = ViewData.ModelState;
+    string? FieldError(string key) => ms.TryGetValue(key, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    string Attempted(string key) => ms.TryGetValue(key, out var entry) ? entry.AttemptedValue ?? string.Empty : string.Empty;
+    var allErrors = ms.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).Where(m => !string.IsNullOrWhiteSpace(m)).ToList();
+    var emailError = FieldError("email");
+    var passwordError = FieldError("password");
+    var confirmError = FieldError("confirmPassword");
+    // Focus lands on the first field that needs attention, else on the first field.
+    var focusKey = emailError is not null ? "email" : passwordError is not null ? "password" : confirmError is not null ? "confirmPassword" : "email";
 }
 
 <div class="setup-container">
     <div class="setup-card">
         <div class="setup-step-badge">Step 3 of 4</div>
         <h1 class="setup-title">Create Admin Account</h1>
-        <p class="setup-subtitle">This will be your main administrator account.</p>
+        <p class="setup-subtitle">This is the account you will sign in with to write and manage the blog.</p>
 
-        @if (!ViewData.ModelState.IsValid)
+        @if (allErrors.Count > 0)
         {
-            <div class="alert alert-error">
-                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                {
-                    <div>@err.ErrorMessage</div>
-                }
+            <div class="alert alert-error setup-alert" role="alert">
+                <p class="setup-alert-title">@(allErrors.Count == 1 ? "Fix the highlighted field to continue." : "Fix the highlighted fields to continue.")</p>
+                <ul>
+                    @foreach (var err in allErrors)
+                    {
+                        <li>@err</li>
+                    }
+                </ul>
             </div>
         }
 
-        <form method="post" action="/setup/savestep3">
+        <form method="post" action="/setup/savestep3" autocomplete="on">
             @Html.AntiForgeryToken()
-            <div class="form-group">
-                <label for="email">Email Address *</label>
-                <input type="email" id="email" name="email" class="form-control" placeholder="admin@example.com" required autofocus />
+            <div class="form-group @(emailError is null ? "" : "has-error")">
+                <label for="email">Email address <span class="required-mark" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                <input type="email" id="email" name="email" class="form-control" value="@Attempted("email")"
+                       placeholder="admin@example.com" required autocomplete="username" autofocus="@(focusKey == "email")"
+                       aria-invalid="@(emailError is null ? "false" : "true")"
+                       aria-describedby="@(emailError is null ? null : "email-error")" />
+                @if (emailError is not null)
+                {
+                    <p class="field-error" id="email-error">@emailError</p>
+                }
             </div>
-            <div class="form-group">
-                <label for="password">Password *</label>
-                <input type="password" id="password" name="password" class="form-control" placeholder="Min. 8 characters" required oninput="checkStrength(this.value)" />
-                <div class="password-strength" id="strengthBar">
+            <div class="form-group @(passwordError is null ? "" : "has-error")">
+                <label for="password">Password <span class="required-mark" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="At least 8 characters"
+                       required minlength="8" autocomplete="new-password" autofocus="@(focusKey == "password")"
+                       aria-invalid="@(passwordError is null ? "false" : "true")"
+                       aria-describedby="@(passwordError is null ? "password-hint" : "password-error password-hint")" />
+                @if (passwordError is not null)
+                {
+                    <p class="field-error" id="password-error">@passwordError</p>
+                }
+                <div class="password-strength" id="strengthBar" aria-hidden="true">
                     <div class="strength-fill" id="strengthFill"></div>
                 </div>
-                <small class="strength-label" id="strengthLabel"></small>
+                <small class="strength-label" id="strengthLabel" aria-live="polite"></small>
+                <p class="field-hint" id="password-hint">Use at least 8 characters. Mixing capitals, digits and symbols makes it stronger.</p>
             </div>
-            <div class="form-group">
-                <label for="confirmPassword">Confirm Password *</label>
-                <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" placeholder="Repeat password" required />
+            <div class="form-group @(confirmError is null ? "" : "has-error")">
+                <label for="confirmPassword">Confirm password <span class="required-mark" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" placeholder="Repeat the password"
+                       required autocomplete="new-password" autofocus="@(focusKey == "confirmPassword")"
+                       aria-invalid="@(confirmError is null ? "false" : "true")"
+                       aria-describedby="@(confirmError is null ? null : "confirmPassword-error")" />
+                @if (confirmError is not null)
+                {
+                    <p class="field-error" id="confirmPassword-error">@confirmError</p>
+                }
             </div>
-            <div class="setup-steps-preview">
-                <div class="step-dot"></div>
-                <div class="step-dot"></div>
+            <div class="setup-steps-preview" aria-hidden="true">
+                <div class="step-dot done"></div>
+                <div class="step-dot done"></div>
                 <div class="step-dot active"></div>
                 <div class="step-dot"></div>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg">Continue →</button>
+            <button type="submit" class="btn btn-primary btn-lg">Continue</button>
         </form>
     </div>
 </div>
 
 @section Scripts {
 <script>
-function checkStrength(val) {
-    var score = 0;
-    if (val.length >= 8) score++;
-    if (/[A-Z]/.test(val)) score++;
-    if (/[0-9]/.test(val)) score++;
-    if (/[^A-Za-z0-9]/.test(val)) score++;
+(function () {
+    // Strength meter: progressive only — the form works without it. Colours come from the
+    // .strength-1 … .strength-4 classes in admin.css (design tokens), never from here.
+    var input = document.getElementById('password');
     var fill = document.getElementById('strengthFill');
     var label = document.getElementById('strengthLabel');
-    var colors = ['#ef4444','#f97316','#eab308','#22c55e'];
-    var labels = ['Weak','Fair','Good','Strong'];
-    fill.style.width = (score * 25) + '%';
-    fill.style.background = colors[score - 1] || '#e5e7eb';
-    label.textContent = score > 0 ? labels[score - 1] : '';
-}
+    if (!input || !fill || !label) return;
+    var labels = ['Weak', 'Fair', 'Good', 'Strong'];
+    input.addEventListener('input', function () {
+        var val = input.value, score = 0;
+        if (val.length >= 8) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
+        fill.className = 'strength-fill' + (score > 0 ? ' strength-' + score : '');
+        fill.style.width = (score * 25) + '%';
+        label.textContent = score > 0 ? 'Password strength: ' + labels[score - 1] : '';
+    });
+})();
 </script>
 }

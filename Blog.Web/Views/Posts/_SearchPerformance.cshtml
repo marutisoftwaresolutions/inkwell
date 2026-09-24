@@ -1,0 +1,107 @@
+@using Blog.Core.Domain
+@using Blog.Core.Services
+@using Blog.Web.Services.SearchConsole
+@{
+    var state   = (SearchDataState)ViewBag.State;
+    var summary = ViewBag.Summary as PageSearchSummary;
+    var queries = ViewBag.Queries as IReadOnlyList<SearchQueryStat> ?? Array.Empty<SearchQueryStat>();
+    var isPublished = (bool)(ViewBag.IsPublished ?? false);
+
+    string Pct(double v) => (v * 100).ToString("0.0") + "%";
+    string Delta(int now, int prev)
+    {
+        if (prev == 0) return now == 0 ? "" : "new";
+        var d = (now - prev) * 100.0 / prev;
+        return (d >= 0 ? "+" : "") + d.ToString("0") + "%";
+    }
+    string DeltaClass(int now, int prev) => prev == 0 ? "text-muted-foreground" : now >= prev ? "text-emerald-700" : "text-red-700";
+}
+
+@* Empty states say WHY they are empty — a blank tile teaches nothing. *@
+@if (!state.Configured)
+{
+    <p class="text-[11px] text-muted-foreground">
+        Not connected. Add a Search Console property and service-account key under
+        <a href="/admin/settings" class="underline">Settings → Search Console</a> to see this post's clicks, impressions and position here.
+    </p>
+}
+else if (!state.HasData)
+{
+    <p class="text-[11px] text-muted-foreground">
+        Connected, but no data has been pulled yet. The nightly sync runs within a minute of startup and every 24 hours after; its last result is on Admin → Dashboard.
+    </p>
+}
+else if (summary is null || !summary.HasData)
+{
+    <p class="text-[11px] text-muted-foreground">
+        @(isPublished ? "This post has not appeared in Google Search results in the last 56 days." : "Search data appears once the post is published and indexed.")
+        Data through @state.AsOf!.Value.ToString("d MMM yyyy").
+    </p>
+}
+else
+{
+    <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="rounded border border-border p-2">
+            <div class="text-[10px] uppercase tracking-wide text-muted-foreground">Clicks · 28d</div>
+            <div class="text-lg font-semibold text-foreground">@summary.Clicks <span class="text-[11px] font-normal @DeltaClass(summary.Clicks, summary.PrevClicks)">@Delta(summary.Clicks, summary.PrevClicks)</span></div>
+        </div>
+        <div class="rounded border border-border p-2">
+            <div class="text-[10px] uppercase tracking-wide text-muted-foreground">Impressions · 28d</div>
+            <div class="text-lg font-semibold text-foreground">@summary.Impressions <span class="text-[11px] font-normal @DeltaClass(summary.Impressions, summary.PrevImpressions)">@Delta(summary.Impressions, summary.PrevImpressions)</span></div>
+        </div>
+        <div class="rounded border border-border p-2">
+            <div class="text-[10px] uppercase tracking-wide text-muted-foreground">CTR</div>
+            <div class="text-lg font-semibold text-foreground">@Pct(summary.Ctr)</div>
+        </div>
+        <div class="rounded border border-border p-2">
+            <div class="text-[10px] uppercase tracking-wide text-muted-foreground">Avg position</div>
+            <div class="text-lg font-semibold text-foreground">@summary.Position.ToString("0.0")
+                @if (summary.PrevPosition > 0)
+                {
+                    var moved = summary.PrevPosition - summary.Position;
+                    <span class="text-[11px] font-normal @(moved >= 0 ? "text-emerald-700" : "text-red-700")">@(moved >= 0 ? "↑" : "↓") @Math.Abs(moved).ToString("0.0")</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (summary.StrikingDistance)
+    {
+        <p class="text-[11px] mt-2 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 px-2 py-1.5">
+            <strong>Striking distance.</strong> Position @summary.Position.ToString("0.0") with @summary.Impressions impressions — one push from page one. Strengthen the answer capsule and Key Facts for the queries below, and add inbound links from related posts.
+        </p>
+    }
+    @if (summary.LowCtrForPosition)
+    {
+        <p class="text-[11px] mt-2 rounded border border-amber-200 bg-amber-50 text-amber-900 px-2 py-1.5">
+            <strong>Low click-through for its rank.</strong> On page one but @Pct(summary.Ctr) of @summary.Impressions impressions click. The title and meta description are the lever here, not the ranking.
+        </p>
+    }
+    @if (summary.LosingImpressions)
+    {
+        <p class="text-[11px] mt-2 rounded border border-red-200 bg-red-50 text-red-800 px-2 py-1.5">
+            <strong>Losing impressions.</strong> @summary.Impressions this window against @summary.PrevImpressions the one before. Check freshness, the year stamp, and whether a competing page has taken the queries.
+        </p>
+    }
+
+    @if (queries.Count > 0)
+    {
+        <table class="w-full mt-3 text-[11px]">
+            <thead class="text-muted-foreground">
+                <tr><th class="text-left font-medium pb-1">Query</th><th class="text-right font-medium pb-1">Clicks</th><th class="text-right font-medium pb-1">Impr.</th><th class="text-right font-medium pb-1">Pos.</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var q in queries)
+                {
+                    <tr class="border-t border-border/60">
+                        <td class="py-1 pr-2 text-foreground break-words">@q.Query</td>
+                        <td class="py-1 text-right text-muted-foreground">@q.Clicks</td>
+                        <td class="py-1 text-right text-muted-foreground">@q.Impressions</td>
+                        <td class="py-1 text-right text-muted-foreground">@q.Position.ToString("0.0")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    <p class="text-[10px] text-muted-foreground mt-2">Google Search, web results, through @state.AsOf!.Value.ToString("d MMM yyyy"). Search Console publishes each day about two days late.</p>
+}

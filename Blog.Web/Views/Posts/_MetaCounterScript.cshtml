@@ -6,13 +6,14 @@
             if (!label) return;
             function update() {
                 var n = (ta.value || '').trim().length;
-                var msg, color;
-                if (n === 0) { msg = 'Add a summary — ideal 120–158 characters for search snippets.'; color = '#8B7355'; }
-                else if (n < 120) { msg = n + ' characters — a bit short. Aim for 120–158.'; color = '#B45309'; }
-                else if (n <= 158) { msg = n + ' characters — ideal length ✓'; color = '#1F5236'; }
-                else { msg = n + ' characters — too long; search engines truncate around 158.'; color = '#8C2A1F'; }
+                var msg, cls;
+                if (n === 0) { msg = 'Add a summary — ideal 120–158 characters for search snippets.'; cls = 'text-muted-foreground'; }
+                else if (n < 120) { msg = n + ' characters — a bit short. Aim for 120–158.'; cls = 'text-amber-700'; }
+                else if (n <= 158) { msg = n + ' characters — ideal length ✓'; cls = 'text-emerald-700'; }
+                else { msg = n + ' characters — too long; search engines truncate around 158.'; cls = 'text-destructive'; }
                 label.textContent = msg;
-                label.style.color = color;
+                label.classList.remove('text-muted-foreground', 'text-amber-700', 'text-emerald-700', 'text-destructive');
+                label.classList.add(cls);
             }
             ta.addEventListener('input', update);
             update();

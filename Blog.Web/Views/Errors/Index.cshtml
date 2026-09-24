@@ -18,9 +18,9 @@
         if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
         return $"{(int)d.TotalDays}d ago";
     }
-    string Badge(int code) => code >= 500 ? "bg-red-100 text-red-700"
-        : code == 404 ? "bg-amber-100 text-amber-700"
-        : "bg-slate-100 text-slate-700";
+    string Badge(int code) => code >= 500 ? "pill-bad"
+        : code == 404 ? "pill-warn"
+        : "bg-muted text-muted-foreground";
 }
 
 <div class="mb-5">
@@ -39,26 +39,26 @@
         <div class="text-xs text-muted-foreground mt-1">Total occurrences</div>
     </div>
     <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-amber-600">@stats.NotFoundGroups.ToString("N0")</div>
+        <div class="text-2xl font-bold tone-warn">@stats.NotFoundGroups.ToString("N0")</div>
         <div class="text-xs text-muted-foreground mt-1">404 signatures</div>
     </div>
     <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-red-600">@stats.ServerErrorGroups.ToString("N0")</div>
+        <div class="text-2xl font-bold tone-bad">@stats.ServerErrorGroups.ToString("N0")</div>
         <div class="text-xs text-muted-foreground mt-1">5xx signatures</div>
     </div>
 </div>
 
 @* ── Filters ───────────────────────────────────────────────────── *@
 <form method="get" class="flex flex-wrap gap-2 mb-4">
-    <select name="status" class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+    <select name="status" aria-label="Filter by status code" class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
         <option value="">All status codes</option>
         <option value="404" selected="@(filterStatus == 404)">404 Not Found</option>
         <option value="500" selected="@(filterStatus == 500)">500 Server Error</option>
         <option value="403" selected="@(filterStatus == 403)">403 Forbidden</option>
     </select>
-    <input type="text" name="q" value="@filterQuery" placeholder="Search path / message / type"
+    <input type="text" name="q" value="@filterQuery" placeholder="Search path / message / type" aria-label="Search errors"
            class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-64" />
-    <button type="submit" class="h-8 px-3 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700">Filter</button>
+    <button type="submit" class="h-8 px-3 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90">Filter</button>
     @if (filterStatus != null || !string.IsNullOrEmpty(filterQuery))
     {
         <a href="/admin/errors" class="h-8 px-3 rounded border border-input text-xs text-foreground flex items-center hover:bg-muted">Clear</a>
@@ -67,7 +67,7 @@
 
 @* ── Grouped listing ───────────────────────────────────────────── *@
 <div class="rounded-xl border border-border bg-card overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="table-scroll"><table class="w-full text-sm">
         <thead>
             <tr class="border-b border-border text-left text-xs text-muted-foreground">
                 <th class="px-4 py-2 font-medium">Status</th>
@@ -82,7 +82,7 @@
         <tbody>
             @if (items.Count == 0)
             {
-                <tr><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">No errors recorded. 🎉</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">No errors recorded in this window.</td></tr>
             }
             @foreach (var e in items)
             {
@@ -95,7 +95,7 @@
                     <td class="px-4 py-2 max-w-[26rem]">
                         @if (!string.IsNullOrEmpty(e.ExceptionType))
                         {
-                            <div class="text-xs font-medium text-red-600 break-all">@e.ExceptionType</div>
+                            <div class="text-xs font-medium tone-bad break-all">@e.ExceptionType</div>
                         }
                         @if (!string.IsNullOrEmpty(e.Message))
                         {
@@ -114,20 +114,20 @@
                         {
                             <div class="font-mono text-[11px] text-foreground">@e.LastIpAddress</div>
                             <form method="post" action="/admin/security/block" class="inline"
-                                  onsubmit="return confirm('Block @e.LastIpAddress for 24 hours?')">
+                                  data-confirm-title="Block this address for 24 hours?" data-confirm-body="@e.LastIpAddress receives 403 for every request until the block expires. Allowlisted addresses and your own address cannot be blocked; lift it early under Admin → Security." data-confirm-action="Block for 24 hours" data-confirm-tone="warning">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="ip" value="@e.LastIpAddress" />
                                 <input type="hidden" name="hours" value="24" />
                                 <input type="hidden" name="reason" value="Blocked from the Error Monitor (@e.StatusCode on @e.Path)" />
                                 <input type="hidden" name="returnUrl" value="@($"/admin/errors?status={filterStatus}&q={filterQuery}&page={page}")" />
-                                <button type="submit" class="mt-1 h-6 px-2 rounded border border-input text-[11px] text-red-600 hover:bg-red-50">Block</button>
+                                <button type="submit" aria-label="Block @e.LastIpAddress for 24 hours" class="mt-1 h-6 px-2 rounded border border-input text-[11px] text-destructive hover:bg-destructive/10">Block</button>
                             </form>
                         }
                     </td>
                 </tr>
             }
         </tbody>
-    </table>
+    </table></div>
 </div>
 
 @if (totalPages > 1)

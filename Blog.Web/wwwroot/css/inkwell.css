@@ -1763,3 +1763,193 @@
   .vd-entry-score { margin-left: 0; text-align: left; width: 100%; }
   .vd-score-bar { grid-template-columns: 76px 1fr 30px; }
 }
+
+/* =============================================================
+   Dark scheme — applies when the operator's colour scheme is
+   "system" and the reader prefers dark, or is forced to "dark".
+   Presets that are already dark (ink, onyx) keep their own palette.
+   Values are the Ink preset's, so dark mode reads as a first-class
+   preset rather than an inverted light one.
+   ============================================================= */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) body.inkwell-root:not([data-preset="ink"]):not([data-preset="onyx"]) {
+    color-scheme: dark;
+    --bg:         #16140F;
+    --surface:    #1E1B16;
+    --surface-2:  #26221C;
+    --border:     #332E26;
+    --rule:       #E8E1D3;
+    --fg:         #F4EFE6;
+    --fg-body:    #CFC7BA;
+    --fg-muted:   #A69E90;
+    --fg-meta:    #B49A78;
+    --link:       #F4EFE6;
+    --link-hover: #E0895A;
+  }
+}
+html[data-theme="dark"] body.inkwell-root:not([data-preset="ink"]):not([data-preset="onyx"]) {
+  color-scheme: dark;
+  --bg:         #16140F;
+  --surface:    #1E1B16;
+  --surface-2:  #26221C;
+  --border:     #332E26;
+  --rule:       #E8E1D3;
+  --fg:         #F4EFE6;
+  --fg-body:    #CFC7BA;
+  --fg-muted:   #A69E90;
+  --fg-meta:    #B49A78;
+  --link:       #F4EFE6;
+  --link-hover: #E0895A;
+}
+
+/* =============================================================
+   Header search (Views/Shared/_NavSearch.cshtml)
+   ============================================================= */
+header:has(> .ink-nav-search), nav:has(> .ink-nav-search) { position: relative; }
+.ink-nav-search { position: absolute; right: 12px; top: 10px; z-index: 40; font-family: var(--sans); }
+.ink-nav-search > summary {
+  list-style: none; cursor: pointer; width: 36px; height: 36px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--fg-meta);
+  background: transparent; transition: background .15s, color .15s;
+}
+.ink-nav-search > summary::-webkit-details-marker { display: none; }
+.ink-nav-search > summary:hover, .ink-nav-search[open] > summary { background: var(--surface-2); color: var(--fg); }
+.ink-nav-search__form {
+  position: absolute; right: 0; top: 42px; display: flex; gap: 6px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: min(320px, calc(100vw - 24px));
+}
+.ink-nav-search__form input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 10px; font-size: var(--fs-sm);
+  color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+}
+.ink-nav-search__form button {
+  height: 36px; padding: 0 12px; font-size: var(--fs-sm); font-weight: 500; border-radius: 6px;
+  color: var(--bg); background: var(--fg); border: 0; cursor: pointer;
+}
+
+/* =============================================================
+   Search results header (Views/Blog/Index.cshtml)
+   ============================================================= */
+.ink-search-head { max-width: var(--measure-wide, 1100px); margin: 0 auto; padding: 28px var(--gutter, 16px) 8px; font-family: var(--sans); }
+.ink-search-head h1 { font-family: var(--serif); font-size: var(--fs-h2); line-height: var(--lh-snug); color: var(--fg); margin: 0 0 6px; }
+.ink-search-head p { color: var(--fg-meta); font-size: var(--fs-sm); margin: 0 0 14px; }
+.ink-search-head form { display: flex; gap: 8px; max-width: 520px; }
+.ink-search-head input { flex: 1; height: 40px; padding: 0 12px; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: var(--fs-ui); }
+.ink-search-head button { height: 40px; padding: 0 16px; color: var(--bg); background: var(--fg); border: 0; border-radius: 6px; font-weight: 500; cursor: pointer; }
+.ink-search-head a { color: var(--fg-meta); font-size: var(--fs-sm); align-self: center; margin-left: 4px; }
+
+/* =============================================================
+   Table of contents (Views/Blog/_TableOfContents.cshtml)
+   ============================================================= */
+.ink-toc { margin: 0 0 var(--sp-8, 32px); padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-family: var(--sans); }
+.ink-toc__title { cursor: pointer; list-style: none; font-size: var(--fs-xs); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--fg-meta); }
+.ink-toc__title::-webkit-details-marker { display: none; }
+.ink-toc__title::after { content: "▾"; float: right; transition: transform .15s; }
+.ink-toc:not([open]) .ink-toc__title::after { transform: rotate(-90deg); }
+.ink-toc__list { margin: 10px 0 0; padding: 0; list-style: none; columns: 1; }
+.ink-toc__item { margin: 0; padding: 4px 0; font-size: var(--fs-sm); line-height: 1.4; }
+.ink-toc__item--h3 { padding-left: 16px; }
+.ink-toc__item a { color: var(--fg-body); text-decoration: none; border-bottom: 1px solid transparent; }
+.ink-toc__item a:hover { color: var(--fg); border-bottom-color: var(--border); }
+@media (min-width: 900px) { .ink-toc__list { columns: 2; column-gap: 28px; } .ink-toc__item { break-inside: avoid; } }
+[data-reading-body] h2[id], [data-reading-body] h3[id] { scroll-margin-top: 24px; }
+
+/* =============================================================
+   Reading progress (Views/Blog/_ReadingProgress.cshtml)
+   ============================================================= */
+.ink-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 60; pointer-events: none; background: transparent; }
+.ink-progress__bar { height: 100%; width: 100%; transform: scaleX(0); transform-origin: 0 50%; background: var(--fg); opacity: .85; transition: transform .08s linear; }
+
+/* =============================================================
+   404 page (Views/Error/NotFound.cshtml)
+   ============================================================= */
+.ink-404 { max-width: 720px; margin: 0 auto; padding: var(--sp-16, 64px) var(--gutter, 16px); text-align: center; font-family: var(--sans); }
+.ink-404__code { font-family: var(--serif); font-size: var(--fs-display); line-height: 1; color: var(--fg-meta); margin: 0 0 8px; }
+.ink-404 h1 { font-family: var(--serif); font-size: var(--fs-h2); color: var(--fg); margin: 0 0 8px; }
+.ink-404 p { color: var(--fg-body); font-size: var(--fs-ui); margin: 0 auto 22px; max-width: 48ch; }
+.ink-404 form { display: flex; gap: 8px; max-width: 460px; margin: 0 auto 32px; }
+.ink-404 input { flex: 1; height: 42px; padding: 0 12px; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: var(--fs-ui); }
+.ink-404 button { height: 42px; padding: 0 16px; color: var(--bg); background: var(--fg); border: 0; border-radius: 6px; font-weight: 500; cursor: pointer; }
+.ink-404__popular { text-align: left; border-top: 1px solid var(--border); padding-top: 20px; }
+.ink-404__popular h2 { font-size: var(--fs-xs); font-weight: 600; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--fg-meta); margin: 0 0 10px; }
+.ink-404__popular ul { list-style: none; margin: 0; padding: 0; }
+.ink-404__popular li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.ink-404__popular a { font-family: var(--serif); font-size: var(--fs-h4); color: var(--fg); text-decoration: none; }
+.ink-404__popular a:hover { color: var(--link-hover); }
+.ink-404__links { margin-top: 20px; font-size: var(--fs-sm); color: var(--fg-meta); }
+.ink-404__links a { color: var(--fg); }
+
+/* =============================================================
+   Reader accessibility (2026-09-19): skip link, visible focus,
+   prose measure. Appended so earlier rules are left untouched;
+   the :focus-visible rules below out-rank the `outline: none`
+   set on .ink-input / .ink-subscribe-input above.
+   ============================================================= */
+.skip-link {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 1000;
+  padding: 10px 16px;
+  font-family: var(--sans);
+  font-size: var(--fs-ui, 15px);
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--fg);
+  border-radius: 0 0 var(--r-2, 4px) 0;
+  text-decoration: none;
+  /* Visually hidden until it takes focus; still in the tab order. */
+  transform: translateY(-120%);
+  opacity: 0;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: none;
+  opacity: 1;
+  outline: 2px solid var(--bg);
+  outline-offset: -4px;
+}
+#main:focus { outline: none; } /* the skip-link target is focused programmatically; no ring needed */
+
+/* Keyboard focus is always visible on the reader surface. Mouse clicks do not show the ring. */
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.ink-input:focus-visible,
+.ink-subscribe-input:focus-visible,
+.ink-nav-search__form input:focus-visible,
+.ink-404 input:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+/* Line length for the prose block on layouts whose article column is wider than the reading measure. */
+.ink-measure-prose {
+  max-width: var(--measure-prose, 65ch);
+}
+
+/* Comment form feedback, placed beside the form it belongs to. */
+.ink-form-alert {
+  padding: var(--sp-4, 16px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--fg-body);
+  margin-bottom: var(--sp-6, 24px);
+}
+.ink-form-alert--error { border-color: var(--ink-accent, var(--fg)); color: var(--ink-accent, var(--fg)); }
+
+/* 404 "Go back" is a button (history.back() needs script), styled as the neighbouring links. */
+.ink-404 .ink-404__back {
+  height: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  color: var(--fg);
+  text-decoration: underline;
+  cursor: pointer;
+}

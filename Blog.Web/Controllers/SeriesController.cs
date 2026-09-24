@@ -31,11 +31,12 @@ public class SeriesController : Controller
         value.ToLower().Trim().Replace(" ", "-").Replace("_", "-").Replace(".", "");
 
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var userId = CurrentUserId();
         var list = await _series.GetAllAsync(userId);
-        return View(list);
+        ViewData["ListSearchPlaceholder"] = "Search series";
+        return View(Blog.Web.Models.ListPaging.Apply(this, list, q, page, s => new[] { s.Title, s.Slug, s.Description }));
     }
 
     [HttpPost("create")]

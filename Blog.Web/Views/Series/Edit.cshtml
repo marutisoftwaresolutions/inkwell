@@ -30,7 +30,7 @@
     <!-- Metadata -->
     <div class="bg-card rounded-lg border border-border p-5">
         <h2 class="font-semibold mb-4">Series details</h2>
-        <form method="post" action="/admin/series/edit/@Model.Id" class="space-y-4">
+        <form method="post" action="/admin/series/edit/@Model.Id" class="space-y-4" data-track-changes>
             @Html.AntiForgeryToken()
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -46,7 +46,10 @@
                 <label class="block text-sm font-medium mb-1">Description</label>
                 <textarea name="description" rows="3" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">@Model.Description</textarea>
             </div>
+            <div class="flex items-center gap-3">
             <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save details</button>
+            <span data-dirty-indicator hidden class="text-xs">Unsaved changes</span>
+            </div>
         </form>
     </div>
 
@@ -67,7 +70,7 @@
             <button type="button" id="addPostBtn" class="px-4 py-2 border border-input rounded-md text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap">Add post</button>
         </div>
 
-        <form method="post" action="/admin/series/@Model.Id/posts" id="postsForm">
+        <form method="post" action="/admin/series/@Model.Id/posts" id="postsForm" data-track-changes>
             @Html.AntiForgeryToken()
             <ul id="postList" class="divide-y divide-border border border-border rounded-md">
                 @foreach (var p in seriesPosts)
@@ -83,13 +86,13 @@
                             }
                         </span>
                         <div class="flex items-center gap-1">
-                            <button type="button" class="move-up p-1 rounded hover:bg-muted text-muted-foreground" title="Move up">
+                            <button type="button" class="move-up p-1 rounded hover:bg-muted text-muted-foreground" title="Move up" aria-label="Move @p.Title up">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
                             </button>
-                            <button type="button" class="move-down p-1 rounded hover:bg-muted text-muted-foreground" title="Move down">
+                            <button type="button" class="move-down p-1 rounded hover:bg-muted text-muted-foreground" title="Move down" aria-label="Move @p.Title down">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                             </button>
-                            <button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series">
+                            <button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series" aria-label="Remove @p.Title from series">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                             </button>
                         </div>
@@ -97,8 +100,9 @@
                 }
             </ul>
             <p id="emptyHint" class="text-sm text-muted-foreground py-3 @(seriesPosts.Any() ? "hidden" : "")">No posts yet — add posts above, order them, then save.</p>
-            <div class="mt-4">
+            <div class="mt-4 flex items-center gap-3">
                 <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save posts &amp; order</button>
+                <span data-dirty-indicator hidden class="text-xs">Unsaved changes</span>
             </div>
         </form>
     </div>
@@ -141,6 +145,10 @@
                 '<button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>' +
                 '</div>';
             li.querySelector('.flex-1').textContent = title;
+            // Accessible names carry the post title (set as attributes, never via innerHTML, so a title cannot inject markup).
+            li.querySelector('.move-up').setAttribute('aria-label', 'Move ' + title + ' up');
+            li.querySelector('.move-down').setAttribute('aria-label', 'Move ' + title + ' down');
+            li.querySelector('.remove-post').setAttribute('aria-label', 'Remove ' + title + ' from series');
             return li;
         }
 

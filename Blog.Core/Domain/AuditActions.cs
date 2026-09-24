@@ -14,15 +14,23 @@ public static class AuditActions
     public const string PostScheduled  = "Post.Scheduled";
     public const string PostDeleted    = "Post.Deleted";
 
+    /// <summary>Content put back from a stored revision (payload names the revision number).</summary>
+    public const string PostRevisionRestored = "Post.RevisionRestored";
+
     // Pages
     public const string PageCreated    = "Page.Created";
     public const string PageUpdated    = "Page.Updated";
     public const string PageDeleted    = "Page.Deleted";
+    public const string PageRevisionRestored = "Page.RevisionRestored";
 
     // Comments
     public const string CommentApproved = "Comment.Approved";
     public const string CommentRejected = "Comment.Rejected";
     public const string CommentDeleted  = "Comment.Deleted";
+    /// <summary>Deleted as spam by a moderator; the posting address was reported to the firewall.</summary>
+    public const string CommentMarkedSpam = "Comment.MarkedSpam";
+    /// <summary>A moderator replied from the Desk (the reply is a published comment by that user).</summary>
+    public const string CommentReplied    = "Comment.Replied";
 
     // Media
     public const string MediaUploaded = "Media.Uploaded";
@@ -38,9 +46,16 @@ public static class AuditActions
     public const string AuthLoggedIn    = "Auth.LoggedIn";
     public const string AuthLoggedOut   = "Auth.LoggedOut";
     public const string AuthLoginFailed = "Auth.LoginFailed";
+    /// <summary>A reset link was issued for an existing account (never logged for unknown addresses).</summary>
+    public const string AuthPasswordResetRequested = "Auth.PasswordResetRequested";
+    /// <summary>A password was changed through a reset link.</summary>
+    public const string AuthPasswordReset = "Auth.PasswordReset";
 
     // Settings
     public const string SettingsUpdated = "Settings.Updated";
+    /// <summary>A Search Console property was connected (payload names the property and service account, never the key).</summary>
+    public const string SettingsSearchConsoleConnected    = "Settings.SearchConsoleConnected";
+    public const string SettingsSearchConsoleDisconnected = "Settings.SearchConsoleDisconnected";
 
     // Theme
     public const string ThemeUpdated      = "Theme.Updated";

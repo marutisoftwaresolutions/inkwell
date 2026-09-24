@@ -2,6 +2,14 @@
 @{
     var maxDepth = 3;
     var slug = (string)ViewData["PostSlug"]!;
+    // Every reply form needs its own label/id pairs; the comment id keeps them unique on the page.
+    var rid = Model.Id.ToString("N");
+    // A rejected reply to this comment comes back with its draft stashed; re-open the form filled in.
+    var isDraftTarget = string.Equals(ViewData["CommentDraftParentId"] as string, Model.Id.ToString(), StringComparison.OrdinalIgnoreCase);
+    var replyError = isDraftTarget ? ViewData["CommentError"] as string : null;
+    var draftName = isDraftTarget ? ViewData["CommentDraftName"] as string ?? "" : "";
+    var draftEmail = isDraftTarget ? ViewData["CommentDraftEmail"] as string ?? "" : "";
+    var draftContent = isDraftTarget ? ViewData["CommentDraftContent"] as string ?? "" : "";
 }
 
 <div class="flex gap-4 pb-6 border-b border-dashed last:border-b-0" style="border-color: var(--border); @(Model.Depth > 0 ? $"margin-left: {Model.Depth * 2}rem; border-left: 2px solid var(--border); padding-left: 1rem;" : "")">
@@ -17,18 +25,33 @@
 
         @if (Model.Depth < maxDepth)
         {
-            <button type="button" class="reply-toggle text-xs font-medium mt-2 hover:underline" style="color: var(--primary);" onclick="toggleReplyForm(this)">
+            <button type="button" class="reply-toggle text-xs font-medium mt-2 hover:underline" style="color: var(--primary);" onclick="toggleReplyForm(this)"
+                    aria-expanded="@(isDraftTarget ? "true" : "false")" aria-controls="reply-form-@rid">
                 Reply
             </button>
-            <div class="reply-form hidden mt-3">
-                <form method="post" action="/@slug/comment" class="space-y-3">
+            <div class="reply-form @(isDraftTarget ? "" : "hidden") mt-3" id="reply-form-@rid">
+                @if (replyError != null)
+                {
+                    <div class="mb-3 p-3 text-sm border border-dashed rounded-md" role="alert" id="reply-error-@rid" style="background: var(--muted); border-color: var(--border); color: var(--destructive);">@replyError</div>
+                }
+                <form method="post" action="/@slug/comment" class="space-y-3" aria-label="Reply to @(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)" aria-describedby="@(replyError != null ? $"reply-error-{rid}" : null)">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="parentId" value="@Model.Id" />
+                    <partial name="_CommentSpamFields" view-data="ViewData" />
                     <div class="grid md:grid-cols-2 gap-3">
-                        <input type="text" name="authorName" placeholder="Name *" class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required />
-                        <input type="email" name="authorEmail" placeholder="Email *" class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required />
+                        <div>
+                            <label for="reply-name-@rid" class="block text-xs font-medium mb-1" style="color: var(--foreground);">Name *</label>
+                            <input type="text" id="reply-name-@rid" name="authorName" placeholder="Your name" autocomplete="name" value="@draftName" class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required />
+                        </div>
+                        <div>
+                            <label for="reply-email-@rid" class="block text-xs font-medium mb-1" style="color: var(--foreground);">Email *</label>
+                            <input type="email" id="reply-email-@rid" name="authorEmail" placeholder="you@example.com" autocomplete="email" value="@draftEmail" class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required />
+                        </div>
                     </div>
-                    <textarea name="content" rows="2" placeholder="Write a reply..." class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required></textarea>
+                    <div>
+                        <label for="reply-content-@rid" class="block text-xs font-medium mb-1" style="color: var(--foreground);">Reply *</label>
+                        <textarea id="reply-content-@rid" name="content" rows="2" placeholder="Write a reply…" class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required>@draftContent</textarea>
+                    </div>
                     <div class="flex gap-2">
                         <button type="submit" class="px-4 py-1.5 text-xs font-medium rounded-md hover:opacity-90 transition-opacity" style="background: var(--primary); color: var(--primary-foreground);">Reply</button>
                         <button type="button" class="px-4 py-1.5 text-xs font-medium rounded-md hover:opacity-90 transition-opacity" style="background: var(--muted); color: var(--muted-foreground);" onclick="toggleReplyForm(this.closest('.reply-form').previousElementSibling)">Cancel</button>

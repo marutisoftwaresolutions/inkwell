@@ -21,11 +21,12 @@ public class TagsController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var tags = await _tags.GetAllAsync(userId);
-        return View(tags);
+        ViewData["ListSearchPlaceholder"] = "Search tags";
+        return View(Blog.Web.Models.ListPaging.Apply(this, tags, q, page, t => new[] { t.Name, t.Slug }));
     }
 
     [HttpPost("create")]

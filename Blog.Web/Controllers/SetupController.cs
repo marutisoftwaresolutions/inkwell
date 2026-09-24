@@ -64,9 +64,10 @@ public class SetupController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveStep2(string blogName, string tagline)
     {
+        // Errors are keyed by field name so Step2.cshtml can place them at the input.
         if (string.IsNullOrWhiteSpace(blogName))
         {
-            ModelState.AddModelError("", "Blog name is required.");
+            ModelState.AddModelError("blogName", "Enter a name for your blog.");
             return View("Step2");
         }
         TempData["BlogName"] = blogName;
@@ -78,19 +79,21 @@ public class SetupController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveStep3(string email, string password, string confirmPassword)
     {
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        // Errors are keyed by field name so Step3.cshtml can place them at the input.
+        if (string.IsNullOrWhiteSpace(email))
+            ModelState.AddModelError("email", "Enter the email address you will sign in with.");
+        if (string.IsNullOrWhiteSpace(password))
+            ModelState.AddModelError("password", "Enter a password of at least 8 characters.");
+        if (!ModelState.IsValid)
+            return View("Step3");
+        if (password.Length < 8)
         {
-            ModelState.AddModelError("", "Email and password are required.");
+            ModelState.AddModelError("password", "Password must be at least 8 characters.");
             return View("Step3");
         }
         if (password != confirmPassword)
         {
-            ModelState.AddModelError("", "Passwords do not match.");
-            return View("Step3");
-        }
-        if (password.Length < 8)
-        {
-            ModelState.AddModelError("", "Password must be at least 8 characters.");
+            ModelState.AddModelError("confirmPassword", "Passwords do not match. Type the same password in both boxes.");
             return View("Step3");
         }
         TempData["AdminEmail"] = email;

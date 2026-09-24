@@ -5,7 +5,11 @@
     ViewData["SiteName"] = ViewBag.SiteName;
     ViewData["Tagline"] = ViewBag.Tagline;
     // Home sets the default title/description here; category & tag actions set their own before this runs.
-    if (ViewData["Title"] == null) ViewData["Title"] = (string)ViewBag.SiteName + " – " + (string)ViewBag.Tagline;
+    var searchQuery = ViewBag.SearchTerm as string;
+    if (ViewData["Title"] == null)
+        ViewData["Title"] = !string.IsNullOrWhiteSpace(searchQuery)
+            ? $"Search: {searchQuery} – {(string)ViewBag.SiteName}"
+            : (string)ViewBag.SiteName + " – " + (string)ViewBag.Tagline;
     if (ViewData["Description"] == null)
     {
         // Home page: enrich the (often short) tagline into a fuller, keyword-relevant meta
@@ -48,6 +52,19 @@
 }
 <script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(collData, collOpts))</script>
 
+
+@if (!string.IsNullOrWhiteSpace(searchQuery))
+{
+    <section class="ink-search-head" aria-labelledby="search-results-heading">
+        <h1 id="search-results-heading">@(Model.TotalItems == 0 ? "No results" : Model.TotalItems == 1 ? "1 result" : $"{Model.TotalItems} results") for “@searchQuery”</h1>
+        <p>@(Model.TotalItems == 0 ? "Try a shorter or more general word, or browse by category below." : Model.TotalPages > 1 ? $"Page {Model.Page} of {Model.TotalPages}." : "Sorted by relevance to the title, then by date.")</p>
+        <form method="get" action="/search" role="search">
+            <input type="search" name="q" value="@searchQuery" aria-label="Search articles" required minlength="2" />
+            <button type="submit">Search</button>
+            <a href="/">Clear</a>
+        </form>
+    </section>
+}
 
 @if (blogLayout == "Magazine")
 {

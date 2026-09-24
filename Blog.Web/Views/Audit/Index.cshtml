@@ -28,12 +28,12 @@
 
 	string BadgeColor(string action) => action switch
 	{
-		var a when a.Contains("Deleted") => "bg-red-100 text-red-700",
-		var a when a.Contains("Created") => "bg-green-100 text-green-700",
-		var a when a.Contains("Published") => "bg-blue-100 text-blue-700",
-		var a when a.Contains("LoggedIn") => "bg-indigo-100 text-indigo-700",
-		var a when a.Contains("Failed") => "bg-orange-100 text-orange-700",
-		var a when a.Contains("LoggedOut") => "bg-gray-100 text-gray-600",
+		var a when a.Contains("Deleted") => "pill-bad",
+		var a when a.Contains("Created") => "pill-ok",
+		var a when a.Contains("Published") => "pill-info",
+		var a when a.Contains("LoggedIn") => "pill-info",
+		var a when a.Contains("Failed") => "pill-warn",
+		var a when a.Contains("LoggedOut") => "bg-muted text-muted-foreground",
 		_ => "bg-muted text-muted-foreground"
 	};
 }
@@ -44,7 +44,7 @@
 		<p class="text-xs text-muted-foreground mt-0.5">@total.ToString("N0") total entries — Admin-only, read-only</p>
 	</div>
 	<a href="/admin/audit/export/csv@Qs(1)"
-	   class="h-8 px-3 rounded bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-700">
+	   class="h-8 px-3 rounded bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:bg-primary/90">
 		<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
 		Export CSV
 	</a>
@@ -54,7 +54,7 @@
 <form method="get" class="flex flex-wrap gap-2 mb-5">
 	<input type="hidden" name="page" value="1" />
 
-	<select name="entityType"
+	<select name="entityType" aria-label="Filter by entity type"
 			class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
 		<option value="">All types</option>
 		@foreach (var et in entityTypes)
@@ -63,10 +63,10 @@
 		}
 	</select>
 
-	<input type="text" name="action" value="@filterAction" placeholder="Action (e.g. Post.Published)"
+	<input type="text" name="action" value="@filterAction" placeholder="Action (e.g. Post.Published)" aria-label="Filter by action"
 		   class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-48" />
 
-	<select name="userId"
+	<select name="userId" aria-label="Filter by user"
 			class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
 		<option value="">All users</option>
 		@foreach (var u in allUsers)
@@ -75,10 +75,10 @@
 		}
 	</select>
 
-	<input type="date" name="from" value="@filterFrom"
+	<input type="date" name="from" value="@filterFrom" aria-label="From date"
 		   class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
 	<span class="flex items-center text-xs text-muted-foreground">to</span>
-	<input type="date" name="to" value="@filterTo"
+	<input type="date" name="to" value="@filterTo" aria-label="To date"
 		   class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
 
 	<button type="submit"
@@ -100,7 +100,7 @@
 	}
 	else
 	{
-		<table class="w-full text-xs">
+		<div class="table-scroll"><table class="w-full text-xs">
 			<thead class="border-b border-border bg-muted/40">
 				<tr>
 					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground whitespace-nowrap">Time (UTC)</th>
@@ -109,19 +109,15 @@
 					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Entity</th>
 					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Name / ID</th>
 					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">IP</th>
+					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground"><span class="sr-only">Details</span></th>
 				</tr>
 			</thead>
-			<tbody class="divide-y divide-border" x-data>
+			<tbody class="divide-y divide-border">
 				@foreach (var row in items)
 				{
 					var rowId = $"row-{row.Id}";
 					var hasDetail = row.OldValues != null || row.NewValues != null;
-					<tr class="hover:bg-muted/30 transition-colors @(hasDetail ? "cursor-pointer" : "")"
-						@if (hasDetail)
-						{
-							<text>@@click="$refs['@rowId'].classList.toggle('hidden')"</text>
-						}
-						>
+					<tr class="hover:bg-muted/30 transition-colors">
 							<td class="px-4 py-2.5 text-muted-foreground whitespace-nowrap font-mono">
 								@row.CreatedAt.ToString("MM-dd HH:mm:ss")
 							</td>
@@ -136,11 +132,19 @@
 								@(row.EntityName ?? row.EntityId ?? "—")
 							</td>
 							<td class="px-4 py-2.5 text-muted-foreground font-mono">@(row.IpAddress ?? "—")</td>
+							<td class="px-4 py-2.5 whitespace-nowrap">
+								@if (hasDetail)
+								{
+									<button type="button" aria-expanded="false" aria-controls="@rowId" aria-label="Details for @row.Action @(row.EntityName ?? row.EntityId)"
+											class="h-6 px-2 rounded border border-input text-[10px] font-medium text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											onclick="var r=document.getElementById('@rowId'); r.hidden=!r.hidden; this.setAttribute('aria-expanded', String(!r.hidden));">Details</button>
+								}
+							</td>
 						</tr>
 						@if (hasDetail)
 						{
-							<tr x-ref="@rowId" class="hidden bg-muted/20">
-								<td colspan="6" class="px-4 py-3">
+							<tr id="@rowId" hidden class="bg-muted/20">
+								<td colspan="7" class="px-4 py-3">
 									<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 										@if (row.OldValues != null)
 										{
@@ -162,7 +166,7 @@
 						}
 					}
 				</tbody>
-			</table>
+			</table></div>
 		}
 	</div>
 

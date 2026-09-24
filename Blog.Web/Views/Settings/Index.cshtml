@@ -2,242 +2,429 @@
 @model SettingsViewModel
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "General Settings";
+    ViewData["Title"] = "Settings";
+    var inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+    var labelCls = "text-sm font-medium leading-none";
+    var helpCls = "text-xs text-muted-foreground";
+    var errCls = "text-sm font-medium text-destructive";
+    var checkCls = "mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background";
 }
 
-<div class="max-w-4xl mx-auto">
-    <div class="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        <div class="p-6 border-b border-border">
-            <h2 class="text-lg font-semibold text-foreground">General Settings</h2>
-            <p class="text-sm text-muted-foreground mt-1">Configure basic site settings and preferences.</p>
-        </div>
-        
-        <form asp-action="Update" method="post" class="p-6 space-y-6">
-            @Html.AntiForgeryToken()
+<style>[x-cloak]{display:none!important}</style>
 
+@*
+    Settings is one form split into tabs. Every tab's fields post together, so switching tabs never
+    loses anything; the sticky bar at the bottom keeps Save in view on every tab; a validation error
+    on a hidden tab switches to that tab before the browser tries to focus the field.
+*@
+<div class="max-w-5xl mx-auto" x-data="settingsTabs()">
+    <div class="mb-6">
+        <h1 class="text-xl font-semibold text-foreground">Settings</h1>
+        <p class="text-sm text-muted-foreground mt-1">
+            How your site presents itself, what readers can do, and how search engines and answer engines see it.
+            Changes on every tab are saved together with the <strong>Save changes</strong> button at the bottom.
+        </p>
+    </div>
+
+    <form asp-action="Update" method="post" data-track-changes x-ref="form" class="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)] items-start">
+        @Html.AntiForgeryToken()
+
+        @* ── Tab list: horizontal on phones, a sticky column on wider screens ── *@
+        <nav id="settings-tabs" role="tablist" aria-label="Settings sections"
+             class="md:sticky md:top-4 flex md:flex-col gap-1 overflow-x-auto md:overflow-visible -mx-1 px-1 pb-1 md:pb-0 text-sm">
+            <template x-for="t in tabs" :key="t.key">
+                <a :href="'#s-' + t.key" role="tab" :id="'tab-' + t.key" :aria-selected="tab === t.key ? 'true' : 'false'" :aria-controls="'s-' + t.key" :tabindex="tab === t.key ? 0 : -1"
+                   @@click.prevent="go(t.key)" @@keydown.arrow-down.prevent="next(1)" @@keydown.arrow-up.prevent="next(-1)" @@keydown.arrow-right.prevent="next(1)" @@keydown.arrow-left.prevent="next(-1)"
+                   class="whitespace-nowrap rounded-md px-3 py-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   :class="tab === t.key ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'">
+                    <span x-text="t.label"></span>
+                    <span x-show="errors[t.key]" x-cloak class="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground" :title="errors[t.key] + ' field(s) need attention'" x-text="errors[t.key]"></span>
+                </a>
+            </template>
+            @* Server-rendered anchors so the section links exist without JavaScript (and for the source tests). *@
+            <noscript>
+                <a href="#s-general">General</a> <a href="#s-display">Display</a> <a href="#s-comments">Comments</a>
+                <a href="#s-analytics">Search &amp; analytics</a> <a href="#s-housekeeping">Notifications &amp; housekeeping</a>
+                <a href="#s-social">Social</a> <a href="#s-identity">Identity</a>
+            </noscript>
+        </nav>
+
+        <div class="min-w-0">
             @if (TempData["Error"] != null)
             {
-                <div class="p-3 mb-4 rounded-md bg-destructive/10 text-destructive text-xs font-medium">
-                    @TempData["Error"]
-                </div>
+                <div class="p-3 mb-4 rounded-md bg-destructive/10 text-destructive text-xs font-medium">@TempData["Error"]</div>
             }
+            <div asp-validation-summary="ModelOnly" class="mb-4 text-sm text-destructive"></div>
 
-            <div class="grid gap-6 md:grid-cols-2">
-                <div class="space-y-2">
-                    <label asp-for="SiteName" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
-                    <input asp-for="SiteName" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    <span asp-validation-for="SiteName" class="text-sm font-medium text-destructive"></span>
+            @* ────────────────────────────── General ────────────────────────────── *@
+            <section id="s-general" role="tabpanel" aria-labelledby="tab-general" x-show="tab === 'general'" x-cloak data-tab="general"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">General</h2>
+                    <p class="@helpCls mt-1">The name and images that identify the site. They appear in the browser tab, the header and footer, feeds, social previews and structured data.</p>
+                </header>
+
+                <div class="grid gap-6 md:grid-cols-2">
+                    <div class="space-y-2">
+                        <label asp-for="SiteName" class="@labelCls"></label>
+                        <input asp-for="SiteName" class="@inputCls" />
+                        <p class="@helpCls">Shown in the header, the browser title after every page name, the RSS feed and the publisher name in structured data.</p>
+                        <span asp-validation-for="SiteName" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="SiteTagline" class="@labelCls"></label>
+                        <input asp-for="SiteTagline" class="@inputCls" placeholder="One sentence that says what this site is about" />
+                        <p class="@helpCls">Used as the home page description for search results and shown under the site name in most layouts. Aim for 60 to 150 characters.</p>
+                        <span asp-validation-for="SiteTagline" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="SiteLanguage" class="@labelCls"></label>
+                        <input asp-for="SiteLanguage" placeholder="en" class="@inputCls" />
+                        <p class="@helpCls">BCP-47 code (<code>en</code>, <code>es</code>, <code>hi</code>, <code>fr-CA</code>…). Sets the page <code>lang</code>, hreflang and schema language.</p>
+                    </div>
+                </div>
+
+                <div class="grid gap-6 md:grid-cols-2 pt-2 border-t border-border">
+                    <div class="space-y-2">
+                        <label asp-for="SiteLogoUrl" class="@labelCls"></label>
+                        <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteLogoUrl) ? "hidden" : "")" id="SiteLogoPreviewWrapper">
+                            <img id="SiteLogoPreview" src="@Model.SiteLogoUrl" alt="Site logo preview" class="w-full h-auto max-h-32 object-contain rounded border" />
+                        </div>
+                        <div class="flex gap-2">
+                            <input asp-for="SiteLogoUrl" id="SiteLogoInput" class="@inputCls" placeholder="https://" />
+                            <button type="button"
+                                    onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteLogoInput', previewImg: 'SiteLogoPreview', folder: 'images' } })); document.getElementById('SiteLogoPreviewWrapper').classList.remove('hidden');"
+                                    class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                        </div>
+                        <p class="@helpCls">Header logo. Pick from the media library or paste a URL; leave blank to show the site name as text. A transparent PNG or SVG about 400 × 100 px works best.</p>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="SiteFaviconUrl" class="@labelCls"></label>
+                        <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteFaviconUrl) ? "hidden" : "")" id="SiteFaviconPreviewWrapper">
+                            <img id="SiteFaviconPreview" src="@Model.SiteFaviconUrl" alt="Favicon preview" class="w-16 h-16 object-contain rounded border" />
+                        </div>
+                        <div class="flex gap-2">
+                            <input asp-for="SiteFaviconUrl" id="SiteFaviconInput" class="@inputCls" placeholder="https://" />
+                            <button type="button"
+                                    onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteFaviconInput', previewImg: 'SiteFaviconPreview', folder: 'images' } })); document.getElementById('SiteFaviconPreviewWrapper').classList.remove('hidden');"
+                                    class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                        </div>
+                        <p class="@helpCls">The small icon in browser tabs and bookmarks. A square PNG or ICO, 32 × 32 px or larger.</p>
+                    </div>
                 </div>
 
                 <div class="space-y-2">
-                    <label asp-for="SiteTagline" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
-                    <input asp-for="SiteTagline" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                    <span asp-validation-for="SiteTagline" class="text-sm font-medium text-destructive"></span>
-                </div>
-                <div class="space-y-2">
-                    <label asp-for="SiteLanguage" class="text-sm font-medium leading-none"></label>
-                    <input asp-for="SiteLanguage" placeholder="en" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-                    <p class="text-xs text-muted-foreground">BCP-47 code (<code>en</code>, <code>es</code>, <code>hi</code>, <code>fr-CA</code>…). Sets the page <code>lang</code>, hreflang and schema language.</p>
-                </div>
-            </div>
-
-            <div class="grid gap-6 md:grid-cols-2">
-                <div class="space-y-2">
-                    <label asp-for="SiteLogoUrl" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
-                    <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteLogoUrl) ? "hidden" : "")" id="SiteLogoPreviewWrapper">
-                        <img id="SiteLogoPreview" src="@Model.SiteLogoUrl" class="w-full h-auto max-h-32 object-contain rounded border" />
+                    <label asp-for="SiteCoverUrl" class="@labelCls"></label>
+                    <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteCoverUrl) ? "hidden" : "")" id="SiteCoverPreviewWrapper">
+                        <img id="SiteCoverPreview" src="@Model.SiteCoverUrl" alt="Cover image preview" class="w-full h-32 object-cover rounded border" />
                     </div>
                     <div class="flex gap-2">
-                        <input asp-for="SiteLogoUrl" id="SiteLogoInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="https://" />
-                        <button type="button" 
-                                onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteLogoInput', previewImg: 'SiteLogoPreview', folder: 'images' } })); document.getElementById('SiteLogoPreviewWrapper').classList.remove('hidden');" 
+                        <input asp-for="SiteCoverUrl" id="SiteCoverInput" class="@inputCls" placeholder="https://" />
+                        <button type="button"
+                                onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteCoverInput', previewImg: 'SiteCoverPreview', folder: 'images' } })); document.getElementById('SiteCoverPreviewWrapper').classList.remove('hidden');"
                                 class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
                     </div>
+                    <p class="@helpCls">Wide hero/banner image at the top of the home page in layouts that show one (recommended 1500 × 500 px). Also the fallback social preview image for pages without their own.</p>
                 </div>
+            </section>
 
-                <div class="space-y-2">
-                    <label asp-for="SiteFaviconUrl" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
-                    <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteFaviconUrl) ? "hidden" : "")" id="SiteFaviconPreviewWrapper">
-                        <img id="SiteFaviconPreview" src="@Model.SiteFaviconUrl" class="w-16 h-16 object-contain rounded border" />
+            @* ────────────────────────────── Display ────────────────────────────── *@
+            <section id="s-display" role="tabpanel" aria-labelledby="tab-display" x-show="tab === 'display'" x-cloak data-tab="display"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Display</h2>
+                    <p class="@helpCls mt-1">How lists, dates and colours are shown. Layouts, presets and fonts live under <a href="/admin/theme" class="underline">Theme</a>.</p>
+                </header>
+                <div class="grid gap-6 md:grid-cols-2">
+                    <div class="space-y-2">
+                        <label asp-for="PostsPerPage" class="@labelCls"></label>
+                        <input asp-for="PostsPerPage" type="number" min="1" max="100" class="@inputCls" />
+                        <p class="@helpCls">Posts on the home page and on category, tag and search pages before a "next page" link (1 to 100).</p>
+                        <span asp-validation-for="PostsPerPage" class="@errCls"></span>
                     </div>
-                    <div class="flex gap-2">
-                        <input asp-for="SiteFaviconUrl" id="SiteFaviconInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="https://" />
-                        <button type="button" 
-                                onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteFaviconInput', previewImg: 'SiteFaviconPreview', folder: 'images' } })); document.getElementById('SiteFaviconPreviewWrapper').classList.remove('hidden');" 
-                                class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                    <div class="space-y-2">
+                        <label asp-for="ColorScheme" class="@labelCls"></label>
+                        <select asp-for="ColorScheme" class="@inputCls">
+                            <option value="system">System — follow each reader's device setting</option>
+                            <option value="light">Always light</option>
+                            <option value="dark">Always dark</option>
+                        </select>
+                        <p class="@helpCls">Applies to the public site and this Desk. Presets that are already dark (Ink, Onyx) keep their own palette.</p>
                     </div>
-                </div>
-            </div>
-
-            <div class="space-y-2">
-                <label asp-for="SiteCoverUrl" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
-                <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteCoverUrl) ? "hidden" : "")" id="SiteCoverPreviewWrapper">
-                    <img id="SiteCoverPreview" src="@Model.SiteCoverUrl" class="w-full h-32 object-cover rounded border" />
-                </div>
-                <div class="flex gap-2">
-                    <input asp-for="SiteCoverUrl" id="SiteCoverInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="https://" />
-                    <button type="button"
-                            onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteCoverInput', previewImg: 'SiteCoverPreview', folder: 'images' } })); document.getElementById('SiteCoverPreviewWrapper').classList.remove('hidden');"
-                            class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
-                </div>
-                <p class="text-xs text-muted-foreground">Wide hero/banner image displayed at the top of your homepage (recommended: 1500 × 500 px).</p>
-            </div>
-
-            <div class="space-y-2">
-                <label asp-for="PostsPerPage" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"></label>
-                <input asp-for="PostsPerPage" type="number" min="1" max="100" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
-                <p class="text-xs text-muted-foreground">Number of posts to display per page (1-100).</p>
-                <span asp-validation-for="PostsPerPage" class="text-sm font-medium text-destructive"></span>
-            </div>
-
-            <div class="space-y-4 pt-2 border-t border-border">
-                <h3 class="text-sm font-medium text-foreground">Comments</h3>
-                <div class="flex items-start space-x-3">
-                    <input asp-for="CommentsEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background" />
-                    <div class="grid gap-1.5 leading-none">
-                        <label asp-for="CommentsEnabled" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Enable comments</label>
-                        <p class="text-sm text-muted-foreground">Allow users to comment on posts.</p>
+                    <div class="space-y-2 md:col-span-2">
+                        <label asp-for="DisplayTimeZoneId" class="@labelCls"></label>
+                        <select asp-for="DisplayTimeZoneId" class="@inputCls">
+                            <option value="UTC">UTC</option>
+                            @foreach (var z in TimeZoneInfo.GetSystemTimeZones().OrderBy(z => z.BaseUtcOffset).ThenBy(z => z.DisplayName))
+                            {
+                                if (z.Id == "UTC") { continue; }
+                                <option value="@z.Id" selected="@(z.Id == Model.DisplayTimeZoneId)">@z.DisplayName</option>
+                            }
+                        </select>
+                        <p class="@helpCls">Dates are stored in UTC and shown in this zone on the public site and in the Desk; a schedule time you type in the editor is read in this zone.</p>
+                        <span asp-validation-for="DisplayTimeZoneId" class="@errCls"></span>
                     </div>
                 </div>
+            </section>
 
-                <div class="flex items-start space-x-3">
-                    <input asp-for="CommentsModeration" type="checkbox" class="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background" />
-                    <div class="grid gap-1.5 leading-none">
-                        <label asp-for="CommentsModeration" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Comment moderation</label>
-                        <p class="text-sm text-muted-foreground">Comments must be approved by an admin before they appear.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="space-y-4 pt-6 border-t border-border">
-                <div>
-                    <h3 class="text-sm font-medium text-foreground">Analytics</h3>
-                    <p class="text-xs text-muted-foreground mt-1">Leave blank to disable tracking.</p>
-                </div>
-                <div class="space-y-2">
-                    <label asp-for="GoogleAnalyticsId" class="text-sm font-medium leading-none"></label>
-                    <input asp-for="GoogleAnalyticsId" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="G-XXXXXXXXXX" />
-                    <p class="text-xs text-muted-foreground">GA4 Measurement ID from Google Analytics → Admin → Data Streams.</p>
-                </div>
-                <div class="space-y-2">
-                    <label asp-for="GoogleSiteVerification" class="text-sm font-medium leading-none"></label>
-                    <input asp-for="GoogleSiteVerification" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="content value from the google-site-verification meta tag" />
-                    <p class="text-xs text-muted-foreground">Search Console → Settings → Ownership verification → HTML tag. Paste only the <code>content</code> value.</p>
-                </div>
-                <div class="space-y-2">
-                    <label asp-for="BingSiteVerification" class="text-sm font-medium leading-none"></label>
-                    <input asp-for="BingSiteVerification" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="content value from the msvalidate.01 meta tag" />
-                    <p class="text-xs text-muted-foreground">Bing Webmaster Tools → verify via meta tag. Paste only the <code>content</code> value.</p>
-                </div>
-
-                <div class="space-y-2 pt-4 border-t border-border">
-                    <div class="flex items-start gap-3">
-                        <input asp-for="IndexNowEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background" />
-                        <div>
-                            <label asp-for="IndexNowEnabled" class="text-sm font-medium leading-none">Enable IndexNow (instant indexing)</label>
-                            <p class="text-xs text-muted-foreground mt-1">Pings Bing, Yandex, Seznam and Naver the moment you publish or update a post, so they re-crawl in minutes instead of days.</p>
+            @* ────────────────────────────── Comments ────────────────────────────── *@
+            <section id="s-comments" role="tabpanel" aria-labelledby="tab-comments" x-show="tab === 'comments'" x-cloak data-tab="comments"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Comments</h2>
+                    <p class="@helpCls mt-1">Whether readers can comment and whether a person approves each comment first. The spam filter (honeypot, timing, link and duplicate checks) is always on and needs no setup; what it rejects is reported to the <a href="/admin/security" class="underline">firewall</a>.</p>
+                </header>
+                <div class="space-y-5">
+                    <div class="flex items-start space-x-3">
+                        <input asp-for="CommentsEnabled" type="checkbox" class="@checkCls" />
+                        <div class="grid gap-1.5 leading-none">
+                            <label asp-for="CommentsEnabled" class="@labelCls">Enable comments</label>
+                            <p class="text-sm text-muted-foreground">Shows the comment form under posts that allow it. Turning this off hides the form everywhere but keeps existing comments.</p>
                         </div>
                     </div>
-                    <label asp-for="IndexNowApiKey" class="text-sm font-medium leading-none"></label>
-                    <input asp-for="IndexNowApiKey" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Leave blank to auto-generate a key on save" />
-                    @if (!string.IsNullOrEmpty(Model.IndexNowApiKey))
+                    <div class="flex items-start space-x-3">
+                        <input asp-for="CommentsModeration" type="checkbox" class="@checkCls" />
+                        <div class="grid gap-1.5 leading-none">
+                            <label asp-for="CommentsModeration" class="@labelCls">Hold comments for approval</label>
+                            <p class="text-sm text-muted-foreground">New comments wait in <a href="/admin/comments" class="underline">Admin → Comments</a> until approved. Off means they appear immediately.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            @* ────────────────────────── Search & analytics ────────────────────────── *@
+            <section id="s-analytics" role="tabpanel" aria-labelledby="tab-analytics" x-show="tab === 'analytics'" x-cloak data-tab="analytics"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-8 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Search &amp; analytics</h2>
+                    <p class="@helpCls mt-1">Prove you own the site to search engines, get new posts indexed fast, and pull real search performance into the Desk. Everything here is optional; blank fields simply switch a feature off.</p>
+                </header>
+
+                <div class="space-y-4">
+                    <h3 class="text-sm font-semibold text-foreground">Ownership verification</h3>
+                    <div class="grid gap-6 md:grid-cols-2">
+                        <div class="space-y-2">
+                            <label asp-for="GoogleSiteVerification" class="@labelCls"></label>
+                            <input asp-for="GoogleSiteVerification" class="@inputCls" placeholder="content value from the google-site-verification meta tag" />
+                            <p class="@helpCls">Search Console → Settings → Ownership verification → HTML tag. Paste only the <code>content</code> value; the tag is emitted for you.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label asp-for="BingSiteVerification" class="@labelCls"></label>
+                            <input asp-for="BingSiteVerification" class="@inputCls" placeholder="content value from the msvalidate.01 meta tag" />
+                            <p class="@helpCls">Bing Webmaster Tools → verify via meta tag. Paste only the <code>content</code> value.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4 pt-6 border-t border-border">
+                    <h3 class="text-sm font-semibold text-foreground">Analytics</h3>
+                    <div class="space-y-2">
+                        <label asp-for="GoogleAnalyticsId" class="@labelCls"></label>
+                        <input asp-for="GoogleAnalyticsId" class="@inputCls" placeholder="G-XXXXXXXXXX" />
+                        <p class="@helpCls">GA4 Measurement ID from Google Analytics → Admin → Data Streams. Leave blank to load no tracker at all; the built-in <a href="/admin/analytics" class="underline">Analytics</a> works either way.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-3 pt-6 border-t border-border">
+                    <h3 class="text-sm font-semibold text-foreground">IndexNow</h3>
+                    <div class="flex items-start gap-3">
+                        <input asp-for="IndexNowEnabled" type="checkbox" class="@checkCls" />
+                        <div>
+                            <label asp-for="IndexNowEnabled" class="@labelCls">Enable IndexNow (instant indexing)</label>
+                            <p class="@helpCls mt-1">Pings Bing, Yandex, Seznam and Naver the moment you publish or update a post, so they re-crawl in minutes instead of days. Google does not use IndexNow; verify with Search Console above instead.</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="IndexNowApiKey" class="@labelCls"></label>
+                        <input asp-for="IndexNowApiKey" class="@inputCls font-mono" placeholder="Leave blank to auto-generate a key on save" />
+                        @if (!string.IsNullOrEmpty(Model.IndexNowApiKey))
+                        {
+                            <p class="@helpCls">Verification file: <a href="/@(Model.IndexNowApiKey).txt" target="_blank" class="underline"><code>/@(Model.IndexNowApiKey).txt</code></a> — served automatically at the site root. No file upload needed.</p>
+                        }
+                        else
+                        {
+                            <p class="@helpCls">A key (a–z, 0–9, dashes) is generated automatically when you enable this and save. It's then served at <code>/{key}.txt</code> (site root) for ownership verification.</p>
+                        }
+                    </div>
+                </div>
+
+                <div class="space-y-3 pt-6 border-t border-border">
+                    <h3 class="text-sm font-semibold text-foreground">Search Console</h3>
+                    @if (Model.SearchConsoleConnectedAs is not null)
                     {
-                        <p class="text-xs text-muted-foreground">Verification file: <a href="/@(Model.IndexNowApiKey).txt" target="_blank" class="underline"><code>/@(Model.IndexNowApiKey).txt</code></a> — served automatically at the site root. No file upload needed.</p>
+                        <p class="text-xs rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2">
+                            Connected to <code>@Model.SearchConsoleProperty</code> as <code>@Model.SearchConsoleConnectedAs</code>.
+                            @if (Model.SearchConsoleLatestDate is DateTime latest)
+                            {
+                                <span>Data through <strong>@latest.ToString("d MMM yyyy")</strong>.</span>
+                            }
+                            else
+                            {
+                                <span>No data pulled yet — the nightly sync runs within a minute of startup and then every 24 hours; check Admin → Dashboard → Scheduled jobs.</span>
+                            }
+                        </p>
+                    }
+                    else if (Model.SearchConsoleCredentialStored)
+                    {
+                        <p class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2">
+                            A key file is stored but cannot be read (the Data Protection key ring changed) or no property is set. Paste the key file again and set the property.
+                        </p>
                     }
                     else
                     {
-                        <p class="text-xs text-muted-foreground">A key (a–z, 0–9, dashes) is generated automatically when you enable this and save. It's then served at <code>/{key}.txt</code> (site root) for ownership verification.</p>
+                        <p class="@helpCls">
+                            Pulls clicks, impressions, CTR and position for every page into the editor, Content Health and the dashboard — no more spreadsheet exports.
+                            Create a <strong>service account</strong> in Google Cloud (IAM → Service Accounts → Keys → JSON), then add its email as a <em>Full</em> or <em>Restricted</em> user on your property in Search Console → Settings → Users and permissions.
+                        </p>
                     }
+                    <div class="space-y-2">
+                        <label asp-for="SearchConsoleProperty" class="@labelCls"></label>
+                        <input asp-for="SearchConsoleProperty" placeholder="example.com  or  https://www.example.com/" class="@inputCls font-mono" />
+                        <p class="@helpCls">A bare domain becomes a domain property (<code>sc-domain:example.com</code>); a URL becomes a URL-prefix property.</p>
+                        <span asp-validation-for="SearchConsoleProperty" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="SearchConsoleServiceAccountJson" class="@labelCls"></label>
+                        <textarea asp-for="SearchConsoleServiceAccountJson" rows="4" autocomplete="off" spellcheck="false" placeholder='@(Model.SearchConsoleCredentialStored ? "Paste a new key file only to replace the stored one." : "{ \"type\": \"service_account\", \"client_email\": \"…\", \"private_key\": \"…\" }")' class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"></textarea>
+                        <p class="@helpCls">Stored encrypted; never shown again, logged, or exported. Leave empty to keep the stored key.</p>
+                        <span asp-validation-for="SearchConsoleServiceAccountJson" class="@errCls"></span>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label asp-for="SearchPerformanceRetentionMonths" class="@labelCls"></label>
+                            <input asp-for="SearchPerformanceRetentionMonths" type="number" min="1" max="16" class="@inputCls" />
+                            <p class="@helpCls">Search Console itself keeps 16 months; the first sync backfills this far.</p>
+                            <span asp-validation-for="SearchPerformanceRetentionMonths" class="@errCls"></span>
+                        </div>
+                        @if (Model.SearchConsoleCredentialStored)
+                        {
+                            <div class="flex items-start gap-3 pt-6">
+                                <input asp-for="SearchConsoleDisconnect" type="checkbox" class="@checkCls" />
+                                <div>
+                                    <label asp-for="SearchConsoleDisconnect" class="@labelCls"></label>
+                                    <p class="@helpCls mt-1">Removes the stored key and property on save. Pulled data is kept until it ages out.</p>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
+            </section>
 
-                <div class="space-y-2 pt-4 border-t border-border">
+            @* ──────────────────── Notifications & housekeeping ──────────────────── *@
+            <section id="s-housekeeping" role="tabpanel" aria-labelledby="tab-housekeeping" x-show="tab === 'housekeeping'" x-cloak data-tab="housekeeping"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-8 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Notifications &amp; housekeeping</h2>
+                    <p class="@helpCls mt-1">Alerts for the operator and how long the platform keeps its own working data. The nightly jobs that apply these limits are listed on the <a href="/admin/dashboard" class="underline">dashboard</a>.</p>
+                </header>
+                <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-foreground">Error alerts</h3>
                     <div class="flex items-start gap-3">
-                        <input asp-for="ErrorNotificationsEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background" />
+                        <input asp-for="ErrorNotificationsEnabled" type="checkbox" class="@checkCls" />
                         <div>
-                            <label asp-for="ErrorNotificationsEnabled" class="text-sm font-medium leading-none">Email me when a server error occurs</label>
-                            <p class="text-xs text-muted-foreground mt-1">Sends an alert the first time a new server-error (5xx) signature is detected, so repeats don't flood your inbox. All errors (incl. 404s) are always visible in Admin → Error Monitor.</p>
+                            <label asp-for="ErrorNotificationsEnabled" class="@labelCls">Email me when a server error occurs</label>
+                            <p class="@helpCls mt-1">Sends an alert the first time a new server-error (5xx) signature is detected, so repeats don't flood your inbox. All errors (incl. 404s) are always visible in <a href="/admin/errors" class="underline">Admin → Error Monitor</a>. Needs SMTP configured on the server.</p>
                         </div>
                     </div>
-                    <label asp-for="ErrorNotificationEmails" class="text-sm font-medium leading-none"></label>
-                    <input asp-for="ErrorNotificationEmails" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="ops@example.com, dev@example.com" />
-                    <p class="text-xs text-muted-foreground">One or more addresses, separated by commas, semicolons, or new lines.</p>
+                    <div class="space-y-2">
+                        <label asp-for="ErrorNotificationEmails" class="@labelCls"></label>
+                        <input asp-for="ErrorNotificationEmails" class="@inputCls" placeholder="ops@example.com, dev@example.com" />
+                        <p class="@helpCls">One or more addresses, separated by commas, semicolons, or new lines.</p>
+                    </div>
                 </div>
-            </div>
+                <div class="grid gap-6 md:grid-cols-2 pt-6 border-t border-border">
+                    <div class="space-y-2">
+                        <label asp-for="CrawlerVisitRetentionDays" class="@labelCls"></label>
+                        <input asp-for="CrawlerVisitRetentionDays" type="number" min="7" max="3650" class="@inputCls" />
+                        <p class="@helpCls">How long <a href="/admin/ai-crawlers" class="underline">Admin → AI Crawlers</a> keeps each crawler request (7–3650 days). Older rows are pruned nightly.</p>
+                        <span asp-validation-for="CrawlerVisitRetentionDays" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="RevisionsPerItem" class="@labelCls"></label>
+                        <input asp-for="RevisionsPerItem" type="number" min="1" max="200" class="@inputCls" />
+                        <p class="@helpCls">A revision is written each time a post or page is saved with changed content; the oldest beyond this count are pruned.</p>
+                        <span asp-validation-for="RevisionsPerItem" class="@errCls"></span>
+                    </div>
+                </div>
+            </section>
 
-            <div class="space-y-4 pt-6 border-t border-border">
-                <div>
-                    <h3 class="text-sm font-medium text-foreground">Social Links</h3>
-                    <p class="text-xs text-muted-foreground mt-1">Leave blank to hide the icon. Used in site headers/footers.</p>
-                </div>
-                
+            @* ────────────────────────────── Social ────────────────────────────── *@
+            <section id="s-social" role="tabpanel" aria-labelledby="tab-social" x-show="tab === 'social'" x-cloak data-tab="social"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Social</h2>
+                    <p class="@helpCls mt-1">Profile links shown as icons in the header or footer of most layouts and listed as <code>sameAs</code> in the publisher's structured data. Leave a field blank to hide that icon. Use the full profile URL.</p>
+                </header>
                 <div class="grid gap-6 md:grid-cols-2">
                     <div class="space-y-2">
-                        <label asp-for="SocialTwitter" class="text-sm font-medium leading-none"></label>
-                        <input asp-for="SocialTwitter" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://x.com/username" />
+                        <label asp-for="SocialTwitter" class="@labelCls"></label>
+                        <input asp-for="SocialTwitter" class="@inputCls" placeholder="https://x.com/username" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="SocialFacebook" class="text-sm font-medium leading-none"></label>
-                        <input asp-for="SocialFacebook" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://facebook.com/username" />
+                        <label asp-for="SocialFacebook" class="@labelCls"></label>
+                        <input asp-for="SocialFacebook" class="@inputCls" placeholder="https://facebook.com/username" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="SocialInstagram" class="text-sm font-medium leading-none"></label>
-                        <input asp-for="SocialInstagram" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://instagram.com/username" />
+                        <label asp-for="SocialInstagram" class="@labelCls"></label>
+                        <input asp-for="SocialInstagram" class="@inputCls" placeholder="https://instagram.com/username" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="SocialYoutube" class="text-sm font-medium leading-none"></label>
-                        <input asp-for="SocialYoutube" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://youtube.com/@@username" />
+                        <label asp-for="SocialYoutube" class="@labelCls"></label>
+                        <input asp-for="SocialYoutube" class="@inputCls" placeholder="https://youtube.com/@@username" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="SocialLinkedin" class="text-sm font-medium leading-none"></label>
-                        <input asp-for="SocialLinkedin" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://linkedin.com/in/username" />
+                        <label asp-for="SocialLinkedin" class="@labelCls"></label>
+                        <input asp-for="SocialLinkedin" class="@inputCls" placeholder="https://linkedin.com/in/username" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="SocialGithub" class="text-sm font-medium leading-none"></label>
-                        <input asp-for="SocialGithub" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://github.com/username" />
+                        <label asp-for="SocialGithub" class="@labelCls"></label>
+                        <input asp-for="SocialGithub" class="@inputCls" placeholder="https://github.com/username" />
                     </div>
                 </div>
-            </div>
+            </section>
 
-
-            <div class="space-y-4 pt-6 border-t border-border">
-                <div>
-                    <h3 class="text-sm font-medium text-foreground">Publisher identity (knowledge graph)</h3>
-                    <p class="text-xs text-muted-foreground mt-1">
+            @* ────────────────────────────── Identity ────────────────────────────── *@
+            <section id="s-identity" role="tabpanel" aria-labelledby="tab-identity" x-show="tab === 'identity'" x-cloak data-tab="identity"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Publisher identity</h2>
+                    <p class="@helpCls mt-1">
                         Who this publication <em>is</em>, as an entity rather than a website. Search and answer engines
                         resolve a brand by cross-referencing authoritative profiles — this is how they tell you apart
                         from a similarly named site, or from whatever your domain published before. Every field is
-                        optional; blanks are omitted from structured data rather than guessed at.
+                        optional; blanks are omitted from structured data rather than guessed at. Feeds the publisher
+                        node in structured data and the Identity section of <code>llms.txt</code>.
                     </p>
-                </div>
+                </header>
 
                 <div class="grid gap-6 md:grid-cols-2">
                     <div class="space-y-2">
-                        <label asp-for="EntityType" class="text-sm font-medium leading-none">Publisher type</label>
-                        <select asp-for="EntityType" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <label asp-for="EntityType" class="@labelCls">Publisher type</label>
+                        <select asp-for="EntityType" class="@inputCls">
                             <option value="Organization">Organization</option>
                             <option value="Person">Person (a personal publication)</option>
                         </select>
-                        <p class="text-xs text-muted-foreground">Sets the schema.org type of the publisher node.</p>
+                        <p class="@helpCls">Sets the schema.org type of the publisher node.</p>
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="EntityLegalName" class="text-sm font-medium leading-none">Legal name</label>
-                        <input asp-for="EntityLegalName" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Registered name, if different from the site name" />
+                        <label asp-for="EntityLegalName" class="@labelCls">Legal name</label>
+                        <input asp-for="EntityLegalName" class="@inputCls" placeholder="Registered name, if different from the site name" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="EntityFounder" class="text-sm font-medium leading-none">Founder</label>
-                        <input asp-for="EntityFounder" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Full name" />
+                        <label asp-for="EntityFounder" class="@labelCls">Founder</label>
+                        <input asp-for="EntityFounder" class="@inputCls" placeholder="Full name" />
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="EntityFoundingDate" class="text-sm font-medium leading-none">Founded</label>
-                        <input asp-for="EntityFoundingDate" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="2019 or 2019-04-01" />
-                        <p class="text-xs text-muted-foreground">A year or a full date. Anything else is left out rather than reshaped.</p>
+                        <label asp-for="EntityFoundingDate" class="@labelCls">Founded</label>
+                        <input asp-for="EntityFoundingDate" class="@inputCls" placeholder="2019 or 2019-04-01" />
+                        <p class="@helpCls">A year or a full date. Anything else is left out rather than reshaped.</p>
                     </div>
                 </div>
 
                 <div class="space-y-2">
-                    <label asp-for="EntitySameAs" class="text-sm font-medium leading-none">Authority profiles</label>
+                    <label asp-for="EntitySameAs" class="@labelCls">Authority profiles</label>
                     <textarea asp-for="EntitySameAs" rows="4" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://en.wikipedia.org/wiki/Your_Publication&#10;https://www.wikidata.org/wiki/Q123456&#10;https://www.crunchbase.com/organization/your-company"></textarea>
-                    <p class="text-xs text-muted-foreground">
+                    <p class="@helpCls">
                         One URL per line — Wikipedia, Wikidata, a company register, Crunchbase, an ORCID. These join your
                         social links in <code>sameAs</code>. Only absolute http(s) URLs are used; a bare handle would
                         invalidate the whole node.
@@ -245,27 +432,101 @@
                 </div>
 
                 <div class="space-y-2">
-                    <label asp-for="EntityIdentityStatement" class="text-sm font-medium leading-none">Identity statement</label>
+                    <label asp-for="EntityIdentityStatement" class="@labelCls">Identity statement</label>
                     <textarea asp-for="EntityIdentityStatement" rows="4" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Leave blank to use the generated wording."></textarea>
-                    <p class="text-xs text-muted-foreground">
+                    <p class="@helpCls">
                         Written for answer engines and published verbatim in the Identity section of
                         <code>llms.txt</code>. Say plainly what this publication is — and, if your domain previously
                         published something else, what it is not. Blank keeps the generated wording.
                     </p>
                 </div>
+            </section>
+
+            @* ── Sticky action bar: Save is visible on every tab, at every scroll position ── *@
+            <div class="sticky bottom-0 z-10 mt-6 -mx-1 px-1 pb-[env(safe-area-inset-bottom,0px)]">
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 backdrop-blur px-4 py-3 shadow-lg">
+                    <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span data-dirty-indicator hidden>Unsaved changes</span>
+                        <span>Saving applies the fields on every tab.</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="/admin/settings" class="h-10 px-4 inline-flex items-center rounded-md border border-input bg-background text-sm hover:bg-muted">Discard</a>
+                        <button type="submit" class="h-10 px-5 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
+                            Save changes
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="pt-6 flex justify-end">
-                <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 shadow-sm">
-                    Save Changes
-                </button>
-            </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </div>
 
 <partial name="_MediaSelectorModal" />
 
-
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
 }
+
+<script>
+    // Settings tabs: one form, seven panels. The hash remembers the tab (#s-general …), a validation
+    // error switches to the tab that holds it, and the browser's own "required" check reveals the
+    // panel before it tries to focus the field (an invisible field cannot be focused, and the submit
+    // would otherwise fail silently).
+    document.addEventListener('alpine:init', function () {
+        Alpine.data('settingsTabs', function () {
+            return {
+                tabs: [
+                    { key: 'general',      label: 'General' },
+                    { key: 'display',      label: 'Display' },
+                    { key: 'comments',     label: 'Comments' },
+                    { key: 'analytics',    label: 'Search & analytics' },
+                    { key: 'housekeeping', label: 'Notifications & housekeeping' },
+                    { key: 'social',       label: 'Social' },
+                    { key: 'identity',     label: 'Identity' }
+                ],
+                tab: 'general',
+                errors: {},
+                init: function () {
+                    var self = this;
+                    var fromHash = (location.hash || '').replace('#s-', '');
+                    if (this.tabs.some(function (t) { return t.key === fromHash; })) this.tab = fromHash;
+
+                    // Count server-side validation errors per tab and open the first offending tab.
+                    var first = null;
+                    this.$refs.form.querySelectorAll('[data-tab]').forEach(function (panel) {
+                        var n = Array.from(panel.querySelectorAll('.field-validation-error, .text-destructive')).filter(function (e) { return e.textContent.trim(); }).length;
+                        if (n) { self.errors[panel.dataset.tab] = n; if (!first) first = panel; }
+                    });
+                    if (first) {
+                        this.tab = first.dataset.tab;
+                        this.$nextTick(function () {
+                            var err = first.querySelector('.field-validation-error, .text-destructive');
+                            if (err) err.scrollIntoView({ block: 'center' });
+                        });
+                    }
+
+                    // Native "required"/"min"/"max" checks: reveal the tab before the browser focuses the field.
+                    this.$refs.form.addEventListener('invalid', function (e) {
+                        var panel = e.target.closest('[data-tab]');
+                        if (panel && self.tab !== panel.dataset.tab) self.tab = panel.dataset.tab;
+                    }, true);
+
+                    window.addEventListener('hashchange', function () {
+                        var k = (location.hash || '').replace('#s-', '');
+                        if (self.tabs.some(function (t) { return t.key === k; })) self.tab = k;
+                    });
+                },
+                go: function (key) {
+                    this.tab = key;
+                    if (history.replaceState) history.replaceState(null, '', '#s-' + key);
+                    var t = document.getElementById('tab-' + key); if (t) t.focus();
+                },
+                next: function (delta) {
+                    var i = this.tabs.findIndex(function (t) { return t.key === this.tab; }.bind(this));
+                    var n = (i + delta + this.tabs.length) % this.tabs.length;
+                    this.go(this.tabs[n].key);
+                }
+            };
+        });
+    });
+</script>

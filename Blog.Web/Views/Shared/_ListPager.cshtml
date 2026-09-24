@@ -1,0 +1,44 @@
+@*
+    Pager for an admin list. Reads ListPage / ListTotalPages / ListQuery from ViewData and
+    preserves ViewData["ListSearchKeep"] values. Renders nothing for a single page.
+*@
+@{
+    var current = ViewData[Blog.Web.Models.ListPaging.PageKey] as int? ?? 1;
+    var totalPages = ViewData[Blog.Web.Models.ListPaging.TotalPagesKey] as int? ?? 1;
+    var q = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string ?? "";
+    var keep = ViewData["ListSearchKeep"] as IDictionary<string, string?> ?? new Dictionary<string, string?>();
+    string Href(int p)
+    {
+        var parts = new List<string> { $"page={p}" };
+        if (!string.IsNullOrEmpty(q)) parts.Add("q=" + Uri.EscapeDataString(q));
+        parts.AddRange(keep.Where(kv => !string.IsNullOrEmpty(kv.Value)).Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value!)}"));
+        return "?" + string.Join("&", parts);
+    }
+    // Window of page numbers around the current one so a 40-page list does not render 40 links.
+    var start = Math.Max(1, current - 2);
+    var end = Math.Min(totalPages, current + 2);
+}
+@if (totalPages > 1)
+{
+    <nav class="mt-4 flex items-center justify-between gap-3 text-sm" aria-label="Pagination">
+        <span class="text-muted-foreground">Page <span class="font-medium text-foreground">@current</span> of <span class="font-medium text-foreground">@totalPages</span></span>
+        <div class="flex items-center gap-1">
+            <a href="@Href(Math.Max(1, current - 1))" class="px-3 py-1 rounded-md border border-input bg-background hover:bg-accent @(current == 1 ? "pointer-events-none opacity-40" : "")" aria-label="Previous page">‹</a>
+            @if (start > 1)
+            {
+                <a href="@Href(1)" class="px-3 py-1 rounded-md border border-input bg-background hover:bg-accent">1</a>
+                @if (start > 2) { <span class="px-1 text-muted-foreground">…</span> }
+            }
+            @for (var i = start; i <= end; i++)
+            {
+                <a href="@Href(i)" class="px-3 py-1 rounded-md border @(i == current ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent")" aria-current="@(i == current ? "page" : null)">@i</a>
+            }
+            @if (end < totalPages)
+            {
+                @if (end < totalPages - 1) { <span class="px-1 text-muted-foreground">…</span> }
+                <a href="@Href(totalPages)" class="px-3 py-1 rounded-md border border-input bg-background hover:bg-accent">@totalPages</a>
+            }
+            <a href="@Href(Math.Min(totalPages, current + 1))" class="px-3 py-1 rounded-md border border-input bg-background hover:bg-accent @(current == totalPages ? "pointer-events-none opacity-40" : "")" aria-label="Next page">›</a>
+        </div>
+    </nav>
+}

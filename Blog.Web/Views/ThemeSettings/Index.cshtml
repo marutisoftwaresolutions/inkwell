@@ -28,20 +28,22 @@
     var currentLayout = Model.Settings.FirstOrDefault(s => s.SettingKey == "layout-index")?.EffectiveValue ?? "Neutral";
 }
 
-<div class="flex gap-6 h-[calc(100vh-8rem)]" x-data="{ showFineTune: false }">
+@* Stacked on phones (panel above the preview); side by side with a viewport-tall panel from lg. *@
+<div class="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-8rem)]" x-data="{ showFineTune: false }">
 
     @* ── LEFT: Editor Panel ──────────────────────────────────────── *@
-    <div class="w-[420px] flex-shrink-0 overflow-y-auto bg-card border border-border rounded-xl shadow-sm">
+    <div class="w-full lg:w-[420px] flex-shrink-0 lg:overflow-y-auto bg-card border border-border rounded-xl shadow-sm">
 
         @* Header *@
         <div class="p-4 flex items-center justify-between border-b border-border sticky top-0 bg-card z-10">
             <h2 class="text-base font-semibold text-foreground">Theme</h2>
             <div class="flex items-center gap-2">
                 <button type="button" @@click="showFineTune = !showFineTune"
+                        aria-controls="theme-fine-tune-panel" :aria-expanded="showFineTune ? 'true' : 'false'"
                         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
                         :class="showFineTune ? 'bg-muted text-foreground' : ''">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                    Fine-Tune
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Fine-tune
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                          class="transition-transform duration-200" :class="showFineTune ? 'rotate-180' : ''">
                         <polyline points="6 9 12 15 18 9"/>
@@ -49,7 +51,7 @@
                 </button>
                 <form asp-action="Reset" asp-controller="ThemeSettings" method="post">
                     @Html.AntiForgeryToken()
-                    <button type="submit" onclick="return confirm('Reset all theme settings to defaults?')"
+                    <button type="submit" data-confirm-title="Reset all theme settings?" data-confirm-body="Every colour, font, layout and preset choice goes back to the defaults and the public site changes immediately. Your posts and pages are not affected." data-confirm-action="Reset theme" data-confirm-tone="warning" data-confirm-typed="RESET"
                             class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                         Reset
@@ -60,7 +62,7 @@
 
         @* Layout Selector *@
         <div class="p-4 border-b border-border">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Blog Layout</p>
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Blog layout</p>
             @{
                 var layouts = new[] {
                     // Modern family
@@ -100,19 +102,19 @@
                         @foreach (var layout in familyGroup)
                         {
                             var isActiveLayout = layout.Id == currentLayout;
-                            <form method="post" asp-action="ApplyLayoutPreset" asp-controller="ThemeSettings" asp-route-presetId="@layout.Id">
+                            <form method="post" asp-action="ApplyLayoutPreset" asp-controller="ThemeSettings" asp-route-presetId="@layout.Id" data-theme-tile>
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden @(isActiveLayout ? "border-foreground shadow-md" : "border-border hover:border-foreground/40")">
-                                    @* Layout schematic thumbnail *@
-                                    <div class="h-14 relative bg-muted/60 flex items-center justify-center p-2 overflow-hidden">
+                                <button type="submit" aria-pressed="@(isActiveLayout ? "true" : "false")" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @(isActiveLayout ? "border-foreground shadow-md" : "border-border hover:border-foreground/40")">
+                                    @* Layout schematic thumbnail — marks are drawn in currentColor so they follow the colour scheme *@
+                                    <div class="h-14 relative bg-muted/60 text-foreground flex items-center justify-center p-2 overflow-hidden" aria-hidden="true">
                                         @if (layout.Id == "Feed")
                                         {
                                             @* left 75% col + right date col, 3 rows *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:4px;">
                                                 @for (int i = 0; i < 3; i++) {
                                                     <div style="display:flex;gap:3px;align-items:center;">
-                                                        <div style="flex:3;height:7px;background:rgba(26,26,26,.22);border-radius:1px;"></div>
-                                                        <div style="flex:1;height:5px;background:rgba(26,26,26,.12);border-radius:1px;"></div>
+                                                        <div style="flex:3;height:7px;background:color-mix(in srgb, currentColor 22%, transparent);border-radius:1px;"></div>
+                                                        <div style="flex:1;height:5px;background:color-mix(in srgb, currentColor 12%, transparent);border-radius:1px;"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -122,7 +124,7 @@
                                             @* 3×2 rectangle grid *@
                                             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:60px;">
                                                 @for (int i = 0; i < 6; i++) {
-                                                    <div style="height:13px;background:rgba(26,26,26,.18);border-radius:2px;"></div>
+                                                    <div style="height:13px;background:color-mix(in srgb, currentColor 18%, transparent);border-radius:2px;"></div>
                                                 }
                                             </div>
                                         }
@@ -130,22 +132,22 @@
                                         {
                                             @* single narrow centered column *@
                                             <div style="width:40px;display:flex;flex-direction:column;gap:4px;align-items:center;">
-                                                <div style="height:3px;width:90%;background:rgba(26,26,26,.4);border-radius:1px;"></div>
-                                                <div style="height:2px;width:80%;background:rgba(26,26,26,.2);border-radius:1px;"></div>
-                                                <div style="height:2px;width:95%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                                <div style="height:2px;width:85%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                                <div style="height:2px;width:90%;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                <div style="height:3px;width:90%;background:color-mix(in srgb, currentColor 40%, transparent);border-radius:1px;"></div>
+                                                <div style="height:2px;width:80%;background:color-mix(in srgb, currentColor 20%, transparent);border-radius:1px;"></div>
+                                                <div style="height:2px;width:95%;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
+                                                <div style="height:2px;width:85%;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
+                                                <div style="height:2px;width:90%;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
                                             </div>
                                         }
                                         else if (layout.Id == "Showcase")
                                         {
                                             @* tall hero + 3 equal cards *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
-                                                <div style="height:18px;background:rgba(26,26,26,.28);border-radius:2px;"></div>
+                                                <div style="height:18px;background:color-mix(in srgb, currentColor 28%, transparent);border-radius:2px;"></div>
                                                 <div style="display:flex;gap:2px;">
-                                                    <div style="flex:1;height:10px;background:rgba(26,26,26,.14);border-radius:1px;"></div>
-                                                    <div style="flex:1;height:10px;background:rgba(26,26,26,.14);border-radius:1px;"></div>
-                                                    <div style="flex:1;height:10px;background:rgba(26,26,26,.14);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:10px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:10px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:10px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;"></div>
                                                 </div>
                                             </div>
                                         }
@@ -153,21 +155,21 @@
                                         {
                                             @* mosaic: 1 wide+tall, 2 medium, 3 small *@
                                             <div style="width:64px;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:18px 10px;gap:2px;">
-                                                <div style="grid-column:1/4;grid-row:1;background:rgba(26,26,26,.3);border-radius:1px;"></div>
-                                                <div style="grid-column:1/3;grid-row:2;background:rgba(26,26,26,.18);border-radius:1px;"></div>
-                                                <div style="grid-column:3;grid-row:2;background:rgba(26,26,26,.12);border-radius:1px;"></div>
+                                                <div style="grid-column:1/4;grid-row:1;background:color-mix(in srgb, currentColor 30%, transparent);border-radius:1px;"></div>
+                                                <div style="grid-column:1/3;grid-row:2;background:color-mix(in srgb, currentColor 18%, transparent);border-radius:1px;"></div>
+                                                <div style="grid-column:3;grid-row:2;background:color-mix(in srgb, currentColor 12%, transparent);border-radius:1px;"></div>
                                             </div>
                                         }
                                         else if (layout.Id == "Timeline")
                                         {
                                             @* vertical line + entries *@
                                             <div style="display:flex;gap:5px;width:60px;height:40px;">
-                                                <div style="width:1px;background:rgba(26,26,26,.25);flex-shrink:0;margin:0 4px;"></div>
+                                                <div style="width:1px;background:color-mix(in srgb, currentColor 25%, transparent);flex-shrink:0;margin:0 4px;"></div>
                                                 <div style="flex:1;display:flex;flex-direction:column;gap:5px;justify-content:center;">
-                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.2);border-radius:1px;width:80%;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.2);border-radius:1px;width:70%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 35%, transparent);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 20%, transparent);border-radius:1px;width:80%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 35%, transparent);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 20%, transparent);border-radius:1px;width:70%;"></div>
                                                 </div>
                                             </div>
                                         }
@@ -177,8 +179,8 @@
                                             <div style="width:60px;display:flex;flex-direction:column;gap:4px;">
                                                 @for (int i = 0; i < 3; i++) {
                                                     <div style="display:flex;gap:3px;align-items:center;">
-                                                        <div style="width:7px;height:7px;border-radius:50%;background:rgba(26,26,26,.25);flex-shrink:0;"></div>
-                                                        <div style="flex:1;height:6px;background:rgba(26,26,26,.15);border-radius:8px;"></div>
+                                                        <div style="width:7px;height:7px;border-radius:50%;background:color-mix(in srgb, currentColor 25%, transparent);flex-shrink:0;"></div>
+                                                        <div style="flex:1;height:6px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:8px;"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -187,9 +189,9 @@
                                         {
                                             @* subscribe banner + 3 list rows *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
-                                                <div style="height:10px;background:rgba(26,26,26,.28);border-radius:1px;width:100%;"></div>
+                                                <div style="height:10px;background:color-mix(in srgb, currentColor 28%, transparent);border-radius:1px;width:100%;"></div>
                                                 @for (int i = 0; i < 3; i++) {
-                                                    <div style="height:6px;background:rgba(26,26,26,.12);border-radius:1px;width:100%;"></div>
+                                                    <div style="height:6px;background:color-mix(in srgb, currentColor 12%, transparent);border-radius:1px;width:100%;"></div>
                                                 }
                                             </div>
                                         }
@@ -197,12 +199,12 @@
                                         {
                                             @* masthead + hero + 3 small *@
                                             <div style="width:68px;display:flex;flex-direction:column;gap:2px;">
-                                                <div style="height:4px;background:rgba(26,26,26,.4);border-radius:1px;width:100%;"></div>
-                                                <div style="height:14px;background:rgba(26,26,26,.25);border-radius:1px;width:100%;"></div>
+                                                <div style="height:4px;background:color-mix(in srgb, currentColor 40%, transparent);border-radius:1px;width:100%;"></div>
+                                                <div style="height:14px;background:color-mix(in srgb, currentColor 25%, transparent);border-radius:1px;width:100%;"></div>
                                                 <div style="display:flex;gap:2px;">
-                                                    <div style="flex:1;height:9px;background:rgba(26,26,26,.13);border-radius:1px;"></div>
-                                                    <div style="flex:1;height:9px;background:rgba(26,26,26,.13);border-radius:1px;"></div>
-                                                    <div style="flex:1;height:9px;background:rgba(26,26,26,.13);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:9px;background:color-mix(in srgb, currentColor 13%, transparent);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:9px;background:color-mix(in srgb, currentColor 13%, transparent);border-radius:1px;"></div>
+                                                    <div style="flex:1;height:9px;background:color-mix(in srgb, currentColor 13%, transparent);border-radius:1px;"></div>
                                                 </div>
                                             </div>
                                         }
@@ -211,24 +213,24 @@
                                             @* 2/3 content + 1/3 sidebar *@
                                             <div style="display:flex;gap:4px;width:64px;height:38px;">
                                                 <div style="flex:2;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
-                                                    <div style="height:3px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;width:85%;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                    <div style="height:3px;background:color-mix(in srgb, currentColor 35%, transparent);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;width:85%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
                                                 </div>
-                                                <div style="width:14px;background:rgba(26,26,26,.1);border-radius:2px;border:1px solid rgba(26,26,26,.15);"></div>
+                                                <div style="width:14px;background:color-mix(in srgb, currentColor 10%, transparent);border-radius:2px;border:1px solid color-mix(in srgb, currentColor 15%, transparent);"></div>
                                             </div>
                                         }
                                         else if (layout.Id == "Notebook")
                                         {
                                             @* Notebook: two columns with marginalia marks *@
                                             <div style="display:flex;gap:4px;width:60px;height:40px;">
-                                                <div style="width:14px;background:rgba(26,26,26,.12);border-radius:2px;border:1px dashed rgba(26,26,26,.25);"></div>
+                                                <div style="width:14px;background:color-mix(in srgb, currentColor 12%, transparent);border-radius:2px;border:1px dashed color-mix(in srgb, currentColor 25%, transparent);"></div>
                                                 <div style="flex:1;display:flex;flex-direction:column;gap:3px;padding-top:2px;">
-                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:80%;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.35);border-radius:1px;margin-top:2px;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.18);border-radius:1px;width:70%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 35%, transparent);border-radius:1px;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 18%, transparent);border-radius:1px;width:80%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 35%, transparent);border-radius:1px;margin-top:2px;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 18%, transparent);border-radius:1px;width:70%;"></div>
                                                 </div>
                                             </div>
                                         }
@@ -236,9 +238,9 @@
                                         {
                                             @* Studio: image cover tiles *@
                                             <div style="width:64px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:16px 10px;gap:2px;">
-                                                <div style="grid-column:1/3;background:rgba(26,26,26,.28);border-radius:1px;"></div>
-                                                <div style="background:rgba(26,26,26,.16);border-radius:1px;"></div>
-                                                <div style="background:rgba(26,26,26,.12);border-radius:1px;"></div>
+                                                <div style="grid-column:1/3;background:color-mix(in srgb, currentColor 28%, transparent);border-radius:1px;"></div>
+                                                <div style="background:color-mix(in srgb, currentColor 16%, transparent);border-radius:1px;"></div>
+                                                <div style="background:color-mix(in srgb, currentColor 12%, transparent);border-radius:1px;"></div>
                                             </div>
                                         }
                                         else if (layout.Id == "Broadsheet")
@@ -247,10 +249,10 @@
                                             <div style="display:flex;gap:3px;width:62px;height:38px;">
                                                 @for (int i = 0; i < 3; i++) {
                                                     <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding-top:2px;">
-                                                        <div style="height:2px;background:rgba(26,26,26,.3);border-radius:1px;"></div>
-                                                        <div style="height:1.5px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
-                                                        <div style="height:1.5px;background:rgba(26,26,26,.15);border-radius:1px;width:80%;"></div>
-                                                        <div style="height:1.5px;background:rgba(26,26,26,.15);border-radius:1px;"></div>
+                                                        <div style="height:2px;background:color-mix(in srgb, currentColor 30%, transparent);border-radius:1px;"></div>
+                                                        <div style="height:1.5px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
+                                                        <div style="height:1.5px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;width:80%;"></div>
+                                                        <div style="height:1.5px;background:color-mix(in srgb, currentColor 15%, transparent);border-radius:1px;"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -261,8 +263,8 @@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:4px;">
                                                 @for (int i = 0; i < 3; i++) {
                                                     <div style="display:flex;align-items:center;gap:3px;">
-                                                        <div style="width:10px;height:2px;background:rgba(26,26,26,.35);border-radius:1px;flex-shrink:0;"></div>
-                                                        <div style="flex:1;height:1px;background:rgba(26,26,26,.2);border-style:dotted;"></div>
+                                                        <div style="width:10px;height:2px;background:color-mix(in srgb, currentColor 35%, transparent);border-radius:1px;flex-shrink:0;"></div>
+                                                        <div style="flex:1;height:1px;background:color-mix(in srgb, currentColor 20%, transparent);border-style:dotted;"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -272,8 +274,8 @@
                                             @* Neutral: simple stacked list, full-width title rows *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:5px;">
                                                 @for (int i = 0; i < 3; i++) {
-                                                    <div style="height:2px;background:rgba(26,26,26,.25);border-radius:1px;width:100%;"></div>
-                                                    <div style="height:2px;background:rgba(26,26,26,.12);border-radius:1px;width:75%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 25%, transparent);border-radius:1px;width:100%;"></div>
+                                                    <div style="height:2px;background:color-mix(in srgb, currentColor 12%, transparent);border-radius:1px;width:75%;"></div>
                                                 }
                                             </div>
                                         }
@@ -283,11 +285,11 @@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:4px;">
                                                 @for (int i = 0; i < 2; i++) {
                                                     <div style="display:flex;gap:3px;align-items:center;">
-                                                        <div style="width:18px;height:14px;background:rgba(26,26,26,.22);border-radius:2px;flex-shrink:0;"></div>
+                                                        <div style="width:18px;height:14px;background:color-mix(in srgb, currentColor 22%, transparent);border-radius:2px;flex-shrink:0;"></div>
                                                         <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
-                                                            <div style="height:2px;background:rgba(26,26,26,.3);border-radius:1px;"></div>
-                                                            <div style="height:2px;background:rgba(26,26,26,.14);border-radius:1px;width:80%;"></div>
-                                                            <div style="height:2px;background:rgba(26,26,26,.14);border-radius:1px;width:60%;"></div>
+                                                            <div style="height:2px;background:color-mix(in srgb, currentColor 30%, transparent);border-radius:1px;"></div>
+                                                            <div style="height:2px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;width:80%;"></div>
+                                                            <div style="height:2px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;width:60%;"></div>
                                                         </div>
                                                     </div>
                                                 }
@@ -298,8 +300,8 @@
                                             @* Minimal: hairline separator, title only rows *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:0;">
                                                 @for (int i = 0; i < 3; i++) {
-                                                    <div style="padding:3px 0;border-bottom:1px solid rgba(26,26,26,.15);">
-                                                        <div style="height:2px;background:rgba(26,26,26,.28);border-radius:1px;width:90%;"></div>
+                                                    <div style="padding:3px 0;border-bottom:1px solid color-mix(in srgb, currentColor 15%, transparent);">
+                                                        <div style="height:2px;background:color-mix(in srgb, currentColor 28%, transparent);border-radius:1px;width:90%;"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -309,8 +311,8 @@
                                             @* Modern: 2-col bold card grid with accent bar *@
                                             <div style="width:64px;display:grid;grid-template-columns:1fr 1fr;gap:3px;">
                                                 @for (int i = 0; i < 4; i++) {
-                                                    <div style="height:16px;background:rgba(26,26,26,.18);border-radius:2px;position:relative;overflow:hidden;">
-                                                        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(26,26,26,.35);"></div>
+                                                    <div style="height:16px;background:color-mix(in srgb, currentColor 18%, transparent);border-radius:2px;position:relative;overflow:hidden;">
+                                                        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:color-mix(in srgb, currentColor 35%, transparent);"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -320,13 +322,13 @@
                                             @* Verdict: ranked rows with score pills *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
                                                 @for (int i = 0; i < 3; i++) {
-                                                    <div style="display:flex;align-items:center;gap:3px;padding:2px 3px;border:1px solid rgba(26,26,26,.15);border-radius:2px;background:rgba(26,26,26,.03);">
-                                                        <div style="width:5px;height:5px;border-radius:1px;background:rgba(26,26,26,.35);flex:none;"></div>
+                                                    <div style="display:flex;align-items:center;gap:3px;padding:2px 3px;border:1px solid color-mix(in srgb, currentColor 15%, transparent);border-radius:2px;background:color-mix(in srgb, currentColor 3%, transparent);">
+                                                        <div style="width:5px;height:5px;border-radius:1px;background:color-mix(in srgb, currentColor 35%, transparent);flex:none;"></div>
                                                         <div style="flex:1;display:flex;flex-direction:column;gap:1.5px;">
-                                                            <div style="height:2px;background:rgba(26,26,26,.30);border-radius:1px;width:@(90 - i * 12)%;"></div>
-                                                            <div style="height:1.5px;background:rgba(26,26,26,.14);border-radius:1px;width:55%;"></div>
+                                                            <div style="height:2px;background:color-mix(in srgb, currentColor 30%, transparent);border-radius:1px;width:@(90 - i * 12)%;"></div>
+                                                            <div style="height:1.5px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;width:55%;"></div>
                                                         </div>
-                                                        <div style="width:10px;height:5px;border-radius:999px;background:rgba(29,78,216,.55);flex:none;"></div>
+                                                        <div style="width:10px;height:5px;border-radius:999px;background:color-mix(in srgb, var(--primary) 55%, transparent);flex:none;"></div>
                                                     </div>
                                                 }
                                             </div>
@@ -336,11 +338,11 @@
                                             @* Catalog: single-column boxed cards, thumbnail-left *@
                                             <div style="width:64px;display:flex;flex-direction:column;gap:3px;">
                                                 @for (int i = 0; i < 3; i++) {
-                                                    <div style="display:flex;align-items:stretch;gap:3px;padding:2px;border:1px solid rgba(26,26,26,.15);border-radius:2px;background:rgba(26,26,26,.03);">
-                                                        <div style="width:12px;height:12px;background:rgba(26,26,26,.30);border-radius:1px;flex:none;"></div>
+                                                    <div style="display:flex;align-items:stretch;gap:3px;padding:2px;border:1px solid color-mix(in srgb, currentColor 15%, transparent);border-radius:2px;background:color-mix(in srgb, currentColor 3%, transparent);">
+                                                        <div style="width:12px;height:12px;background:color-mix(in srgb, currentColor 30%, transparent);border-radius:1px;flex:none;"></div>
                                                         <div style="flex:1;display:flex;flex-direction:column;gap:2px;justify-content:center;">
-                                                            <div style="height:2px;background:rgba(26,26,26,.30);border-radius:1px;width:80%;"></div>
-                                                            <div style="height:1.5px;background:rgba(26,26,26,.14);border-radius:1px;width:60%;"></div>
+                                                            <div style="height:2px;background:color-mix(in srgb, currentColor 30%, transparent);border-radius:1px;width:80%;"></div>
+                                                            <div style="height:1.5px;background:color-mix(in srgb, currentColor 14%, transparent);border-radius:1px;width:60%;"></div>
                                                         </div>
                                                     </div>
                                                 }
@@ -367,10 +369,9 @@
             }
         </div>
 
-        @* Inkwell Color Presets *@
+        @* Inkwell colour presets — the Inkwell token namespace (--bg/--fg/--surface) read by every layout
+           except the five Tailwind-token layouts (Neutral, Classic, Minimal, Modern, Grid). *@
         <div class="p-4 border-b border-border">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Inkwell Color Preset</p>
-            <p class="text-[10px] text-muted-foreground mb-3">Applies to Magazine layout &amp; front-end — Active: <strong>@(Model.Settings.FirstOrDefault(s => s.SettingKey == "inkwell-preset")?.EffectiveValue ?? "cream")</strong></p>
             @{
                 var currentInkwellPreset = Model.Settings.FirstOrDefault(s => s.SettingKey == "inkwell-preset")?.EffectiveValue ?? "cream";
                 var inkwellPresets = new[]
@@ -392,19 +393,22 @@
                     new { Id = "ink",         Name = "Ink",         Bg = "#16140F", Fg = "#F4EFE6", Accent = "#E8B27A", Surface = "#1E1B16" },
                     new { Id = "onyx",        Name = "Onyx",        Bg = "#0A0A0C", Fg = "#FAFAFA", Accent = "#FCD9A8", Surface = "#14141A" },
                 };
+                var currentInkwellPresetName = inkwellPresets.FirstOrDefault(p => p.Id == currentInkwellPreset)?.Name ?? currentInkwellPreset;
             }
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Colour preset — Editorial, Review and Modern layouts</p>
+            <p class="text-[10px] text-muted-foreground mb-3">Governs Magazine, Journal, Notebook, Studio, Broadsheet, Almanac, Verdict, Feed, Reader, Showcase, Bento, Timeline, Stream, Newsletter and Catalog. Active: <strong>@currentInkwellPresetName</strong></p>
             <div class="grid grid-cols-3 gap-2">
                 @foreach (var ip in inkwellPresets)
                 {
                     var isActiveIp = ip.Id == currentInkwellPreset;
-                    <form method="post" asp-action="ApplyInkwellPreset" asp-controller="ThemeSettings" asp-route-presetName="@ip.Id">
+                    <form method="post" asp-action="ApplyInkwellPreset" asp-controller="ThemeSettings" asp-route-presetName="@ip.Id" data-theme-tile>
                         @Html.AntiForgeryToken()
-                        <button type="submit"
-                                style="width:100%;border-radius:6px;overflow:hidden;border:2px solid @(isActiveIp ? "#1A1A1A" : "rgba(0,0,0,0.14)");box-shadow:@(isActiveIp ? "0 0 0 2px rgba(26,26,26,0.25)" : "none");transition:border-color .15s,box-shadow .15s;cursor:pointer;padding:0;background:none;">
-                            @* mini mockup *@
-                            <div style="height:44px;background:@ip.Bg;display:flex;align-items:stretch;padding:6px 7px 5px;gap:5px;border-bottom:1px solid rgba(0,0,0,0.08);">
+                        <button type="submit" aria-pressed="@(isActiveIp ? "true" : "false")"
+                                class="theme-preset-tile @(isActiveIp ? "is-active" : "")">
+                            @* mini mockup — drawn in the preset's own colours on purpose; hairlines derive from its foreground so dark presets still read *@
+                            <div style="height:44px;background:@ip.Bg;display:flex;align-items:stretch;padding:6px 7px 5px;gap:5px;border-bottom:1px solid color-mix(in srgb, @ip.Fg 8%, transparent);">
                                 @* sidebar *@
-                                <div style="width:10px;background:@ip.Surface;border-radius:1px;border:1px solid rgba(0,0,0,0.07);flex-shrink:0;"></div>
+                                <div style="width:10px;background:@ip.Surface;border-radius:1px;border:1px solid color-mix(in srgb, @ip.Fg 7%, transparent);flex-shrink:0;"></div>
                                 @* content lines *@
                                 <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:3px;">
                                     <div style="height:3px;background:@ip.Fg;opacity:0.65;border-radius:1px;"></div>
@@ -415,7 +419,7 @@
                                 <div style="width:6px;height:6px;border-radius:50%;background:@ip.Accent;margin-top:2px;flex-shrink:0;"></div>
                             </div>
                             @* label row *@
-                            <div style="background:@ip.Surface;padding:3px 7px 4px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(0,0,0,0.06);">
+                            <div style="background:@ip.Surface;padding:3px 7px 4px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid color-mix(in srgb, @ip.Fg 6%, transparent);">
                                 <span style="font-size:9px;font-weight:600;color:@ip.Fg;font-family:'Geist',sans-serif;letter-spacing:0.02em;">@ip.Name</span>
                                 @if (isActiveIp)
                                 {
@@ -428,16 +432,18 @@
             </div>
         </div>
 
-        @* Legacy Color Presets (Neutral / Grid / Classic / Minimal / Modern layouts) *@
+        @* Classic colour presets — the Tailwind token namespace (--background/--primary/…) emitted from the
+           "colors" setting group and read by Neutral, Classic, Minimal, Modern and Grid. *@
         <div class="p-4">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Color Presets</p>
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Colour preset — Classic layouts</p>
+            <p class="text-[10px] text-muted-foreground mb-3">Governs Neutral, Classic, Minimal, Modern and Grid. Fine-tune below adjusts these colours individually.</p>
             <div class="grid grid-cols-2 gap-3">
                 @foreach (var preset in presets)
                 {
                     var isActive = preset.Id == activePresetId;
-                    <form method="post" asp-action="ApplyPreset" asp-route-presetId="@preset.Id">
+                    <form method="post" asp-action="ApplyPreset" asp-route-presetId="@preset.Id" data-theme-tile>
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden hover:shadow-md @(isActive ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-border hover:border-primary/50")">
+                        <button type="submit" aria-pressed="@(isActive ? "true" : "false")" class="w-full text-left rounded-lg border-2 transition-all duration-200 overflow-hidden hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @(isActive ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-border hover:border-primary/50")">
                             <div class="h-16 relative" style="background: @preset.Background;">
                                 <div class="absolute bottom-0 left-0 right-0 h-1.5" style="background: @preset.Primary;"></div>
                                 <div class="p-2 flex flex-col justify-between h-full">
@@ -468,25 +474,28 @@
         </div>
 
         @* Fine-Tune Panel (collapsible) *@
-        <div x-show="showFineTune" style="display:none;" class="border-t border-border">
-            <form asp-action="Update" asp-controller="ThemeSettings" method="post" class="p-4 space-y-5">
+        <div x-show="showFineTune" style="display:none;" class="border-t border-border" id="theme-fine-tune-panel">
+            @* Tracked: the desk guard shows the pill and asks before leaving; tile forms ask before discarding (script below). *@
+            <form asp-action="Update" asp-controller="ThemeSettings" method="post" class="p-4 space-y-5" id="theme-fine-tune" data-track-changes>
                 @Html.AntiForgeryToken()
 
                 @* Colors *@
                 <div class="space-y-3">
                     <div class="flex items-center gap-2 pb-2 border-b border-border">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.63 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.17-4.49-9-10-9z"/></svg>
-                        <h3 class="text-xs font-semibold text-foreground uppercase tracking-wider">Colors</h3>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground" aria-hidden="true"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.63 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.17-4.49-9-10-9z"/></svg>
+                        <h3 class="text-xs font-semibold text-foreground uppercase tracking-wider">Colours</h3>
+                        <span class="ml-auto" data-dirty-indicator hidden>Unsaved changes</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         @foreach (var setting in Model.Settings.Where(s => s.SettingGroup == "colors"))
                         {
+                            var colorId = "color-" + setting.SettingKey;
                             <div class="flex items-center gap-2 p-2 rounded-md bg-muted/30 border border-border/50">
-                                <input type="color" name="settings[@setting.SettingKey]" value="@setting.EffectiveValue"
+                                <input type="color" id="@colorId" name="settings[@setting.SettingKey]" value="@setting.EffectiveValue"
                                        data-key="@setting.SettingKey"
                                        class="theme-color-input w-8 h-8 rounded border border-input cursor-pointer p-0.5 bg-background flex-shrink-0" />
                                 <div class="min-w-0">
-                                    <p class="text-xs font-medium text-foreground truncate">@setting.Label</p>
+                                    <label for="@colorId" class="block text-xs font-medium text-foreground truncate cursor-pointer">@setting.Label</label>
                                     <p class="text-[10px] text-muted-foreground font-mono">@setting.EffectiveValue</p>
                                 </div>
                             </div>
@@ -502,32 +511,44 @@
                     </div>
                     @foreach (var setting in Model.Settings.Where(s => s.SettingGroup == "typography"))
                     {
+                        var fontId = "font-" + setting.SettingKey;
                         <div class="space-y-1">
-                            <label class="text-xs font-medium text-foreground">@setting.Label</label>
-                            <div x-data="fontSelector('@setting.EffectiveValue.Replace("'", "\\'")', '@setting.SettingKey')" class="relative" @@click.away="isOpen = false">
-                                <div @@click="isOpen = !isOpen" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs cursor-pointer select-none hover:bg-muted/30 transition-colors">
+                            <label for="@(fontId)-trigger" class="text-xs font-medium text-foreground">@setting.Label</label>
+                            @* Button + listbox: the trigger is focusable and announces the popup; the list is driven by
+                               ArrowUp/Down, Enter and Escape from the search box via aria-activedescendant. *@
+                            <div x-data="fontSelector('@setting.EffectiveValue.Replace("'", "\\'")', '@setting.SettingKey', '@fontId')" class="relative" @@click.away="close(false)">
+                                <button type="button" id="@(fontId)-trigger" x-ref="trigger"
+                                        aria-haspopup="listbox" aria-controls="@(fontId)-listbox" :aria-expanded="isOpen ? 'true' : 'false'"
+                                        @@click="toggle()" @@keydown.arrow-down.prevent="openList()" @@keydown.arrow-up.prevent="openList()"
+                                        class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs text-left cursor-pointer select-none hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <span x-text="selectedFont"></span>
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground"><path d="M6 9l6 6 6-6"/></svg>
-                                </div>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
                                 <input type="hidden" name="settings[@setting.SettingKey]" x-model="selectedFont" data-key="@setting.SettingKey" class="theme-font-input" />
-                                
-                                <div x-show="isOpen" style="display: none;" class="absolute z-[100] mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg top-full left-0">
+
+                                <div x-show="isOpen" style="display: none;" class="absolute z-[100] mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg top-full left-0"
+                                     @@keydown.arrow-down.prevent="move(1)" @@keydown.arrow-up.prevent="move(-1)"
+                                     @@keydown.enter.prevent="choose()" @@keydown.escape.prevent.stop="close(true)" @@keydown.tab="close(false)">
                                     <div class="p-2 border-b border-border bg-popover rounded-t-md sticky top-0 z-10">
                                         <div class="relative">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="absolute left-2.5 top-2.5 text-muted-foreground"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                            <input type="text" x-model="searchQuery" placeholder="Search Google Fonts..." class="w-full h-8 rounded-sm bg-background border border-input pl-8 pr-2 text-xs outline-none focus:ring-1 focus:ring-ring" @@keydown.stop />
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="absolute left-2.5 top-2.5 text-muted-foreground" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                            <label for="@(fontId)-search" class="sr-only">Search fonts</label>
+                                            <input type="text" id="@(fontId)-search" x-ref="search" x-model="searchQuery" placeholder="Search fonts" autocomplete="off"
+                                                   aria-controls="@(fontId)-listbox" :aria-activedescendant="activeId()"
+                                                   class="w-full h-8 rounded-sm bg-background border border-input pl-8 pr-2 text-xs outline-none focus:ring-1 focus:ring-ring" />
                                         </div>
                                     </div>
-                                    <div class="max-h-[220px] overflow-y-auto p-1 bg-popover rounded-b-md" @@scroll="handleScroll($event.target)">
+                                    <div id="@(fontId)-listbox" role="listbox" aria-label="@setting.Label" class="max-h-[220px] overflow-y-auto p-1 bg-popover rounded-b-md" @@scroll="handleScroll($event.target)">
                                         <template x-if="loading">
                                             <div class="p-4 flex justify-center items-center">
                                                 <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                                             </div>
                                         </template>
-                                        <template x-for="font in filteredFonts" :key="font.family">
-                                            <div @@click="selectFont(font.family)" 
-                                                 class="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-xs outline-none hover:bg-accent hover:text-accent-foreground transition-colors"
-                                                 :class="font.family === selectedFont ? 'bg-primary/10 text-primary font-semibold' : ''">
+                                        <template x-for="(font, index) in filteredFonts" :key="font.family">
+                                            <div role="option" :id="optionId(index)" :aria-selected="font.family === selectedFont ? 'true' : 'false'"
+                                                 @@click="selectFont(font.family)" @@mousemove="activeIndex = index"
+                                                 class="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-xs outline-none transition-colors"
+                                                 :class="{ 'bg-accent text-accent-foreground': activeIndex === index, 'text-primary font-semibold': font.family === selectedFont }">
                                                 <span x-text="font.family" :style="`font-family: '${font.family}', sans-serif;`"></span>
                                             </div>
                                         </template>
@@ -542,8 +563,8 @@
                 </div>
 
                 <button type="submit" class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 shadow-sm transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    Save Custom Theme
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save custom theme
                 </button>
             </form>
         </div>
@@ -553,12 +574,13 @@
     <div class="flex-1 min-w-0 bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
             <div class="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                <span class="text-sm font-medium text-foreground">Live Preview</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                <span class="text-sm font-medium text-foreground">Live preview</span>
             </div>
         </div>
         <div class="flex-1 bg-muted/20 relative">
-            <iframe id="preview-iframe" src="/" class="w-full h-full border-0" style="transform-origin: top left;"></iframe>
+            @* On phones the panel has no fixed height, so the iframe keeps a viewport-relative minimum instead of collapsing. *@
+            <iframe id="preview-iframe" src="/" title="Live preview of the home page" class="w-full h-full min-h-[60vh] lg:min-h-0 border-0" style="transform-origin: top left;"></iframe>
         </div>
     </div>
 </div>
@@ -629,20 +651,60 @@
             });
         });
 
-        // Alpine.js Font Selector Component
+        // ── Preset tiles vs. unsaved fine-tune edits ──
+        // Every tile is its own POST, so clicking one while the fine-tune form is dirty would silently
+        // throw the edits away. Ask first (shared dialog), then submit for real.
+        (function () {
+            const fineTune = document.getElementById('theme-fine-tune');
+            if (!fineTune) return;
+
+            // The desk guard (inkwell-desk.js) keeps the beforeunload prompt armed while the form is dirty.
+            // Once the user has chosen to discard, tell it the edits are being dropped on purpose: a
+            // non-bubbling submit event reaches only the form's own tracker (which clears dirty and marks
+            // it submitted) and never the document-level busy/dialog handlers. Nothing is posted.
+            function disarmUnsavedGuard() {
+                fineTune.reset();
+                fineTune.dispatchEvent(new Event('submit', { bubbles: false, cancelable: true }));
+            }
+
+            document.querySelectorAll('form[data-theme-tile]').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    if (form.dataset.discardConfirmed === '1') { delete form.dataset.discardConfirmed; return; }
+                    if (!window.InkwellDesk || !window.InkwellDialog || !InkwellDesk.isDirty()) return;
+                    e.preventDefault();
+                    const submitter = e.submitter;
+                    InkwellDialog.confirm({
+                        title: 'Apply this preset?',
+                        body: 'Your unsaved colour and font edits will be discarded.',
+                        action: 'Apply preset',
+                        cancel: 'Keep editing',
+                        tone: 'warning'
+                    }).then(ok => {
+                        if (!ok) return;
+                        disarmUnsavedGuard();
+                        form.dataset.discardConfirmed = '1';
+                        if (typeof form.requestSubmit === 'function') form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);
+                        else form.submit();
+                    });
+                }, true);
+            });
+        })();
+
+        // Alpine.js Font Selector Component (self-hosted families only — see /fonts/fonts.css)
         document.addEventListener('alpine:init', () => {
-            window.googleFontsList = null;
-            window.fetchingFonts = null;
-            
-            Alpine.data('fontSelector', (initialValue, key) => ({
+            window.inkwellFontList = null;
+
+            Alpine.data('fontSelector', (initialValue, key, idBase) => ({
                 selectedFont: initialValue,
                 key: key,
+                idBase: idBase,
                 isOpen: false,
                 searchQuery: '',
                 fonts: [],
                 loading: false,
                 limit: 50,
-                
+                activeIndex: -1,
+
                 async init() {
                     // Provide a quick initial generic set of popular fonts for instant render
                     this.fonts = [
@@ -657,7 +719,7 @@
                     }
                     
                     this.$watch('isOpen', async (val) => {
-                        if (val && (!window.googleFontsList || this.fonts.length < 100)) {
+                        if (val && (!window.inkwellFontList || this.fonts.length < 100)) {
                             this.loadFonts();
                         }
                     });
@@ -671,12 +733,55 @@
                     
                     this.$watch('searchQuery', () => {
                         this.limit = 50;
+                        this.activeIndex = this.filteredFonts.length ? 0 : -1;
                     });
                 },
-                
+
+                // ── Keyboard / ARIA ──
+                toggle() { this.isOpen ? this.close(false) : this.openList(); },
+
+                openList() {
+                    this.isOpen = true;
+                    const i = this.filteredFonts.findIndex(f => f.family === this.selectedFont);
+                    this.activeIndex = i >= 0 ? i : (this.filteredFonts.length ? 0 : -1);
+                    this.$nextTick(() => {
+                        if (this.$refs.search) this.$refs.search.focus();
+                        this.scrollActiveIntoView();
+                    });
+                },
+
+                close(refocus) {
+                    if (!this.isOpen) return;
+                    this.isOpen = false;
+                    this.searchQuery = '';
+                    if (refocus && this.$refs.trigger) this.$refs.trigger.focus();
+                },
+
+                move(delta) {
+                    const n = this.filteredFonts.length;
+                    if (!n) return;
+                    this.activeIndex = (this.activeIndex + delta + n) % n;
+                    this.scrollActiveIntoView();
+                },
+
+                choose() {
+                    const f = this.filteredFonts[this.activeIndex];
+                    if (f) this.selectFont(f.family);
+                },
+
+                optionId(i) { return this.idBase + '-opt-' + i; },
+                activeId() { return this.activeIndex >= 0 ? this.optionId(this.activeIndex) : null; },
+
+                scrollActiveIntoView() {
+                    const id = this.activeId();
+                    if (!id) return;
+                    const el = document.getElementById(id);
+                    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+                },
+
                 async loadFonts() {
                     // Self-hosted font list — all fonts available in /fonts/fonts.css
-                    window.googleFontsList = [
+                    window.inkwellFontList = [
                         { family: 'Source Serif 4' }, { family: 'Geist' }, { family: 'Geist Mono' },
                         { family: 'Inter' }, { family: 'Alexandria' },
                         { family: 'Roboto' }, { family: 'Open Sans' }, { family: 'Montserrat' },
@@ -684,7 +789,7 @@
                         { family: 'Playfair Display' }, { family: 'Lora' }, { family: 'Libre Baskerville' },
                         { family: 'Oswald' }, { family: 'Raleway' }, { family: 'Poppins' }
                     ];
-                    this.fonts = window.googleFontsList;
+                    this.fonts = window.inkwellFontList;
                     if (!this.fonts.find(f => f.family === this.selectedFont)) {
                         this.fonts.unshift({ family: this.selectedFont });
                     }
@@ -707,8 +812,7 @@
                 
                 selectFont(family) {
                     this.selectedFont = family;
-                    this.isOpen = false;
-                    this.searchQuery = '';
+                    this.close(true);
                 }
             }));
         });

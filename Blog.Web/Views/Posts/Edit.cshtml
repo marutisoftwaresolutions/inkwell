@@ -6,7 +6,7 @@
 }
 
 <div class="h-[calc(100vh-8rem)] flex flex-col">
-    <form method="post" action="@formAction" id="postForm" class="flex-1 flex flex-col h-full">
+    <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" value="@Model.Html" />
         <input type="hidden" name="Plaintext" id="postPlaintext" value="@Model.Plaintext" />
@@ -18,7 +18,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                     Back
                 </a>
-                <span id="autosaveStatus" class="text-xs text-muted-foreground"></span>
+                <span id="autosaveStatus" class="text-xs text-muted-foreground"></span> <span data-dirty-indicator hidden>Unsaved changes</span>
             </div>
             <div class="flex items-center gap-2">
                 <button type="submit" name="submitAction" value="draft" class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">
@@ -27,7 +27,7 @@
                 <button type="button" id="publishBtn" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">
                     @(Model.Status == Blog.Core.Domain.PostStatus.Published ? "Update" : "Publish")
                 </button>
-                <button type="button" onclick="document.getElementById('settingsPanel').classList.toggle('hidden')" class="md:hidden px-3 py-2 border border-input rounded-md">
+                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-2 border border-input rounded-md">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </button>
             </div>
@@ -36,20 +36,20 @@
         <div class="flex-1 flex gap-0 overflow-hidden rounded-xl border border-border shadow-sm">
             <!-- LEFT: Component Palette -->
             <div class="w-14 bg-card border-r border-border flex flex-col items-center py-3 gap-1 shrink-0 overflow-y-auto" id="componentPalette">
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="10" y1="13" x2="14" y2="13"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="9" height="18" rx="1"/><line x1="14" y1="8" x2="22" y2="8"/><line x1="14" y1="12" x2="22" y2="12"/><line x1="14" y1="16" x2="20" y2="16"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="quote" draggable="true" title="Quote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="divider" draggable="true" title="Divider"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="spacer" draggable="true" title="Spacer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M12 5v14"/><path d="M18 8l-6-3-6 3"/><path d="M18 16l-6 3-6-3"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="video" draggable="true" title="Video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading" aria-label="Heading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text" aria-label="Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image" aria-label="Image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button" aria-label="Button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero" aria-label="Hero"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="10" y1="13" x2="14" y2="13"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text" aria-label="Image + Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="9" height="18" rx="1"/><line x1="14" y1="8" x2="22" y2="8"/><line x1="14" y1="12" x2="22" y2="12"/><line x1="14" y1="16" x2="20" y2="16"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="quote" draggable="true" title="Quote" aria-label="Quote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="divider" draggable="true" title="Divider" aria-label="Divider"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="spacer" draggable="true" title="Spacer" aria-label="Spacer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M12 5v14"/><path d="M18 8l-6-3-6 3"/><path d="M18 16l-6 3-6-3"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="video" draggable="true" title="Video" aria-label="Video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
             </div>
             <!-- CENTER: Canvas -->
             <div class="flex-1 flex flex-col bg-card overflow-hidden">
-                <input type="text" name="Title" id="postTitle" value="@Model.Title" placeholder="Post Title" required
+                <input type="text" name="Title" id="postTitle" value="@Model.Title" aria-label="Title" placeholder="Post Title" required
                        class="w-full px-6 py-4 text-3xl font-bold bg-transparent focus:outline-none placeholder:text-muted/50 border-b border-border" />
                 <div class="flex-1 overflow-y-auto bg-muted/20" id="canvasScroll">
                     <div class="max-w-3xl mx-auto py-8 px-6 min-h-full" id="canvas">
@@ -62,11 +62,21 @@
             </div>
 
             <!-- Sidebar Settings -->
-            <aside id="settingsPanel" class="w-72 bg-card border-l border-border overflow-y-auto shrink-0 flex flex-col">
+            <aside id="settingsPanel" class="hidden md:flex flex-col fixed inset-0 z-40 md:static md:inset-auto md:z-auto w-full md:w-72 bg-card md:border-l border-border overflow-y-auto shrink-0" aria-labelledby="settingsPanelTitle">
                 <div id="postSettingsView" class="p-4 flex-1">
-                    <h3 class="font-semibold mb-4 text-lg">Post Settings</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 id="settingsPanelTitle" class="font-semibold text-lg">Post Settings</h3>
+                        <button type="button" data-settings-close onclick="toggleSettingsPanel(false)" aria-label="Close post settings" class="md:hidden h-8 w-8 inline-flex items-center justify-center rounded-md border border-input hover:bg-muted">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
                     
-                    <div class="space-y-4">
+                    <details class="group" data-desk-section="post-publishing" open>
+                    <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
+                        <span>Publishing</span>
+                        <svg class="transition-transform group-open:rotate-180 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </summary>
+                    <div class="space-y-4 pt-2 pb-4">
                     <!-- Slug -->
                     <div>
                         <label class="block text-sm font-medium mb-1">URL Slug</label>
@@ -101,7 +111,7 @@
                             <template x-for="id in selected" :key="id">
                                 <span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium border border-primary/20 flex items-center gap-1">
                                     <span x-text="items.find(x => x.Id === id)?.Name || 'Unknown'"></span>
-                                    <button type="button" @@click.stop="toggle(id)" class="hover:text-primary-foreground hover:bg-primary rounded-full p-0.5 transition-colors">
+                                    <button type="button" @@click.stop="toggle(id)" aria-label="Remove category" class="hover:text-primary-foreground hover:bg-primary rounded-full p-0.5 transition-colors">
                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                     </button>
                                 </span>
@@ -154,7 +164,7 @@
                             <template x-for="tag in selected" :key="tag">
                                 <span class="bg-secondary text-secondary-foreground px-2 py-0.5 rounded text-xs font-medium border border-border flex items-center gap-1">
                                     <span x-text="tag"></span>
-                                    <button type="button" @@click.stop="toggle(tag)" class="hover:text-destructive transition-colors">
+                                    <button type="button" @@click.stop="toggle(tag)" aria-label="Remove tag" class="hover:text-destructive transition-colors">
                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                     </button>
                                 </span>
@@ -231,36 +241,64 @@
                         <label class="text-sm font-medium">Allow Comments</label>
                         <input type="checkbox" name="AllowComments" value="true" @(Model.AllowComments ? "checked" : "") class="rounded border-input text-primary focus:ring-primary h-5 w-5" />
                     </div>
-                    <!-- Answer-engine readiness -->
-                    @await Html.PartialAsync("_AeoReadiness", Model)
-
-                    <!-- Internal link suggestions -->
-                    <div x-data="{ linksOpen: false }" class="border-t border-border pt-4 mt-4">
-                        <button type="button" @@click="linksOpen = !linksOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
-                            <span>Internal links</span>
-                            <svg :class="linksOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <!-- Revision history -->
+                    <div x-data="{ revOpen: false }" class="border-t border-border pt-4 mt-4">
+                        <button type="button" @@click="revOpen = !revOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
+                            <span>Revisions</span>
+                            <svg :class="revOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
-                        <div x-show="linksOpen" x-transition class="pt-4"
-                             hx-get="/admin/posts/link-suggestions/@Model.Id"
+                        <div x-show="revOpen" x-transition class="pt-3"
+                             hx-get="/admin/revisions/post/@Model.Id"
                              hx-trigger="intersect once"
                              hx-swap="innerHTML">
-                            <p class="text-[11px] text-muted-foreground">Looking for related posts…</p>
+                            <p class="text-[11px] text-muted-foreground">Loading history…</p>
                         </div>
                     </div>
 
-                    <!-- SEO & Social settings -->
-                    <div x-data="{ seoOpen: false }" class="border-t border-border pt-4 mt-4">
-                        <button type="button" @@click="seoOpen = !seoOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
-                            <span>SEO & Social</span>
-                            <svg :class="seoOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <!-- Preview link -->
+                    <div x-data="{ previewOpen: false }" class="border-t border-border pt-4 mt-4">
+                        <button type="button" @@click="previewOpen = !previewOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
+                            <span>Share a preview</span>
+                            <svg :class="previewOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
-                        <div x-show="seoOpen" x-transition class="space-y-4 pt-4">
-                            <div>
-                                <label class="block text-xs font-medium mb-1">Answer capsule</label>
-                                <textarea name="AnswerCapsule" rows="3" placeholder="A direct answer in 40-60 words, shown above the article."
-                                          class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">@Model.AnswerCapsule</textarea>
-                                <p class="text-[11px] text-muted-foreground mt-1">Answer engines quote passages, not pages. Aim for 40-60 words.</p>
+                        <div x-show="previewOpen" x-transition class="pt-3">
+                            <p class="text-[11px] text-muted-foreground mb-2">A signed link that shows this post as last saved to someone without an account. Valid seven days.</p>
+                            <div hx-get="/admin/posts/preview-link/@Model.Id" hx-trigger="click" hx-swap="outerHTML">
+                                <button type="button" class="h-8 px-3 rounded border border-input text-xs hover:bg-muted">Create preview link</button>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Featured Image -->
+                    <div class="pt-4 border-t border-border">
+                        <label class="block text-sm font-medium mb-2">Featured Image</label>
+                        <input type="hidden" name="FeatureImage" id="FeaturedImageUrlInput" value="@Model.FeatureImage" />
+                        <div class="mt-2 text-center">
+                            <img id="FeaturedImagePreview" src="@Model.FeatureImage" alt="Featured Image Preview" class="w-full h-auto rounded-md mb-3 border border-border @(string.IsNullOrEmpty(Model.FeatureImage) ? "hidden" : "")" />
+                            <button type="button"
+                                    onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'FeaturedImageUrlInput', previewImg: 'FeaturedImagePreview' } }))"
+                                    class="w-full px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                Select Image
+                            </button>
+                            <button type="button"
+                                    onclick="document.getElementById('FeaturedImageUrlInput').value = ''; document.getElementById('FeaturedImagePreview').classList.add('hidden'); this.classList.add('hidden');"
+                                    class="mt-2 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model.FeatureImage) ? "hidden" : "")"
+                                    id="RemoveFeaturedImageBtn">
+                                Remove Image
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                    </details>
+
+                    <!-- SEO & Social settings -->
+                    <details class="group border-t border-border" data-desk-section="post-seo">
+                    <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
+                        <span>SEO and social</span>
+                        <svg class="transition-transform group-open:rotate-180 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </summary>
+                        <div class="space-y-4 pt-2 pb-4">
                             <div>
                                 <label class="block text-xs font-medium mb-1">Meta Title</label>
                                 <input type="text" name="MetaTitle" value="@Model.MetaTitle" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
@@ -285,7 +323,7 @@
                                     <div>
                                         <label class="block text-xs font-medium mb-1">OG Image</label>
                                         <input type="hidden" name="OgImage" id="OgImageInput" value="@Model.OgImage" />
-                                        <img id="OgImagePreview" src="@Model.OgImage" class="mt-2 mb-2 w-full h-auto rounded border @(string.IsNullOrEmpty(Model.OgImage) ? "hidden" : "")" />
+                                        <img id="OgImagePreview" src="@Model.OgImage" alt="Open Graph image preview" class="mt-2 mb-2 w-full h-auto rounded border @(string.IsNullOrEmpty(Model.OgImage) ? "hidden" : "")" />
                                         <button type="button" 
                                                 onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'OgImageInput', previewImg: 'OgImagePreview', folder: 'og' } }))" 
                                                 class="w-full px-3 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-2">
@@ -310,7 +348,7 @@
                                     <div>
                                         <label class="block text-xs font-medium mb-1">Twitter Image</label>
                                         <input type="hidden" name="TwitterImage" id="TwitterImageInput" value="@Model.TwitterImage" />
-                                        <img id="TwitterImagePreview" src="@Model.TwitterImage" class="mt-2 mb-2 w-full h-auto rounded border @(string.IsNullOrEmpty(Model.TwitterImage) ? "hidden" : "")" />
+                                        <img id="TwitterImagePreview" src="@Model.TwitterImage" alt="Twitter card image preview" class="mt-2 mb-2 w-full h-auto rounded border @(string.IsNullOrEmpty(Model.TwitterImage) ? "hidden" : "")" />
                                         <button type="button" 
                                                 onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'TwitterImageInput', previewImg: 'TwitterImagePreview', folder: 'twitter' } }))" 
                                                 class="w-full px-3 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-2">
@@ -319,7 +357,52 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Search performance (Search Console) -->
+                            <div x-data="{ searchOpen: false }" class="border-t border-border pt-4 mt-4">
+                                <button type="button" @@click="searchOpen = !searchOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
+                                    <span>Search performance</span>
+                                    <svg :class="searchOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                                <div x-show="searchOpen" x-transition class="pt-3"
+                                     hx-get="/admin/posts/search-performance/@Model.Id"
+                                     hx-trigger="intersect once"
+                                     hx-swap="innerHTML">
+                                    <p class="text-[11px] text-muted-foreground">Loading search data…</p>
+                                </div>
+                            </div>
+
+                            <!-- Internal link suggestions -->
+                            <div x-data="{ linksOpen: false }" class="border-t border-border pt-4 mt-4">
+                                <button type="button" @@click="linksOpen = !linksOpen" class="flex items-center justify-between w-full text-left font-medium text-sm">
+                                    <span>Internal links</span>
+                                    <svg :class="linksOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </button>
+                                <div x-show="linksOpen" x-transition class="pt-4"
+                                     hx-get="/admin/posts/link-suggestions/@Model.Id"
+                                     hx-trigger="intersect once"
+                                     hx-swap="innerHTML">
+                                    <p class="text-[11px] text-muted-foreground">Looking for related posts…</p>
+                                </div>
+                            </div>
                         </div>
+                    </details>
+
+                    <!-- Answer blocks: what answer engines quote -->
+                    <details class="group border-t border-border" data-desk-section="post-answers">
+                    <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
+                        <span>Answer blocks</span>
+                        <svg class="transition-transform group-open:rotate-180 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </summary>
+                    <div class="space-y-4 pt-2 pb-4">
+                    <!-- Answer-engine readiness -->
+                    @await Html.PartialAsync("_AeoReadiness", Model)
+
+                    <div class="pt-4 border-t border-border">
+                        <label for="AnswerCapsule" class="block text-xs font-medium mb-1">Answer capsule</label>
+                        <textarea name="AnswerCapsule" id="AnswerCapsule" rows="3" placeholder="A direct answer in 40-60 words, shown above the article."
+                                  class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">@Model.AnswerCapsule</textarea>
+                        <p class="text-[11px] text-muted-foreground mt-1">Answer engines quote passages, not pages. Aim for 40-60 words.</p>
                     </div>
 
                     <!-- FAQ Section -->
@@ -339,8 +422,8 @@
                                         <span class="text-xs text-muted-foreground font-medium">Q&A #<span x-text="i+1"></span></span>
                                         <button type="button" @@click="remove(i)" class="text-xs text-destructive hover:underline">Remove</button>
                                     </div>
-                                    <input type="text" x-model="faq.question" @@input="serialize()" placeholder="Question…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
-                                    <textarea x-model="faq.answer" @@input="serialize()" placeholder="Answer…" rows="2" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"></textarea>
+                                    <input type="text" x-model="faq.question" @@input="serialize()" aria-label="Question" placeholder="Question…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <textarea x-model="faq.answer" @@input="serialize()" aria-label="Answer" placeholder="Answer…" rows="2" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"></textarea>
                                 </div>
                             </template>
                             <template x-if="faqs.length === 0">
@@ -366,8 +449,8 @@
                                         <span class="text-xs text-muted-foreground font-medium">Fact #<span x-text="i+1"></span></span>
                                         <button type="button" @@click="remove(i)" class="text-xs text-destructive hover:underline">Remove</button>
                                     </div>
-                                    <input type="text" x-model="fact.label" @@input="serialize()" placeholder="Label (e.g. Best for)…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
-                                    <input type="text" x-model="fact.value" @@input="serialize()" placeholder="Value (e.g. Small practices)…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <input type="text" x-model="fact.label" @@input="serialize()" aria-label="Fact label" placeholder="Label (e.g. Best for)…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <input type="text" x-model="fact.value" @@input="serialize()" aria-label="Fact value" placeholder="Value (e.g. Small practices)…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
                                 </div>
                             </template>
                             <template x-if="facts.length === 0">
@@ -393,8 +476,8 @@
                                         <span class="text-xs text-muted-foreground font-medium">Step <span x-text="i+1"></span></span>
                                         <button type="button" @@click="remove(i)" class="text-xs text-destructive hover:underline">Remove</button>
                                     </div>
-                                    <input type="text" x-model="step.name" @@input="serialize()" placeholder="Step title…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
-                                    <textarea x-model="step.text" @@input="serialize()" placeholder="What to do…" rows="2" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"></textarea>
+                                    <input type="text" x-model="step.name" @@input="serialize()" aria-label="Step title" placeholder="Step title…" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                                    <textarea x-model="step.text" @@input="serialize()" aria-label="What to do" placeholder="What to do…" rows="2" class="w-full px-2 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none"></textarea>
                                 </div>
                             </template>
                             <template x-if="steps.length === 0">
@@ -405,29 +488,8 @@
 
                     <!-- Roundup / Comparison Section -->
                     <partial name="_RoundupEditor" model="Model" />
-
-                    <!-- Featured Image -->
-                    <div class="pt-4 border-t border-border">
-                        <label class="block text-sm font-medium mb-2">Featured Image</label>
-                        <input type="hidden" name="FeatureImage" id="FeaturedImageUrlInput" value="@Model.FeatureImage" />
-                        
-                        <div class="mt-2 text-center">
-                            <img id="FeaturedImagePreview" src="@Model.FeatureImage" alt="Featured Image Preview" class="w-full h-auto rounded-md mb-3 border border-border @(string.IsNullOrEmpty(Model.FeatureImage) ? "hidden" : "")" />
-                            
-                            <button type="button" 
-                                    onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'FeaturedImageUrlInput', previewImg: 'FeaturedImagePreview' } }))" 
-                                    class="w-full px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                                Select Image
-                            </button>
-                            <button type="button" 
-                                    onclick="document.getElementById('FeaturedImageUrlInput').value = ''; document.getElementById('FeaturedImagePreview').classList.add('hidden'); this.classList.add('hidden');" 
-                                    class="mt-2 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model.FeatureImage) ? "hidden" : "")"
-                                    id="RemoveFeaturedImageBtn">
-                                Remove Image
-                            </button>
-                        </div>
                     </div>
+                    </details>
                 </div>
 
                 <!-- Component Settings (dynamic, shown on block click) -->
@@ -447,6 +509,32 @@
 </div>
 
 <partial name="_MediaSelectorModal" />
+
+<script>
+    // Phone-width settings sheet: hidden until asked for, then covers the canvas. Desktop keeps the fixed column.
+    window.toggleSettingsPanel = function (open) {
+        var panel = document.getElementById('settingsPanel'), toggle = document.getElementById('settingsToggle');
+        var show = typeof open === 'boolean' ? open : panel.classList.contains('hidden');
+        panel.classList.toggle('hidden', !show);
+        panel.classList.toggle('flex', show);
+        if (toggle) toggle.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) { var close = panel.querySelector('[data-settings-close]'); if (close) close.focus(); }
+        else if (toggle) toggle.focus();
+    };
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || !window.matchMedia('(max-width: 767.98px)').matches) return;
+        var panel = document.getElementById('settingsPanel');
+        if (panel && !panel.classList.contains('hidden')) toggleSettingsPanel(false);
+    });
+    // Sidebar sections remember whether they were open, per section, in this browser only.
+    (function () {
+        document.querySelectorAll('details[data-desk-section]').forEach(function (d) {
+            var key = 'desk.section.' + d.dataset.deskSection;
+            try { var saved = localStorage.getItem(key); if (saved === '1') d.open = true; else if (saved === '0') d.open = false; } catch (e) { /* storage unavailable: keep the default */ }
+            d.addEventListener('toggle', function () { try { localStorage.setItem(key, d.open ? '1' : '0'); } catch (e) { /* nothing to remember with */ } });
+        });
+    })();
+</script>
 
 <!-- Publish Modal -->
 <div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
@@ -566,10 +654,12 @@
                 button:()=>`<div class="comp-button"><a href="#" contenteditable="true">Click Me</a></div>`,
                 hero:()=>`<div class="comp-hero"><h2 contenteditable="true">Welcome</h2><p contenteditable="true">A brief description.</p><a href="#" contenteditable="true">Get Started</a></div>`,
                 imagetext:()=>`<div class="comp-imagetext"><img src="" alt="" onclick="selectBlockImage(this)" style="cursor:pointer;width:50%;" /><div class="it-content"><h3 contenteditable="true" style="font-size:1.3rem;font-weight:700;margin-bottom:0.5rem;">Title</h3><p contenteditable="true" style="line-height:1.7;">Description</p></div></div>`,
-                quote:()=>`<div class="comp-quote"><blockquote contenteditable="true">"The best way to predict the future is to create it."</blockquote><cite contenteditable="true">â€” Abraham Lincoln</cite></div>`,
+                quote:()=>`<div class="comp-quote"><blockquote contenteditable="true">"The best way to predict the future is to create it."</blockquote><cite contenteditable="true">— Abraham Lincoln</cite></div>`,
                 divider:()=>`<div class="comp-divider"><hr/></div>`,
                 spacer:()=>`<div class="comp-spacer" style="height:60px;"><span>spacer</span></div>`,
-                video:()=>{const u=prompt('YouTube/Vimeo URL:');if(!u)return null;const m=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/),v=u.match(/vimeo\.com\/(\d+)/);const e=m?`https://www.youtube.com/embed/${m[1]}`:v?`https://player.vimeo.com/video/${v[1]}`:null;if(!e){alert('Invalid URL');return null;}return `<div class="comp-video"><iframe src="${e}" allowfullscreen loading="lazy"></iframe></div>`;}
+                video:()=>{const embed=u=>{const m=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/),v=u.match(/vimeo\.com\/(\d+)/);return m?`https://www.youtube.com/embed/${m[1]}`:v?`https://player.vimeo.com/video/${v[1]}`:null;};
+                    // Desk dialog with live validation instead of the browser prompt; returns a Promise of HTML (add resolves it).
+                    return InkwellDialog.prompt({title:'Embed a video',body:'Paste a YouTube or Vimeo link. The player is embedded lazily and never blocks the page.',label:'Video URL',placeholder:'https://www.youtube.com/watch?v=…',action:'Embed video',validate:v=>v.trim()&&!embed(v.trim())?'That is not a YouTube or Vimeo URL.':null,valid:'Looks good.'}).then(u=>{if(!u)return null;const e=embed(u);return e?`<div class="comp-video"><iframe src="${e}" allowfullscreen loading="lazy"></iframe></div>`:null;});}
             };
             const settingsDefs = {
                 heading: (b) => { const h=b.querySelector('h1,h2,h3,h4,h5,h6'); return `<div class="setting-field"><label>Heading Text</label><input type="text" value="${h?.textContent||''}" oninput="updateBlockText(this.value, 'h1,h2,h3,h4,h5,h6')" /></div><div class="setting-field"><label>Heading Level</label><select onchange="changeHeadingLevel(this.value)"><option value="h1" ${h?.tagName==='H1'?'selected':''}>H1 - Large</option><option value="h2" ${h?.tagName==='H2'?'selected':''}>H2 - Medium</option><option value="h3" ${h?.tagName==='H3'?'selected':''}>H3 - Small</option></select></div><div class="setting-field"><label>Alignment</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(h?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${h?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${h?.style.textAlign==='right'?'selected':''}>Right</option></select></div>`; },
@@ -614,9 +704,9 @@
             window.updateImgTextSize = function(v) { const m=selectedBlock?.querySelector('.comp-imagetext img'); if(m) m.style.width=v; };
             window.updateVideoUrl = function(v) { const ifr=selectedBlock?.querySelector('iframe'); if(ifr) ifr.src=v; };
 
-            const tbHtml=`<div class="block-toolbar"><button type="button" title="Drag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></button><button type="button" onclick="moveBlock(this,-1)" title="Up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button><button type="button" onclick="moveBlock(this,1)" title="Down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><button type="button" onclick="duplicateBlock(this)" title="Duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><button type="button" onclick="deleteBlock(this)" title="Delete" style="color:var(--destructive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>`;
+            const tbHtml=`<div class="block-toolbar"><button type="button" title="Drag" aria-label="Drag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></button><button type="button" onclick="moveBlock(this,-1)" title="Up" aria-label="Up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button><button type="button" onclick="moveBlock(this,1)" title="Down" aria-label="Down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><button type="button" onclick="duplicateBlock(this)" title="Duplicate" aria-label="Duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><button type="button" onclick="deleteBlock(this)" title="Delete" aria-label="Delete" style="color:var(--destructive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>`;
             function mk(html,type){const b=document.createElement('div');b.className='builder-block';b.dataset.type=type;b.draggable=true;b.innerHTML=tbHtml+`<div class="block-content">${html}</div>`;b.addEventListener('dragstart',ds);b.addEventListener('dragend',de);b.addEventListener('dragover',dov);b.addEventListener('drop',dd);b.addEventListener('click', (e) => { if (!e.target.closest('.block-toolbar')) selectBlock(b); });return b;}
-            function add(t,before){const h=C[t]();if(h===null)return;const b=mk(h,t);if(before)canvas.insertBefore(b,before);else canvas.appendChild(b);ue();selectBlock(b);}
+            function add(t,before){Promise.resolve(C[t]()).then(h=>{if(h===null||h===undefined)return;const b=mk(h,t);if(before)canvas.insertBefore(b,before);else canvas.appendChild(b);ue();selectBlock(b);});}
             function ue(){canvasEmpty.style.display=canvas.querySelectorAll('.builder-block').length===0?'flex':'none';}
             document.querySelectorAll('.palette-item').forEach(btn=>{btn.addEventListener('dragstart',e=>{dragFromPalette=btn.dataset.component;e.dataTransfer.effectAllowed='copy';e.dataTransfer.setData('text/plain','');});btn.addEventListener('dragend',()=>{dragFromPalette=null;});btn.addEventListener('click',()=>{add(btn.dataset.component);});});
             canvas.addEventListener('dragover',e=>{e.preventDefault();});canvas.addEventListener('drop',e=>{e.preventDefault();if(dragFromPalette){add(dragFromPalette);dragFromPalette=null;}});
@@ -633,7 +723,7 @@
             function exH(){let h='';canvas.querySelectorAll('.builder-block').forEach(b=>{const c=b.querySelector('.block-content');if(!c)return;const cl=c.cloneNode(true);cl.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));cl.querySelectorAll('[onclick]').forEach(el=>el.removeAttribute('onclick'));cl.querySelectorAll('.img-placeholder').forEach(el=>el.remove());cl.querySelectorAll('.comp-spacer span').forEach(el=>el.remove());h+=cl.innerHTML.trim()+'\n';});return h.trim();}
             function exP(){let t='';canvas.querySelectorAll('.builder-block').forEach(b=>{const c=b.querySelector('.block-content');if(c)t+=c.textContent.trim()+'\n';});return t.trim();}
 
-            // â”€â”€ Hydrate existing content â”€â”€
+            // ── Hydrate existing content ──
             function hydrateContent() {
                 const raw = document.getElementById('postContent').value;
                 if (!raw || !raw.trim()) return;

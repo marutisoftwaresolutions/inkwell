@@ -44,10 +44,11 @@ public class ImportController : Controller
 
     // ── Stage 0: job list + start ─────────────────────────────────────────────
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var jobs = await _jobs.GetJobsAsync(CurrentUserId());
-        return View(jobs);
+        ViewData["ListSearchPlaceholder"] = "Search imports by file, source or status";
+        return View(Blog.Web.Models.ListPaging.Apply(this, jobs, q, page, j => new[] { j.FileName, j.Source.ToString(), j.Status.ToString() }));
     }
 
     // ── Stage 1: upload + analyze ─────────────────────────────────────────────
@@ -211,6 +212,20 @@ public class ImportController : Controller
         var job = await _jobs.GetJobAsync(id, CurrentUserId());
         if (job == null) return NotFound();
         return View(job);
+    }
+
+    /// <summary>
+    /// The preview's "Run the import" is a confirmed POST (typed OVERWRITE when anything would be
+    /// replaced), so the step past the prediction is deliberate and anti-forgery-protected. Nothing
+    /// is written here: the batches start from the Run page.
+    /// </summary>
+    [HttpPost("run/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunConfirmed(Guid id)
+    {
+        var job = await _jobs.GetJobAsync(id, CurrentUserId());
+        if (job == null) return NotFound();
+        return RedirectToAction(nameof(Run), new { id });
     }
 
     [HttpPost("process-batch/{id}")]

@@ -26,6 +26,11 @@ public static class ThreatScorer
     public const int ForbiddenScore = 2;
     /// <summary>A rejected sign-in — brute-force signal (recorded by AccountController).</summary>
     public const int FailedLoginScore = 3;
+    /// <summary>
+    /// A comment submission the spam filter discarded (recorded by BlogController). Weighted like a
+    /// failed sign-in: one is noise, a burst from one address is a bot, and it should block itself.
+    /// </summary>
+    public const int CommentSpamScore = 3;
 
     // Paths no legitimate visitor or search engine ever requests on a .NET blog: PHP/JSP/CGI
     // handlers, WordPress and phpMyAdmin surfaces, VCS and secret files, traversal, and the

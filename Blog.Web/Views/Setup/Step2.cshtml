@@ -1,41 +1,60 @@
 @{
     Layout = "_SetupLayout";
     ViewData["Title"] = "Blog Details";
+
+    // Errors come from SetupController as ModelState entries keyed by field name ("blogName"); a
+    // keyless entry would still surface in the summary below. Submitted values are re-shown from the
+    // binder's attempted values so a slip does not empty the form.
+    var ms = ViewData.ModelState;
+    string? FieldError(string key) => ms.TryGetValue(key, out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    string Attempted(string key) => ms.TryGetValue(key, out var entry) ? entry.AttemptedValue ?? string.Empty : string.Empty;
+    var allErrors = ms.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).Where(m => !string.IsNullOrWhiteSpace(m)).ToList();
+    var blogNameError = FieldError("blogName");
 }
 
 <div class="setup-container">
     <div class="setup-card">
         <div class="setup-step-badge">Step 2 of 4</div>
         <h1 class="setup-title">Name Your Blog</h1>
-        <p class="setup-subtitle">Give your blog a name and tagline.</p>
+        <p class="setup-subtitle">Give your blog a name and a short tagline. Both can be changed later in Settings.</p>
 
-        @if (!ViewData.ModelState.IsValid)
+        @if (allErrors.Count > 0)
         {
-            <div class="alert alert-error">
-                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                {
-                    <div>@err.ErrorMessage</div>
-                }
+            <div class="alert alert-error setup-alert" role="alert">
+                <p class="setup-alert-title">@(allErrors.Count == 1 ? "Fix the highlighted field to continue." : "Fix the highlighted fields to continue.")</p>
+                <ul>
+                    @foreach (var err in allErrors)
+                    {
+                        <li>@err</li>
+                    }
+                </ul>
             </div>
         }
 
         <form method="post" action="/setup/savestep2">
             @Html.AntiForgeryToken()
-            <div class="form-group">
-                <label for="blogName">Blog Name *</label>
-                <input type="text" id="blogName" name="blogName" class="form-control" placeholder="My Awesome Blog" required autofocus />
+            <div class="form-group @(blogNameError is null ? "" : "has-error")">
+                <label for="blogName">Blog name <span class="required-mark" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+                <input type="text" id="blogName" name="blogName" class="form-control" value="@Attempted("blogName")"
+                       placeholder="My Awesome Blog" required autofocus maxlength="200"
+                       aria-invalid="@(blogNameError is null ? "false" : "true")"
+                       aria-describedby="@(blogNameError is null ? null : "blogName-error")" />
+                @if (blogNameError is not null)
+                {
+                    <p class="field-error" id="blogName-error">@blogNameError</p>
+                }
             </div>
             <div class="form-group">
                 <label for="tagline">Tagline</label>
-                <input type="text" id="tagline" name="tagline" class="form-control" placeholder="Thoughts, stories and ideas." />
+                <input type="text" id="tagline" name="tagline" class="form-control" value="@Attempted("tagline")" placeholder="Thoughts, stories and ideas." maxlength="500" />
             </div>
-            <div class="setup-steps-preview">
-                <div class="step-dot"></div>
+            <div class="setup-steps-preview" aria-hidden="true">
+                <div class="step-dot done"></div>
                 <div class="step-dot active"></div>
                 <div class="step-dot"></div>
                 <div class="step-dot"></div>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg">Continue →</button>
+            <button type="submit" class="btn btn-primary btn-lg">Continue</button>
         </form>
     </div>
 </div>

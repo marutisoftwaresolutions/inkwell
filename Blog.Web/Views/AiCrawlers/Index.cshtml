@@ -32,7 +32,7 @@
 <div class="flex gap-2 mb-6 text-xs">
     @foreach (var d in new[] { 7, 30, 90 })
     {
-        <a href="?days=@d" class="h-8 px-3 rounded border @(days == d ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-input text-foreground hover:bg-muted") inline-flex items-center">
+        <a href="?days=@d" aria-current="@(days == d ? "page" : null)" class="h-8 px-3 rounded border @(days == d ? "border-primary bg-primary text-primary-foreground" : "border-input text-foreground hover:bg-muted") inline-flex items-center">
             Last @d days
         </a>
     }
@@ -44,7 +44,7 @@
         <div class="text-xs text-muted-foreground mt-1">AI crawler visits</div>
     </div>
     <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold @(aiEngines > 0 ? "text-emerald-600" : "text-amber-600")">@aiEngines</div>
+        <div class="text-2xl font-bold @(aiEngines > 0 ? "tone-ok" : "tone-warn")">@aiEngines</div>
         <div class="text-xs text-muted-foreground mt-1">AI engines reading you</div>
     </div>
     <div class="rounded-xl border border-border bg-card p-4">
@@ -59,7 +59,7 @@
 
 @if (aiVisits == 0)
 {
-    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    <div class="mb-6 rounded-lg border pill-warn px-4 py-3 text-sm">
         No AI crawler has fetched this site in the last @days days. That is worth knowing: if the pages
         are not being read, no amount of answer-capsule or structured-data work can produce a citation.
         Check that <code>robots.txt</code> permits these agents, and that the site is reachable and indexed.
@@ -70,11 +70,11 @@
 {
     <div class="rounded-xl border border-border bg-card p-4 mb-6">
         <div class="text-sm font-medium text-foreground mb-3">AI crawler visits per day</div>
-        <div class="flex items-end gap-1 h-24">
+        <div class="flex items-end gap-1 h-24" role="img" aria-label="AI crawler visits per day: @string.Join(", ", daily.Select(x => $"{x.Day:d MMM} {x.Visits}"))">
             @foreach (var d in daily)
             {
                 var h = d.Visits == 0 ? 2 : (int)Math.Max(4, Math.Round(d.Visits * 100.0 / peak));
-                <div class="flex-1 rounded-t @(d.Visits == 0 ? "bg-border" : "bg-emerald-500/70")"
+                <div class="flex-1 rounded-t @(d.Visits == 0 ? "bg-border" : "bg-primary/70")"
                      style="height:@(h)%"
                      title="@d.Day.ToString("d MMM yyyy"): @d.Visits visits"></div>
             }
@@ -84,7 +84,7 @@
 
 <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
     <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">AI answer engines</div>
-    <table class="w-full text-sm">
+    <div class="table-scroll"><table class="w-full text-sm">
         <thead>
             <tr class="border-b border-border text-left text-xs text-muted-foreground">
                 <th class="px-4 py-2 font-medium">Crawler</th>
@@ -108,14 +108,14 @@
                 </tr>
             }
         </tbody>
-    </table>
+    </table></div>
 </div>
 
 @if (topPages.Count > 0)
 {
     <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
         <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">Pages AI engines read most</div>
-        <table class="w-full text-sm">
+        <div class="table-scroll"><table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
                     <th class="px-4 py-2 font-medium">Page</th>
@@ -135,13 +135,21 @@
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
     </div>
 }
 
 <details class="rounded-xl border border-border bg-card">
     <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">Search crawlers</summary>
-    <table class="w-full text-sm border-t border-border">
+    <div class="table-scroll"><table class="w-full text-sm border-t border-border">
+        <thead>
+            <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                <th class="px-4 py-2 font-medium">Crawler</th>
+                <th class="px-4 py-2 font-medium">Operator</th>
+                <th class="px-4 py-2 font-medium text-right">Visits</th>
+                <th class="px-4 py-2 font-medium">Last seen</th>
+            </tr>
+        </thead>
         <tbody>
             @foreach (var c in search)
             {
@@ -153,11 +161,14 @@
                 </tr>
             }
         </tbody>
-    </table>
+    </table></div>
 </details>
 
 <p class="text-[11px] text-muted-foreground mt-3">
     A user-agent is self-asserted and can be forged, so this shows <em>claimed</em> identity. It is a
     visibility report and is never used to allow or deny a request — the firewall decides that on
     behaviour, not on a name.
+</p>
+<p class="text-[11px] text-muted-foreground mt-1">
+    Visits are kept for <strong>@ViewBag.RetentionDays days</strong> and pruned nightly; change the window under Admin → Settings.
 </p>

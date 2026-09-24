@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Core.Services;
 using Blog.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -25,7 +26,7 @@ public class UsersController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var currentUserIdStr = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
         Guid? currentUserId = Guid.TryParse(currentUserIdStr, out var id) ? id : null;
@@ -45,22 +46,29 @@ public class UsersController : Controller
         }
         ViewBag.UserRoles = userRoles;
 
-        return View(users);
+        ViewData["ListSearchPlaceholder"] = "Search users by name, email or role";
+        return View(Blog.Web.Models.ListPaging.Apply(this, users, q, page, u => new[] { u.DisplayName, u.Username, u.Email, u.Role }));
     }
 
     [HttpPost("invite")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Invite(string displayName, string email, string password, string roleName)
+    public async Task<IActionResult> Invite(string displayName, string email, string? password, string roleName)
     {
-        if (string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(email))
         {
-            TempData["Error"] = "All fields are required.";
+            TempData["Error"] = "Enter a display name and an email address.";
             return RedirectToAction("Index");
         }
 
-        if (password.Length < 8)
+        // A blank password means "generate one for me": the admin never has to invent a
+        // credential for someone else. Whatever is used is shown once on the next page.
+        if (string.IsNullOrWhiteSpace(password))
         {
-            TempData["Error"] = "Password must be at least 8 characters.";
+            password = PasswordGenerator.Generate();
+        }
+        else if (password.Length < PasswordGenerator.MinimumLength)
+        {
+            TempData["Error"] = $"Password must be at least {PasswordGenerator.MinimumLength} characters, or leave it blank to generate one.";
             return RedirectToAction("Index");
         }
 
@@ -100,7 +108,11 @@ public class UsersController : Controller
 
             await _audit.LogAsync(AuditActions.UserInvited, "User", null, $"{displayName} ({email})",
                 newValues: $"{{\"role\":\"{roleName}\"}}");
-            TempData["Success"] = $"{displayName} has been added as {roleName}. They can log in with {email}.";
+            TempData["Success"] = $"{displayName} has been added as {roleName}. They sign in with {email} and the password shown below.";
+            // Shown exactly once by the Users view; TempData is consumed on that render, so a
+            // refresh does not repeat it. Nothing is emailed.
+            TempData["InvitePassword"] = password;
+            TempData["InviteEmail"] = email;
         }
         catch (Microsoft.Data.SqlClient.SqlException ex)
             when (ex.Number == 2601 || ex.Number == 2627)
@@ -150,6 +162,14 @@ public class UsersController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleActive(Guid userId)
     {
+        // Self-guard: disabling your own account signs you out with no way back in.
+        var currentUserIdStr = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(currentUserIdStr, out var currentUserId) && currentUserId == userId)
+        {
+            TempData["Error"] = "You cannot disable your own account.";
+            return RedirectToAction("Index");
+        }
+
         var user = await _users.GetByIdAsync(userId);
         if (user == null) return NotFound();
 

@@ -65,6 +65,35 @@ public class UserSettings
     /// <summary>Email the error-notification recipients whenever an address is auto-blocked.</summary>
     public bool   FirewallNotifyOnBlock           { get; set; } = false;
 
+    /// <summary>
+    /// Days of AI/search crawler visits kept in <c>CrawlerVisits</c> before the nightly retention
+    /// job prunes them (Admin → AI Crawlers). Stored in the Settings JSON blob; older payloads fall
+    /// back to the default. 7–3650.
+    /// </summary>
+    public int CrawlerVisitRetentionDays { get; set; } = 90;
+
+    // ── Search Console (Admin → Settings → Search Console) ──────────────────
+    // Per-tenant service-account access to the Search Console API. The operator pastes the key
+    // file Google issues; it is stored Data-Protection-encrypted and never returned to the UI,
+    // logged, audited or exported. Empty = not connected; every consumer degrades to "no data".
+    /// <summary>The property as Search Console names it: "sc-domain:example.com" or "https://www.example.com/".</summary>
+    public string SearchConsoleProperty { get; set; } = string.Empty;
+    /// <summary>The service-account JSON, protected with IDataProtector. Never plain text.</summary>
+    public string SearchConsoleCredentialProtected { get; set; } = string.Empty;
+    /// <summary>The service account's email, kept in clear so the Settings screen can say who is connected.</summary>
+    public string SearchConsoleClientEmail { get; set; } = string.Empty;
+    /// <summary>Months of daily rows kept in SearchPerformance. Search Console itself keeps 16. 1–16.</summary>
+    public int SearchPerformanceRetentionMonths { get; set; } = 16;
+
+    /// <summary>
+    /// Time zone used to display dates and to interpret a typed schedule time. Storage is always
+    /// UTC. A Windows or IANA id the host recognises; empty or unknown means UTC.
+    /// </summary>
+    public string DisplayTimeZoneId { get; set; } = "UTC";
+
+    /// <summary>Revisions kept per post or page; the oldest are pruned as new ones are written. 1–200.</summary>
+    public int RevisionsPerItem { get; set; } = 25;
+
     // ── Entity / knowledge graph ──────────────────────────────────────────────
     // Who this publication *is*, as an entity rather than a website. Search engines and answer
     // engines resolve a brand by cross-referencing authoritative profiles; without them a domain

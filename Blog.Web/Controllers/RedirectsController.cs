@@ -29,7 +29,7 @@ public class RedirectsController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(string? tab)
+    public async Task<IActionResult> Index(string? tab, string? q, int page = 1)
     {
         var rules = await _redirects.GetAllAsync();
 
@@ -38,7 +38,9 @@ public class RedirectsController : Controller
         var triaged = NotFoundTriage.Triage(groups, slugs);
 
         ViewBag.Tab       = tab == "notfound" ? "notfound" : "rules";
-        ViewBag.Rules     = rules;
+        ViewBag.Rules     = Blog.Web.Models.ListPaging.Apply(this, rules, q, page, r => new[] { r.From, r.To });
+        ViewData["ListSearchPlaceholder"] = "Search rules by from or to path";
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["tab"] = (string)ViewBag.Tab };
         ViewBag.NotFounds = triaged;
 
         // Actionable = something links here, or it is close enough to a real slug to be a rename.

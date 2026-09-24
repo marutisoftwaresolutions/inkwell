@@ -13,7 +13,7 @@
     @Html.AntiForgeryToken()
 
     <div class="bg-card border border-border rounded-lg p-5 space-y-4">
-        <div class="flex items-center justify-between text-sm">
+        <div class="flex items-center justify-between text-sm" aria-live="polite">
             <span id="phase" class="font-medium">Ready to start.</span>
             <span id="pct" class="text-muted-foreground">0%</span>
         </div>
@@ -35,9 +35,9 @@
     </div>
 
     <div class="bg-card border border-border rounded-lg p-4">
-        <h3 class="font-semibold text-sm mb-2">Exceptions <span id="errCount" class="text-muted-foreground font-normal"></span></h3>
-        <ul id="errLog" class="text-xs text-destructive space-y-1 max-h-64 overflow-auto font-mono"></ul>
-        <p id="noErr" class="text-xs text-muted-foreground">No errors yet.</p>
+        <h3 class="font-semibold text-sm mb-2">Problems <span id="errCount" class="text-muted-foreground font-normal"></span></h3>
+        <ul id="errLog" class="text-xs text-destructive space-y-1 max-h-64 overflow-auto font-mono" aria-live="polite"></ul>
+        <p id="noErr" class="text-xs text-muted-foreground">No problems yet.</p>
     </div>
 </div>
 

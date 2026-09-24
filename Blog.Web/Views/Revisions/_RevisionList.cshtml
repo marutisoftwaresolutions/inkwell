@@ -1,0 +1,35 @@
+@using Blog.Core.Domain
+@{
+    var revisions = (IReadOnlyList<Revision>)ViewBag.Revisions;
+    var type = ((string)ViewBag.EntityType).ToLowerInvariant();
+    var entityId = (Guid)ViewBag.EntityId;
+    string Ago(DateTime utc)
+    {
+        var d = DateTime.UtcNow - utc;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
+        if (d.TotalDays < 30) return $"{(int)d.TotalDays}d ago";
+        return utc.ToString("d MMM yyyy");
+    }
+}
+@if (revisions.Count == 0)
+{
+    <p class="text-[11px] text-muted-foreground">No revisions yet. One is written each time this is saved with changed content.</p>
+}
+else
+{
+    <ul class="space-y-1.5 text-[11px]">
+        @foreach (var r in revisions)
+        {
+            <li class="flex items-baseline justify-between gap-2">
+                <div class="min-w-0">
+                    <a href="/admin/revisions/@type/@entityId/@r.Id" class="text-foreground hover:underline">#@r.Number · @r.Reason</a>
+                    <div class="text-muted-foreground truncate" title="@r.CreatedAt.ToString("u")">@Ago(r.CreatedAt)@(string.IsNullOrEmpty(r.AuthorName) ? "" : " · " + r.AuthorName) · @r.Status · @(r.HtmlLength / 1000)k</div>
+                </div>
+                <a href="/admin/revisions/@type/@entityId/@r.Id" class="shrink-0 h-6 px-2 rounded border border-input text-[10px] inline-flex items-center hover:bg-muted">Compare</a>
+            </li>
+        }
+    </ul>
+    <p class="text-[10px] text-muted-foreground mt-2">Oldest revisions are pruned past the limit in Settings. Restoring never changes the slug or publish state.</p>
+}

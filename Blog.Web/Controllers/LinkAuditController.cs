@@ -1,5 +1,6 @@
 using Blog.Core.Interfaces;
 using Blog.Core.Services;
+using Blog.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,8 +24,10 @@ public class LinkAuditController : Controller
     }
 
     /// <param name="filter">severe (default) · broken · gone · redirect · chain · all</param>
+    /// <param name="q">Search across post title, slug, link, anchor and issue text.</param>
+    /// <param name="page">1-based page within the filtered, searched list.</param>
     [HttpGet("")]
-    public async Task<IActionResult> Index(string filter = "severe")
+    public async Task<IActionResult> Index(string filter = "severe", string? q = null, int page = 1)
     {
         var ownerId = _tenant.IsCloudMode && _tenant.IsResolved ? _tenant.UserId : (Guid?)null;
         var data = await _repo.LoadAsync(ownerId);
@@ -40,8 +43,11 @@ public class LinkAuditController : Controller
             _          => all.Where(i => i.IsSevere)
         };
 
-        ViewBag.Issues     = filtered.ToList();
+        ViewBag.Issues     = ListPaging.Apply(this, filtered, q, page,
+            i => new[] { i.SourceTitle, i.SourceSlug, i.Href, i.Anchor, i.Detail, i.Kind.ToString() });
         ViewBag.Filter     = filter;
+        ViewData["ListSearchPlaceholder"] = "Search by post, slug or link…";
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["filter"] = filter };
         ViewBag.Scanned    = data.Documents.Count;
         ViewBag.Broken     = all.Count(i => i.Kind == LinkIssueKind.Broken);
         ViewBag.Gone       = all.Count(i => i.Kind == LinkIssueKind.Gone);

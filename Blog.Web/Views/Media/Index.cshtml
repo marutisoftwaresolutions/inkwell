@@ -1,197 +1,305 @@
 @model List<Blog.Core.Domain.Media>
+@using Blog.Core.Interfaces
+@using Blog.Web.Controllers
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Media Library";
+
+    var folder = ViewData["MediaFolder"] as string ?? "";
+    var references = ViewData["MediaReferences"] as Dictionary<Guid, List<MediaReference>> ?? new Dictionary<Guid, List<MediaReference>>();
+    var q = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string ?? "";
+    var page = ViewData[Blog.Web.Models.ListPaging.PageKey] as int? ?? 1;
+
+    // Uploads land in the folder whose tab is open ("All" and "General" both mean the general images folder).
+    var uploadFolder = MediaController.NormalizeFolder(folder, "images");
+    var folderLabel = MediaController.Folders.First(f => f.Key == folder).Label;
+
+    string FolderHref(string key)
+    {
+        var parts = new List<string>();
+        if (key.Length > 0) parts.Add("folder=" + key);
+        if (q.Length > 0) parts.Add("q=" + Uri.EscapeDataString(q));
+        return Url.Action("Index", "Media") + (parts.Count == 0 ? "" : "?" + string.Join("&", parts));
+    }
+
+    static string Names(List<string> titles)
+        => titles.Count <= 4 ? string.Join(", ", titles) : string.Join(", ", titles.Take(4)) + $" and {titles.Count - 4} more";
+
+    // "Used in 2 posts: A, B; 1 page: About." — the dialog states what breaks instead of guessing.
+    static string Usage(List<MediaReference> refs)
+    {
+        var posts = refs.Where(r => r.Kind == "post").Select(r => r.Title).ToList();
+        var pages = refs.Where(r => r.Kind == "page").Select(r => r.Title).ToList();
+        var parts = new List<string>();
+        if (posts.Count > 0) parts.Add($"{posts.Count} post{(posts.Count == 1 ? "" : "s")}: {Names(posts)}");
+        if (pages.Count > 0) parts.Add($"{pages.Count} page{(pages.Count == 1 ? "" : "s")}: {Names(pages)}");
+        return "Used in " + string.Join("; ", parts) + ".";
+    }
 }
 
 <div class="space-y-6">
-    @* <!-- Upload Area -->@Html.AntiForgeryToken() *@
-    <div id="uploadZone" class="border-2 border-dashed border-border rounded-lg p-12 text-center hover:bg-muted/50 transition-all cursor-pointer relative group">
-        <input type="file" id="fileInput" multiple accept="image/*,video/mp4,video/webm,application/pdf,.doc,.docx,.xls,.xlsx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-        <div class="space-y-4">
-            <div class="w-16 h-16 bg-muted text-muted-foreground rounded-full flex items-center justify-center mx-auto group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <section aria-labelledby="upload-heading">
+        <div id="uploadZone" class="border-2 border-dashed border-border rounded-lg p-8 md:p-12 text-center hover:bg-muted/50 transition-all cursor-pointer relative group focus-within:ring-2 focus-within:ring-ring aria-busy:cursor-progress aria-busy:opacity-70" aria-busy="false">
+            @Html.AntiForgeryToken()
+            <label for="fileInput" class="sr-only">Choose files to upload</label>
+            <input type="file" id="fileInput" name="file" multiple accept="@MediaController.AcceptAttribute" aria-describedby="upload-hint"
+                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-progress" />
+            <div class="space-y-4">
+                <div class="w-16 h-16 bg-muted text-muted-foreground rounded-full flex items-center justify-center mx-auto group-hover:bg-primary/10 group-hover:text-primary group-focus-within:bg-primary/10 group-focus-within:text-primary transition-colors" aria-hidden="true">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <div>
+                    <h2 id="upload-heading" class="text-lg font-medium text-foreground">Click to upload or drag and drop</h2>
+                    <p id="upload-hint" class="text-muted-foreground text-sm mt-1">
+                        JPG, PNG, GIF, WebP or SVG images, MP4 or WebM video, PDF, Word and Excel files, up to @MediaController.MaxUploadMegabytes MB each.
+                        @if (uploadFolder != "images")
+                        {
+                            <span>Files go to the @folderLabel folder.</span>
+                        }
+                    </p>
+                </div>
             </div>
-            <div>
-                <h3 class="text-lg font-medium text-foreground">Click to upload or drag and drop</h3>
-                <p class="text-muted-foreground text-sm mt-1">SVG, PNG, JPG or GIF (max. 10MB)</p>
+            <!-- Progress (hidden until an upload starts) -->
+            <div id="uploadProgress" class="hidden mt-6 max-w-sm mx-auto relative z-20" role="status" aria-live="polite">
+                <div class="flex justify-between text-xs text-muted-foreground mb-1">
+                    <span id="progressLabel">Uploading…</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                    <div id="progressFill" class="bg-primary h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <button type="button" id="uploadRefresh" class="hidden mt-3 text-sm text-primary underline underline-offset-2">Show the new files</button>
             </div>
         </div>
-        <!-- Progress Bar (Hidden by default) -->
-        <div id="uploadProgress" class="hidden mt-6 max-w-sm mx-auto">
-             <div class="flex justify-between text-xs text-muted-foreground mb-1">
-                <span id="progressLabel">Uploading...</span>
-                <span id="progressPercent">0%</span>
-            </div>
-            <div class="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                <div id="progressFill" class="bg-primary h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-            </div>
-        </div>
-    </div>
+    </section>
 
-    <!-- Media Grid -->
-    <div x-data="{ tab: 'all' }">
-        <div class="flex items-center gap-4 mb-6 border-b border-border relative">
-            <h2 class="text-lg font-semibold mr-4 py-2">Library Items</h2>
-            <button @@click="tab = 'all'"     class="px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px" :class="tab === 'all' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'">All</button>
-            <button @@click="tab = 'images'"  class="px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px" :class="tab === 'images' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'">General</button>
-            <button @@click="tab = 'og'"      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px" :class="tab === 'og' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'">Open Graph</button>
-            <button @@click="tab = 'twitter'" class="px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px" :class="tab === 'twitter' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'">Twitter Cards</button>
+    <section aria-labelledby="library-heading">
+        <div class="flex flex-wrap items-center gap-x-4 mb-6 border-b border-border">
+            <h2 id="library-heading" class="text-lg font-semibold mr-4 py-2">Library Items</h2>
+            <nav aria-label="Folders" class="flex items-center overflow-x-auto">
+                @foreach (var f in MediaController.Folders)
+                {
+                    var active = f.Key == folder;
+                    <a href="@FolderHref(f.Key)" aria-current="@(active ? "page" : null)"
+                       class="px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @(active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")">@f.Label</a>
+                }
+            </nav>
         </div>
-        
+
+        <partial name="_ListSearch" />
         @if (!Model.Any())
         {
-             <div class="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-border/50">
-                <svg class="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <p>No media files uploaded yet.</p>
+            <div class="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-border/50">
+                <svg class="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                @if (q.Length > 0)
+                {
+                    <p>No files match “@q”@(folder.Length > 0 ? $" in the {folderLabel} folder" : "").</p>
+                }
+                else if (folder.Length > 0)
+                {
+                    <p>No files in the @folderLabel folder yet. Upload one above and it lands here.</p>
+                }
+                else
+                {
+                    <p>No media files yet. Upload the first one above.</p>
+                }
             </div>
         }
         else
         {
-            <div id="mediaGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <ul id="mediaGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 list-none p-0 m-0">
                 @foreach (var item in Model)
                 {
-                    string folderType = "images";
-                    if (item.FilePath != null && item.FilePath.Contains("/og/", StringComparison.OrdinalIgnoreCase)) folderType = "og";
-                    else if (item.FilePath != null && item.FilePath.Contains("/twitter/", StringComparison.OrdinalIgnoreCase)) folderType = "twitter";
+                    var cType = item.ContentType ?? "";
+                    var name = item.FileName ?? "";
+                    var display = string.IsNullOrEmpty(item.OriginalFileName) ? name : item.OriginalFileName;
+                    var isImage = cType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gif", StringComparison.OrdinalIgnoreCase);
+                    references.TryGetValue(item.Id, out var refs);
+                    var used = refs?.Count ?? 0;
+                    var tone = used > 0 ? "danger" : "warning";
+                    var typed = used > 0 ? "DELETE" : null;   // a referenced file is deleted only after typing the word
+                    var body = used > 0
+                        ? $"“{display}” is removed from the library and the server. {Usage(refs!)} Each of those will show a broken image until it is edited."
+                        : $"“{display}” is removed from the library and the server. Not referenced by any post or page.";
 
-                    <div class="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border"
-                         x-show="tab === 'all' || tab === '@folderType'"
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 scale-95"
-                         x-transition:enter-end="opacity-100 scale-100"
-                         style="display: none;" x-init="$el.style.display = 'block'">
-                        @{ var cType = item.ContentType ?? ""; var name = item.FileName ?? ""; }
-                        @if (cType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+                    <li class="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border focus-within:ring-2 focus-within:ring-ring">
+                        @if (isImage)
                         {
-                            <img src="@item.Url" alt="@item.AltText" loading="lazy" class="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                            <img src="@item.Url" alt="@(item.AltText ?? display)" loading="lazy" class="w-full h-full object-cover transition-transform group-hover:scale-105" />
                         }
                         else
                         {
                             <div class="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-4">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                <span class="text-xs font-mono mt-2 uppercase">@System.IO.Path.GetExtension(item.FileName ?? "").TrimStart('.')</span>
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span class="text-xs font-mono mt-2 uppercase">@System.IO.Path.GetExtension(name).TrimStart('.')</span>
                             </div>
                         }
-                        
-                         <!-- Overlay -->
-                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                            <p class="text-white text-xs truncate mb-2" title="@item.OriginalFileName">@item.OriginalFileName</p>
+
+                        @* Actions: a bottom strip that is always visible under 768 px; on wider screens a full overlay
+                           revealed by hover or by keyboard focus, so nothing here is reachable only with a mouse. *@
+                        <div class="absolute inset-x-0 bottom-0 md:inset-0 bg-black/70 md:bg-black/60 opacity-100 md:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                            <p class="text-white text-xs truncate" title="@display">@display</p>
+                            <p class="text-white/70 text-[11px] mb-2">@(used > 0 ? $"Used in {used} {(used == 1 ? "item" : "items")}" : "Not in use")</p>
                             <div class="flex items-center gap-2">
-                                <button onclick="copyToClipboard('@item.Url')" class="flex-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded backdrop-blur-sm transition-colors text-center">
+                                <button type="button" data-copy-url="@item.Url" aria-label="Copy URL of @display"
+                                        class="flex-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded backdrop-blur-sm transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
                                     Copy URL
                                 </button>
-                                <form method="post" action="/admin/media/delete/@item.Id" onsubmit="return confirm('Delete file?')" class="inline">
+                                <form method="post" action="/admin/media/delete/@item.Id" class="inline"
+                                      data-confirm-title="Delete this file?"
+                                      data-confirm-body="@body"
+                                      data-confirm-action="Delete file"
+                                      data-confirm-tone="@tone"
+                                      data-confirm-typed="@typed">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="p-1 bg-red-500/80 hover:bg-red-500 text-white rounded transition-colors" title="Delete">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                    <input type="hidden" name="folder" value="@folder" />
+                                    <input type="hidden" name="q" value="@q" />
+                                    <input type="hidden" name="page" value="@(page)" />
+                                    <button type="submit" aria-label="Delete @display"
+                                            class="p-1 bg-red-500/80 hover:bg-red-500 text-white rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                     </button>
                                 </form>
                             </div>
                         </div>
-                    </div>
+                    </li>
                 }
-            </div>
+            </ul>
         }
-    </div>
+        <partial name="_ListPager" />
+    </section>
 </div>
 
 @section Scripts {
 <script>
+(function () {
+    'use strict';
     const fileInput = document.getElementById('fileInput');
     const uploadZone = document.getElementById('uploadZone');
     const progress = document.getElementById('uploadProgress');
     const progressFill = document.getElementById('progressFill');
     const progressLabel = document.getElementById('progressLabel');
     const progressPercent = document.getElementById('progressPercent');
+    const refreshButton = document.getElementById('uploadRefresh');
+    const uploadFolder = '@uploadFolder';
+    const token = uploadZone.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+    let uploading = false;
 
-    fileInput.addEventListener('change', handleFiles);
+    // The success message survives the reload that refreshes the grid.
+    try {
+        const pending = sessionStorage.getItem('media:uploaded');
+        if (pending) { sessionStorage.removeItem('media:uploaded'); InkwellDialog.toast('success', pending, 4000); }
+    } catch (e) { /* storage unavailable: the grid itself shows the result */ }
 
-    // Drag and drop visual feedback
-    uploadZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadZone.classList.add('border-primary', 'bg-primary/5');
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleUpload(e.target.files);
     });
 
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (uploading) return;
+        uploadZone.classList.add('border-primary', 'bg-primary/5');
+    });
     uploadZone.addEventListener('dragleave', () => {
         uploadZone.classList.remove('border-primary', 'bg-primary/5');
     });
-
     uploadZone.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadZone.classList.remove('border-primary', 'bg-primary/5');
-        if (e.dataTransfer.files.length) {
-            handleUpload(e.dataTransfer.files);
-        }
+        if (!uploading && e.dataTransfer.files.length) handleUpload(e.dataTransfer.files);
     });
+    refreshButton.addEventListener('click', () => window.location.reload());
 
-    function handleFiles(e) {
-        if (e.target.files.length) {
-            handleUpload(e.target.files);
-        }
+    function setUploading(on) {
+        uploading = on;
+        fileInput.disabled = on;                 // the input covers the zone, so this also stops click-to-browse
+        uploadZone.setAttribute('aria-busy', on ? 'true' : 'false');
+        InkwellDesk.busy(on);
     }
 
-            async function handleUpload(files) {
-            progress.classList.remove('hidden');
-            // Grab the token from the hidden input we just added at the top
-            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    async function reasonOf(response) {
+        let text = '';
+        try { text = await response.text(); } catch (e) { /* no body */ }
+        try { const json = JSON.parse(text); if (json && json.error) return json.error; } catch (e) { /* not JSON */ }
+        if (response.status === 400 && !text) return 'The request was refused. Reload the page and try again.';
+        return text && text.length < 200 ? text : ('HTTP ' + response.status);
+    }
 
-            let completed = 0;
-            let hasErrors = false;
-            const total = files.length;
+    async function handleUpload(files) {
+        if (uploading || !files.length) return;
+        setUploading(true);
+        progress.classList.remove('hidden');
+        refreshButton.classList.add('hidden');
+        progressFill.classList.remove('bg-red-500');
+        progressFill.classList.add('bg-primary');
+        progressFill.style.width = '0%';
+        progressPercent.textContent = '0%';
 
+        const total = files.length;
+        let done = 0, failed = 0;
+        try {
             for (let i = 0; i < total; i++) {
                 const file = files[i];
-                progressLabel.textContent = `Uploading ${file.name}...`;
+                progressLabel.textContent = `Uploading ${file.name}…`;
 
                 const formData = new FormData();
                 formData.append('file', file);
-
-                // FIX: Append the token directly to the FormData, NOT the headers
-                if (token) {
-                    formData.append('__RequestVerificationToken', token);
-                }
+                formData.append('folder', uploadFolder);
 
                 try {
-                    // FIX: Removed the custom 'headers' entirely.
-                    // The browser will automatically set the correct multipart/form-data headers.
-                    const response = await fetch('/admin/Media/upload', {
+                    const response = await fetch('/admin/media/upload', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        headers: token ? { 'RequestVerificationToken': token } : {}
                     });
-
-                    if (!response.ok) {
-                        hasErrors = true;
-                        console.error(`Server rejected file ${file.name} with status ${response.status}`);
+                    if (response.ok) {
+                        done++;
+                    } else {
+                        failed++;
+                        InkwellDialog.toast('error', `${file.name}: ${await reasonOf(response)}`, 8000);
                     }
                 } catch (error) {
-                    hasErrors = true;
-                    console.error('Network or fetch error for file', file.name, error);
+                    failed++;
+                    InkwellDialog.toast('error', `${file.name}: the server could not be reached.`, 8000);
                 }
 
-                completed++;
-                const pct = Math.round((completed / total) * 100);
+                const pct = Math.round(((i + 1) / total) * 100);
                 progressFill.style.width = pct + '%';
                 progressPercent.textContent = pct + '%';
             }
-
-            if (!hasErrors) {
-                progressLabel.textContent = 'Upload Complete!';
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                progressLabel.textContent = 'Finished with errors. Check F12 Console.';
-                progressFill.classList.remove('bg-primary');
-                progressFill.classList.add('bg-red-500');
-            }
+        } finally {
+            setUploading(false);
+            fileInput.value = '';
         }
 
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(window.location.origin + text).then(() => {
-            // Could show a toast notification here
-            alert('URL Copied!'); 
-        });
+        const summary = `Uploaded ${done} file${done === 1 ? '' : 's'}.`;
+        if (failed === 0) {
+            progressLabel.textContent = summary;
+            try { sessionStorage.setItem('media:uploaded', summary); } catch (e) { /* toast is lost, grid still refreshes */ }
+            window.location.reload(); // the folder, search and page are in the query string, so the tab survives
+        } else if (done > 0) {
+            // Keep the page so the error toasts stay readable; the operator refreshes when ready.
+            progressLabel.textContent = `${summary} ${failed} failed.`;
+            refreshButton.classList.remove('hidden');
+        } else {
+            progressLabel.textContent = failed === 1 ? 'The file was not uploaded.' : 'No files were uploaded.';
+            progressFill.classList.remove('bg-primary');
+            progressFill.classList.add('bg-red-500');
+        }
     }
+
+    document.addEventListener('click', (e) => {
+        const button = e.target.closest('[data-copy-url]');
+        if (!button) return;
+        const url = window.location.origin + button.dataset.copyUrl;
+        if (!navigator.clipboard) {
+            InkwellDialog.toast('error', 'Copying is not available here. The URL is ' + url, 8000);
+            return;
+        }
+        navigator.clipboard.writeText(url)
+            .then(() => InkwellDialog.toast('success', 'URL copied.', 2500))
+            .catch(() => InkwellDialog.toast('error', 'Could not copy. The URL is ' + url, 8000));
+    });
+})();
 </script>
 }

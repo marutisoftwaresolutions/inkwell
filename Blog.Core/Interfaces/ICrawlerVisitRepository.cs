@@ -15,4 +15,10 @@ public interface ICrawlerVisitRepository
 
     /// <summary>Daily AI-crawler visit counts over the window, oldest first, for the trend.</summary>
     Task<IReadOnlyList<CrawlerDay>> GetDailyAiVisitsAsync(Guid? ownerId, int days);
+
+    /// <summary>Every owner that has at least one recorded visit — the retention job prunes per owner.</summary>
+    Task<IReadOnlyList<Guid>> GetOwnerIdsAsync();
+
+    /// <summary>Deletes the owner's visits recorded before the cut-off; returns the rows removed.</summary>
+    Task<int> PruneAsync(Guid ownerId, DateTime olderThanUtc);
 }

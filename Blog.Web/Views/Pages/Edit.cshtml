@@ -6,7 +6,7 @@
 }
 
 <div class="h-[calc(100vh-8rem)] flex flex-col" id="pageBuilderApp">
-    <form method="post" action="/admin/pages/edit/@Model.Id" id="pageForm" class="flex-1 flex flex-col h-full">
+    <form method="post" action="/admin/pages/edit/@Model.Id" id="pageForm" data-track-changes class="flex-1 flex flex-col h-full">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Content" id="pageContent" value="@Model.Content" />
 
@@ -18,15 +18,18 @@
                     Back
                 </a>
                 <span class="text-xs text-muted-foreground hidden sm:inline-block border-l border-border pl-4">Editing: <span class="font-mono">@Model.Slug</span></span>
-                <input type="text" name="Title" id="pageTitle" value="@Model.Title" placeholder="Page title…" required
+                <input type="text" name="Title" id="pageTitle" value="@Model.Title" aria-label="Title" placeholder="Page title…" required
                        class="text-xl font-bold bg-transparent focus:outline-none placeholder:text-muted-foreground/40 w-64 border-b border-transparent focus:border-primary transition-colors" />
             </div>
             <div class="flex items-center gap-2">
-                <button type="submit" name="action" value="draft" class="px-3 py-1.5 border border-input bg-background hover:bg-accent rounded-md text-xs font-medium transition-colors">
+                <span data-dirty-indicator hidden>Unsaved changes</span> <button type="submit" name="action" value="draft" class="px-3 py-1.5 border border-input bg-background hover:bg-accent rounded-md text-xs font-medium transition-colors">
                     @(Model.IsPublished ? "Unpublish" : "Save Draft")
                 </button>
                 <button type="button" id="publishBtn" class="px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-xs font-medium shadow-sm transition-colors">
                     @(Model.IsPublished ? "Update" : "Publish")
+                </button>
+                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Page settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-1.5 border border-input rounded-md">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </button>
             </div>
         </div>
@@ -37,34 +40,34 @@
 
             <!-- LEFT: Component Palette -->
             <div class="w-14 bg-card border-r border-border flex flex-col items-center py-3 gap-1 shrink-0 overflow-y-auto" id="componentPalette">
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading" aria-label="Heading">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text Block">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text Block" aria-label="Text Block">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image" aria-label="Image">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button" aria-label="Button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero Section">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero Section" aria-label="Hero Section">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text" aria-label="Image + Text">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="9" height="18" rx="1"/><line x1="14" y1="8" x2="22" y2="8"/><line x1="14" y1="12" x2="22" y2="12"/><line x1="14" y1="16" x2="20" y2="16"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="quote" draggable="true" title="Quote">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="quote" draggable="true" title="Quote" aria-label="Quote">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="divider" draggable="true" title="Divider">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="divider" draggable="true" title="Divider" aria-label="Divider">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><line x1="3" y1="12" x2="21" y2="12"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="spacer" draggable="true" title="Spacer">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="spacer" draggable="true" title="Spacer" aria-label="Spacer">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M12 5v14"/><path d="M18 8l-6-3-6 3"/><path d="M18 16l-6 3-6-3"/></svg>
                 </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="video" draggable="true" title="Video Embed">
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="video" draggable="true" title="Video Embed" aria-label="Video Embed">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 </button>
             </div>
@@ -80,10 +83,20 @@
             </div>
 
             <!-- RIGHT: Settings Panel -->
-            <aside id="settingsPanel" class="w-72 bg-card border-l border-border overflow-y-auto shrink-0">
+            <aside id="settingsPanel" class="hidden md:flex flex-col fixed inset-0 z-40 md:static md:inset-auto md:z-auto w-full md:w-72 bg-card md:border-l border-border overflow-y-auto shrink-0" aria-labelledby="settingsPanelTitle">
                 <div id="pageSettingsView" class="p-4">
-                    <h3 class="font-semibold mb-4 text-sm">Page Settings</h3>
-                    <div class="space-y-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 id="settingsPanelTitle" class="font-semibold text-sm">Page Settings</h3>
+                        <button type="button" data-settings-close onclick="toggleSettingsPanel(false)" aria-label="Close page settings" class="md:hidden h-8 w-8 inline-flex items-center justify-center rounded-md border border-input hover:bg-muted">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <details class="group" data-desk-section="page-publishing" open>
+                    <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
+                        <span>Publishing</span>
+                        <svg class="transition-transform group-open:rotate-180 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </summary>
+                    <div class="space-y-4 pt-2 pb-4">
                         <div>
                             <label class="block text-xs font-medium mb-1 text-muted-foreground">URL Slug</label>
                             <input type="text" name="Slug" id="slugInput" value="@Model.Slug" placeholder="auto-generated" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
@@ -106,9 +119,23 @@
                                     class="mt-1 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model?.FeaturedImageUrl) ? "hidden" : "")" id="RemoveFeaturedImageBtn">Remove</button>
                         </div>
                         
-                        <div class="pt-3 border-t border-border space-y-3">
-                            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">SEO & Social</label>
-                            
+                        <div class="pt-3 border-t border-border">
+                            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Revisions</label>
+                            <div hx-get="/admin/revisions/page/@Model.Id" hx-trigger="load" hx-swap="innerHTML">
+                                <p class="text-[11px] text-muted-foreground">Loading history…</p>
+                            </div>
+                        </div>
+
+                    </div>
+                    </details>
+
+                    <details class="group border-t border-border" data-desk-section="page-seo">
+                    <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
+                        <span>SEO and social</span>
+                        <svg class="transition-transform group-open:rotate-180 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </summary>
+                        <div class="pt-2 pb-4 space-y-3">
+
                             <div>
                                 <label class="block text-[10px] font-medium mb-1 text-muted-foreground">Meta Title</label>
                                 <input type="text" name="MetaTitle" value="@Model.MetaTitle" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
@@ -137,7 +164,7 @@
                             <div>
                                 <label class="block text-[10px] font-medium mb-1 text-muted-foreground">OG Image</label>
                                 <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.OgImage) ? "hidden" : "")" id="OgImagePreviewWrapper">
-                                    <img id="OgImagePreview" src="@Model.OgImage" class="w-full h-auto rounded border" />
+                                    <img id="OgImagePreview" src="@Model.OgImage" alt="Open Graph image preview" class="w-full h-auto rounded border" />
                                 </div>
                                 <div class="flex gap-2">
                                     <input type="text" name="OgImage" id="OgImageInput" value="@Model.OgImage" class="flex-1 px-3 py-2 bg-background border border-input rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-ring" placeholder="https://" />
@@ -160,7 +187,7 @@
                             <div>
                                 <label class="block text-[10px] font-medium mb-1 text-muted-foreground">Twitter Image</label>
                                 <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.TwitterImage) ? "hidden" : "")" id="TwitterImagePreviewWrapper">
-                                    <img id="TwitterImagePreview" src="@Model.TwitterImage" class="w-full h-auto rounded border" />
+                                    <img id="TwitterImagePreview" src="@Model.TwitterImage" alt="Twitter card image preview" class="w-full h-auto rounded border" />
                                 </div>
                                 <div class="flex gap-2">
                                     <input type="text" name="TwitterImage" id="TwitterImageInput" value="@Model.TwitterImage" class="flex-1 px-3 py-2 bg-background border border-input rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-ring" placeholder="https://" />
@@ -170,7 +197,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </details>
                 </div>
                 <div id="componentSettingsView" class="p-4 hidden">
                     <div class="flex items-center justify-between mb-4">
@@ -188,6 +215,32 @@
 </div>
 
 <partial name="_MediaSelectorModal" />
+
+<script>
+    // Phone-width settings sheet: hidden until asked for, then covers the canvas. Desktop keeps the fixed column.
+    window.toggleSettingsPanel = function (open) {
+        var panel = document.getElementById('settingsPanel'), toggle = document.getElementById('settingsToggle');
+        var show = typeof open === 'boolean' ? open : panel.classList.contains('hidden');
+        panel.classList.toggle('hidden', !show);
+        panel.classList.toggle('flex', show);
+        if (toggle) toggle.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) { var close = panel.querySelector('[data-settings-close]'); if (close) close.focus(); }
+        else if (toggle) toggle.focus();
+    };
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || !window.matchMedia('(max-width: 767.98px)').matches) return;
+        var panel = document.getElementById('settingsPanel');
+        if (panel && !panel.classList.contains('hidden')) toggleSettingsPanel(false);
+    });
+    // Sidebar sections remember whether they were open, per section, in this browser only.
+    (function () {
+        document.querySelectorAll('details[data-desk-section]').forEach(function (d) {
+            var key = 'desk.section.' + d.dataset.deskSection;
+            try { var saved = localStorage.getItem(key); if (saved === '1') d.open = true; else if (saved === '0') d.open = false; } catch (e) { /* storage unavailable: keep the default */ }
+            d.addEventListener('toggle', function () { try { localStorage.setItem(key, d.open ? '1' : '0'); } catch (e) { /* nothing to remember with */ } });
+        });
+    })();
+</script>
 
 <div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
     <div class="bg-card w-full max-w-sm rounded-lg shadow-lg border border-border p-6">
@@ -258,13 +311,18 @@
         quote: () => `<div class="comp-quote"><blockquote contenteditable="true">"The best way to predict the future is to create it."</blockquote><cite contenteditable="true">— Abraham Lincoln</cite></div>`,
         divider: () => `<div class="comp-divider"><hr/></div>`,
         spacer: () => `<div class="comp-spacer" style="height:60px;"><span>spacer</span></div>`,
-        video: () => {
-            const url = prompt('Enter YouTube or Vimeo URL:');
+        // Asks for the URL through the Desk dialog with live validation; returns a Promise of HTML.
+        video: () => InkwellDialog.prompt({
+            title: 'Embed a video',
+            body: 'Paste a YouTube or Vimeo link. The player is embedded lazily and never blocks the page.',
+            label: 'Video URL', placeholder: 'https://www.youtube.com/watch?v=…', action: 'Embed video',
+            validate: v => v.trim() && !parseVideoUrl(v.trim()) ? 'That is not a YouTube or Vimeo URL.' : null,
+            valid: 'Looks good.'
+        }).then(url => {
             if (!url) return null;
             const embedUrl = parseVideoUrl(url);
-            if (!embedUrl) { alert('Invalid video URL'); return null; }
-            return `<div class="comp-video"><iframe src="${embedUrl}" allowfullscreen loading="lazy"></iframe></div>`;
-        }
+            return embedUrl ? `<div class="comp-video"><iframe src="${embedUrl}" allowfullscreen loading="lazy"></iframe></div>` : null;
+        })
     };
 
     function parseVideoUrl(url) {
@@ -331,11 +389,11 @@
     function createBlock(html, type) {
         const block = document.createElement('div'); block.className = 'builder-block'; block.dataset.type = type; block.draggable = true;
         block.innerHTML = `<div class="block-toolbar">
-            <button type="button" class="drag-handle" title="Drag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></button>
-            <button type="button" onclick="moveBlock(this,-1)" title="Up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
-            <button type="button" onclick="moveBlock(this,1)" title="Down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-            <button type="button" onclick="duplicateBlock(this)" title="Duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-            <button type="button" onclick="deleteBlock(this)" title="Delete" style="color:var(--destructive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            <button type="button" class="drag-handle" title="Drag" aria-label="Drag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></button>
+            <button type="button" onclick="moveBlock(this,-1)" title="Up" aria-label="Up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+            <button type="button" onclick="moveBlock(this,1)" title="Down" aria-label="Down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+            <button type="button" onclick="duplicateBlock(this)" title="Duplicate" aria-label="Duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            <button type="button" onclick="deleteBlock(this)" title="Delete" aria-label="Delete" style="color:var(--destructive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
         </div><div class="block-content">${html}</div>`;
         block.addEventListener('dragstart', onBlockDragStart); block.addEventListener('dragend', onBlockDragEnd);
         block.addEventListener('dragover', onBlockDragOver); block.addEventListener('drop', onBlockDrop);
@@ -349,7 +407,7 @@
         if (e.target.id === 'canvasScroll' || e.target.id === 'canvas' || e.target.id === 'canvasEmpty') showPageSettings();
     });
 
-    function addBlock(type, insertBefore) { const html = components[type](); if(html===null) return; const block = createBlock(html,type); if(insertBefore) canvas.insertBefore(block,insertBefore); else canvas.appendChild(block); updateEmptyState(); selectBlock(block); }
+    function addBlock(type, insertBefore) { Promise.resolve(components[type]()).then(html => { if(html===null||html===undefined) return; const block = createBlock(html,type); if(insertBefore) canvas.insertBefore(block,insertBefore); else canvas.appendChild(block); updateEmptyState(); selectBlock(block); }); }
     function updateEmptyState() { canvasEmpty.style.display = canvas.querySelectorAll('.builder-block').length === 0 ? 'flex' : 'none'; }
 
     // ── PALETTE ──

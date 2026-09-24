@@ -43,7 +43,7 @@ public class SettingRepository : ISettingRepository
         using var conn = _ctx.CreateConnection();
         await conn.ExecuteAsync(@"
             MERGE Settings AS target
-            USING (SELECT @UserId AS UserId, @JsonPayload AS JsonPayload, GETDATE() AS UpdatedAt) AS source
+            USING (SELECT @UserId AS UserId, @JsonPayload AS JsonPayload, GETUTCDATE() AS UpdatedAt) AS source
             ON target.UserId = source.UserId
             WHEN MATCHED THEN
                 UPDATE SET JsonPayload = source.JsonPayload, UpdatedAt = source.UpdatedAt

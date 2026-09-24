@@ -1,0 +1,79 @@
+/* ── Inkwell Editorial Desk palette ─────────────────────────── */
+:root {
+    --background:                 #FAF7F2;  /* ink-cream */
+    --foreground:                 #1A1A1A;  /* ink-black */
+    --card:                       #F4EFE6;  /* surface */
+    --card-foreground:            #1A1A1A;
+    --popover:                    #FAF7F2;
+    --popover-foreground:         #1A1A1A;
+    --primary:                    #1A1A1A;  /* ink-black — Compose button bg */
+    --primary-foreground:         #FAF7F2;  /* cream — Compose button text */
+    --secondary:                  #F4EFE6;  /* surface */
+    --secondary-foreground:       #1A1A1A;
+    --muted:                      #EFE9DC;  /* surface-2 */
+    --muted-foreground:           #8B7355;  /* ink-sepia */
+    --accent:                     #E8E1D3;  /* cream-edge — hover bg */
+    --accent-foreground:          #1A1A1A;
+    --destructive:                #8C2A1F;  /* burgundy */
+    --destructive-foreground:     #FAF7F2;
+    --border:                     #E8E1D3;
+    --input:                      #E8E1D3;
+    --ring:                       #1A1A1A;
+    --sidebar:                    #F4EFE6;  /* slightly off-cream sidebar */
+    --sidebar-foreground:         #1A1A1A;
+    --sidebar-primary:            #1A1A1A;  /* active nav bg */
+    --sidebar-primary-foreground: #FAF7F2;
+    --sidebar-accent:             #EFE9DC;  /* hover bg */
+    --sidebar-accent-foreground:  #1A1A1A;
+    --sidebar-border:             #E8E1D3;
+    --sidebar-ring:               #1A1A1A;
+    --radius:                     2px;
+}
+
+body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Geist', 'Inter', system-ui, sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ── Dark scheme (Settings → Colour scheme: system follows the OS; dark forces it) ── */
+@media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+        color-scheme: dark;
+        --background: #16140F; --foreground: #F4EFE6;
+        --card: #1E1B16; --card-foreground: #F4EFE6;
+        --popover: #1E1B16; --popover-foreground: #F4EFE6;
+        --primary: #F4EFE6; --primary-foreground: #16140F;
+        --secondary: #26221C; --secondary-foreground: #F4EFE6;
+        --muted: #26221C; --muted-foreground: #B49A78;
+        --accent: #332E26; --accent-foreground: #F4EFE6;
+        --destructive: #E06B5E; --destructive-foreground: #16140F;
+        --border: #332E26; --input: #332E26; --ring: #F4EFE6;
+        --sidebar: #1A1712; --sidebar-foreground: #F4EFE6;
+        --sidebar-primary: #F4EFE6; --sidebar-primary-foreground: #16140F;
+        --sidebar-accent: #26221C; --sidebar-accent-foreground: #F4EFE6;
+        --sidebar-border: #332E26; --sidebar-ring: #F4EFE6;
+    }
+}
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --background: #16140F; --foreground: #F4EFE6;
+    --card: #1E1B16; --card-foreground: #F4EFE6;
+    --popover: #1E1B16; --popover-foreground: #F4EFE6;
+    --primary: #F4EFE6; --primary-foreground: #16140F;
+    --secondary: #26221C; --secondary-foreground: #F4EFE6;
+    --muted: #26221C; --muted-foreground: #B49A78;
+    --accent: #332E26; --accent-foreground: #F4EFE6;
+    --destructive: #E06B5E; --destructive-foreground: #16140F;
+    --border: #332E26; --input: #332E26; --ring: #F4EFE6;
+    --sidebar: #1A1712; --sidebar-foreground: #F4EFE6;
+    --sidebar-primary: #F4EFE6; --sidebar-primary-foreground: #16140F;
+    --sidebar-accent: #26221C; --sidebar-accent-foreground: #F4EFE6;
+    --sidebar-border: #332E26; --sidebar-ring: #F4EFE6;
+}

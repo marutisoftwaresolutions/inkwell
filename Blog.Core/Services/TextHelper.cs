@@ -52,4 +52,38 @@ public static class TextHelper
         var branded = $"{rawTitle} | {siteName}";
         return branded.Length <= MaxBrandedTitleLength ? branded : rawTitle;
     }
+
+    /// <summary>
+    /// Adult silent-reading speed for non-fiction English, in words per minute — the figure most
+    /// reading-time estimators converge on. One constant for every layout so two screens cannot
+    /// disagree about the same post.
+    /// </summary>
+    public const int WordsPerMinute = 238;
+
+    private static readonly Regex _tag = new(@"<[^>]+>", RegexOptions.Compiled);
+    private static readonly Regex _word = new(@"[\p{L}\p{N}]+(?:[’'\-][\p{L}\p{N}]+)*", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Words in the text, counting HTML tags as nothing. A hyphenated or apostrophised word is one
+    /// word; punctuation-only tokens are none. Works for any script that has letters or digits.
+    /// </summary>
+    public static int CountWords(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+        var stripped = _tag.Replace(text, " ");
+        return _word.Matches(System.Net.WebUtility.HtmlDecode(stripped)).Count;
+    }
+
+    /// <summary>
+    /// "N min read" for a post body. Prefers the stored plaintext; falls back to stripping the HTML
+    /// when plaintext is missing (older posts, API writes). Never less than one minute — a short
+    /// note is still a read, and "0 min read" reads as broken.
+    /// </summary>
+    public static int ReadingMinutes(string? plaintext, string? html = null, int wordsPerMinute = WordsPerMinute)
+    {
+        var words = CountWords(plaintext);
+        if (words == 0) words = CountWords(html);
+        if (wordsPerMinute <= 0) wordsPerMinute = WordsPerMinute;
+        return Math.Max(1, (int)Math.Round(words / (double)wordsPerMinute, MidpointRounding.AwayFromZero));
+    }
 }

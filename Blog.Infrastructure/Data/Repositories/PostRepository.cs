@@ -37,7 +37,7 @@ public class PostRepository : IPostRepository
         {
             if (filter.Status.Value == PostStatus.Published)
             {
-                where.Add("(p.Status = 'Published' AND p.PublishedAt <= GETDATE() OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))");
+                where.Add("(p.Status = 'Published' AND p.PublishedAt <= GETUTCDATE() OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETUTCDATE()))");
             }
             else
             {
@@ -215,7 +215,7 @@ public class PostRepository : IPostRepository
                 post.AuthorId, Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
                 post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson, post.AnswerCapsule,
-                CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
             });
     }
 
@@ -242,7 +242,7 @@ public class PostRepository : IPostRepository
                 Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
                 post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson, post.AnswerCapsule,
-                UpdatedAt = DateTime.Now, post.Id, post.AuthorId
+                UpdatedAt = DateTime.UtcNow, post.Id, post.AuthorId
             });
     }
 
@@ -283,7 +283,7 @@ public class PostRepository : IPostRepository
         if (status.HasValue) 
         {
             if (status.Value == PostStatus.Published)
-                sql += " AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= GETDATE()))";
+                sql += " AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= GETUTCDATE()))";
             else
                 sql += " AND Status = @Status";
         }
@@ -300,7 +300,7 @@ public class PostRepository : IPostRepository
     public async Task<int> GetViewsTodayAsync(Guid? authorId = null)
     {
         using var conn = _ctx.CreateConnection();
-        var sql = "SELECT ISNULL(SUM(ViewCount), 0) FROM Posts WHERE CAST(UpdatedAt AS DATE) = CAST(GETDATE() AS DATE)";
+        var sql = "SELECT ISNULL(SUM(ViewCount), 0) FROM Posts WHERE CAST(UpdatedAt AS DATE) = CAST(GETUTCDATE() AS DATE)";
         if (authorId.HasValue) sql += " AND AuthorId = @AuthorId";
         
         return await conn.ExecuteScalarAsync<int>(sql, new { AuthorId = authorId });
@@ -390,7 +390,7 @@ public class PostRepository : IPostRepository
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE p.Id != @PostId
-              AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETDATE()))
+              AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETUTCDATE()))
             {orderBy}";
 
         return (await conn.QueryAsync<Post>(sql, p)).ToList();

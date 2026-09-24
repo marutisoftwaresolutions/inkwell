@@ -21,12 +21,24 @@ public class BlogController : Controller
     private readonly IUserRepository _users;
     private readonly IRedirectRepository _redirects;
     private readonly ReCaptchaService _recaptcha;
+    private readonly Blog.Web.Services.CommentFormTokenService _commentToken;
+    private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
+    private readonly ILogger<BlogController> _log;
+    private readonly Blog.Web.Services.PreviewLinkService _previewLinks;
 
     public BlogController(IPostRepository posts, IPageRepository pages, ICategoryRepository categories,
         ITagRepository tags, ISeriesRepository series, ICommentRepository comments, ISettingRepository settings,
         ICustomThemeSettingRepository themeSettings, ITenantContext tenantContext, IUserRepository users,
-        IRedirectRepository redirects, ReCaptchaService recaptcha)
+        IRedirectRepository redirects, ReCaptchaService recaptcha,
+        Blog.Web.Services.CommentFormTokenService commentToken,
+        Blog.Web.Services.Security.IpFirewallService firewall,
+        ILogger<BlogController> log,
+        Blog.Web.Services.PreviewLinkService previewLinks)
     {
+        _previewLinks = previewLinks;
+        _commentToken = commentToken;
+        _firewall = firewall;
+        _log = log;
         _posts = posts;
         _pages = pages;
         _categories = categories;
@@ -362,7 +374,7 @@ public class BlogController : Controller
         if (page != null) return View("Page", page);
 
         var post = await _posts.GetBySlugAsync(slug);
-        if (post == null || (post.Status != Blog.Core.Domain.PostStatus.Published && !(post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.Now)))
+        if (post == null || (post.Status != Blog.Core.Domain.PostStatus.Published && !(post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)))
         {
             // Check the Redirects table — the slug may have moved (e.g. a year update), or the URL
             // may be a retired legacy route that must answer 410 Gone rather than 404 so search
@@ -380,13 +392,35 @@ public class BlogController : Controller
             return NotFound();
         }
 
-        // Only count views from anonymous visitors — skip admin/editor sessions
-        if (User.Identity?.IsAuthenticated != true)
-        {
-            await _posts.IncrementViewCountAsync(post.Id);
-            post.ViewCount += 1; // reflect increment so the view shows the current count
-        }
+        return await RenderPostAsync(post, ownerId, isPreview: false);
+    }
 
+    /// <summary>
+    /// A signed, expiring link that shows an unpublished post to a reviewer without an account.
+    /// Issued from the editor (PostsController.PreviewLink). Never indexed, never counted as a
+    /// view, comments closed; a published post previews the same way, showing the saved state.
+    /// </summary>
+    [HttpGet("preview/{token}")]
+    public async Task<IActionResult> Preview(string token)
+    {
+        var claim = _previewLinks.Validate(token);
+        if (claim is null) return NotFound();
+
+        var post = await _posts.GetByIdAsync(claim.Value.PostId, null);
+        if (post is null) return NotFound();
+
+        Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
+        Response.Headers["Cache-Control"] = "no-store";
+        ViewData["Robots"] = "noindex,nofollow";
+        ViewBag.IsPreview = true;
+        ViewBag.PreviewExpires = claim.Value.ExpiresUtc;
+
+        var ownerId = await GetOwnerUserIdAsync(_users);
+        return await RenderPostAsync(post, ownerId, isPreview: true);
+    }
+
+    private async Task<IActionResult> RenderPostAsync(Blog.Core.Domain.Post post, Guid ownerId, bool isPreview)
+    {
         // Build nested comment tree
         var flatComments = await _comments.GetApprovedForPostAsync(post.Id);
         var commentLookup = flatComments.ToDictionary(c => c.Id);
@@ -405,12 +439,21 @@ public class BlogController : Controller
             }
         }
         ViewBag.Comments = rootComments;
+        // Signed render-time token for the spam filter; the reply forms read it through ViewData.
+        try { ViewBag.CommentFormToken = _commentToken.Issue(post.Id); }
+        catch (Exception ex)
+        {
+            // A broken key ring must not take the page down; comments are rejected until it is fixed.
+            _log.LogError(ex, "Comment-form token could not be issued (Data Protection key ring?).");
+            ViewBag.CommentFormToken = string.Empty;
+        }
 
         var settingsId = _tenantContext.IsCloudMode ? ownerId : ownerId;
         ViewBag.OwnerId = settingsId;
 
         var userSettings = await _settings.GetSettingsAsync(settingsId);
-        ViewBag.CommentsEnabled = userSettings.CommentsEnabled;
+        ViewBag.CommentsEnabled = userSettings.CommentsEnabled && !isPreview;
+        ViewBag.DisplayTimeZone = userSettings.DisplayTimeZoneId;
         ViewBag.SiteLogoUrl = userSettings.SiteLogoUrl;
         ViewBag.SiteTwitter = userSettings.SocialTwitter;
         ViewData["SiteLanguage"] = string.IsNullOrWhiteSpace(userSettings.SiteLanguage) ? "en" : userSettings.SiteLanguage;
@@ -418,6 +461,42 @@ public class BlogController : Controller
         ViewBag.AuthorSlug = (await _users.GetByIdAsync(post.AuthorId))?.Slug;
         ViewBag.Categories = await _categories.GetPublicAsync(ownerId);
         var settings = await _themeSettings.GetAllAsync(ownerId);
+
+        // Conditional GET for anonymous readers and crawlers. The validators cover everything that
+        // changes the markup — the post, its approved comments, the theme, the site settings and the
+        // deployed build — so a 304 only ever stands in for a byte-identical page. Cache-Control is
+        // Only count views from anonymous visitors — skip admin/editor sessions and previews. Counted
+        // before the validator check so a returning reader who gets a 304 still counts (the ETag folds
+        // in ViewCount/100, so the count itself does not defeat caching).
+        if (!isPreview && User.Identity?.IsAuthenticated != true)
+        {
+            await _posts.IncrementViewCountAsync(post.Id);
+            post.ViewCount += 1;
+        }
+
+        // no-cache: every request still revalidates, it just skips the render and the transfer when
+        // nothing changed. Signed-in staff and previews are never served from a validator.
+        if (!isPreview && User.Identity?.IsAuthenticated != true)
+        {
+            var lastComment = flatComments.Count == 0 ? DateTime.MinValue : flatComments.Max(c => c.CreatedAt);
+            var lastModified = Blog.Core.Services.HttpCacheValidation.ToHttpDate(
+                new[] { post.UpdatedAt, post.PublishedAt ?? DateTime.MinValue, lastComment }.Max());
+            var etag = Blog.Core.Services.HttpCacheValidation.WeakETag(
+                post.Id, post.UpdatedAt, post.ViewCount / 100, flatComments.Count, lastComment,
+                string.Join(";", settings.OrderBy(s => s.SettingKey, StringComparer.Ordinal).Select(s => s.SettingKey + "=" + s.EffectiveValue)),
+                userSettings.SiteName, userSettings.SiteLogoUrl, userSettings.SiteLanguage, userSettings.DisplayTimeZoneId,
+                userSettings.CommentsEnabled, userSettings.SocialTwitter,
+                typeof(Program).Assembly.GetName().Version?.ToString());
+
+            Response.Headers.ETag = etag;
+            Response.Headers.LastModified = lastModified.ToString("R");
+            Response.Headers.CacheControl = "no-cache";
+
+            if (Blog.Core.Services.HttpCacheValidation.IsFresh(
+                    Request.Headers.IfNoneMatch.ToString(), etag,
+                    Request.Headers.IfModifiedSince.ToString(), lastModified))
+                return StatusCode(StatusCodes.Status304NotModified);
+        }
         var layoutIndexSetting = settings.FirstOrDefault(s => s.SettingKey == "layout-index");
         var layoutPostCardSetting = settings.FirstOrDefault(s => s.SettingKey == "layout-postcard");
         var layoutPostSetting = settings.FirstOrDefault(s => s.SettingKey == "layout-post");
@@ -460,37 +539,94 @@ public class BlogController : Controller
         var post = await _posts.GetBySlugAsync(slug);
         if (post == null) return NotFound();
 
+        // Every outcome lands the reader on the comments block, where the message and the form are,
+        // not at the top of the article. A rejected submission also carries the draft back so the
+        // reader does not retype it (Post.cshtml / _CommentThread.cshtml re-fill from TempData).
+        IActionResult BackToComments() =>
+            LocalRedirect((Url.Action("Post", new { slug }) ?? $"/{slug}") + "#comments");
+        void KeepDraft()
+        {
+            TempData["CommentDraftName"] = authorName ?? "";
+            TempData["CommentDraftEmail"] = authorEmail ?? "";
+            TempData["CommentDraftContent"] = content ?? "";
+            if (parentId.HasValue) TempData["CommentDraftParentId"] = parentId.Value.ToString();
+        }
+
         if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(authorEmail) || string.IsNullOrWhiteSpace(content))
         {
-            TempData["CommentError"] = "All fields are required.";
-            return RedirectToAction("Post", new { slug });
+            TempData["CommentError"] = "Name, email and comment are all needed.";
+            KeepDraft();
+            return BackToComments();
         }
 
         var captchaToken = Request.Form["g-recaptcha-response"].ToString();
         if (!await _recaptcha.ValidateAsync(captchaToken))
         {
-            TempData["CommentError"] = "reCAPTCHA verification failed. Please try again.";
-            return RedirectToAction("Post", new { slug });
+            TempData["CommentError"] = "The reCAPTCHA check did not pass. Please try again.";
+            KeepDraft();
+            return BackToComments();
         }
 
         var ownerId = await GetOwnerUserIdAsync(_users);
         var moderation = (await _settings.GetSettingsAsync(ownerId)).CommentsModeration;
+        var authorIp = _firewall.ResolveClientIp(HttpContext);
+        if (string.IsNullOrEmpty(authorIp)) authorIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        // Spam gate — public submissions only. Signed-in staff are never filtered or scored (the same
+        // invariant the IP firewall keeps), so an editor replying from the Desk cannot trip it.
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            var tokenState = _commentToken.Validate(
+                Request.Form[Blog.Web.Services.CommentFormTokenService.FieldName].ToString(), post.Id, out var formAge);
+
+            var submission = new Blog.Core.Services.CommentSubmission(
+                AuthorName: authorName,
+                AuthorEmail: authorEmail,
+                Content: content,
+                HoneypotValue: Request.Form[Blog.Web.Services.CommentFormTokenService.HoneypotFieldName].ToString(),
+                TokenState: tokenState,
+                FormAge: formAge,
+                IsDuplicateOfRecentComment: await _comments.HasRecentDuplicateAsync(
+                    post.AuthorId, content, Blog.Core.Services.CommentSpamFilter.DuplicateWindow),
+                RecentCommentsFromSameAddress: string.IsNullOrEmpty(authorIp) ? 0
+                    : await _comments.CountRecentFromAddressAsync(
+                        authorIp, Blog.Core.Services.CommentSpamFilter.RateWindow));
+
+            var verdict = Blog.Core.Services.CommentSpamFilter.Evaluate(submission);
+            switch (verdict.Action)
+            {
+                case Blog.Core.Services.CommentSpamAction.AskToRetry:
+                    _log.LogInformation("Comment on {Slug} needs a fresh form: {Reason}", slug, verdict.Reason);
+                    TempData["CommentError"] = "This comment form has expired. Please reload the page and try again.";
+                    KeepDraft();
+                    return BackToComments();
+
+                case Blog.Core.Services.CommentSpamAction.RejectSilently:
+                    // Nothing is stored. The reply is identical to a moderated submission's so the
+                    // sender cannot tell which rule fired; the firewall learns about it instead.
+                    _log.LogInformation("Comment on {Slug} discarded as spam: {Reason}", slug, verdict.Reason);
+                    await _firewall.RegisterCommentSpamAsync(HttpContext, verdict.Reason);
+                    TempData["CommentSuccess"] = "Your comment is awaiting moderation.";
+                    return BackToComments();
+            }
+        }
+
         var comment = new Blog.Core.Domain.Comment
         {
             PostId = post.Id,
-            AuthorName = authorName,
-            AuthorEmail = authorEmail,
-            Content = content,
+            AuthorName = authorName.Trim(),
+            AuthorEmail = authorEmail.Trim(),
+            Content = content.Trim(),
             ParentId = parentId,
             Status = Blog.Core.Domain.CommentStatus.Pending,
-            AuthorIp = HttpContext.Connection.RemoteIpAddress?.ToString()
+            AuthorIp = authorIp
         };
 
         await _comments.CreateAsync(comment);
         TempData["CommentSuccess"] = moderation
             ? "Your comment is awaiting moderation."
-            : "Comment posted!";
-        return RedirectToAction("Post", new { slug });
+            : "Comment posted.";
+        return BackToComments();
     }
 
     [HttpGet("feed")]
@@ -722,6 +858,10 @@ public class BlogController : Controller
         var ownerId = await GetOwnerUserIdAsync(_users);
         var settings = await _settings.GetSettingsAsync(ownerId);
         var categories = await _categories.GetAllAsync(ownerId);
+        var publishedPages = (await _pages.GetAllAsync(ownerId))
+            .Where(p => p.IsPublished && !string.IsNullOrWhiteSpace(p.Slug))
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
 
         var siteName = string.IsNullOrWhiteSpace(settings.SiteName) ? Request.Host.Value : settings.SiteName;
@@ -775,6 +915,18 @@ public class BlogController : Controller
             sb.AppendLine();
             foreach (var topic in topicNames)
                 sb.AppendLine($"- {topic}");
+            sb.AppendLine();
+        }
+
+        // Published CMS pages — About, Contact, Editorial Policy, Methodology — are what an answer
+        // engine reads to establish who the publisher is. Listed only when the tenant has some;
+        // drafts never appear. Nav visibility is irrelevant here: a published page is a public page.
+        if (publishedPages.Count > 0)
+        {
+            sb.AppendLine("## Pages");
+            sb.AppendLine();
+            foreach (var page in publishedPages)
+                sb.AppendLine($"- {page.Title}: {baseUrl}/{page.Slug}");
             sb.AppendLine();
         }
 
@@ -878,6 +1030,31 @@ public class BlogController : Controller
             {
                 sb.AppendLine($"- {topic.First().Name} ({topic.Count()} articles): {baseUrl}/tag/{topic.Key}");
                 sb.AppendLine($"  {string.Join("; ", topic.Select(x => x.Post.Title))}");
+            }
+            sb.AppendLine();
+        }
+
+        // Published CMS pages, with a one-line summary each (meta description, else the opening of
+        // the page). Same rule as llms.txt: only published pages, and no section when there are none.
+        var fullPages = (await _pages.GetAllAsync(ownerId))
+            .Where(p => p.IsPublished && !string.IsNullOrWhiteSpace(p.Slug))
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (fullPages.Count > 0)
+        {
+            sb.AppendLine("## Pages");
+            sb.AppendLine();
+            foreach (var page in fullPages)
+            {
+                var text = !string.IsNullOrWhiteSpace(page.MetaDescription)
+                    ? page.MetaDescription
+                    : System.Text.RegularExpressions.Regex.Replace(page.Content ?? string.Empty, "<[^>]+>", " ");
+                text = System.Net.WebUtility.HtmlDecode(text).Replace('\r', ' ').Replace('\n', ' ').Trim();
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+                if (text.Length > 180) text = text[..177].TrimEnd() + "...";
+                sb.AppendLine(string.IsNullOrEmpty(text)
+                    ? $"- {page.Title}: {baseUrl}/{page.Slug}"
+                    : $"- {page.Title}: {baseUrl}/{page.Slug} — {text}");
             }
             sb.AppendLine();
         }

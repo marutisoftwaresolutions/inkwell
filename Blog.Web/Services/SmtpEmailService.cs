@@ -15,6 +15,8 @@ public class SmtpEmailService : IEmailService
         _logger = logger;
     }
 
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_settings.Host);
+
     public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
     {
         if (string.IsNullOrWhiteSpace(_settings.Host))

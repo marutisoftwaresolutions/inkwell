@@ -9,12 +9,14 @@ public class ErrorController : Controller
     private readonly ISettingRepository _settings;
     private readonly ITenantContext _tenantContext;
     private readonly ErrorLogService _errorLog;
+    private readonly IPostRepository _posts;
 
-    public ErrorController(ISettingRepository settings, ITenantContext tenantContext, ErrorLogService errorLog)
+    public ErrorController(ISettingRepository settings, ITenantContext tenantContext, ErrorLogService errorLog, IPostRepository posts)
     {
         _settings = settings;
         _tenantContext = tenantContext;
         _errorLog = errorLog;
+        _posts = posts;
     }
 
     [Route("error/{statusCode}")]
@@ -40,6 +42,21 @@ public class ErrorController : Controller
         {
             case 404:
                 ViewData["Title"] = "Page Not Found";
+                // A dead end strands the reader: echo what they asked for (so a typo is obvious),
+                // offer search, and show what other readers open most. Fail-open — an empty list
+                // just hides the section.
+                ViewBag.RequestedPath = HttpContext.Request.Path.Value ?? "/";
+                try
+                {
+                    var recent = await _posts.GetPostsAsync(new PostFilter
+                    {
+                        Status = Blog.Core.Domain.PostStatus.Published,
+                        AuthorId = userId == Guid.Empty ? null : userId,
+                        Page = 1, PageSize = 24
+                    });
+                    ViewBag.PopularPosts = recent.Items.OrderByDescending(p => p.ViewCount).Take(5).ToList();
+                }
+                catch { ViewBag.PopularPosts = new List<Blog.Core.Domain.Post>(); }
                 return View("NotFound");
             case 410:
                 // Deliberately retired URL (e.g. a legacy product route). Distinct from 404 so the

@@ -34,6 +34,45 @@ public class SettingsViewModel
     [Display(Name = "Comment Moderation")]
     public bool CommentsModeration { get; set; }
 
+    [Required]
+    [Range(7, 3650)]
+    [Display(Name = "Keep AI-crawler visits for (days)")]
+    public int CrawlerVisitRetentionDays { get; set; } = 90;
+
+    [Display(Name = "Display time zone")]
+    public string? DisplayTimeZoneId { get; set; } = "UTC";
+
+    /// <summary>system (follow the reader's OS) · light · dark. Applies to the public site and the Desk.</summary>
+    [Display(Name = "Colour scheme")]
+    public string? ColorScheme { get; set; } = "system";
+
+    [Required]
+    [Range(1, 200)]
+    [Display(Name = "Revisions kept per post or page")]
+    public int RevisionsPerItem { get; set; } = 25;
+
+    // ── Search Console ───────────────────────────────────────────────────────
+    [Display(Name = "Search Console property")]
+    public string? SearchConsoleProperty { get; set; }
+
+    /// <summary>Write-only: pasted to connect or replace; never populated from stored settings.</summary>
+    [Display(Name = "Service-account key file (JSON)")]
+    public string? SearchConsoleServiceAccountJson { get; set; }
+
+    [Display(Name = "Disconnect Search Console")]
+    public bool SearchConsoleDisconnect { get; set; }
+
+    [Range(1, 16)]
+    [Display(Name = "Keep search data for (months)")]
+    public int SearchPerformanceRetentionMonths { get; set; } = 16;
+
+    /// <summary>Display only: the connected service account's email, or null when not connected.</summary>
+    public string? SearchConsoleConnectedAs { get; set; }
+    /// <summary>Display only: a credential is stored (even if the property is missing).</summary>
+    public bool SearchConsoleCredentialStored { get; set; }
+    /// <summary>Display only: newest date with pulled data.</summary>
+    public DateTime? SearchConsoleLatestDate { get; set; }
+
     [Display(Name = "Google Analytics Measurement ID")]
     public string? GoogleAnalyticsId { get; set; }
 

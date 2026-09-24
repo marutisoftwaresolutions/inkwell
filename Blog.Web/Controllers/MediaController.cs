@@ -19,7 +19,15 @@ public class MediaController : Controller
     private readonly ILogger<MediaController> _logger;
     private readonly AuditService _audit;
     private readonly IImageProcessingService _imageProcessing;
-    private static readonly HashSet<string> AllowedMimes = new(StringComparer.OrdinalIgnoreCase)
+
+    /// <summary>Files per library page. Also bounds the reference query behind the delete dialog.</summary>
+    public const int PageSize = 48;
+
+    /// <summary>Largest file the library accepts; the view quotes <see cref="MaxUploadMegabytes"/> so the copy cannot drift.</summary>
+    public const int MaxUploadMegabytes = 10;
+    public const long MaxUploadBytes = MaxUploadMegabytes * 1024L * 1024L;
+
+    private static readonly string[] AllowedMimeList =
     {
         "image/jpeg","image/png","image/gif","image/webp","image/svg+xml",
         "video/mp4","video/webm",
@@ -27,6 +35,26 @@ public class MediaController : Controller
         "application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     };
+    private static readonly HashSet<string> AllowedMimes = new(AllowedMimeList, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The file input's <c>accept</c> list — exactly the types <see cref="Upload"/> admits, nothing more.</summary>
+    public static readonly string AcceptAttribute = string.Join(",", AllowedMimeList);
+
+    /// <summary>Upload folders the library knows. The empty key is "every folder".</summary>
+    public static readonly IReadOnlyList<(string Key, string Label)> Folders = new[]
+    {
+        ("", "All"), ("images", "General"), ("og", "Open Graph"), ("twitter", "Twitter Cards")
+    };
+
+    /// <summary>Whitelists a folder from the query string or an upload form: unknown values become <paramref name="fallback"/>.</summary>
+    public static string NormalizeFolder(string? folder, string fallback = "")
+        => (folder ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "images" => "images",
+            "og" => "og",
+            "twitter" => "twitter",
+            _ => fallback
+        };
 
     public MediaController(IMediaRepository media, IWebHostEnvironment env, ILogger<MediaController> logger,
         AuditService audit, IImageProcessingService imageProcessing)
@@ -39,41 +67,53 @@ public class MediaController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(string? q, string? folder, int page = 1)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var items = await _media.GetAllAsync(userId, page, 48);
-        ViewBag.Total = await _media.GetTotalCountAsync(userId);
+        var query = (q ?? string.Empty).Trim();
+        var folderKey = NormalizeFolder(folder);
+        if (page < 1) page = 1;
+
+        var items = await _media.SearchAsync(userId, query, page, PageSize, folderKey);
+        var total = await _media.CountSearchAsync(userId, query, folderKey);
+        // Who still embeds each file on this page — the delete dialog says so instead of guessing.
+        var references = items.Count == 0
+            ? new Dictionary<Guid, List<MediaReference>>()
+            : await _media.FindReferencesAsync(items);
+
+        ViewBag.Total = total;
         ViewBag.Page = page;
+        ViewData["ListSearchPlaceholder"] = "Search files by name";
+        // The folder tab lives in the query string so search, paging and the post-delete redirect keep it.
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["folder"] = folderKey.Length == 0 ? null : folderKey };
+        ViewData["MediaFolder"] = folderKey;
+        ViewData["MediaReferences"] = references;
+        Blog.Web.Models.ListPaging.Stash(this, Blog.Web.Models.PagingMeta.FromCounts(query, page, total, PageSize, items.Count));
         return View(items);
     }
 
     [HttpPost("upload")]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600, ValueLengthLimit = 104857600)]
-    //[ValidateAntiForgeryToken]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Upload([FromForm] IFormFile? file, [FromForm] string folder = "images")
     {
         try
         {
             if (file == null || file.Length == 0)
-                return BadRequest(new { error = "No file provided." });
+                return BadRequest(new { error = "No file was received." });
 
-            if (file.Length > 10 * 1024 * 1024)
-                return BadRequest(new { error = "File exceeds 10MB limit." });
+            if (file.Length > MaxUploadBytes)
+                return BadRequest(new { error = $"The file is larger than {MaxUploadMegabytes} MB." });
 
             var mime = file.ContentType;
             if (!AllowedMimes.Contains(mime))
-                return BadRequest(new { error = "File type not allowed." });
+                return BadRequest(new { error = "That file type is not accepted. Upload an image, MP4 or WebM video, PDF, Word or Excel file." });
 
             // Save under wwwroot/uploads/{folder}/{yyyy-MM}. Raster images are auto-converted to WebP
             // (with dimensions captured) by the shared IImageProcessingService — the same code path the
             // content importer uses. Non-image types and SVG/WebP pass through unchanged.
-            var safeFolder = folder.ToLowerInvariant() switch {
-                "og" => "og",
-                "twitter" => "twitter",
-                _ => "images"
-            };
+            var safeFolder = NormalizeFolder(folder, "images");
             var relativeMonthDir = DateTime.UtcNow.ToString("yyyy-MM");
             var subdir = $"{safeFolder}/{relativeMonthDir}";
 
@@ -108,19 +148,20 @@ public class MediaController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "UPLOAD ERROR");
-            return StatusCode(500, new { error = ex.Message, details = ex.ToString() });
+            _logger.LogError(ex, "Media upload failed");
+            // The reason reaches the operator; the stack trace stays in the log.
+            return StatusCode(500, new { error = "The upload failed on the server: " + ex.Message });
         }
     }
 
     [HttpPost("delete/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, [FromForm] string? folder, [FromForm] string? q, [FromForm] int page = 1)
     {
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
             return Unauthorized();
-            
+
         var item = await _media.GetByIdAsync(id, userId);
         if (item != null)
         {
@@ -130,13 +171,13 @@ public class MediaController : Controller
                 // Remove the leading slash to make it a relative path for Path.Combine
                 filePath = filePath.TrimStart('/');
             }
-            
+
             if (!string.IsNullOrEmpty(filePath))
             {
                 var fullPath = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), filePath.Replace('/', Path.DirectorySeparatorChar));
                 _logger.LogInformation("Attempting to delete file from disk: {FullPath}", fullPath);
-                
-                if (System.IO.File.Exists(fullPath)) 
+
+                if (System.IO.File.Exists(fullPath))
                 {
                     System.IO.File.Delete(fullPath);
                     _logger.LogInformation("Successfully deleted from disk: {FullPath}", fullPath);
@@ -146,13 +187,21 @@ public class MediaController : Controller
                     _logger.LogWarning("File not found on disk: {FullPath}", fullPath);
                 }
             }
-            
+
             await _media.DeleteAsync(id, userId);
             _logger.LogInformation("Deleted DB record for media ID: {Id}", id);
             await _audit.LogAsync(AuditActions.MediaDeleted, "Media", id.ToString(), item.FileName);
         }
         TempData["Success"] = "File deleted.";
-        return RedirectToAction("Index");
+
+        // Back to the same folder tab, search and page the user deleted from.
+        var folderKey = NormalizeFolder(folder);
+        return RedirectToAction("Index", new
+        {
+            folder = folderKey.Length > 0 ? folderKey : null,
+            q = string.IsNullOrWhiteSpace(q) ? null : q.Trim(),
+            page = page > 1 ? page : (int?)null
+        });
     }
 
     [HttpGet("api")]
@@ -161,7 +210,7 @@ public class MediaController : Controller
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var items = await _media.GetAllAsync(userId, page, 50); // Fetch a batch for the modal
         var total = await _media.GetTotalCountAsync(userId);
-        
+
         return Json(new {
             items = items.Select(m => new {
                 id = m.Id,

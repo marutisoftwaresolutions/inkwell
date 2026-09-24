@@ -7,20 +7,23 @@
     var primaryAdmin = await UsersRepo.GetFirstAdminAsync();
     var ownerId = primaryAdmin?.Id ?? Guid.Empty;
     var settings = await SettingsRepo.GetSettingsAsync(ownerId);
-    var siteName = settings?.SiteName ?? "BLGFRNT";
+    var siteName = settings?.SiteName ?? "Inkwell";
     var siteInitial = !string.IsNullOrEmpty(siteName) ? siteName[0] : 'B';
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="@((settings?.Theme is "light" or "dark") ? settings!.Theme : "system")">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] – Admin</title>
+    <meta name="robots" content="noindex,nofollow" />
     
     <!-- Inkwell Fonts (self-hosted) -->
     <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true" />
     <!-- Inkwell design tokens -->
     <link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
+    <!-- Desk tokens: light palette plus the dark scheme (prefers-color-scheme: dark and data-theme="dark") -->
+    <link rel="stylesheet" href="~/css/desk-tokens.css" asp-append-version="true" />
     <!-- Admin stylesheet -->
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
     <!-- Lucide icons (self-hosted) -->
@@ -72,57 +75,11 @@
             }
         }
     </script>
-
-    <style>
-        /* ── Inkwell Editorial Desk palette ─────────────────────────── */
-        :root {
-            --background:                 #FAF7F2;  /* ink-cream */
-            --foreground:                 #1A1A1A;  /* ink-black */
-            --card:                       #F4EFE6;  /* surface */
-            --card-foreground:            #1A1A1A;
-            --popover:                    #FAF7F2;
-            --popover-foreground:         #1A1A1A;
-            --primary:                    #1A1A1A;  /* ink-black — Compose button bg */
-            --primary-foreground:         #FAF7F2;  /* cream — Compose button text */
-            --secondary:                  #F4EFE6;  /* surface */
-            --secondary-foreground:       #1A1A1A;
-            --muted:                      #EFE9DC;  /* surface-2 */
-            --muted-foreground:           #8B7355;  /* ink-sepia */
-            --accent:                     #E8E1D3;  /* cream-edge — hover bg */
-            --accent-foreground:          #1A1A1A;
-            --destructive:                #8C2A1F;  /* burgundy */
-            --destructive-foreground:     #FAF7F2;
-            --border:                     #E8E1D3;
-            --input:                      #E8E1D3;
-            --ring:                       #1A1A1A;
-            --sidebar:                    #F4EFE6;  /* slightly off-cream sidebar */
-            --sidebar-foreground:         #1A1A1A;
-            --sidebar-primary:            #1A1A1A;  /* active nav bg */
-            --sidebar-primary-foreground: #FAF7F2;
-            --sidebar-accent:             #EFE9DC;  /* hover bg */
-            --sidebar-accent-foreground:  #1A1A1A;
-            --sidebar-border:             #E8E1D3;
-            --sidebar-ring:               #1A1A1A;
-            --radius:                     2px;
-        }
-
-        body {
-            background-color: var(--background);
-            color: var(--foreground);
-            font-family: 'Geist', 'Inter', system-ui, sans-serif;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
-    </style>
 </head>
 <body class="min-h-screen flex antialiased">
     
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-sidebar border-r border-sidebar-border hidden md:flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 transform -translate-x-full md:translate-x-0">
+    <aside id="sidebar" aria-label="Admin navigation" class="w-64 bg-sidebar border-r border-sidebar-border flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 transform -translate-x-full md:translate-x-0">
         <div class="h-16 flex items-center px-6">
             <div class="flex items-center gap-2 font-bold text-xl text-sidebar-foreground">
                 <div class="w-8 h-8 rounded bg-sidebar-primary text-sidebar-primary-foreground flex items-center font-normal justify-center">
@@ -130,7 +87,7 @@
                 </div>
                 <span>@siteName</span>
             </div>
-            <button class="md:hidden ml-auto group" onclick="document.getElementById('sidebar').classList.add('-translate-x-full')">
+            <button type="button" class="md:hidden ml-auto group" data-nav-close aria-label="Close menu">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
@@ -139,101 +96,104 @@
             @{
                 var controller = ViewContext.RouteData.Values["controller"]?.ToString();
                 var action = ViewContext.RouteData.Values["action"]?.ToString();
+                bool IsActive(string ctrl, string? act = null) => ctrl == controller && (act == null || act == action);
+                // The active item is announced, not just coloured: aria-current="page" on the link.
+                string? NavCurrent(string ctrl, string? act = null) => IsActive(ctrl, act) ? "page" : null;
                 string NavClass(string ctrl, string? act = null) {
-                    bool isActive = (ctrl == controller && (act == null || act == action));
+                    bool isActive = IsActive(ctrl, act);
                     return isActive 
                         ? "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md bg-sidebar-accent text-sidebar-accent-foreground"
                         : "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors";
                 }
             }
 
-            <a href="/admin/dashboard" class="@NavClass("Dashboard")">
+            <a href="/admin/dashboard" class="@NavClass("Dashboard")" aria-current="@NavCurrent("Dashboard")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                 Dashboard
             </a>
             
-            <a href="/admin/posts" class="@NavClass("Posts")">
+            <a href="/admin/posts" class="@NavClass("Posts")" aria-current="@NavCurrent("Posts")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 Posts
             </a>
-            <a href="/admin/link-audit" class="@NavClass("LinkAudit")">
+            <a href="/admin/link-audit" class="@NavClass("LinkAudit")" aria-current="@NavCurrent("LinkAudit")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 Link Audit
             </a>
 
 
-            <a href="/admin/content-health" class="@NavClass("ContentHealth")">
+            <a href="/admin/content-health" class="@NavClass("ContentHealth")" aria-current="@NavCurrent("ContentHealth")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 Content Health
             </a>
 
-            <a href="/admin/categories" class="@NavClass("Categories")">
+            <a href="/admin/categories" class="@NavClass("Categories")" aria-current="@NavCurrent("Categories")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 Categories
             </a>
 
-            <a href="/admin/tags" class="@NavClass("Tags")">
+            <a href="/admin/tags" class="@NavClass("Tags")" aria-current="@NavCurrent("Tags")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                 Tags
             </a>
 
-            <a href="/admin/series" class="@NavClass("Series")">
+            <a href="/admin/series" class="@NavClass("Series")" aria-current="@NavCurrent("Series")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                 Series
             </a>
 
-            <a href="/admin/pages" class="@NavClass("Pages")">
+            <a href="/admin/pages" class="@NavClass("Pages")" aria-current="@NavCurrent("Pages")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                 Pages
             </a>
             
-            <a href="/admin/media" class="@NavClass("Media")">
+            <a href="/admin/media" class="@NavClass("Media")" aria-current="@NavCurrent("Media")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 Media
             </a>
 
-            <a href="/admin/import" class="@NavClass("Import")">
+            <a href="/admin/import" class="@NavClass("Import")" aria-current="@NavCurrent("Import")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Import
             </a>
             
-            <a href="/admin/comments" class="@NavClass("Comments")">
+            <a href="/admin/comments" class="@NavClass("Comments")" aria-current="@NavCurrent("Comments")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 Comments
             </a>
 
-            <a href="/admin/analytics" class="@NavClass("Analytics")">
+            <a href="/admin/analytics" class="@NavClass("Analytics")" aria-current="@NavCurrent("Analytics")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 Analytics
             </a>
 
-            <a href="/admin/ai-crawlers" class="@NavClass("AiCrawlers")">
+            <a href="/admin/ai-crawlers" class="@NavClass("AiCrawlers")" aria-current="@NavCurrent("AiCrawlers")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><line x1="9" y1="13" x2="9" y2="15"/><line x1="15" y1="13" x2="15" y2="15"/><path d="M2 14h2"/><path d="M20 14h2"/></svg>
                 AI Crawlers
             </a>
 
             @if (User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value == "Admin")
             {
-                <a href="/admin/audit" class="@NavClass("Audit")">
+                <a href="/admin/audit" class="@NavClass("Audit")" aria-current="@NavCurrent("Audit")">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     Audit Trail
                 </a>
-                <a href="/admin/errors" class="@NavClass("Errors")">
+                <a href="/admin/errors" class="@NavClass("Errors")" aria-current="@NavCurrent("Errors")">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     Error Monitor
                 </a>
-                <a href="/admin/security" class="@NavClass("Security")">
+                <a href="/admin/security" class="@NavClass("Security")" aria-current="@NavCurrent("Security")">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     Security
                 </a>
 
-                <a href="/admin/redirects" class="@NavClass("Redirects")">
+                <a href="/admin/redirects" class="@NavClass("Redirects")" aria-current="@NavCurrent("Redirects")">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
                     Redirects
                 </a>
             }
 
-            <a href="/admin/subscribers" class="@NavClass("Subscribers")">
+            <a href="/admin/subscribers" class="@NavClass("Subscribers")" aria-current="@NavCurrent("Subscribers")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 Subscribers
             </a>
@@ -242,25 +202,25 @@
                  <p class="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Settings</p>
             </div>
 
-            <a href="/admin/settings" class="@NavClass("Settings")">
+            <a href="/admin/settings" class="@NavClass("Settings")" aria-current="@NavCurrent("Settings")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 General
             </a>
 
             @if (User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value == "Admin")
             {
-                <a href="/admin/users" class="@NavClass("Users")">
+                <a href="/admin/users" class="@NavClass("Users")" aria-current="@NavCurrent("Users")">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     Users
                 </a>
             }
 
-            <a href="/admin/theme" class="@NavClass("ThemeSettings")">
+            <a href="/admin/theme" class="@NavClass("ThemeSettings")" aria-current="@NavCurrent("ThemeSettings")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.63 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.17-4.49-9-10-9z"/></svg>
                 Theme
             </a>
 
-            <a href="/account/profile" class="@NavClass("Account", "Profile")">
+            <a href="/account/profile" class="@NavClass("Account", "Profile")" aria-current="@NavCurrent("Account", "Profile")">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 Profile
             </a>
@@ -273,7 +233,7 @@
         <div class="p-4 border-t border-sidebar-border">
              <form method="post" asp-controller="Account" asp-action="Logout">
                 @Html.AntiForgeryToken()
-                <button type="submit" class="w-full flex items-center gap-2 justify-center px-4 py-2 text-sm font-medium text-destructive bg-transparent border border-destructive rounded-md hover:bg-destructive hover:text-white transition-colors shadow-sm">
+                <button type="submit" class="w-full flex items-center gap-2 justify-center px-4 py-2 text-sm font-medium text-destructive bg-transparent border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground transition-colors shadow-sm">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     Logout
                 </button>
@@ -282,14 +242,14 @@
     </aside>
 
     <!-- Overlay for mobile -->
-    <div id="sidebar-overlay" onclick="document.getElementById('sidebar').classList.remove('translate-x-0'); document.getElementById('sidebar').classList.add('-translate-x-full'); this.classList.add('hidden')" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
+    <div id="sidebar-overlay" data-nav-close class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
 
     <!-- Main Content -->
     <main class="flex-1 md:ml-64 flex flex-col min-h-screen">
         <!-- Topbar -->
         <header class="h-16 flex items-center justify-between px-6 border-b border-border bg-background sticky top-0 z-30">
             <div class="flex items-center gap-4">
-                <button class="md:hidden text-foreground p-1 hover:bg-muted rounded" onclick="document.getElementById('sidebar').classList.remove('-translate-x-full'); document.getElementById('sidebar').classList.add('translate-x-0'); document.getElementById('sidebar-overlay').classList.remove('hidden')">
+                <button type="button" class="md:hidden text-foreground p-1 hover:bg-muted rounded" data-nav-open aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
                 <h1 class="text-xl font-bold tracking-tight text-foreground">@ViewData["Title"]</h1>
@@ -320,26 +280,26 @@
             <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full" style="pointer-events: none;">
                 @if (TempData["Success"] != null)
                 {
-                    <div id="toast-success" class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-green-600 shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <div id="toast-success" role="status" aria-live="polite" class="desk-toast toast-ok p-4 rounded-lg border border-border bg-card text-card-foreground flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tone-ok shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                         <span>@TempData["Success"]</span>
-                        <button onclick="this.closest('div').remove()" class="ml-auto pl-2 text-green-600 hover:text-green-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                        <button type="button" aria-label="Dismiss notification" title="Dismiss" onclick="this.closest('div').remove()" class="ml-auto pl-2 text-muted-foreground hover:text-foreground"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                     </div>
                 }
                 @if (TempData["Error"] != null)
                 {
-                    <div id="toast-error" class="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-red-600 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    <div id="toast-error" role="alert" class="desk-toast toast-bad p-4 rounded-lg border border-border bg-card text-card-foreground flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tone-bad shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                         <span>@TempData["Error"]</span>
-                        <button onclick="this.closest('div').remove()" class="ml-auto pl-2 text-red-600 hover:text-red-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                        <button type="button" aria-label="Dismiss notification" title="Dismiss" onclick="this.closest('div').remove()" class="ml-auto pl-2 text-muted-foreground hover:text-foreground"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                     </div>
                 }
                 @if (TempData["Warning"] != null)
                 {
-                    <div id="toast-warning" class="p-4 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-yellow-600 shrink-0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <div id="toast-warning" role="alert" class="desk-toast toast-warn p-4 rounded-lg border border-border bg-card text-card-foreground flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tone-warn shrink-0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                         <span>@TempData["Warning"]</span>
-                        <button onclick="this.closest('div').remove()" class="ml-auto pl-2 text-yellow-600 hover:text-yellow-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                        <button type="button" aria-label="Dismiss notification" title="Dismiss" onclick="this.closest('div').remove()" class="ml-auto pl-2 text-muted-foreground hover:text-foreground"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                     </div>
                 }
                 
@@ -351,24 +311,52 @@
                         if (modelStateVal is null) { continue; }
                         foreach (var error in modelStateVal.Errors)
                         {
-                            <div class="toast-model-error p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-red-600 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            <div role="alert" class="toast-model-error desk-toast toast-bad p-4 rounded-lg border border-border bg-card text-card-foreground flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tone-bad shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                                 <span>@error.ErrorMessage</span>
-                                <button onclick="this.closest('div').remove()" class="ml-auto pl-2 text-red-600 hover:text-red-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                                <button type="button" aria-label="Dismiss notification" title="Dismiss" onclick="this.closest('div').remove()" class="ml-auto pl-2 text-muted-foreground hover:text-foreground"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                             </div>
                         }
                     }
                 }
             </div>
 
+            @* Only the success toast fades. Error and warning toasts are role="alert" and stay until dismissed, so a failed save is never missed. *@
             <script>
                 setTimeout(() => {
                     document.getElementById('toast-success')?.remove();
-                    document.getElementById('toast-error')?.remove();
-                    document.getElementById('toast-warning')?.remove();
-                    document.querySelectorAll('.toast-model-error').forEach(e => e.remove());
                 }, 8000);
             </script>
+
+            @* ── Desk dialog: the styled replacement for the browser's native popups; logic in wwwroot/js/inkwell-dialog.js ── *@
+            <dialog id="inkwell-dialog" class="rounded-xl border border-border bg-card text-card-foreground shadow-2xl p-0 w-full max-w-md backdrop:bg-black/50 backdrop:backdrop-blur-[2px]" aria-labelledby="ikd-title" aria-describedby="ikd-body">
+                <form id="ikd-form" method="dialog" class="p-6">
+                    <div class="flex items-start gap-4">
+                        <div id="ikd-icon" class="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0 text-primary bg-primary/10">?</div>
+                        <div class="min-w-0 flex-1">
+                            <h2 id="ikd-title" class="text-base font-semibold leading-snug">Confirm this action?</h2>
+                            <p id="ikd-body" class="text-sm text-muted-foreground mt-1.5 leading-relaxed"></p>
+                            <div id="ikd-input-wrap" class="mt-4" hidden>
+                                <label id="ikd-input-label" for="ikd-input" class="block text-xs font-medium text-muted-foreground mb-1"></label>
+                                <input id="ikd-input" type="text" autocomplete="off" spellcheck="false" class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                                <p id="ikd-input-hint" class="text-xs mt-1 min-h-[1rem]"></p>
+                            </div>
+                            <div id="ikd-typed-wrap" class="mt-4" hidden>
+                                <label for="ikd-typed" class="block text-xs font-medium text-muted-foreground mb-1">Type <code id="ikd-typed-word" class="font-mono font-semibold text-foreground"></code> to confirm</label>
+                                <input id="ikd-typed" type="text" autocomplete="off" spellcheck="false" class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-2">
+                        <button type="button" id="ikd-cancel" class="h-9 px-4 rounded-md border border-input bg-background text-sm font-medium hover:bg-muted transition-colors">Cancel</button>
+                        <button type="button" id="ikd-ok" class="h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
+                    </div>
+                </form>
+            </dialog>
+            <script src="~/js/inkwell-dialog.js" asp-append-version="true"></script>
+            @* Busy bar for form posts, htmx requests and uploads; unsaved-changes guard for editors. *@
+            <div id="desk-busy" role="progressbar" aria-hidden="true"></div>
+            <script src="~/js/inkwell-desk.js" asp-append-version="true"></script>
 
             @RenderBody()
         </div>
@@ -378,6 +366,27 @@
     <!-- Highlight.js for Syntax Highlighting in Editor (self-hosted) -->
     <link rel="stylesheet" href="~/lib/highlightjs/github-dark.min.css">
     <script src="~/lib/highlightjs/highlight.min.js"></script>
+    @* Placed errors (design rule 12): on load, scroll the first field-level validation message into view and focus its input. Works for every editor without per-view code. *@
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var msgs = document.querySelectorAll('.field-validation-error, [data-valmsg-for]');
+            var first = null;
+            for (var i = 0; i < msgs.length; i++) { if (msgs[i].textContent.trim()) { first = msgs[i]; break; } }
+            var field = null;
+            if (first) {
+                var name = first.getAttribute('data-valmsg-for');
+                var scope = first.closest('form') || document;
+                if (name) { field = scope.querySelector('[name="' + name.replace(/"/g, '\\"') + '"]'); }
+                if (!field && first.parentElement) { field = first.parentElement.querySelector('input:not([type=hidden]), select, textarea'); }
+                first.scrollIntoView({ block: 'center' });
+            } else {
+                field = document.querySelector('.input-validation-error, [aria-invalid="true"]');
+                if (!field) { return; }
+                field.scrollIntoView({ block: 'center' });
+            }
+            if (field) { try { field.focus({ preventScroll: true }); } catch (e) { } }
+        });
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

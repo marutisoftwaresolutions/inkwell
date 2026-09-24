@@ -45,7 +45,7 @@ public class UserRepository : IUserRepository
             new { user.Id, user.Uuid, user.Email, user.Username, user.DisplayName, user.Slug, user.PasswordHash, user.Role, user.Status, user.CreatedByUserId,
                   user.Bio, user.ProfileImage, user.AvatarUrl, user.CoverImage, user.Website, user.Twitter, user.Facebook, user.MetaTitle, user.MetaDescription, user.IsActive, user.LastLogin,
                   user.Credentials, user.Specialty, user.LicenseNumber,
-                  CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
+                  CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
     }
 
     public async Task UpdateAsync(User user)
@@ -60,7 +60,7 @@ public class UserRepository : IUserRepository
             new { user.Email, user.Username, user.DisplayName, user.Slug, user.PasswordHash, user.Role, user.Status,
                   user.Bio, user.ProfileImage, user.AvatarUrl, user.CoverImage, user.Website, user.Twitter, user.Facebook, user.MetaTitle, user.MetaDescription, user.IsActive, user.LastLogin,
                   user.Credentials, user.Specialty, user.LicenseNumber,
-                  UpdatedAt = DateTime.Now, user.Id });
+                  UpdatedAt = DateTime.UtcNow, user.Id });
     }
 
     // Authentication tracking methods (AccessFailedCount / LockoutEnd / RefreshToken) have been removed
@@ -113,7 +113,7 @@ public class UserRepository : IUserRepository
                 : (u.Email ?? "user").Split('@')[0];
             var slug = await GenerateUniqueSlugCoreAsync(conn, baseName, u.Id);
             await conn.ExecuteAsync("UPDATE Users SET Slug = @Slug, UpdatedAt = @Now WHERE Id = @Id",
-                new { Slug = slug, Now = DateTime.Now, u.Id });
+                new { Slug = slug, Now = DateTime.UtcNow, u.Id });
             count++;
         }
         return count;

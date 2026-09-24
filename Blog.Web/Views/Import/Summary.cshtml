@@ -25,7 +25,7 @@
         @if (Model.Status == Blog.Core.Domain.ImportJobStatus.Completed && Model.ImportedItems > 0
              && !string.Equals(Model.Options.SlugConflict, "Overwrite", StringComparison.OrdinalIgnoreCase))
         {
-            <form method="post" action="/admin/import/undo/@Model.Id" onsubmit="return confirm('Undo this import? The imported posts, pages, images and comments will be deleted. Categories and tags are kept. This cannot be reversed.');">
+            <form method="post" action="/admin/import/undo/@Model.Id" data-confirm-title="Undo this import?" data-confirm-body="Removes the @Model.ImportedItems item(s) this import created — posts, pages, images and comments. Categories and tags are kept. This cannot be reversed." data-confirm-action="Undo import" data-confirm-tone="danger" data-confirm-typed="UNDO">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-4 py-2 border border-destructive/40 text-destructive hover:bg-destructive/10 rounded-md text-sm font-medium">Undo import</button>
             </form>
@@ -36,15 +36,15 @@
     {
         <div class="bg-card border border-border rounded-lg p-4">
             <h3 class="font-semibold text-sm mb-2">Failed items (@failed.Count)</h3>
-            <table class="w-full text-left text-xs">
-                <thead><tr class="text-muted-foreground border-b border-border"><th class="py-2 pr-3">Type</th><th class="py-2 pr-3">Title</th><th class="py-2">Error</th></tr></thead>
+            <div class="table-scroll"><table class="w-full text-left text-xs">
+                <thead><tr class="text-muted-foreground border-b border-border"><th class="py-2 pr-3">Type</th><th class="py-2 pr-3">Title</th><th class="py-2">Problem</th></tr></thead>
                 <tbody class="divide-y divide-border">
                     @foreach (var f in failed)
                     {
                         <tr><td class="py-2 pr-3">@f.ItemType</td><td class="py-2 pr-3">@f.Title</td><td class="py-2 text-destructive font-mono">@f.Error</td></tr>
                     }
                 </tbody>
-            </table>
+            </table></div>
         </div>
     }
 </div>

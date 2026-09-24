@@ -215,6 +215,49 @@ public sealed class IpFirewallService
         }
     }
 
+    /// <summary>
+    /// Record a comment submission the spam filter discarded. The response is a 302 identical to a
+    /// real submission's, so — like a failed sign-in — the signal is invisible to status-code scoring
+    /// and has to be reported here explicitly. Same guards as every other path: fail open, never score
+    /// an allowlisted address, never re-score one that is already blocked.
+    /// </summary>
+    public async Task RegisterCommentSpamAsync(HttpContext ctx, string reason)
+    {
+        try
+        {
+            var ip = ResolveClientIp(ctx);
+            if (string.IsNullOrEmpty(ip)) return;
+            await RegisterCommentSpamAsync(ip, reason, ctx.Request.Path.Value, ctx.Request.Headers.UserAgent.ToString());
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "Firewall comment-spam scoring failed (non-fatal).");
+        }
+    }
+
+    /// <summary>
+    /// The same signal for a comment a moderator marks as spam after the fact: the address that
+    /// posted it (stored on the comment) is scored as if the filter had caught it. Same guards.
+    /// </summary>
+    public async Task RegisterCommentSpamAsync(string ip, string reason, string? path = null, string? userAgent = null)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(ip)) return;
+            var snap = await GetSnapshotAsync();
+            if (!snap.Options.Enabled) return;
+            if (snap.Allowlist.Contains(ip)) return;
+            if (snap.Rules.ContainsKey(ip)) return;
+
+            var verdict = new ThreatVerdict(ThreatScorer.CommentSpamScore, $"Comment spam: {reason}");
+            await RegisterThreatAsync(ip, verdict, path, userAgent, snap);
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "Firewall comment-spam scoring failed (non-fatal).");
+        }
+    }
+
     private async Task RegisterThreatAsync(string ip, ThreatVerdict verdict, string? path, string? ua, Snapshot snap)
     {
         var now    = DateTime.UtcNow;

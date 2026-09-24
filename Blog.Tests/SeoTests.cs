@@ -138,6 +138,8 @@ public class SeoDocumentsTests
         Assert.Contains("User-agent: Bytespider", _robots);
         Assert.Contains("Disallow: /admin/", _robots);
         Assert.Contains("Disallow: /api/", _robots);
+        Assert.Contains("Disallow: /search", _robots);   // site search is noindex; keep crawl budget off it
+        Assert.Contains("Disallow: /preview/", _robots); // tokenised draft previews must never be crawled
     }
 
     [Fact]

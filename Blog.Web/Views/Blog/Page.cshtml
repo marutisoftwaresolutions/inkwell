@@ -1,9 +1,16 @@
 @model Blog.Core.Domain.Page
 @{
     Layout = "_PublicLayout";
-    ViewData["Title"] = Model.Title;
-    ViewData["Description"] = "";
+    ViewData["Title"] = !string.IsNullOrEmpty(Model.MetaTitle) ? Model.MetaTitle : Model.Title;
+    // Left null (not "") when the page has no MetaDescription, so _PublicLayout falls back to the
+    // site description instead of emitting a blank <meta name="description">.
+    ViewData["Description"] = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription : null;
     ViewData["SiteName"] = ViewBag.SiteName ?? "Blog";
+
+    // Canonical is emitted once by _PublicLayout from this value — do not emit a second <link> here.
+    ViewData["Canonical"] = !string.IsNullOrEmpty(Model.CanonicalUrl)
+        ? Model.CanonicalUrl
+        : $"{Context.Request.Scheme}://{Context.Request.Host}/{Model.Slug}";
 
     var blogLayout = (string)(ViewBag.LayoutPage ?? "Neutral");
 }

@@ -1,0 +1,18 @@
+@*
+    Hidden fields the comment spam filter reads (see Blog.Core.Services.CommentSpamFilter).
+
+    - commentToken: the form's signed render time. Proves the form was fetched and tells the filter
+      how long the reader spent writing. Issued by CommentFormTokenService in BlogController.Post.
+    - contact_ref: a honeypot. Off-screen, unlabeled, excluded from the tab order and from autofill;
+      a real reader never sees it, so anything posted in it is a form-filling script.
+
+    Layout-independent by design: inline styles only, no CSS class any of the 20 layouts must define.
+*@
+@{
+    var commentFormToken = ViewData["CommentFormToken"] as string ?? "";
+}
+<input type="hidden" name="@Blog.Web.Services.CommentFormTokenService.FieldName" value="@commentFormToken" />
+<div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;">
+    <label for="@Blog.Web.Services.CommentFormTokenService.HoneypotFieldName">Leave this field empty</label>
+    <input type="text" id="@Blog.Web.Services.CommentFormTokenService.HoneypotFieldName" name="@Blog.Web.Services.CommentFormTokenService.HoneypotFieldName" value="" tabindex="-1" autocomplete="off" />
+</div>

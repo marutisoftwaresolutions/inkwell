@@ -1,6 +1,6 @@
 @model Blog.Core.Domain.Post
 @{
-    var readingMinutes = Math.Max(1, (Model.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
+    var readingMinutes = Blog.Core.Services.TextHelper.ReadingMinutes(Model.Plaintext, Model.Html);
     var primaryCategory = Model.Categories.FirstOrDefault();
 }
 
@@ -53,7 +53,7 @@
                         <div class="meta" style="margin-top:1px;">@Model.AuthorSpecialty</div>
                     }
                     <div class="meta" style="margin-top:2px;">
-                        @Model.PublishedAt?.ToString("d MMMM yyyy") · @readingMinutes min read · @Model.ViewCount views
+                        @Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt, (string?)ViewBag.DisplayTimeZone)?.ToString("d MMMM yyyy") · @readingMinutes min read · @Model.ViewCount views
                     </div>
                     @if (Model.LastVerifiedAt.HasValue || Model.NextReviewAt.HasValue)
                     {
@@ -88,9 +88,14 @@
             <partial name="_KeyFacts" model="Model" />
             <partial name="_HowTo" model="Model" />
         </div>
-        <div class="ink-essay-body dropcap">
-            @Html.Raw(Model.Html)
+        @{ var toc = Blog.Core.Services.TableOfContents.Build(Model.Html); }
+        <div style="max-width:var(--measure-prose);margin:0 auto;padding:0 var(--gutter);">
+            <partial name="_TableOfContents" model="toc.Entries" />
         </div>
+        <div class="ink-essay-body dropcap" data-reading-body>
+            @Html.Raw(toc.Html)
+        </div>
+        <partial name="_ReadingProgress" />
 
         @* ── FAQ accordion ──────────────────────────────────────── *@
         @if (Model.Faqs.Any())

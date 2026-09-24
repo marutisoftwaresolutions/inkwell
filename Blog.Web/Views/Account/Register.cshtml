@@ -1,17 +1,32 @@
 @model dynamic
+@inject Blog.Core.Interfaces.IUserRepository UsersRepo
+@inject Blog.Core.Interfaces.ISettingRepository SettingsRepo
 @{
     Layout = null;
     ViewData["Title"] = "Setup Admin Account";
+    // Colour scheme resolves the same way as _AdminLayout (owner's Settings → Colour scheme); fails open to "system".
+    var colorScheme = "system";
+    try
+    {
+        var primaryAdmin = await UsersRepo.GetFirstAdminAsync();
+        var settings = await SettingsRepo.GetSettingsAsync(primaryAdmin?.Id ?? Guid.Empty);
+        if (settings?.Theme is "light" or "dark") colorScheme = settings.Theme;
+    }
+    catch { }
+    var hasError = ViewBag.Error != null;
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="@colorScheme">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"]</title>
-    
+    <meta name="robots" content="noindex,nofollow" />
+
     <!-- Fonts (self-hosted) -->
     <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true">
+    <!-- Desk tokens (light + dark scheme) -->
+    <link rel="stylesheet" href="~/css/desk-tokens.css" asp-append-version="true">
 
     <!-- Tailwind CSS (self-hosted) -->
     <script src="~/lib/tailwindcss/tailwind.js"></script>
@@ -26,13 +41,18 @@
                         'card-foreground': 'var(--card-foreground)',
                         primary: 'var(--primary)',
                         'primary-foreground': 'var(--primary-foreground)',
-                        input: 'var(--input)',
-                        ring: 'var(--ring)',
                         muted: 'var(--muted)',
                         'muted-foreground': 'var(--muted-foreground)',
+                        accent: 'var(--accent)',
+                        'accent-foreground': 'var(--accent-foreground)',
+                        destructive: 'var(--destructive)',
+                        'destructive-foreground': 'var(--destructive-foreground)',
+                        border: 'var(--border)',
+                        input: 'var(--input)',
+                        ring: 'var(--ring)',
                     },
                     fontFamily: {
-                        sans: ['Alexandria', 'sans-serif'],
+                        sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
                     },
                     borderRadius: {
                         DEFAULT: 'var(--radius)',
@@ -41,162 +61,84 @@
             }
         }
     </script>
-    <style>
-        :root {
-            --background: #f8f5f0;
-            --foreground: #3e2723;
-            --card: #f8f5f0;
-            --card-foreground: #3e2723;
-            --primary: #2e7d32;
-            --primary-foreground: #ffffff;
-            --muted: #f0e9e0;
-            --muted-foreground: #6d4c41;
-            --input: #e0d6c9;
-            --ring: #2e7d32;
-            --radius: 0.5rem;
-        }
-
-        body {
-            background-color: var(--background);
-            color: var(--foreground);
-            font-family: 'Alexandria', sans-serif;
-        }
-    </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-card border border-input rounded-lg shadow-lg p-8">
+    <main class="w-full max-w-md bg-card text-card-foreground border border-border rounded-lg shadow-lg p-8">
         <div class="text-center mb-8">
-            <div class="w-12 h-12 bg-primary text-primary-foreground rounded mx-auto flex items-center justify-center mb-4">
+            <div class="w-12 h-12 bg-primary text-primary-foreground rounded mx-auto flex items-center justify-center mb-4" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
             <h1 class="text-2xl font-bold">Register Your Account</h1>
             <p class="text-muted-foreground text-sm mt-1">Create your admin account to get started.</p>
         </div>
 
-        @if (ViewBag.Error != null)
+        @if (hasError)
         {
-            <div id="toast-error" class="fixed bottom-6 right-6 z-50 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-center gap-2 shadow-lg animate-slide-in-right max-w-sm">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-red-600 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                <span>@ViewBag.Error</span>
-                <button onclick="document.getElementById('toast-error').remove()" class="ml-4 text-red-600 hover:text-red-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <script>setTimeout(() => document.getElementById('toast-error')?.remove(), 5000);</script>
+            <p id="form-error" role="alert" class="mb-6 p-3 rounded border border-destructive text-destructive text-sm">@ViewBag.Error</p>
         }
 
         <form id="register-form" method="post" action="/Account/Register" class="space-y-4">
             @Html.AntiForgeryToken()
-            
+
             <div>
-                <label class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Full Name</label>
-                <input type="text" name="name" id="name" value="@ViewBag.Name" placeholder="John Doe" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required autofocus />
+                <label for="name" class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Full name</label>
+                <input type="text" name="name" id="name" value="@ViewBag.Name" placeholder="Your name" autocomplete="name" aria-describedby="@(hasError ? "form-error" : null)" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required autofocus />
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Email Address</label>
-                <input type="email" name="email" id="email" value="@ViewBag.Email" placeholder="you@example.com" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
-                <p id="email-error" class="text-xs text-red-500 mt-1.5 hidden">Invalid email format</p>
+                <label for="email" class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Email address</label>
+                <input type="email" name="email" id="email" value="@ViewBag.Email" placeholder="you@example.com" autocomplete="username" aria-describedby="email-error" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
+                <p id="email-error" class="text-xs text-destructive mt-1.5 hidden">Enter a valid email address.</p>
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Password</label>
-                <input type="hidden" name="password" id="password-real" />
-                <input type="text" id="password" placeholder="••••••••" autocomplete="new-password" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
-                <p id="password-hint" class="text-xs text-muted-foreground mt-1.5 transition-colors">Length &ge; 8, uppercase, lowercase, and a number</p>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Confirm Password</label>
-                <input type="hidden" name="confirmPassword" id="confirmPassword-real" />
-                <input type="text" id="confirmPassword" placeholder="••••••••" autocomplete="new-password" class="w-full px-3 py-2 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
-                <p id="confirm-error" class="text-xs text-red-500 mt-1.5 hidden">Passwords do not match</p>
+                <label for="password" class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Password</label>
+                <div class="relative">
+                    <input type="password" name="password" id="password" autocomplete="new-password" aria-describedby="password-hint" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
+                    <button type="button" data-toggle-password="password" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Show</button>
+                </div>
+                <p id="password-hint" class="text-xs text-muted-foreground mt-1.5 transition-colors">At least 8 characters, with an uppercase letter, a lowercase letter and a number.</p>
             </div>
 
-            <button type="submit" id="submit-btn" class="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded hover:bg-primary/90 transition-colors shadow-sm mt-6">
-                Create Account
+            <div>
+                <label for="confirmPassword" class="block text-sm font-medium mb-1.5 uppercase tracking-wide text-muted-foreground text-xs">Confirm password</label>
+                <div class="relative">
+                    <input type="password" name="confirmPassword" id="confirmPassword" autocomplete="new-password" aria-describedby="confirm-error" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
+                    <button type="button" data-toggle-password="confirmPassword" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Show</button>
+                </div>
+                <p id="confirm-error" class="text-xs text-destructive mt-1.5 hidden">Passwords don't match.</p>
+            </div>
+
+            <button type="submit" id="submit-btn" class="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded hover:opacity-90 transition-opacity shadow-sm mt-6">
+                Create account
             </button>
             <div class="text-center text-sm mt-5 text-muted-foreground">
-                Already have an account? <a href="/account/login" class="text-primary hover:underline font-medium">Login</a>
+                Already have an account? <a href="/account/login" class="text-foreground hover:underline font-medium">Sign in</a>
             </div>
         </form>
-        
+
         <script>
+            document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var input = document.getElementById(btn.getAttribute('data-toggle-password'));
+                    if (!input) return;
+                    var show = input.type === 'password';
+                    input.type = show ? 'text' : 'password';
+                    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                    btn.textContent = show ? 'Hide' : 'Show';
+                });
+            });
+
             const emailInput = document.getElementById('email');
-            const passwordDisplay = document.getElementById('password');
-            const passwordReal = document.getElementById('password-real');
-            const confirmDisplay = document.getElementById('confirmPassword');
-            const confirmReal = document.getElementById('confirmPassword-real');
+            const passwordInput = document.getElementById('password');
+            const confirmInput = document.getElementById('confirmPassword');
             const form = document.getElementById('register-form');
             const emailError = document.getElementById('email-error');
             const passwordHint = document.getElementById('password-hint');
             const confirmError = document.getElementById('confirm-error');
 
             const emailRegex = /^[^\s@@]+@@[^\s@@]+\.[a-zA-Z]{2,}$/;
-            const DOT = '\u2022';
-
-            // ── Peek-then-mask engine ──────────────────────────────────────
-            function createPeekField(displayEl, hiddenEl) {
-                var pwd = '';
-                var peekTimer;
-                function maskStr(s) { return DOT.repeat(s.length); }
-
-                displayEl.addEventListener('input', function() {
-                    clearTimeout(peekTimer);
-                    var cursorPos = displayEl.selectionStart;
-                    var displayVal = displayEl.value;
-                    var oldLen = pwd.length;
-                    var newLen = displayVal.length;
-
-                    if (newLen > oldLen) {
-                        var addedCount = newLen - oldLen;
-                        var insertPos = cursorPos - addedCount;
-                        var addedChars = '';
-                        for (var i = insertPos; i < cursorPos; i++) {
-                            addedChars += displayVal[i];
-                        }
-                        pwd = pwd.substring(0, insertPos) + addedChars + pwd.substring(insertPos);
-                    } else if (newLen < oldLen) {
-                        var removedCount = oldLen - newLen;
-                        pwd = pwd.substring(0, cursorPos) + pwd.substring(cursorPos + removedCount);
-                    }
-
-                    hiddenEl.value = pwd;
-
-                    if (newLen >= oldLen && pwd.length > 0 && cursorPos > 0) {
-                        var before = maskStr(pwd.substring(0, cursorPos - 1));
-                        var peeked = pwd[cursorPos - 1];
-                        var after = maskStr(pwd.substring(cursorPos));
-                        displayEl.value = before + peeked + after;
-                        displayEl.setSelectionRange(cursorPos, cursorPos);
-
-                        peekTimer = setTimeout(function() {
-                            var cp = displayEl.selectionStart;
-                            displayEl.value = maskStr(pwd);
-                            displayEl.setSelectionRange(cp, cp);
-                        }, 500);
-                    } else {
-                        displayEl.value = maskStr(pwd);
-                        displayEl.setSelectionRange(cursorPos, cursorPos);
-                    }
-                });
-
-                displayEl.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    var pasted = (e.clipboardData || window.clipboardData).getData('text');
-                    var cursorPos = displayEl.selectionStart;
-                    var selEnd = displayEl.selectionEnd;
-                    pwd = pwd.substring(0, cursorPos) + pasted + pwd.substring(selEnd);
-                    hiddenEl.value = pwd;
-                    displayEl.value = maskStr(pwd);
-                    var newPos = cursorPos + pasted.length;
-                    displayEl.setSelectionRange(newPos, newPos);
-                });
-
-                return { getRealValue: function() { return pwd; } };
-            }
-
-            var pwdPeek = createPeekField(passwordDisplay, passwordReal);
-            var confirmPeek = createPeekField(confirmDisplay, confirmReal);
-            // ──────────────────────────────────────────────────────────────
 
             function isStrongPassword(pwd) {
                 if (pwd.length < 8) return false;
@@ -211,70 +153,51 @@
             }
 
             function updateInputState(input, isValid) {
-                if (isValid || input.value === '') {
-                    input.classList.remove('border-red-500', 'focus:ring-red-500');
-                    input.classList.add('border-input', 'focus:ring-ring');
-                } else {
-                    input.classList.remove('border-input', 'focus:ring-ring');
-                    input.classList.add('border-red-500', 'focus:ring-red-500');
-                }
+                const invalid = !isValid && input.value !== '';
+                input.classList.toggle('border-destructive', invalid);
+                input.classList.toggle('focus:ring-destructive', invalid);
+                input.classList.toggle('border-input', !invalid);
+                input.classList.toggle('focus:ring-ring', !invalid);
+                if (invalid) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
             }
 
             function validateEmail() {
                 const isValid = emailRegex.test(emailInput.value);
                 updateInputState(emailInput, isValid);
-                if (!isValid && emailInput.value !== '') {
-                    emailError.classList.remove('hidden');
-                } else {
-                    emailError.classList.add('hidden');
-                }
+                emailError.classList.toggle('hidden', isValid || emailInput.value === '');
                 return isValid;
             }
 
             function validatePassword() {
-                const realPwd = pwdPeek.getRealValue();
-                const isValid = isStrongPassword(realPwd);
-                updateInputState(passwordDisplay, isValid);
-                if (!isValid && realPwd !== '') {
-                    passwordHint.classList.remove('text-muted-foreground');
-                    passwordHint.classList.add('text-red-500');
-                } else {
-                    passwordHint.classList.remove('text-red-500');
-                    passwordHint.classList.add('text-muted-foreground');
-                }
-                if(confirmPeek.getRealValue() !== '') validateConfirm();
+                const isValid = isStrongPassword(passwordInput.value);
+                updateInputState(passwordInput, isValid);
+                const bad = !isValid && passwordInput.value !== '';
+                passwordHint.classList.toggle('text-muted-foreground', !bad);
+                passwordHint.classList.toggle('text-destructive', bad);
+                if (confirmInput.value !== '') validateConfirm();
                 return isValid;
             }
 
             function validateConfirm() {
-                const isValid = confirmPeek.getRealValue() === pwdPeek.getRealValue();
-                updateInputState(confirmDisplay, isValid);
-                if (!isValid && confirmPeek.getRealValue() !== '') {
-                    confirmError.classList.remove('hidden');
-                } else {
-                    confirmError.classList.add('hidden');
-                }
+                const isValid = confirmInput.value === passwordInput.value;
+                updateInputState(confirmInput, isValid);
+                confirmError.classList.toggle('hidden', isValid || confirmInput.value === '');
                 return isValid;
             }
 
             emailInput.addEventListener('input', validateEmail);
-            passwordDisplay.addEventListener('input', validatePassword);
-            confirmDisplay.addEventListener('input', validateConfirm);
+            passwordInput.addEventListener('input', validatePassword);
+            confirmInput.addEventListener('input', validateConfirm);
 
-            form.addEventListener('submit', function(e) {
-                const isEmailValid = emailRegex.test(emailInput.value);
-                const isPwdValid = isStrongPassword(pwdPeek.getRealValue());
-                const isMatch = confirmPeek.getRealValue() === pwdPeek.getRealValue();
-                
-                validateEmail();
-                validatePassword();
-                validateConfirm();
-
-                if (!isEmailValid || !isPwdValid || !isMatch) {
+            form.addEventListener('submit', function (e) {
+                const ok = validateEmail() & validatePassword() & validateConfirm();
+                if (!ok) {
                     e.preventDefault();
+                    const first = form.querySelector('[aria-invalid="true"]');
+                    if (first) first.focus();
                 }
             });
         </script>
-    </div>
+    </main>
 </body>
 </html>

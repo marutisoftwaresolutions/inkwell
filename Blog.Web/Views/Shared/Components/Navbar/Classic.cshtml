@@ -1,13 +1,10 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
     var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
-    var logoUrl = !string.IsNullOrEmpty(Model.SiteLogoUrl)
-        ? Model.SiteLogoUrl
-        : $"https://placehold.co/400x120/171717/FFFFFF?text={Uri.EscapeDataString(Model.SiteName.ToUpper())}";
 }
 
 @* CLASSIC — Old newspaper left-aligned masthead: thick left accent · full-width top bar · stacked right icons *@
-<header x-data="{ searchOpen: false, mobileOpen: false }"
+<header x-data="{ mobileOpen: false }"
         class="w-full sticky top-0 z-50 border-b-2"
         style="background: var(--background); border-color: var(--foreground);">
 
@@ -27,10 +24,13 @@
                 </div>
             </a>
 
-            @* Center: logo *@
-            <a href="/" class="hidden md:flex items-center px-6 border-l border-r" style="border-color: var(--border);">
-                <img src="@logoUrl" alt="@Model.SiteName" class="h-12 w-auto object-contain" />
-            </a>
+            @* Center: logo — only when the site has one; the name is already the brand on the left *@
+            @if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
+            {
+                <a href="/" class="hidden md:flex items-center px-6 border-l border-r" style="border-color: var(--border);">
+                    <img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-12 w-auto object-contain" />
+                </a>
+            }
 
             @* Right: stacked icon cluster *@
             <div class="flex items-center gap-1 pl-4">
@@ -62,12 +62,7 @@
                         }
                     </div>
                 </div>
-                @* Search *@
-                <button @@click="searchOpen = !searchOpen"
-                        class="w-10 h-10 flex items-center justify-center border hover:opacity-70 transition-opacity"
-                        style="border-color: var(--border);">
-                    <i class="bi bi-search text-base"></i>
-                </button>
+                @* Search: the shared _NavSearch control at the end of the header *@
                 @* Dashboard *@
                 @if (User.Identity != null && User.Identity.IsAuthenticated)
                 {
@@ -78,8 +73,8 @@
                     </a>
                 }
                 @* Mobile menu *@
-                <button @@click="mobileOpen = !mobileOpen" class="md:hidden w-10 h-10 flex items-center justify-center border" style="border-color: var(--border);">
-                    <i class="bi bi-list text-xl"></i>
+                <button @@click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen" aria-label="Open menu" class="md:hidden w-10 h-10 flex items-center justify-center border" style="border-color: var(--border);">
+                    <i class="bi bi-list text-xl" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -100,27 +95,5 @@
         </div>
     </div>
 
-    @* Search overlay *@
-    <div x-show="searchOpen"
-         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-[60] flex items-start justify-center pt-20" style="background: rgba(0,0,0,0.6);">
-        <div @@click.away="searchOpen = false" class="w-full max-w-lg mx-4 border-2" style="background: var(--background); border-color: var(--foreground);">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <span class="text-xs uppercase tracking-widest font-bold" style="color: var(--foreground);">Search the Archive</span>
-                    <button @@click="searchOpen = false" class="text-xl hover:opacity-60">&times;</button>
-                </div>
-                <form action="/" method="get" class="flex border-b-2" style="border-color: var(--foreground);">
-                    <input type="text" name="search" placeholder="What are you looking for?"
-                           class="flex-1 h-11 px-0 bg-transparent text-sm outline-none"
-                           style="color: var(--foreground);" />
-                    <button type="submit" class="px-4 h-11 text-xs font-bold uppercase tracking-widest hover:opacity-70">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
+    <partial name="_NavSearch" />
 </header>

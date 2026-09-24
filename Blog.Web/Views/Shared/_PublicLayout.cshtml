@@ -1,4 +1,5 @@
 @inject Blog.Core.Interfaces.ICustomThemeSettingRepository ThemeSettingsRepo
+@inject Blog.Core.Interfaces.ISettingRepository SiteSettingsForSchemeRepo
 @inject Blog.Core.Interfaces.ISettingRepository SettingsRepo
 @inject Blog.Core.Interfaces.ITenantContext TenantContext
 @inject Blog.Core.Interfaces.IUserRepository UserRepo
@@ -28,6 +29,9 @@
 	Guid brandingId = contentId;
 
 	var themeSettings = await ThemeSettingsRepo.GetAllAsync(brandingId);
+	// Colour scheme: "system" (follow the reader), "light", or "dark" — Admin → Settings.
+	var colorScheme = (await SiteSettingsForSchemeRepo.GetSettingsAsync(brandingId))?.Theme?.Trim().ToLowerInvariant();
+	if (colorScheme != "light" && colorScheme != "dark") colorScheme = "system";
 	var themeDict = themeSettings.ToDictionary(s => s.SettingKey, s => s.EffectiveValue);
 
 	string GetTheme(string key, string fallback) => themeDict.TryGetValue(key, out var v) ? v : fallback;
@@ -69,7 +73,7 @@
 	var siteLocale = Blog.Core.Services.LocaleHelper.OgLocale(siteLang);
 }
 <!DOCTYPE html>
-<html lang="@siteLang">
+<html lang="@siteLang" data-theme="@colorScheme">
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -216,6 +220,35 @@
 		</style>
 	}
 
+
+	@* Dark scheme for the Tailwind-namespace tokens the older layouts use. Inkwell-namespace tokens
+	   are handled in inkwell.css. Honoured when the colour scheme is "system" and the reader prefers
+	   dark, or forced when it is "dark". *@
+	<style>
+		@@media (prefers-color-scheme: dark) {
+			html:not([data-theme="light"]) {
+				color-scheme: dark;
+				--background: #16140F; --foreground: #F4EFE6;
+				--primary: #F4EFE6; --primary-foreground: #16140F;
+				--secondary: #26221C; --secondary-foreground: #F4EFE6;
+				--muted: #26221C; --muted-foreground: #B49A78;
+				--accent: #332E26; --accent-foreground: #F4EFE6;
+				--card: #1E1B16; --card-foreground: #F4EFE6;
+				--border: #332E26; --destructive: #E06B5E;
+			}
+		}
+		html[data-theme="dark"] {
+			color-scheme: dark;
+			--background: #16140F; --foreground: #F4EFE6;
+			--primary: #F4EFE6; --primary-foreground: #16140F;
+			--secondary: #26221C; --secondary-foreground: #F4EFE6;
+			--muted: #26221C; --muted-foreground: #B49A78;
+			--accent: #332E26; --accent-foreground: #F4EFE6;
+			--card: #1E1B16; --card-foreground: #F4EFE6;
+			--border: #332E26; --destructive: #E06B5E;
+		}
+	</style>
+
 	<!-- Inkwell Design System -->
 	<link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
 	<!-- Legacy neutral styles (filters, pagination, non-Magazine layouts) -->
@@ -342,6 +375,8 @@
 	var inkwellPreset = GetTheme("inkwell-preset", "cream");
 }
 <body class="inkwell-root font-sans" data-preset="@inkwellPreset" style="color: var(--fg-body); background: var(--bg);">
+	@* Keyboard and screen-reader users land here first; the link stays visually hidden until it takes focus. *@
+	<a class="skip-link" href="#main">Skip to content</a>
 
 	@if (ViewData["HideLayoutChrome"] == null)
 	{
@@ -352,7 +387,7 @@
 	}
 
 	<!-- Main Content -->
-	<main class="relative">
+	<main id="main" class="relative" tabindex="-1">
 		@RenderBody()
 	</main>
 

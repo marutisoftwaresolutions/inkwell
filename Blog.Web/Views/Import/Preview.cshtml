@@ -72,7 +72,7 @@
                 These point at content this import does not bring and that does not already exist here.
             </span>
         </div>
-        <table class="w-full text-sm">
+        <div class="table-scroll"><table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
                     <th class="px-4 py-2 font-medium">In</th>
@@ -88,7 +88,7 @@
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
     </div>
 }
 
@@ -98,7 +98,7 @@
         <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">
             @group.Key (@group.Count())
         </div>
-        <table class="w-full text-sm">
+        <div class="table-scroll"><table class="w-full text-sm">
             <tbody>
                 @foreach (var item in group.Take(200))
                 {
@@ -117,17 +117,38 @@
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
     </div>
 }
 
-<div class="flex gap-3 mt-6">
+@{
+    // The confirmation names the counts the tiles show, so what the dialog promises is what the preview predicted.
+    var runBody = $"Creates {p.Creates}, gives {p.Renames} a new slug, overwrites {p.Overwrites} and skips {p.Skips}. "
+                + $"{p.ImagesToFetch} image{(p.ImagesToFetch == 1 ? "" : "s")} will be fetched from the old site while it runs.";
+    if (p.Overwrites > 0)
+        runBody += $" The {p.Overwrites} overwritten {(p.Overwrites == 1 ? "post or page" : "posts or pages")} cannot be recovered from the import.";
+}
+<div class="flex flex-wrap gap-3 mt-6">
     <a href="/admin/import/configure/@Model.Id"
        class="h-9 px-4 rounded border border-input text-sm text-foreground hover:bg-muted inline-flex items-center">
         ← Change options
     </a>
-    <a href="/admin/import/run/@Model.Id"
-       class="h-9 px-4 rounded bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 inline-flex items-center">
-        Run the import
-    </a>
+    @if (p.Overwrites > 0)
+    {
+        <form method="post" action="/admin/import/run/@Model.Id"
+              data-confirm-title="Run the import?" data-confirm-body="@runBody"
+              data-confirm-action="Run import" data-confirm-tone="danger" data-confirm-typed="OVERWRITE">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="h-9 px-4 rounded bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 inline-flex items-center">Run the import</button>
+        </form>
+    }
+    else
+    {
+        <form method="post" action="/admin/import/run/@Model.Id"
+              data-confirm-title="Run the import?" data-confirm-body="@runBody"
+              data-confirm-action="Run import" data-confirm-tone="neutral">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="h-9 px-4 rounded bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 inline-flex items-center">Run the import</button>
+        </form>
+    }
 </div>

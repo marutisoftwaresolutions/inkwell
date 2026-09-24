@@ -21,11 +21,12 @@ public class CategoriesController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, int page = 1)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var categories = await _categories.GetAllAsync(userId);
-        return View(categories);
+        ViewData["ListSearchPlaceholder"] = "Search categories";
+        return View(Blog.Web.Models.ListPaging.Apply(this, categories, q, page, c => new[] { c.Name, c.Slug }));
     }
 
     [HttpPost("create")]

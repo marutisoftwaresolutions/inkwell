@@ -108,14 +108,17 @@ public class IntegrationSmokeTests : IClassFixture<WebApplicationFactory<Program
     {
         if (!_dbAvailable) return;
 
-        // Find a real published post URL from the sitemap (skip home/section pages).
+        // Find a real published post URL from the sitemap. Posts are the only entries sitemap
+        // generation gives priority 0.8 (home is 1.0, CMS pages 0.6, categories/tags lower) — a
+        // path-based exclusion list (category/tag/author) missed CMS Pages, so a published "About"
+        // page was once picked here and failed this test for having no BlogPosting schema.
         var sitemap = await GetAsync("/sitemap.xml");
-        var baseUri = _factory.CreateClient().BaseAddress!;
-        var postLoc = Regex.Matches(sitemap, "<loc>([^<]+)</loc>")
+        var postLoc = Regex.Matches(sitemap, "<url>(.*?)</url>", RegexOptions.Singleline)
             .Select(m => m.Groups[1].Value)
-            .FirstOrDefault(u => !u.Contains("/category/") && !u.Contains("/tag/") &&
-                                 !u.Contains("/author/") && u.TrimEnd('/') != baseUri.ToString().TrimEnd('/'));
-        if (postLoc is null) return; // no published posts to assert against
+            .Where(block => block.Contains("<priority>0.8</priority>"))
+            .Select(block => Regex.Match(block, "<loc>([^<]+)</loc>").Groups[1].Value)
+            .FirstOrDefault();
+        if (string.IsNullOrEmpty(postLoc)) return; // no published posts to assert against
 
         var path = new Uri(postLoc).PathAndQuery;
         var html = await GetAsync(path);

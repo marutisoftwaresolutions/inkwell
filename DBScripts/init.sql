@@ -1,6 +1,6 @@
 -- =============================================================================
 -- init.sql  —  Blogfront / Inkwell Complete Database Schema
--- Version : 1.0.5 (2026-09-05)
+-- Version : 1.0.6 (2026-09-24)
 -- Target  : SQL Server 2019+ / Azure SQL
 -- Usage   : Run once on a fresh database. Every block is idempotent (IF NOT
 --           EXISTS) so it is safe to re-run against an existing database.
@@ -9,7 +9,7 @@
 -- =============================================================================
 
 PRINT '==========================================================';
-PRINT 'Blogfront / Inkwell — Full Schema Init v1.0.5';
+PRINT 'Blogfront / Inkwell — Full Schema Init v1.0.6-dev';
 PRINT 'Started: ' + CONVERT(NVARCHAR, GETUTCDATE(), 120) + ' UTC';
 PRINT '==========================================================';
 
@@ -771,7 +771,103 @@ ELSE
     PRINT '  [=] CrawlerVisits already exists — skipped.';
 
 -- =============================================================================
--- 33. Column top-ups on tables created above
+-- 33. Jobs  —  ledger for the in-process scheduled-job runner (Admin → Dashboard)
+--     One row per job name: last start/finish, outcome, one-line report.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'Jobs')
+BEGIN
+    CREATE TABLE Jobs (
+        Name           NVARCHAR(100)  NOT NULL PRIMARY KEY,
+        LastStartedAt  DATETIME2      NULL,
+        LastFinishedAt DATETIME2      NULL,
+        LastSucceeded  BIT            NOT NULL CONSTRAINT DF_Jobs_LastSucceeded DEFAULT 0,
+        LastMessage    NVARCHAR(1000) NULL,
+        RunCount       INT            NOT NULL CONSTRAINT DF_Jobs_RunCount DEFAULT 0
+    );
+    PRINT '  [+] Jobs table created.';
+END
+ELSE
+    PRINT '  [=] Jobs already exists — skipped.';
+
+-- =============================================================================
+-- 34. PasswordResetTokens  —  self-service password reset links (hash only,
+--     single-use, 30-minute expiry; expired rows pruned nightly)
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'PasswordResetTokens')
+BEGIN
+    CREATE TABLE PasswordResetTokens (
+        Id        UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        UserId    UNIQUEIDENTIFIER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+        TokenHash NVARCHAR(128)    NOT NULL,
+        ExpiresAt DATETIME2        NOT NULL,
+        UsedAt    DATETIME2        NULL,
+        CreatedAt DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        RequestIp NVARCHAR(45)     NULL
+    );
+    CREATE UNIQUE INDEX UX_PasswordResetTokens_TokenHash ON PasswordResetTokens (TokenHash);
+    CREATE INDEX IX_PasswordResetTokens_User_CreatedAt ON PasswordResetTokens (UserId, CreatedAt DESC);
+    PRINT '  [+] PasswordResetTokens table + indexes created.';
+END
+ELSE
+    PRINT '  [=] PasswordResetTokens already exists — skipped.';
+
+-- =============================================================================
+-- 35. SearchPerformance  —  daily Search Console rows (date × page × query),
+--     pulled nightly per connected owner; feeds the striking-distance panel,
+--     the Search filters in Content Health and the dashboard tile.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'SearchPerformance')
+BEGIN
+    CREATE TABLE SearchPerformance (
+        Id          BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        OwnerId     UNIQUEIDENTIFIER NOT NULL,
+        [Date]      DATE             NOT NULL,
+        Page        NVARCHAR(1024)   NOT NULL,
+        Query       NVARCHAR(512)    NOT NULL,
+        Clicks      INT              NOT NULL,
+        Impressions INT              NOT NULL,
+        Ctr         FLOAT            NOT NULL,
+        Position    FLOAT            NOT NULL
+    );
+    CREATE INDEX IX_SearchPerformance_Owner_Date      ON SearchPerformance (OwnerId, [Date]);
+    CREATE INDEX IX_SearchPerformance_Owner_Page_Date ON SearchPerformance (OwnerId, Page, [Date]);
+    PRINT '  [+] SearchPerformance table + indexes created.';
+END
+ELSE
+    PRINT '  [=] SearchPerformance already exists — skipped.';
+
+-- =============================================================================
+-- 36. Revisions  —  content snapshots of posts and pages, written on every
+--     saved change; compared and restored from the editor sidebar; pruned to
+--     the tenant's RevisionsPerItem.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'Revisions')
+BEGIN
+    CREATE TABLE Revisions (
+        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        EntityType      NVARCHAR(20)     NOT NULL,
+        EntityId        UNIQUEIDENTIFIER NOT NULL,
+        Number          INT              NOT NULL,
+        Title           NVARCHAR(500)    NOT NULL,
+        Slug            NVARCHAR(500)    NOT NULL,
+        Html            NVARCHAR(MAX)    NOT NULL,
+        MetaTitle       NVARCHAR(500)    NULL,
+        MetaDescription NVARCHAR(1000)   NULL,
+        StructuredJson  NVARCHAR(MAX)    NULL,
+        Status          NVARCHAR(50)     NOT NULL,
+        Reason          NVARCHAR(100)    NOT NULL,
+        AuthorId        UNIQUEIDENTIFIER NOT NULL,
+        AuthorName      NVARCHAR(200)    NULL,
+        CreatedAt       DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+    CREATE INDEX IX_Revisions_Entity_CreatedAt ON Revisions (EntityType, EntityId, CreatedAt DESC);
+    PRINT '  [+] Revisions table + index created.';
+END
+ELSE
+    PRINT '  [=] Revisions already exists — skipped.';
+
+-- =============================================================================
+-- 37. Column top-ups on tables created above
 --     These arrived after their table did, so a database created by an older
 --     copy of this file needs them added rather than the table recreated.
 -- =============================================================================
@@ -811,6 +907,58 @@ BEGIN
 END
 ELSE
     PRINT '  [=] Redirects.StatusCode already exists — skipped.';
+
+-- Comments.MemberId: the signed-in user behind a Desk reply. Section 5 creates it; this
+-- top-up covers a database built from a copy that predates it
+-- (DBScripts/2026-09-19_ensure-comments-memberid-column.sql).
+IF COL_LENGTH('Comments', 'MemberId') IS NULL
+BEGIN
+    ALTER TABLE Comments ADD MemberId UNIQUEIDENTIFIER NULL;
+    PRINT '  [+] Comments.MemberId added.';
+END
+ELSE
+    PRINT '  [=] Comments.MemberId already exists — skipped.';
+
+-- =============================================================================
+-- 38. Index top-ups on tables created above
+--     Same reason as section 37: the CREATE TABLE blocks never run again on a
+--     database that already exists, so an index that arrived later is added here.
+-- =============================================================================
+
+-- Revisions: numbers are unique per entity; the repository computes the next
+-- number inside the INSERT and relies on this index as the hard guarantee
+-- (DBScripts/2026-09-19_add-unique-index-revisions-number.sql). Duplicates a
+-- pre-index install produced are renumbered first, only where they exist.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('Revisions') AND name = 'UX_Revisions_Entity_Number')
+BEGIN
+    IF EXISTS (SELECT 1 FROM Revisions GROUP BY EntityType, EntityId, Number HAVING COUNT(*) > 1)
+    BEGIN
+        ;WITH d AS (
+            SELECT r.Number,
+                   NewNumber = ROW_NUMBER() OVER (PARTITION BY r.EntityType, r.EntityId ORDER BY r.Number, r.CreatedAt, r.Id)
+            FROM Revisions r
+            WHERE EXISTS (SELECT 1 FROM Revisions x
+                          WHERE x.EntityType = r.EntityType AND x.EntityId = r.EntityId
+                          GROUP BY x.Number HAVING COUNT(*) > 1)
+        )
+        UPDATE d SET Number = NewNumber WHERE Number <> NewNumber;
+        PRINT '  [~] Revisions: duplicate numbers renumbered.';
+    END
+    CREATE UNIQUE INDEX UX_Revisions_Entity_Number ON Revisions (EntityType, EntityId, Number);
+    PRINT '  [+] UX_Revisions_Entity_Number created.';
+END
+ELSE
+    PRINT '  [=] UX_Revisions_Entity_Number already exists — skipped.';
+
+-- Comments: the spam gate filters every submission on CreatedAt (and AuthorIp)
+-- (DBScripts/2026-09-19_add-index-comments-createdat.sql).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('Comments') AND name = 'IX_Comments_CreatedAt')
+BEGIN
+    CREATE INDEX IX_Comments_CreatedAt ON Comments (CreatedAt) INCLUDE (AuthorIp);
+    PRINT '  [+] IX_Comments_CreatedAt created.';
+END
+ELSE
+    PRINT '  [=] IX_Comments_CreatedAt already exists — skipped.';
 -- =============================================================================
 
 PRINT '';

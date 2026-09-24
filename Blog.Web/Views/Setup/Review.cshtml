@@ -1,36 +1,51 @@
 @{
     Layout = "_SetupLayout";
-    ViewData["Title"] = "Review & Launch";
+    ViewData["Title"] = "Review and Launch";
 }
 
 <div class="setup-container">
     <div class="setup-card">
         <div class="setup-step-badge">Step 4 of 4</div>
-        <h1 class="setup-title">Ready to Launch!</h1>
-        <p class="setup-subtitle">Review your settings before we create your blog.</p>
+        <h1 class="setup-title">Ready to launch</h1>
+        <p class="setup-subtitle">Check these details, then launch. Both can be changed later in Settings.</p>
 
-        <div class="review-list">
+        <dl class="review-list">
             <div class="review-item">
-                <span class="review-label">Blog Name</span>
-                <span class="review-value">@ViewBag.BlogName</span>
+                <dt class="review-label">Blog name</dt>
+                <dd class="review-value">@ViewBag.BlogName</dd>
             </div>
             <div class="review-item">
-                <span class="review-label">Admin Email</span>
-                <span class="review-value">@ViewBag.AdminEmail</span>
+                <dt class="review-label">Admin email</dt>
+                <dd class="review-value">@ViewBag.AdminEmail</dd>
             </div>
-        </div>
+        </dl>
 
-        <form method="post" action="/setup/launch">
+        <form method="post" action="/setup/launch" id="launchForm">
             @Html.AntiForgeryToken()
-            <div class="setup-steps-preview">
-                <div class="step-dot"></div>
-                <div class="step-dot"></div>
-                <div class="step-dot"></div>
+            <div class="setup-steps-preview" aria-hidden="true">
+                <div class="step-dot done"></div>
+                <div class="step-dot done"></div>
+                <div class="step-dot done"></div>
                 <div class="step-dot active"></div>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg btn-launch" id="launchBtn">
-                🚀 Launch My Blog
-            </button>
+            <button type="submit" class="btn btn-primary btn-lg btn-launch" id="launchBtn">Launch blog</button>
+            <a href="/setup/step2" class="btn btn-ghost">Go back and change something</a>
         </form>
     </div>
 </div>
+
+@section Scripts {
+<script>
+(function () {
+    // Launch creates the admin account and settings; a second click must not create them twice.
+    var form = document.getElementById('launchForm');
+    var btn = document.getElementById('launchBtn');
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+        btn.textContent = 'Launching…';
+    });
+})();
+</script>
+}
