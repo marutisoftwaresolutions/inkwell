@@ -30,6 +30,22 @@ dotnet run
 ```
 Full docs: https://www.useinkwell.app/docs
 
+### Deploy with Docker
+
+```bash
+cp .env.example .env    # set DOMAIN and MSSQL_SA_PASSWORD
+docker compose up -d
+```
+
+Starts the app, a SQL Server container, and Caddy for automatic HTTPS on the domain in `.env`. The
+schema applies itself on first boot the same way it does anywhere else, then the setup wizard runs
+at your domain. `docker-compose.yml`, `Dockerfile`, `docker/Caddyfile` and `.env.example` are at the
+repo root — read the comments in `docker-compose.yml` for the local-evaluation option (no domain, no
+TLS, the app's port published directly instead of through Caddy).
+
+A single container without the bundled database also works — see the `docker run` example at the
+top of `Dockerfile` — pointed at your own SQL Server via `ConnectionStrings__DefaultConnection`.
+
 ---
 
 ## Features
@@ -122,6 +138,7 @@ Full docs: https://www.useinkwell.app/docs
 | CSS build | Public `wwwroot/css/tailwind.css` is compiled from `tailwind.config.js` + `tailwind.src.css` and committed. Regenerate after adding utility classes with `npx tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify`, or build with `-p:BuildTailwindCss=true` (needs Node). `dotnet build` alone needs no Node. |
 | Tests | `Blog.Tests` (xUnit) — SEO unit guards (title branding, meta-description truncation, robots.txt tokens, locale mapping) plus `WebApplicationFactory` HTTP smoke tests (home/robots/sitemap/llms/search/post). Integration tests self-skip when no SQL Server is reachable. Run with `dotnet test`. |
 | Solution format | `Blog.slnx` (modern .NET solution file) |
+| Docker | `Dockerfile` (multi-stage, non-root, published as a self-contained ASP.NET runtime image) + `docker-compose.yml` (app, SQL Server, Caddy for automatic TLS) at the repo root. See Quick Start above. |
 
 ---
 
@@ -228,6 +245,12 @@ DBScripts/              Idempotent, dated SQL scripts (YYYY-MM-DD_description.sq
 | `ReCaptcha:SiteKey` / `SecretKey` | Google reCAPTCHA v2 (optional — skipped if absent) |
 | `Jwt:Key` / `Issuer` / `Audience` | JWT config for API authentication |
 | `DataProtection:KeysPath` | Folder for the Data Protection key ring (comment-form tokens, preview links, the Search Console credential). Must survive redeploys and be writable by the app pool; defaults to `App_Data/keys` under the content root. The dashboard warns when it cannot be persisted. |
+| `ReverseProxy:TrustForwardedHeaders` | Trust `X-Forwarded-For` / `X-Forwarded-Proto` from whatever reaches Kestrel. `false` by default and correct for a bare IIS/Kestrel deployment. Set `true` only when Kestrel is genuinely unreachable except through a reverse proxy you control — the Docker Compose deployment sets this because only Caddy's ports are published to the host. |
+
+Every key above (and `Smtp`, `Jwt`, etc.) can also be set as an environment variable using the
+ASP.NET Core double-underscore convention — `ConnectionStrings:DefaultConnection` becomes
+`ConnectionStrings__DefaultConnection` — which is how `docker-compose.yml` configures the app; no
+`appsettings.json` is baked into the image.
 
 ---
 

@@ -1,0 +1,39 @@
+# Keep the build context small and never bake secrets or tenant content into an image.
+.git/
+.gsd/
+.agent/
+.gemini/
+.claude/
+docs/
+deploy/
+tools/
+Google Search Console Data/
+
+**/bin/
+**/obj/
+**/.vs/
+
+# Secrets — never in the image; supplied at runtime via -e / docker-compose env vars.
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+.env
+!.env.example
+
+# Tenant content — a volume at runtime, never a build-time asset (see Dockerfile and
+# docker-compose.yml). Keep the .gitkeep placeholders so the folder structure still exists.
+Blog.Web/wwwroot/uploads/**
+!Blog.Web/wwwroot/uploads/**/.gitkeep
+Blog.Web/wwwroot/og-cache/**
+!Blog.Web/wwwroot/og-cache/.gitkeep
+
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+README.md
+CHANGELOG.md
+RELEASE_NOTES.md
+LICENSE

@@ -7,6 +7,7 @@ using Blog.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using SixLabors.ImageSharp.Web.DependencyInjection;
@@ -19,6 +20,19 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestBodySize = 104 * 1024 * 1024; // 104 MB limit
 });
+
+// Reverse-proxy trust (Docker/Caddy) — see the app.UseForwardedHeaders() call in the pipeline below
+// for the full rationale. Must be configured before builder.Build(); OFF unless explicitly enabled.
+var trustForwardedHeaders = builder.Configuration.GetValue<bool>("ReverseProxy:TrustForwardedHeaders");
+if (trustForwardedHeaders)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 // ── Infrastructure (DB repositories for posts, media, etc.) ──────────────────
 // The data layer is SQL Server only (DapperContext → SqlConnection). If no connection string is
@@ -244,6 +258,24 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
+
+// Reverse-proxy trust (Docker/Caddy, or any deployment where Kestrel is not internet-facing) — OFF
+// by default, matching the "proxy headers are untrusted by default" security invariant. A bare
+// self-hosted IIS/Kestrel deployment (the existing default) talks to readers directly and must not
+// enable this. Behind Caddy, Kestrel only ever sees plain http and the container's bridge-network
+// address, so without this: the CanonicalHost redirect below loops forever (req.Scheme never reads
+// "https"), and every reader, the IP firewall and PageViewMiddleware all see Caddy's address
+// instead of the real client. Safe to trust any address here specifically because the compose
+// deployment never publishes the app's own port to the host — only Caddy's 80/443 are reachable
+// from outside, so nothing but Caddy can ever reach this middleware. (Registered as an Options
+// instance up front, alongside the other builder.Services calls — see near the top of this file —
+// because it must be configured before builder.Build() runs; only app.UseForwardedHeaders() itself
+// belongs down here in the pipeline.)
+if (trustForwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();

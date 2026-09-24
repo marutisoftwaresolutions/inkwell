@@ -1,0 +1,6 @@
+# Caddy reverse proxy: automatic HTTPS for {$DOMAIN} (set in .env), forwarding to the app
+# container over plain HTTP on the compose-internal network. See docker-compose.yml — the app's
+# port is never published to the host, so this is the only way in.
+{$DOMAIN} {
+	reverse_proxy app:8080
+}

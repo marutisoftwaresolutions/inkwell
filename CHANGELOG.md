@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Docker deployment** — a `Dockerfile` (multi-stage, non-root, health-checked) and `docker-compose.yml` (the app, SQL Server, and Caddy for automatic HTTPS) are now at the repo root. `docker compose up -d` after copying `.env.example` to `.env` starts a complete stack on the schema's normal auto-apply path; a single container against an external SQL Server also works, configured entirely through environment variables (`ConnectionStrings__DefaultConnection` and friends) with no `appsettings.json` baked into the image. Adds `ReverseProxy:TrustForwardedHeaders` (default `false`), which the compose deployment enables because only Caddy's ports are published to the host — a bare IIS/Kestrel install is unaffected.
+
+### Fixed
+
+- **A fresh checkout could fail to build.** `Blog.Web.csproj` listed close to twenty specific uploaded media files as individual build items; each one is an error waiting for any checkout other than the machine that happened to have that exact file — a new clone, CI, or a Docker build, which must exclude live uploads from the image in the first place. Removed; uploads are excluded from the project's default items by design and were never meant to be enumerated there.
+
 ## [1.0.6] — 2026-09-24
 
 ### Added

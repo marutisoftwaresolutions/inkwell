@@ -404,6 +404,12 @@ var posts = new[]
         "How to Evaluate an Optometry Software Vendor",
         "BUYER'S GUIDE", "Practice Management Software",
         "3b0764", "6d28d9", "c4b5fd", ShapeStyle.Checklist),
+
+    new PostSpec(
+        "optometry-revenue-cycle-management",
+        "Optometry Revenue Cycle Management: A Complete Guide",
+        "PRACTICE GUIDE", "Billing & Revenue Cycle",
+        "064e3b", "0f766e", "34d399", ShapeStyle.Analytics),
 };
 
 // ── Verdict roundups always use the programmatic branded card, for a consistent
@@ -444,7 +450,8 @@ var pngMappings = new System.Collections.Generic.Dictionary<string, string>
     { "contact-lens-practice-builder-software-grow-revenue", "contact_lens_builder_1779510251085.png" },
     { "optical-pos-systems-eye-care-stores-2026", "optical_pos_system_1779510266345.png" },
     { "teleoptometry-reimbursement-guide-state-by-state", "teleoptometry_reimbursement_1779510279336.png" },
-    { "anti-reflective-lens-coating-track-upsell-optometry-software", "anti_reflective_coating_1779510299776.png" }
+    { "anti-reflective-lens-coating-track-upsell-optometry-software", "anti_reflective_coating_1779510299776.png" },
+    { "optometry-revenue-cycle-management", "optometry_rcm_illustration.jpg" }
 };
 
 // ── --only=<slug>[,<slug>] ─────────────────────────────────────────────────────
