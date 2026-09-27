@@ -14,13 +14,30 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
     {
         using var conn = _ctx.CreateConnection();
         await conn.ExecuteAsync(@"
-            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, StatusCode, UserAgent, VisitedAt)
-            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @StatusCode, @UserAgent, @VisitedAt);",
+            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, StatusCode, UserAgent, VisitedAt, Verified)
+            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @StatusCode, @UserAgent, @VisitedAt, @Verified);",
             new
             {
-                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.StatusCode, v.UserAgent,
+                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.StatusCode, v.UserAgent, v.Verified,
                 VisitedAt = v.VisitedAt == default ? DateTime.UtcNow : v.VisitedAt
             });
+    }
+
+    public async Task<int> RecordManyAsync(IReadOnlyCollection<CrawlerVisit> visits)
+    {
+        if (visits.Count == 0) return 0;
+        using var conn = _ctx.CreateConnection();
+        using var tx = conn.BeginTransaction();
+        var written = await conn.ExecuteAsync(@"
+            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, StatusCode, UserAgent, VisitedAt, Verified)
+            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @StatusCode, @UserAgent, @VisitedAt, @Verified);",
+            visits.Select(v => new
+            {
+                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.StatusCode, v.UserAgent, v.Verified,
+                VisitedAt = v.VisitedAt == default ? DateTime.UtcNow : v.VisitedAt
+            }), tx);
+        tx.Commit();
+        return written;
     }
 
     // "(@OwnerId IS NULL OR OwnerId = @OwnerId)" is a classic SQL Server anti-pattern: with a
@@ -39,6 +56,8 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
                    MAX(CAST(IsAi AS INT)) AS IsAi,
                    COUNT(1)               AS Visits,
                    COUNT(DISTINCT Path)   AS Pages,
+                   SUM(CASE WHEN Verified = 1 THEN 1 ELSE 0 END) AS VerifiedVisits,
+                   SUM(CASE WHEN Verified = 0 THEN 1 ELSE 0 END) AS FailedVisits,
                    MAX(VisitedAt)         AS LastSeen
               FROM CrawlerVisits
              WHERE VisitedAt >= @Since {OwnerFilter(ownerId)}
@@ -61,6 +80,7 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
              WHERE VisitedAt >= @Since
                {OwnerFilter(ownerId)}
                AND (@AiOnly = 0 OR IsAi = 1)
+               AND (Verified IS NULL OR Verified = 1)   -- a failed check is someone else using the name
              GROUP BY Path
              ORDER BY Visits DESC;",
             new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId, AiOnly = aiOnly ? 1 : 0, Take = take });
@@ -75,6 +95,7 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
             SELECT CAST(VisitedAt AS DATE) AS Day, COUNT(1) AS Visits
               FROM CrawlerVisits
              WHERE VisitedAt >= @Since AND IsAi = 1 {OwnerFilter(ownerId)}
+               AND (Verified IS NULL OR Verified = 1)
              GROUP BY CAST(VisitedAt AS DATE)
              ORDER BY Day;",
             new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId });

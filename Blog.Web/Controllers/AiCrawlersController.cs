@@ -54,8 +54,10 @@ public class AiCrawlersController : Controller
         ViewBag.Search    = full.Where(a => !a.IsAi).ToList();
         ViewBag.TopPages  = topPagesTask.Result;
         ViewBag.Daily     = FillGaps(dailyTask.Result, days);
-        ViewBag.AiVisits  = full.Where(a => a.IsAi).Sum(a => a.Visits);
-        ViewBag.AiEngines = full.Count(a => a.IsAi && a.Visits > 0);
+        // Headline figures leave out visits that failed the operator's network check: those are someone
+        // else using the name, not the engine reading the site. The table still shows them.
+        ViewBag.AiVisits  = full.Where(a => a.IsAi).Sum(a => a.Visits - a.FailedVisits);
+        ViewBag.AiEngines = full.Count(a => a.IsAi && a.Visits - a.FailedVisits > 0);
         ViewBag.RetentionDays = Blog.Web.Services.Jobs.CrawlerVisitRetentionJob.ClampDays(
             settingsTask.Result.CrawlerVisitRetentionDays);
 

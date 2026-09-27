@@ -72,9 +72,12 @@ public sealed class IpFirewallService
     private readonly ConcurrentDictionary<string, Watch> _watch   = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _pendingHits = new(StringComparer.OrdinalIgnoreCase);
 
-    public IpFirewallService(IServiceScopeFactory scopes, ILogger<IpFirewallService> log)
+    private readonly Blog.Web.Services.CrawlerVerifier _crawlerVerifier;
+
+    public IpFirewallService(IServiceScopeFactory scopes, Blog.Web.Services.CrawlerVerifier crawlerVerifier, ILogger<IpFirewallService> log)
     {
         _scopes = scopes;
+        _crawlerVerifier = crawlerVerifier;
         _log = log;
     }
 
@@ -179,7 +182,11 @@ public sealed class IpFirewallService
             var path  = ctx.Request.Path.Value ?? "/";
             var query = ctx.Request.QueryString.HasValue ? ctx.Request.QueryString.Value : null;
             var ua    = ctx.Request.Headers.UserAgent.ToString();
-            var isCrawler = snap.Options.ProtectCrawlers && ThreatScorer.IsProtectedCrawler(ua);
+            // Crawler protection follows the User-Agent, except for an address already proven (two
+            // independent checks, see CrawlerVerification.IsProvenImpostor) not to be that crawler.
+            // Memory-only lookup; unknown or unchecked keeps the protection (invariant 3).
+            var isCrawler = snap.Options.ProtectCrawlers && ThreatScorer.IsProtectedCrawler(ua)
+                && !_crawlerVerifier.IsKnownImpostor(ua, ip);
 
             var verdict = ThreatScorer.Score(path, query, statusCode, isCrawler);
             if (!verdict.IsThreat) return;

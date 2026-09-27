@@ -1,6 +1,6 @@
 -- =============================================================================
 -- init.sql  —  Blogfront / Inkwell Complete Database Schema
--- Version : 1.0.6 (2026-09-24)
+-- Version : 1.0.7 (2026-09-27)
 -- Target  : SQL Server 2019+ / Azure SQL
 -- Usage   : Run once on a fresh database. Every block is idempotent (IF NOT
 --           EXISTS) so it is safe to re-run against an existing database.
@@ -918,6 +918,17 @@ BEGIN
 END
 ELSE
     PRINT '  [=] Comments.MemberId already exists — skipped.';
+
+-- CrawlerVisits.Verified: whether the request came from the network the crawler's operator
+-- publishes (1), failed that check (0), or could not be checked (NULL)
+-- (DBScripts/2026-09-27_add-verified-to-crawlervisits.sql).
+IF COL_LENGTH('CrawlerVisits', 'Verified') IS NULL
+BEGIN
+    ALTER TABLE CrawlerVisits ADD Verified BIT NULL;
+    PRINT '  [+] CrawlerVisits.Verified added.';
+END
+ELSE
+    PRINT '  [=] CrawlerVisits.Verified already exists — skipped.';
 
 -- =============================================================================
 -- 38. Index top-ups on tables created above

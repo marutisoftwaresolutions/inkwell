@@ -5,6 +5,7 @@
 @inject Blog.Core.Interfaces.IUserRepository UserRepo
 @inject Blog.Core.Interfaces.ICategoryRepository CategoryRepo
 @inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
+@inject Blog.Web.Services.PageViewBeaconService PageViewBeacon
 @using System.Security.Claims
 @{
 	Guid contentId = Guid.Empty;
@@ -422,5 +423,12 @@
 		<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 	}
 	@await RenderSectionAsync("Scripts", required: false)
+	@* Page views are counted when this script reports back, so clients that never run JavaScript are
+	   not counted. Emitted only for pages that count (home, posts, pages; anonymous; not an error). *@
+	@{ var pageViewToken = PageViewBeacon.TokenFor(Context); }
+	@if (pageViewToken is not null)
+	{
+		<script src="~/js/inkwell-views.js" asp-append-version="true" data-pv="@pageViewToken" defer></script>
+	}
 </body>
 </html>

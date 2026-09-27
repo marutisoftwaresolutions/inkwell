@@ -7,13 +7,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.0.7] — 2026-09-27
+
 ### Added
 
 - **Docker deployment** — a `Dockerfile` (multi-stage, non-root, health-checked) and `docker-compose.yml` (the app, SQL Server, and Caddy for automatic HTTPS) are now at the repo root. `docker compose up -d` after copying `.env.example` to `.env` starts a complete stack on the schema's normal auto-apply path; a single container against an external SQL Server also works, configured entirely through environment variables (`ConnectionStrings__DefaultConnection` and friends) with no `appsettings.json` baked into the image. Adds `ReverseProxy:TrustForwardedHeaders` (default `false`), which the compose deployment enables because only Caddy's ports are published to the host — a bare IIS/Kestrel install is unaffected.
+- **Crawler identity check in AI Crawlers** — each visit claiming to be Googlebot, Bingbot, Applebot, GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot or Perplexity-User is checked against the IP list or reverse-DNS name its operator publishes. The report gains an **Identity check** column (verified, failed, unchecked), and visits that fail — someone else using the crawler's name — are left out of the headline totals, the daily trend and the most-crawled pages. Operators that publish no method stay unchecked. Private or proxy addresses and checks that cannot run are recorded as unchecked, never as failed. The server fetches each operator's public list at most once a day; nothing about readers is sent. Existing visits stay unchecked. Upgrading adds a `Verified` column to `CrawlerVisits` automatically.
+
+### Changed
+
+- **Page views are counted when the page's script reports back.** A public page now carries a small self-hosted script that sends a signed, path-bound token to `/pv` once the page loads; only that beacon records a view. Clients that never run JavaScript — scrapers and request floods, which sent the server's counts far above Google Analytics — are no longer counted, so Analytics now counts on the same basis as GA. Readers with JavaScript disabled are not counted either, and figures before the upgrade were counted on the server, so expect a step down in the trend. No cookies are set and nothing is stored in the browser. Signed-in users, bots, beacons for a different page and more than 30 beacons a minute from one address are ignored.
+- **"Most read" ignores crawlers.** A post's view counter no longer rises when a search engine, AI crawler or script fetches it.
+- **Page view and crawler tracking is buffered.** A counted request no longer writes to the database or calls the geo-IP service itself: rows are held in memory and written in batches every 30 seconds or 500 rows, with a final flush when the application stops. Geo-IP lookups happen at flush time for at most 20 new addresses per batch, keeping the free service under its rate limit; views beyond that budget are stored without a country. Each buffer is capped at 50,000 rows and drops (and logs) anything past that, so a traffic flood cannot grow memory or become a flood of database writes. Up to 30 seconds of analytics can be lost if the process ends abruptly.
 
 ### Fixed
 
+- **Crawler errors were recorded twice or under the wrong address.** When a crawler hit a missing page, AI Crawlers logged both the requested URL and the internal `/error/404` page; a crawler that caused a server error was logged only as `/error/500`, hiding which URL failed. Each request is now recorded once, under the URL that was requested, with its real status.
+- **Some Google fetchers were counted as readers.** GoogleOther, Google-InspectionTool, Google-Read-Aloud and similar Google agents carry no "bot" token in their user-agent and were counted as page views. They are now filtered out.
 - **A fresh checkout could fail to build.** `Blog.Web.csproj` listed close to twenty specific uploaded media files as individual build items; each one is an error waiting for any checkout other than the machine that happened to have that exact file — a new clone, CI, or a Docker build, which must exclude live uploads from the image in the first place. Removed; uploads are excluded from the project's default items by design and were never meant to be enumerated there.
+
+### Security
+
+- **Reader IP hashes are no longer reversible.** Page view IPs were stored as SHA-256 of the address plus a salt that was the same in every copy of the source, so anyone with a copy of the table could recover the addresses; the README had also called it a per-install salt. They are now stored as HMAC-SHA256 under a random secret generated for each installation and kept, Data-Protection-encrypted, as `ip-hash.secret` beside the key ring — back it up with the keys. Rows written before the upgrade keep the old values until `DBScripts/2026-09-27_clear-legacy-ip-hashes.sql` is run with the upgrade time; nothing in Inkwell reads the column, so clearing it loses no feature.
+- **Crawler impersonators lose the firewall's crawler protection.** Search and AI crawlers are still never scored for missing pages, except from an address already proven not to be the crawler it names — outside the operator's published IP list and with reverse DNS that is not the operator's (Google, Bing, Apple). Unchecked addresses, and operators that publish only an IP list, keep the protection so a real crawler is never blocked on a stale list.
+- **Traffic recording behind a proxy uses the real client address.** With **Trust proxy headers** enabled, page views, crawler visits and the crawler identity check use the address the firewall resolves from `CF-Connecting-IP` / `X-Forwarded-For`, not the proxy's.
 
 ## [1.0.6] — 2026-09-24
 

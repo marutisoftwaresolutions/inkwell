@@ -18,28 +18,17 @@ public class PageViewRepository : IPageViewRepository
         "'/admin','/account','/newsletter','/avatar','/og-image','/landing','/error'" +
         ")))";
 
-    public async Task RecordAsync(PageView view)
+    public async Task<int> RecordManyAsync(IReadOnlyCollection<PageView> views)
     {
+        if (views.Count == 0) return 0;
         using var conn = _ctx.CreateConnection();
-        await conn.ExecuteAsync(@"
+        using var tx = conn.BeginTransaction();
+        var written = await conn.ExecuteAsync(@"
             INSERT INTO PageViews (OwnerId, Path, Referrer, Source, Medium, Campaign, Term, Content, IpHash, UserAgent, Country, Region, CreatedAt)
             VALUES (@OwnerId, @Path, @Referrer, @Source, @Medium, @Campaign, @Term, @Content, @IpHash, @UserAgent, @Country, @Region, @CreatedAt)",
-            new
-            {
-                view.OwnerId,
-                view.Path,
-                view.Referrer,
-                view.Source,
-                view.Medium,
-                view.Campaign,
-                view.Term,
-                view.Content,
-                view.IpHash,
-                view.UserAgent,
-                view.Country,
-                view.Region,
-                view.CreatedAt
-            });
+            views, tx);
+        tx.Commit();
+        return written;
     }
 
     public async Task<int> GetTotalAsync(Guid ownerId, DateTime from, DateTime to)

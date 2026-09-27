@@ -102,6 +102,7 @@ builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services
 builder.Services.AddScoped<Blog.Web.Services.RevisionService>();
 // Signed, expiring preview links for unpublished posts (nothing stored).
 builder.Services.AddSingleton<Blog.Web.Services.PreviewLinkService>();
+builder.Services.AddSingleton<Blog.Web.Services.PageViewBeaconService>();
 builder.Services.AddHttpClient<IndexNowService>(c => c.Timeout = TimeSpan.FromSeconds(8));
 builder.Services.AddScoped<ErrorLogService>();
 
@@ -161,6 +162,13 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddControllersWithViews();
 builder.Services.AddMemoryCache();
+// Page views and crawler visits are buffered in memory and written in batches (PageViewMiddleware).
+builder.Services.AddSingleton<Blog.Web.Services.CrawlerVerifier>();
+// Reader IPs are pseudonymised with a per-install secret kept beside the key ring (ADR-0015).
+builder.Services.AddSingleton(sp => new Blog.Web.Services.IpHasher(keysPath,
+    sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(),
+    sp.GetRequiredService<ILogger<Blog.Web.Services.IpHasher>>()));
+builder.Services.AddSingleton<Blog.Web.Services.TrafficRecorder>();
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddImageSharp();
 
@@ -186,6 +194,14 @@ if (Directory.Exists(oldUploads))
 }
 
 var app = builder.Build();
+
+// Write whatever analytics are still buffered before the process exits (app-pool recycle, deploy).
+// Bounded so a slow database can never hold up shutdown.
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    try { app.Services.GetRequiredService<Blog.Web.Services.TrafficRecorder>().FlushAsync().Wait(TimeSpan.FromSeconds(5)); }
+    catch { /* analytics must never block shutdown */ }
+});
 
 var startupWarnings = app.Services.GetRequiredService<Blog.Web.Services.StartupWarnings>();
 if (keysPath is null)
@@ -355,7 +371,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseTenantResolution();
-app.UsePageViewTracking();
+app.UseCrawlerVisitTracking();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // Attribute-routed controllers (admin, API)

@@ -467,8 +467,10 @@ public class BlogController : Controller
         // deployed build — so a 304 only ever stands in for a byte-identical page. Cache-Control is
         // Only count views from anonymous visitors — skip admin/editor sessions and previews. Counted
         // before the validator check so a returning reader who gets a 304 still counts (the ETag folds
-        // in ViewCount/100, so the count itself does not defeat caching).
-        if (!isPreview && User.Identity?.IsAuthenticated != true)
+        // in ViewCount/100, so the count itself does not defeat caching). Crawlers and scripts are not
+        // readers: without this, every GPTBot or Googlebot fetch raised "most read".
+        if (!isPreview && User.Identity?.IsAuthenticated != true
+            && !Blog.Core.Services.BotUserAgent.IsBot(Request.Headers.UserAgent.ToString()))
         {
             await _posts.IncrementViewCountAsync(post.Id);
             post.ViewCount += 1;

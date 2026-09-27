@@ -4,7 +4,8 @@ namespace Blog.Core.Interfaces;
 
 public interface IPageViewRepository
 {
-    Task RecordAsync(PageView view);
+    /// <summary>Writes a batch of buffered views in one transaction; returns the rows written.</summary>
+    Task<int> RecordManyAsync(IReadOnlyCollection<PageView> views);
     Task<int> GetTotalAsync(Guid ownerId, DateTime from, DateTime to);
     Task<IReadOnlyList<(DateTime Date, int Count)>> GetDailyAsync(Guid ownerId, DateTime from, DateTime to);
     Task<IReadOnlyList<(string Source, string Medium, int Count)>> GetSourceBreakdownAsync(Guid ownerId, DateTime from, DateTime to);

@@ -516,6 +516,12 @@ public class MigrationService
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ErrorLogs') AND name = 'LastIpAddress')
                 BEGIN
                     ALTER TABLE ErrorLogs ADD LastIpAddress NVARCHAR(45) NULL;
+                END
+
+                -- Crawler identity check against the operator's published network (DBScripts/2026-09-27_add-verified-to-crawlervisits.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CrawlerVisits') AND name = 'Verified')
+                BEGIN
+                    ALTER TABLE CrawlerVisits ADD Verified BIT NULL;
                 END";
             
             await Dapper.SqlMapper.ExecuteAsync(connection, sql);

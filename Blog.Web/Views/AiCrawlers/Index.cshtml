@@ -19,6 +19,19 @@
         if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
         return $"{(int)d.TotalDays}d ago";
     }
+
+    // What the network check found. "Not checkable" when the operator publishes no method.
+    string Check(CrawlerActivity c)
+    {
+        if (c.Visits == 0) return "";
+        if (Blog.Core.Services.CrawlerVerification.For(c.Crawler) is null) return "not checkable";
+        var parts = new List<string>();
+        if (c.VerifiedVisits > 0) parts.Add($"{c.VerifiedVisits:N0} verified");
+        if (c.FailedVisits > 0) parts.Add($"{c.FailedVisits:N0} failed");
+        var unchecked_ = c.Visits - c.VerifiedVisits - c.FailedVisits;
+        if (unchecked_ > 0) parts.Add($"{unchecked_:N0} unchecked");
+        return string.Join(" · ", parts);
+    }
 }
 
 <div class="mb-5">
@@ -26,6 +39,9 @@
     <p class="text-xs text-muted-foreground mt-0.5">
         Which AI answer engines and search crawlers actually fetch this site, and what they read.
         Search Console reports generative-AI impressions without naming the engine — this names it.
+        A crawler's name is self-declared, so each visit is checked against the network its operator
+        publishes; visits that fail are someone else using the name and are left out of the totals, trend
+        and top pages.
     </p>
 </div>
 
@@ -92,6 +108,7 @@
                 <th class="px-4 py-2 font-medium">What it is for</th>
                 <th class="px-4 py-2 font-medium text-right">Visits</th>
                 <th class="px-4 py-2 font-medium text-right">Pages</th>
+                <th class="px-4 py-2 font-medium">Identity check</th>
                 <th class="px-4 py-2 font-medium">Last seen</th>
             </tr>
         </thead>
@@ -104,6 +121,7 @@
                     <td class="px-4 py-2 text-xs text-muted-foreground max-w-[22rem]">@c.Purpose</td>
                     <td class="px-4 py-2 text-right font-semibold @(c.Visits > 0 ? "text-foreground" : "text-muted-foreground")">@c.Visits.ToString("N0")</td>
                     <td class="px-4 py-2 text-right text-xs text-muted-foreground">@c.Pages</td>
+                    <td class="px-4 py-2 text-xs @(c.FailedVisits > 0 ? "text-destructive" : "text-muted-foreground") whitespace-nowrap">@Check(c)</td>
                     <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
                 </tr>
             }
@@ -147,6 +165,7 @@
                 <th class="px-4 py-2 font-medium">Crawler</th>
                 <th class="px-4 py-2 font-medium">Operator</th>
                 <th class="px-4 py-2 font-medium text-right">Visits</th>
+                <th class="px-4 py-2 font-medium">Identity check</th>
                 <th class="px-4 py-2 font-medium">Last seen</th>
             </tr>
         </thead>
@@ -157,6 +176,7 @@
                     <td class="px-4 py-2 font-mono text-xs text-foreground">@c.Crawler</td>
                     <td class="px-4 py-2 text-xs text-muted-foreground">@c.Operator</td>
                     <td class="px-4 py-2 text-right font-semibold text-foreground">@c.Visits.ToString("N0")</td>
+                    <td class="px-4 py-2 text-xs @(c.FailedVisits > 0 ? "text-destructive" : "text-muted-foreground") whitespace-nowrap">@Check(c)</td>
                     <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
                 </tr>
             }

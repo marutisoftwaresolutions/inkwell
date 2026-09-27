@@ -12,6 +12,10 @@ public class CrawlerVisit
     public int      StatusCode { get; set; }
     public string?  UserAgent  { get; set; }
     public DateTime VisitedAt  { get; set; }
+
+    /// <summary>true: the address is the operator's; false: checked and it is not (a spoofed User-Agent);
+    /// null: the operator publishes no verification method, or the check could not run.</summary>
+    public bool?    Verified   { get; set; }
 }
 
 /// <summary>Per-crawler totals for the reporting window.</summary>
@@ -23,6 +27,12 @@ public class CrawlerActivity
     public int      Visits     { get; set; }
     public int      Pages      { get; set; }
     public DateTime? LastSeen  { get; set; }
+
+    /// <summary>Visits from an address the operator publishes as its own.</summary>
+    public int      VerifiedVisits { get; set; }
+
+    /// <summary>Visits whose address failed the operator's check — someone else using the name.</summary>
+    public int      FailedVisits   { get; set; }
 
     /// <summary>What the operator publishes this bot as doing; filled in from the identifier.</summary>
     public string Purpose { get; set; } = "";

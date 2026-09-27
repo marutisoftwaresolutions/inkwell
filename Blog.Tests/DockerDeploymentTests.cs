@@ -67,9 +67,11 @@ public class DockerDeploymentTests
     public void Env_example_exists_and_the_real_env_file_is_gitignored_not_env_example()
     {
         Assert.True(Exists(".env.example"));
-        var gi = Read(".gitignore");
-        Assert.Contains("\n.env\n", gi);
-        Assert.Contains("!.env.example", gi);
+        // Compare whole lines, not "\n.env\n": the file is checked out with CRLF or LF depending on the
+        // machine's git settings, and the rule is the same either way.
+        var lines = Read(".gitignore").Split('\n').Select(l => l.TrimEnd('\r').Trim()).ToList();
+        Assert.Contains(".env", lines);
+        Assert.Contains("!.env.example", lines);
     }
 
     [Fact]

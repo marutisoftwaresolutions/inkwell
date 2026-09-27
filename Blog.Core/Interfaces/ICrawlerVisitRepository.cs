@@ -7,6 +7,9 @@ public interface ICrawlerVisitRepository
     /// <summary>Records one identified crawler request. Best-effort; never throws into the request.</summary>
     Task RecordAsync(CrawlerVisit visit);
 
+    /// <summary>Writes a batch of buffered visits in one transaction; returns the rows written.</summary>
+    Task<int> RecordManyAsync(IReadOnlyCollection<CrawlerVisit> visits);
+
     /// <summary>Per-crawler totals over the window, busiest first.</summary>
     Task<IReadOnlyList<CrawlerActivity>> GetActivityAsync(Guid? ownerId, int days);
 
