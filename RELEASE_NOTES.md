@@ -79,9 +79,13 @@ external SQL Server also works, configured entirely through environment variable
 - **Back up `ip-hash.secret`** together with your Data Protection keys (`DataProtection:KeysPath`,
   default `App_Data/keys`). If it is lost, reader hashes simply start a new series. Nothing in Inkwell
   depends on them.
-- **Optional: clear the old reversible hashes.** Run `DBScripts/2026-09-27_clear-legacy-ip-hashes.sql`
-  with `@Before` set to the time you upgraded. It only reports until you also set `@Apply = 1`. It
-  cannot be undone, which is the point.
+- **Optional: clear the old reversible hashes.** Rows written before the upgrade keep them. Nothing in
+  Inkwell reads the column, so you can remove them; this cannot be undone, which is the point. Put the
+  UTC time you upgraded in place of the date below:
+  ```sql
+  UPDATE PageViews SET IpHash = NULL WHERE IpHash IS NOT NULL AND CreatedAt < '2026-09-27T00:00:00';
+  ```
+  On a large table, run it in batches (`UPDATE TOP (50000) …` until no rows are affected).
 - **Outbound requests.** To verify crawlers, the server now fetches the public IP lists that Google,
   Bing, Apple, OpenAI and Perplexity publish (at most once a day each), and does some reverse-DNS
   lookups. Nothing about readers is sent.

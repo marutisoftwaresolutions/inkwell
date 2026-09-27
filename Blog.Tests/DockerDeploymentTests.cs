@@ -67,6 +67,9 @@ public class DockerDeploymentTests
     public void Env_example_exists_and_the_real_env_file_is_gitignored_not_env_example()
     {
         Assert.True(Exists(".env.example"));
+        // .gitignore is local-only by owner decision (2026-09-27): it is never committed, so a fresh
+        // clone has none and there is nothing to check. Where it exists, the rules must hold.
+        if (!Exists(".gitignore")) return;
         // Compare whole lines, not "\n.env\n": the file is checked out with CRLF or LF depending on the
         // machine's git settings, and the rule is the same either way.
         var lines = Read(".gitignore").Split('\n').Select(l => l.TrimEnd('\r').Trim()).ToList();
