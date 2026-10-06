@@ -60,6 +60,11 @@
 	var siteDescription = userSettings.SiteDescription;
 
 	var globalSettings = await SettingsRepo.GetSettingsAsync(brandingId);
+	// Cookie consent (v1.0.8): with the banner on, Google Analytics is not in the page at all until the
+	// reader accepts (inkwell-consent.js loads it). A malformed Measurement ID is never emitted.
+	var consentMode = Blog.Core.Services.CookieConsent.Decide(globalSettings.CookieConsentEnabled, globalSettings.GoogleAnalyticsId);
+	var analyticsId = Blog.Core.Services.CookieConsent.IsValidAnalyticsId(globalSettings.GoogleAnalyticsId) ? globalSettings.GoogleAnalyticsId.Trim() : null;
+	var analyticsInHead = analyticsId is not null && consentMode == Blog.Core.Services.CookieConsentMode.Off;
 
 	// ── Title template ──────────────────────────────────────────────────────
 	// Every page ends up with a single " | {SiteName}" suffix: no missing brand,
@@ -102,7 +107,7 @@
 	   Geist (headings/UI) and Source Serif 4 (body copy) are the Inkwell design-system
 	   defaults used on virtually every page; preloading their latin subsets removes a
 	   font-swap round-trip on the LCP text. font-display:swap is already set in fonts.css. *@
-	@if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
+	@if (analyticsInHead)
 	{
 		<link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
 	}
@@ -158,14 +163,14 @@
 		}
 	}
 	@await RenderSectionAsync("MetaTags", required: false)
-	@if (!string.IsNullOrWhiteSpace(globalSettings.GoogleAnalyticsId))
+	@if (analyticsInHead)
 	{
-		<script async src="https://www.googletagmanager.com/gtag/js?id=@globalSettings.GoogleAnalyticsId"></script>
+		<script async src="https://www.googletagmanager.com/gtag/js?id=@analyticsId"></script>
 		<script>
 			window.dataLayer = window.dataLayer || [];
 			function gtag(){dataLayer.push(arguments);}
 			gtag('js', new Date());
-			gtag('config', '@globalSettings.GoogleAnalyticsId');
+			gtag('config', '@analyticsId');
 		</script>
 	}
 
@@ -398,6 +403,8 @@
 		@await Component.InvokeAsync("Footer", new { ownerId = brandingId })
 	}
 
+	<partial name="_CookieConsent" model="(consentMode, analyticsId)" />
+
 	<!-- Scroll to Top -->
 	<a href="#" id="backToTop" class="back-top fixed py-2 px-3 border border-dashed end-4 bottom-4" style="background: var(--muted); border-color: var(--border); color: var(--muted-foreground);" aria-label="Scroll To Top">
 		<i class="bi bi-arrow-up"></i>
@@ -421,6 +428,10 @@
 	@if (!string.IsNullOrEmpty(_rcfg["ReCaptcha:SiteKey"]))
 	{
 		<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+	}
+	@if (ViewData["HasGallery"] is true)
+	{
+		<script src="~/js/inkwell-gallery.js" asp-append-version="true" defer></script>
 	}
 	@await RenderSectionAsync("Scripts", required: false)
 	@* Page views are counted when this script reports back, so clients that never run JavaScript are

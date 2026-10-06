@@ -1,6 +1,6 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
-    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
+    var sortedPages = Model.Links;
 }
 
 <header class="sticky top-0 z-50 w-full relative" style="background: var(--background);">
@@ -59,10 +59,10 @@
                         </a>
                         @foreach (var navPage in sortedPages)
                         {
-                            <a href="/@navPage.Slug"
+                            <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)"
                                class="flex items-center px-5 py-3 text-sm uppercase hover:opacity-50 transition-opacity border-b"
                                style="border-color: var(--border); color: var(--foreground); letter-spacing: 0.08em;">
-                                @navPage.Title
+                                @if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title
                             </a>
                         }
                     </div>

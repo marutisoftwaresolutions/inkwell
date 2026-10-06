@@ -29,5 +29,8 @@ public class Page
     
     public string? TwitterTitle { get; set; }
     public string? TwitterDescription { get; set; }
+
+    /// <summary>Custom field values, a flat { key: value } JSON object (ADR-0025). Read through CustomFields.</summary>
+    public string? CustomFieldsJson { get; set; }
     public string? TwitterImage { get; set; }
 }

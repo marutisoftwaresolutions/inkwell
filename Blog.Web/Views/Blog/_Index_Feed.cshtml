@@ -57,7 +57,7 @@
                             <p style="font-family:var(--sans);font-size:0.9375rem;line-height:1.6;color:var(--fg-body);margin:0 0 var(--sp-6);max-width:var(--measure-prose);">@excerpt</p>
                         }
                         <div style="display:flex;align-items:center;gap:var(--sp-6);">
-                            <time style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">@post.PublishedAt?.ToString("MMM d, yyyy")</time>
+                            <time style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">@Dates.Medium(post.PublishedAt)</time>
                             @if (!string.IsNullOrEmpty(post.AuthorName))
                             {
                                 <span style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">by @post.AuthorName</span>

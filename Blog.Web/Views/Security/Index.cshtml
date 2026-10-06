@@ -151,7 +151,7 @@
                         <td class="px-4 py-2 text-right font-semibold tone-warn">@w.Score</td>
                         <td class="px-4 py-2 text-right text-xs text-muted-foreground">@w.Requests</td>
                         <td class="px-4 py-2 text-xs text-muted-foreground break-all max-w-[24rem]">@w.LastReason</td>
-                        <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@w.LastSeenAt.ToString("u")">@Ago(w.LastSeenAt)</td>
+                        <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(w.LastSeenAt)">@Ago(w.LastSeenAt)</td>
                         <td class="px-4 py-2 text-right">
                             <form method="post" action="/admin/security/block" class="inline"
                                   data-confirm-title="Block @w.IpAddress for 24 hours?" data-confirm-body="Every request from it gets a 403 for the next 24 hours. Search and AI crawlers are identified by user agent, not by address, so check the watchlist row before blocking a shared range." data-confirm-action="Block for 24 hours" data-confirm-tone="warning">
@@ -223,9 +223,9 @@
                         }
                     </td>
                     <td class="px-4 py-2 text-right font-semibold text-foreground">@r.HitCount.ToString("N0")</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@r.CreatedAt.ToString("u")">@Ago(r.CreatedAt)</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(r.CreatedAt)">@Ago(r.CreatedAt)</td>
                     <td class="px-4 py-2 text-xs whitespace-nowrap @(r.IsPermanent ? "tone-bad font-medium" : "text-muted-foreground")"
-                        title="@(r.ExpiresAt?.ToString("u") ?? "never")">@Until(r.ExpiresAt)</td>
+                        title="@(r.ExpiresAt is null ? "never" : Dates.DateTimeSeconds(r.ExpiresAt))">@Until(r.ExpiresAt)</td>
                     <td class="px-4 py-2 text-right">
                         <form method="post" action="/admin/security/remove/@r.Id?kind=@filterKind&q=@filterQuery&page=@(page)" class="inline"
                               data-confirm-title="@(isBlock ? "Unblock this address?" : "Remove from the allowlist?")" data-confirm-body="@(isBlock ? $"{r.IpAddress} can reach the site again immediately. It is blocked again automatically if it keeps probing." : $"{r.IpAddress} loses its never-block protection and becomes subject to automatic blocking like any other address.")" data-confirm-action="@(isBlock ? "Unblock" : "Remove entry")" data-confirm-tone="warning">

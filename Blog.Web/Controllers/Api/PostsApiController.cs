@@ -16,11 +16,13 @@ public class PostsApiController : ControllerBase
 {
     private readonly IPostRepository _posts;
     private readonly PostService _postService;
+    private readonly Blog.Web.Services.Webhooks.WebhookPublisher _webhooks;
 
-    public PostsApiController(IPostRepository posts, PostService postService)
+    public PostsApiController(IPostRepository posts, PostService postService, Blog.Web.Services.Webhooks.WebhookPublisher webhooks)
     {
         _posts = posts;
         _postService = postService;
+        _webhooks = webhooks;
     }
 
     [HttpGet]
@@ -52,7 +54,6 @@ public class PostsApiController : ControllerBase
         var post = await _posts.GetBySlugAsync(slug);
         if (post == null || (post.Status != PostStatus.Published && !(post.Status == PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)))
             return NotFound(ApiError(404, "Post not found."));
-        await _posts.IncrementViewCountAsync(post.Id);
         return Ok(new { data = post });
     }
 
@@ -62,11 +63,15 @@ public class PostsApiController : ControllerBase
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var userEmail = User.FindFirstValue(ClaimTypes.Email)!;
 
+        if (string.IsNullOrWhiteSpace(req.Content) && req.Markdown is null)
+            return BadRequest(ApiError(400, "Send the body as \"content\" (HTML) or \"markdown\"."));
+
         var post = new Post
         {
-            Title = req.Title, Slug = req.Slug ?? "", Html = req.Content,
-            MetaDescription = req.Summary ?? "", Plaintext = req.Content, AuthorId = userId, Status = PostStatus.Draft
+            Title = req.Title, Slug = req.Slug ?? "", Html = req.Content ?? "",
+            MetaDescription = req.Summary ?? "", Plaintext = req.Content ?? "", AuthorId = userId, Status = PostStatus.Draft
         };
+        ApplyBody(post, req.Content, req.Markdown);
 
         var (id, error) = await _postService.CreatePostAsync(post, req.CategoryIds ?? new(), req.Tags ?? new(), userId, userEmail);
         if (error != null) return BadRequest(ApiError(400, error));
@@ -82,16 +87,17 @@ public class PostsApiController : ControllerBase
 
         var existing = await _posts.GetByIdAsync(id);
         if (existing == null) return NotFound(ApiError(404, "Post not found."));
+        var before = new Post { Status = existing.Status, ScheduledAt = existing.ScheduledAt };
 
         existing.Title = req.Title ?? existing.Title;
-        existing.Html = req.Content ?? existing.Html;
-        existing.Plaintext = req.Content ?? existing.Plaintext;
+        ApplyBody(existing, req.Content, req.Markdown);
         existing.MetaDescription = req.Summary ?? existing.MetaDescription;
         existing.Slug = req.Slug ?? existing.Slug;
 
         var error = await _postService.UpdatePostAsync(existing, req.CategoryIds ?? new(), req.Tags ?? new(), userId, userEmail);
         if (error != null) return BadRequest(ApiError(400, error));
 
+        await _webhooks.PostSavedAsync(HttpContext, before, existing);
         return Ok(new { data = "Updated." });
     }
 
@@ -100,8 +106,13 @@ public class PostsApiController : ControllerBase
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var userEmail = User.FindFirstValue(ClaimTypes.Email)!;
+        var beforePost = await _posts.GetByIdAsync(id);
         var error = await _postService.PublishPostAsync(id, userId, userEmail);
         if (error != null) return NotFound(ApiError(404, error));
+
+        var afterPost = await _posts.GetByIdAsync(id);
+        if (afterPost is not null)
+            await _webhooks.PostSavedAsync(HttpContext, beforePost is null ? null : new Post { Status = beforePost.Status, ScheduledAt = beforePost.ScheduledAt }, afterPost);
         return Ok(new { data = "Published." });
     }
 
@@ -115,11 +126,34 @@ public class PostsApiController : ControllerBase
         return Ok(new { data = "Deleted permanently." });
     }
 
+    /// <summary>
+    /// Markdown authoring (ADR-0022): "markdown" makes Markdown the post's source and renders its HTML; "content"
+    /// (HTML) makes HTML the source again, so a later Desk save can never re-render over it from stale Markdown.
+    /// Neither leaves the body as it was.
+    /// </summary>
+    private static void ApplyBody(Post post, string? html, string? markdown)
+    {
+        if (markdown is not null)
+        {
+            post.EditorMode = EditorModes.Markdown;
+            post.Markdown = markdown;
+            post.Html = MarkdownRenderer.ToHtml(markdown);
+            post.Plaintext = MarkdownRenderer.ToPlaintext(post.Html);
+        }
+        else if (html is not null)
+        {
+            post.EditorMode = EditorModes.Rich;
+            post.Markdown = null;
+            post.Html = html;
+            post.Plaintext = MarkdownRenderer.ToPlaintext(html);
+        }
+    }
+
     private static object ApiError(int code, string error) =>
         new { statusCode = code, error, traceId = System.Diagnostics.Activity.Current?.Id };
 }
 
-public record CreatePostRequest(string Title, string? Slug, string Content, string? Summary,
-    List<Guid>? CategoryIds, List<string>? Tags);
+public record CreatePostRequest(string Title, string? Slug, string? Content, string? Summary,
+    List<Guid>? CategoryIds, List<string>? Tags, string? Markdown = null);
 public record UpdatePostRequest(string? Title, string? Slug, string? Content, string? Summary,
-    List<Guid>? CategoryIds, List<string>? Tags);
+    List<Guid>? CategoryIds, List<string>? Tags, string? Markdown = null);

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Core.Services;
 
 namespace Blog.Web.Services.Import;
 
@@ -235,6 +236,20 @@ public class ImportProcessor
             UpdatedAt = DateTime.UtcNow,
             AllowComments = true
         };
+
+        // Markdown authoring (ADR-0022): a Ghost post written in Markdown stays a Markdown post when asked.
+        // Its images get the same new addresses as the HTML's, so the next save renders working images.
+        if (opts.KeepMarkdown && !string.IsNullOrWhiteSpace(p.Markdown))
+        {
+            var markdown = p.Markdown!;
+            foreach (var (old, replacement) in map)
+                if (!string.IsNullOrEmpty(replacement)) markdown = markdown.Replace(old, replacement, StringComparison.Ordinal);
+            post.EditorMode = EditorModes.Markdown;
+            post.Markdown = markdown;
+            post.Html = MarkdownRenderer.ToHtml(markdown);
+            if (opts.SanitizeHtml) post.Html = _rewriter.Sanitize(post.Html);
+            post.Plaintext = StripTags(post.Html);
+        }
 
         Guid postId;
         if (postOverwriteId.HasValue) { await _posts.UpdateAsync(post); postId = postOverwriteId.Value; }

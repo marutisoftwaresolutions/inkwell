@@ -53,6 +53,24 @@ public class DashboardController : Controller
     {
         var userId = GetCurrentUserId();
 
+        // Editorial workflow: those who may publish see what waits for review (oldest first); authors see
+        // their own posts that were sent back with a note.
+        if (User.HasClaim("Permission", "posts.publish"))
+        {
+            ViewBag.ReviewMode = "review";
+            ViewBag.ReviewItems = await _posts.GetReviewQueueAsync(5);
+            ViewBag.ReviewCount = await _posts.GetTotalCountAsync(Blog.Core.Domain.PostStatus.InReview, null);
+        }
+        else
+        {
+            ViewBag.ReviewMode = "changes";
+            ViewBag.ReviewItems = (await _posts.GetPostsAsync(new Blog.Core.Interfaces.PostFilter
+            {
+                Status = Blog.Core.Domain.PostStatus.NeedsChanges, AuthorId = userId, Page = 1, PageSize = 5
+            })).Items;
+            ViewBag.ReviewCount = await _posts.GetTotalCountAsync(Blog.Core.Domain.PostStatus.NeedsChanges, userId);
+        }
+
         ViewBag.TotalPosts = await _posts.GetTotalCountAsync(null, userId);
         ViewBag.PublishedPosts = await _posts.GetTotalCountAsync(Blog.Core.Domain.PostStatus.Published, userId);
         ViewBag.DraftPosts = await _posts.GetTotalCountAsync(Blog.Core.Domain.PostStatus.Draft, userId);

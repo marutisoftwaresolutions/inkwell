@@ -42,6 +42,21 @@ public class SettingsViewModel
     [Display(Name = "Display time zone")]
     public string? DisplayTimeZoneId { get; set; } = "UTC";
 
+    /// <summary>ISO 3166-1 alpha-2; narrows the zone and date-format lists (ADR-0027).</summary>
+    [Display(Name = "Country")]
+    public string? Country { get; set; }
+
+    /// <summary>The locale whose date conventions every date follows, e.g. "en-IN".</summary>
+    [Display(Name = "Date format")]
+    public string? DateLocale { get; set; } = "en-US";
+
+    /// <summary>"locale" or "iso8601".</summary>
+    public string? DateFormat { get; set; } = "locale";
+
+    /// <summary>"locale", "24h" or "12h".</summary>
+    [Display(Name = "Clock")]
+    public string? ClockFormat { get; set; } = "locale";
+
     /// <summary>system (follow the reader's OS) · light · dark. Applies to the public site and the Desk.</summary>
     [Display(Name = "Colour scheme")]
     public string? ColorScheme { get; set; } = "system";
@@ -74,7 +89,23 @@ public class SettingsViewModel
     public DateTime? SearchConsoleLatestDate { get; set; }
 
     [Display(Name = "Google Analytics Measurement ID")]
+    [RegularExpression(@"^\s*((G|UA|GT|AW)-[A-Z0-9-]{4,24})?\s*$",
+        ErrorMessage = "Enter the Measurement ID exactly as Google shows it, for example G-ABC123XYZ9, or leave it blank.")]
     public string? GoogleAnalyticsId { get; set; }
+
+    [Display(Name = "Ask readers for cookie consent")]
+    public bool CookieConsentEnabled { get; set; } = true;
+
+    /// <summary>Roles that must use two-factor sign-in (Admin-only field).</summary>
+    public List<string> TwoFactorRequiredRoles { get; set; } = new();
+
+    /// <summary>The custom field definitions as JSON, edited by the Custom fields tab (ADR-0025).</summary>
+    public string? CustomFieldsJson { get; set; }
+
+    /// <summary>True when the form carried the Custom fields tab, so a save without it never clears the definitions.</summary>
+    public bool CustomFieldsPosted { get; set; }
+    /// <summary>True when the form carried the role boxes (only Admins see them), so an empty list means "none ticked".</summary>
+    public bool TwoFactorRolesPosted { get; set; }
 
     [Display(Name = "Google Search Console verification code")]
     public string? GoogleSiteVerification { get; set; }

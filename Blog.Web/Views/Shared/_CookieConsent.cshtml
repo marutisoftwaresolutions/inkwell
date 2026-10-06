@@ -1,0 +1,43 @@
+@model (Blog.Core.Services.CookieConsentMode Mode, string? AnalyticsId)
+@using Blog.Core.Services
+@*
+    Cookie consent banner (v1.0.8). Always rendered hidden: inkwell-consent.js shows it only to a reader
+    who has not chosen yet, so every reader gets identical HTML and HTTP caching is unaffected.
+    Nothing here is tenant-specific.
+*@
+@if (Model.Mode != CookieConsentMode.Off)
+{
+    var asking = Model.Mode == CookieConsentMode.AskForAnalytics;
+    <button type="button" class="ink-consent-settings" data-cookie-settings hidden>Cookie settings</button>
+
+    <section id="ink-consent" class="ink-consent" hidden
+             role="region" aria-labelledby="ink-consent-title" aria-describedby="ink-consent-text"
+             data-cookie="@CookieConsent.CookieName" data-days="@CookieConsent.RememberDays"
+             data-ga-id="@(asking ? Model.AnalyticsId : null)">
+        @if (asking)
+        {
+            <p id="ink-consent-title" class="ink-consent__title">Cookies on this site</p>
+            <p id="ink-consent-text" class="ink-consent__text">
+                Essential cookies keep the site working. With your permission, this site also uses Google Analytics cookies to learn
+                which articles are read. Nothing is set until you choose, and you can change your mind any time from
+                “Cookie settings” at the foot of the page.
+            </p>
+            <div class="ink-consent__actions">
+                <button type="button" class="ink-consent__btn" data-consent="granted">Accept analytics cookies</button>
+                <button type="button" class="ink-consent__btn" data-consent="denied">Reject analytics cookies</button>
+            </div>
+        }
+        else
+        {
+            <p id="ink-consent-title" class="ink-consent__title">Cookies on this site</p>
+            <p id="ink-consent-text" class="ink-consent__text">
+                This site uses only essential cookies, which keep sign-in, comment forms and this choice working.
+                It uses no analytics or advertising cookies.
+            </p>
+            <div class="ink-consent__actions">
+                <button type="button" class="ink-consent__btn" data-consent="ack">OK</button>
+            </div>
+        }
+    </section>
+    <script src="~/js/inkwell-consent.js" asp-append-version="true" defer></script>
+}

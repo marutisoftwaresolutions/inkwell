@@ -6,6 +6,7 @@
     var ai       = (IReadOnlyList<CrawlerActivity>)ViewBag.Ai;
     var search   = (IReadOnlyList<CrawlerActivity>)ViewBag.Search;
     var topPages = (IReadOnlyList<CrawledPage>)ViewBag.TopPages;
+    var queried  = (IReadOnlyList<CrawledRequest>)ViewBag.Queried;
     var daily    = (IReadOnlyList<CrawlerDay>)ViewBag.Daily;
     int days = ViewBag.Days, aiVisits = ViewBag.AiVisits, aiEngines = ViewBag.AiEngines;
 
@@ -92,7 +93,7 @@
                 var h = d.Visits == 0 ? 2 : (int)Math.Max(4, Math.Round(d.Visits * 100.0 / peak));
                 <div class="flex-1 rounded-t @(d.Visits == 0 ? "bg-border" : "bg-primary/70")"
                      style="height:@(h)%"
-                     title="@d.Day.ToString("d MMM yyyy"): @d.Visits visits"></div>
+                     title="@Dates.CalendarDate(d.Day, Blog.Core.Services.DateStyle.Medium): @d.Visits visits"></div>
             }
         </div>
     </div>
@@ -156,6 +157,43 @@
         </table></div>
     </div>
 }
+
+@* Many URLs share one path (/?page=…, /?p=…), so the page table above cannot say what crawlers
+   actually fetch. Shown as text, never as a link: these are addresses crawlers chose, not ours. *@
+<div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
+    <div class="px-4 py-2 border-b border-border">
+        <div class="text-sm font-medium text-foreground">Requests with a query string</div>
+        <div class="text-xs text-muted-foreground">What search and AI crawlers requested when the address carried parameters. Visits that failed the identity check are left out.</div>
+    </div>
+    @if (queried.Count == 0)
+    {
+        <p class="px-4 py-3 text-xs text-muted-foreground">No crawler requests with a query string in the last @days days. Visits recorded before this report existed were stored without one.</p>
+    }
+    else
+    {
+        <div class="table-scroll"><table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <th class="px-4 py-2 font-medium">Path</th>
+                    <th class="px-4 py-2 font-medium">Query string</th>
+                    <th class="px-4 py-2 font-medium text-right">Visits</th>
+                    <th class="px-4 py-2 font-medium text-right">Crawlers</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in queried)
+                {
+                    <tr class="border-b border-border/50 hover:bg-muted/40">
+                        <td class="px-4 py-2 font-mono text-[11px] text-foreground break-all">@r.Path</td>
+                        <td class="px-4 py-2 font-mono text-[11px] text-muted-foreground break-all">?@r.Query</td>
+                        <td class="px-4 py-2 text-right font-semibold text-foreground">@r.Visits.ToString("N0")</td>
+                        <td class="px-4 py-2 text-right text-xs text-muted-foreground">@r.Crawlers</td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    }
+</div>
 
 <details class="rounded-xl border border-border bg-card">
     <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">Search crawlers</summary>

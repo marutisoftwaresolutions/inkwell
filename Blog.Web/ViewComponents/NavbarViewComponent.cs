@@ -10,13 +10,16 @@ public class NavbarViewComponent : ViewComponent
     private readonly IPageRepository _pages;
     private readonly ICategoryRepository _categories;
     private readonly ICustomThemeSettingRepository _themeSettings;
+    private readonly Blog.Web.Services.MenuService _menus;
 
     public NavbarViewComponent(
         ISettingRepository settings,
         IPageRepository pages,
         ICategoryRepository categories,
-        ICustomThemeSettingRepository themeSettings)
+        ICustomThemeSettingRepository themeSettings,
+        Blog.Web.Services.MenuService menus)
     {
+        _menus = menus;
         _settings = settings;
         _pages = pages;
         _categories = categories;
@@ -37,6 +40,11 @@ public class NavbarViewComponent : ViewComponent
             Pages = navPages,
             Categories = categories
         };
+
+        // A header menu, when one exists, replaces the nav-page links; otherwise the links are built from
+        // the nav pages exactly as the views built them before menus existed (backward compatible).
+        var menu = await _menus.GetLinksAsync(ownerId, Blog.Core.Domain.MenuLocations.Header);
+        model.Links = menu.Count > 0 ? menu : Blog.Core.Services.NavigationMenu.FromPages(navPages);
 
         // Select layout variant — only render views that actually exist
         var supportedNavbarLayouts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

@@ -1,0 +1,169 @@
+@model Blog.Web.ViewComponents.DateSettingsViewComponent.Model
+@*
+    Date and time (ADR-0027). Country narrows the zone and format lists (fetched from /admin/settings/date-options).
+    A choice already valid for the new country is kept; one that is not is replaced by the country's main zone or
+    usual format, and the change is announced. The preview shows today in the chosen settings
+    (/admin/settings/date-preview). Inputs belong to the Settings form and post with it.
+*@
+@{
+    var inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
+    var labelCls = "text-sm font-medium leading-none";
+    var helpCls = "text-xs text-muted-foreground";
+    var errCls = "text-sm font-medium text-destructive";
+    var init = new
+    {
+        country = Model.Country, zone = Model.Zone, locale = Model.Locale, format = Model.Format, clock = Model.Clock,
+        zones = Model.Zones.Select(o => new { value = o.Value, label = o.Label }),
+        locales = Model.Locales.Select(o => new { value = o.Value, label = o.Label }),
+        preview = Model.Preview,
+    };
+    string? Err(string key) => Model.Errors.TryGetValue(key, out var e) ? e : null;
+    string Described(string key, string? help) => string.Join(" ", new[] { help, Err(key) is null ? null : key + "-error" }.Where(x => x != null));
+}
+<div class="md:col-span-2 space-y-4 border-t border-border pt-6" x-data='dateSettings(@Json.Serialize(init))'>
+    <div>
+        <h3 class="text-sm font-semibold text-foreground">Date and time</h3>
+        <p class="@helpCls mt-1">Every date on the site and in this Desk uses this time zone and format. Times you type in the editor are read in this zone.</p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+            <label for="Country" class="@labelCls">Country</label>
+            <select id="Country" name="Country" class="@inputCls" x-model="country" @@change="countryChanged()"
+                    aria-describedby="@Described("Country", "Country-help") Country-status" aria-invalid="@(Err("Country") != null ? "true" : null)">
+                <option value="">Not set — list every time zone and format</option>
+                @foreach (var c in Model.Countries)
+                {
+                    <option value="@c.Code" selected="@(c.Code == Model.Country)">@c.Name</option>
+                }
+            </select>
+            <p id="Country-help" class="@helpCls">Lists the country's time zones and date formats. A zone or format that does not belong to the country is replaced by its usual one.</p>
+            <p id="Country-status" class="text-xs text-foreground" role="status" aria-live="polite" x-text="countryNote" x-show="countryNote"></p>
+            <p id="Country-load-error" class="@errCls" role="alert" x-show="loadError" x-text="loadError"></p>
+            @if (Err("Country") is { } ce) { <p id="Country-error" class="@errCls">@ce</p> }
+        </div>
+        <div class="space-y-2">
+            <label for="DisplayTimeZoneId" class="@labelCls">Time zone</label>
+            <select id="DisplayTimeZoneId" name="DisplayTimeZoneId" class="@inputCls" x-model="zone" @@change="refreshPreview()"
+                    aria-describedby="@Described("DisplayTimeZoneId", "DisplayTimeZoneId-help")" aria-invalid="@(Err("DisplayTimeZoneId") != null ? "true" : null)">
+                <template x-for="z in zones" :key="z.value">
+                    <option :value="z.value" x-text="z.label" :selected="z.value === zone"></option>
+                </template>
+            </select>
+            <p id="DisplayTimeZoneId-help" class="@helpCls"><span x-show="!country">Choose a country first to shorten this list, or type a city to jump to it. </span>Daylight saving is applied automatically; the offset shown is standard time.</p>
+            @if (Err("DisplayTimeZoneId") is { } ze) { <p id="DisplayTimeZoneId-error" class="@errCls">@ze</p> }
+        </div>
+        <div class="space-y-2">
+            <label for="DateLocale" class="@labelCls">Date format</label>
+            <select id="DateLocale" name="DateLocale" class="@inputCls" x-model="locale" @@change="refreshPreview()" :disabled="format === 'iso8601'"
+                    aria-describedby="@Described("DateLocale", "DateLocale-help")" aria-invalid="@(Err("DateLocale") != null ? "true" : null)">
+                <template x-for="l in locales" :key="l.value">
+                    <option :value="l.value" x-text="l.label" :selected="l.value === locale"></option>
+                </template>
+            </select>
+            @* A disabled select does not post; keep the locale when ISO 8601 is on. *@
+            <input type="hidden" name="DateLocale" :value="locale" :disabled="format !== 'iso8601'" disabled />
+            <p id="DateLocale-help" class="@helpCls"><span x-show="format === 'iso8601'">Turn off ISO 8601 below to choose. </span>The language and order of day, month and year, as people in that country write them.</p>
+            @if (Err("DateLocale") is { } le) { <p id="DateLocale-error" class="@errCls">@le</p> }
+        </div>
+        <div class="space-y-2">
+            <label for="ClockFormat" class="@labelCls">Clock</label>
+            <select id="ClockFormat" name="ClockFormat" class="@inputCls" x-model="clock" @@change="refreshPreview()" :disabled="format === 'iso8601'" aria-describedby="ClockFormat-help">
+                <option value="locale" selected="@(Model.Clock == "locale")">Same as the date format</option>
+                <option value="24h" selected="@(Model.Clock == "24h")">24-hour (14:30)</option>
+                <option value="12h" selected="@(Model.Clock == "12h")">12-hour (2:30 pm)</option>
+            </select>
+            <input type="hidden" name="ClockFormat" :value="clock" :disabled="format !== 'iso8601'" disabled />
+            <p id="ClockFormat-help" class="@helpCls" x-show="format === 'iso8601'">ISO 8601 always uses the 24-hour clock. Turn it off below to choose.</p>
+        </div>
+        <div class="space-y-1 md:col-span-2">
+            <div class="flex items-start gap-2">
+                <input id="DateFormatIso" type="checkbox" class="mt-1 h-4 w-4 rounded border-border" :checked="format === 'iso8601'"
+                       @@change="format = $event.target.checked ? 'iso8601' : 'locale'; refreshPreview()"
+                       checked="@(Model.Format == "iso8601")" aria-describedby="iso-help" />
+                <label for="DateFormatIso" class="text-sm text-foreground">Use ISO 8601 dates everywhere</label>
+            </div>
+            <p id="iso-help" class="@helpCls ms-6">Dates like 2026-10-05 and times like 14:30: the international standard, the same in every country, but less familiar to most readers.</p>
+            <input type="hidden" name="DateFormat" :value="format" value="@Model.Format" />
+        </div>
+    </div>
+    <p class="text-sm text-foreground" role="status" aria-live="polite">Preview: <strong x-text="preview">@Model.Preview</strong> <span class="@helpCls" x-show="previewNote" x-text="previewNote"></span></p>
+</div>
+
+<script>
+    // Date settings (ADR-0027): the lists follow the country; the preview follows every choice.
+    document.addEventListener('alpine:init', function () {
+        Alpine.data('dateSettings', function (init) {
+            return {
+                country: init.country, zone: init.zone, locale: init.locale, format: init.format, clock: init.clock,
+                zones: init.zones, locales: init.locales, preview: init.preview, previewNote: '',
+                countryNote: '', loadError: '',
+                previewTimer: null, countryTimer: null, countryRequest: null,
+                touch: function () {
+                    // Values changed by script fire no event; tell the unsaved-changes guard. Announce on the block
+                    // with "input": a "change" on the select that called us would call us again, for ever.
+                    this.$nextTick(function () {
+                        var box = document.getElementById('Country').closest('[x-data]');
+                        if (box) box.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                },
+                countryChanged: function () {
+                    // Arrowing through the closed list fires a change per step: wait for a pause, cancel the
+                    // previous request, and only the newest answer counts.
+                    var self = this;
+                    clearTimeout(this.countryTimer);
+                    this.countryTimer = setTimeout(function () { self.loadCountry(); }, 250);
+                },
+                loadCountry: function () {
+                    var self = this;
+                    if (this.countryRequest) this.countryRequest.abort();
+                    var request = this.countryRequest = new AbortController();
+                    var q = new URLSearchParams({ country: this.country || '', zone: this.zone || '', locale: this.locale || '' });
+                    this.loadError = '';
+                    if (window.InkwellDesk) InkwellDesk.busy(true);
+                    fetch('/admin/settings/date-options?' + q, { credentials: 'same-origin', signal: request.signal })
+                        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+                        .then(function (d) {
+                            if (request !== self.countryRequest) return;
+                            var notes = [];
+                            var countryName = (document.querySelector('#Country option:checked') || {}).textContent || '';
+                            self.zones = d.zones;
+                            self.locales = d.locales;
+                            // Keep a choice that belongs to the new country; replace only one that does not, and say so.
+                            if (self.country && d.suggestZone && !d.zones.some(function (z) { return z.value === self.zone && z.value !== 'UTC'; })) {
+                                self.zone = d.suggestZone;
+                                var zl = d.zones.find(function (z) { return z.value === d.suggestZone; });
+                                notes.push('Time zone set to ' + (zl ? zl.label.split(' — ')[0] : d.suggestZone) + ', the main zone for ' + countryName + '.');
+                            }
+                            if (self.country && d.suggestLocale && !d.locales.some(function (l) { return l.value === self.locale; })) {
+                                self.locale = d.suggestLocale;
+                                var ll = d.locales.find(function (l) { return l.value === d.suggestLocale; });
+                                notes.push('Date format set to ' + (ll ? ll.label.split(' — ')[0] : d.suggestLocale) + '.');
+                            }
+                            self.countryNote = notes.join(' ');
+                            self.touch();
+                            self.refreshPreview();
+                        })
+                        .catch(function (e) {
+                            if (e && e.name === 'AbortError') return;
+                            self.loadError = 'The time zones and formats for this country could not be loaded. Choose the country again, or reload the page.';
+                        })
+                        .finally(function () { if (window.InkwellDesk) InkwellDesk.busy(false); });
+                },
+                refreshPreview: function () {
+                    var self = this;
+                    clearTimeout(this.previewTimer);
+                    this.previewTimer = setTimeout(function () {
+                        var q = new URLSearchParams({ zone: self.zone || '', locale: self.locale || '', format: self.format, clock: self.clock });
+                        fetch('/admin/settings/date-preview?' + q, { credentials: 'same-origin' })
+                            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+                            .then(function (d) {
+                                self.preview = d.dateTime + ' · ' + d.long;
+                                self.previewNote = d.known ? '' : 'This server does not know that time zone; it would show UTC.';
+                            })
+                            .catch(function () { self.previewNote = 'The preview could not be loaded.'; });
+                    }, 150);
+                }
+            };
+        });
+    });
+</script>

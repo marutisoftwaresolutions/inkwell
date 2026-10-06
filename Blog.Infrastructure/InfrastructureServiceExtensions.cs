@@ -13,6 +13,7 @@ public static class InfrastructureServiceExtensions
         var context = new DapperContext(connectionString);
         services.AddSingleton(context);
         services.AddSingleton<MigrationService>();
+        services.AddSingleton<BackupDataStore>();
 
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IPageRepository, PageRepository>();
@@ -21,6 +22,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ISeriesRepository, SeriesRepository>();
         services.AddScoped<ICommentRepository, CommentRepository>();
         services.AddScoped<IMediaRepository, MediaRepository>();
+        services.AddScoped<IReferenceDataRepository, ReferenceDataRepository>();
+        services.AddScoped<INewsletterRepository, NewsletterRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ISettingRepository, SettingRepository>();
         services.AddScoped<IRevisionRepository, RevisionRepository>();
@@ -38,8 +41,11 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ILinkSuggestionRepository, LinkSuggestionRepository>();
         services.AddScoped<ICrawlerVisitRepository, CrawlerVisitRepository>();
         services.AddScoped<IJobRunRepository, JobRunRepository>();
+        services.AddScoped<Blog.Core.Services.Export.IExportSource, ExportRepository>();
         services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
         services.AddScoped<ISearchPerformanceRepository, SearchPerformanceRepository>();
+        services.AddScoped<IWebhookRepository, WebhookRepository>();
+        services.AddScoped<IMenuRepository, MenuRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
         services.AddScoped<OptometryTaxonomySeeder>();

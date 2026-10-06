@@ -11,6 +11,8 @@ public interface IMediaRepository
     Task<Media?> GetByIdAsync(Guid id, Guid? uploadedBy = null);
     Task<Guid> CreateAsync(Media media);
     Task DeleteAsync(Guid id, Guid? uploadedBy = null);
+    /// <summary>Sets the alt text and caption the editors copy into a post when the file is placed. False when not found or not the caller's.</summary>
+    Task<bool> UpdateDetailsAsync(Guid id, Guid uploadedBy, string? altText, string? caption);
     Task<int> GetTotalCountAsync(Guid? uploadedBy = null);
 
     /// <summary>

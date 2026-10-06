@@ -16,6 +16,12 @@ public interface ICrawlerVisitRepository
     /// <summary>Pages drawing the most AI-crawler attention over the window.</summary>
     Task<IReadOnlyList<CrawledPage>> GetTopPagesAsync(Guid? ownerId, int days, bool aiOnly = true, int take = 20);
 
+    /// <summary>
+    /// Requests that carried a query string, busiest first — the only way to see what crawlers fetch
+    /// when many URLs share one path (/?page=…, /?p=…). Failed identity checks are left out.
+    /// </summary>
+    Task<IReadOnlyList<CrawledRequest>> GetTopQueriedRequestsAsync(Guid? ownerId, int days, int take = 20);
+
     /// <summary>Daily AI-crawler visit counts over the window, oldest first, for the trend.</summary>
     Task<IReadOnlyList<CrawlerDay>> GetDailyAiVisitsAsync(Guid? ownerId, int days);
 

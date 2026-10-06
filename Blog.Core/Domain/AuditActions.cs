@@ -12,6 +12,9 @@ public static class AuditActions
     public const string PostPublished  = "Post.Published";
     public const string PostUnpublished = "Post.Unpublished";
     public const string PostScheduled  = "Post.Scheduled";
+    public const string PostSubmittedForReview = "Post.SubmittedForReview";
+    public const string PostChangesRequested   = "Post.ChangesRequested";
+    public const string PostApproved           = "Post.Approved";
     public const string PostDeleted    = "Post.Deleted";
 
     /// <summary>Content put back from a stored revision (payload names the revision number).</summary>
@@ -35,6 +38,7 @@ public static class AuditActions
     // Media
     public const string MediaUploaded = "Media.Uploaded";
     public const string MediaDeleted  = "Media.Deleted";
+    public const string MediaUpdated  = "Media.Updated";
 
     // Users
     public const string UserInvited      = "User.Invited";
@@ -46,6 +50,14 @@ public static class AuditActions
     public const string AuthLoggedIn    = "Auth.LoggedIn";
     public const string AuthLoggedOut   = "Auth.LoggedOut";
     public const string AuthLoginFailed = "Auth.LoginFailed";
+
+    // Two-factor sign-in (ADR-0021)
+    public const string TwoFactorEnabled                  = "User.TwoFactorEnabled";
+    public const string TwoFactorDisabled                 = "User.TwoFactorDisabled";
+    public const string TwoFactorReset                    = "User.TwoFactorReset";
+    public const string TwoFactorRecoveryCodesRegenerated = "User.RecoveryCodesRegenerated";
+    public const string TwoFactorRecoveryCodeUsed         = "User.RecoveryCodeUsed";
+    public const string TwoFactorFailed                   = "Auth.TwoFactorFailed";
     /// <summary>A reset link was issued for an existing account (never logged for unknown addresses).</summary>
     public const string AuthPasswordResetRequested = "Auth.PasswordResetRequested";
     /// <summary>A password was changed through a reset link.</summary>
@@ -74,6 +86,12 @@ public static class AuditActions
 
     // Newsletter / Subscribers
     public const string NewsletterSent      = "Newsletter.Sent";
+    public const string NewsletterDrafted   = "Newsletter.Drafted";
+    public const string NewsletterUpdated   = "Newsletter.Updated";
+    public const string NewsletterDeleted   = "Newsletter.Deleted";
+    public const string NewsletterQueued    = "Newsletter.Queued";
+    public const string NewsletterCancelled = "Newsletter.Cancelled";
+    public const string NewsletterTestSent  = "Newsletter.TestSent";
     public const string SubscriberDeleted   = "Subscriber.Deleted";
     public const string SubscriberExported  = "Subscriber.Exported";
 
@@ -93,4 +111,28 @@ public static class AuditActions
     public const string RedirectCreated = "Redirect.Created";
     public const string RedirectUpdated = "Redirect.Updated";
     public const string RedirectDeleted = "Redirect.Deleted";
+
+    // Webhooks
+    public const string WebhookCreated     = "Webhook.Created";
+    public const string WebhookUpdated     = "Webhook.Updated";
+    public const string WebhookDeleted     = "Webhook.Deleted";
+    public const string WebhookRedelivered = "Webhook.Redelivered";
+    public const string WebhookTested      = "Webhook.Tested";
+
+    // Navigation menus (a menu is saved as a whole; Deleted = saved empty, back to the theme default)
+    public const string MenuCreated = "Menu.Created";
+    public const string MenuUpdated = "Menu.Updated";
+    public const string MenuDeleted = "Menu.Deleted";
+
+    // Backups (Created is logged by the job, on behalf of the admin who queued it)
+    public const string BackupRequested  = "Backup.Requested";
+    public const string BackupCreated    = "Backup.Created";
+    public const string BackupDownloaded = "Backup.Downloaded";
+    public const string BackupDeleted    = "Backup.Deleted";
+    public const string BackupRestored   = "Backup.Restored";
+
+    // Content export to WordPress / Ghost (target, options and counts only; never content or credentials)
+    public const string ExportStarted   = "Export.Started";
+    public const string ExportCompleted = "Export.Completed";
+    public const string ExportFailed    = "Export.Failed";
 }

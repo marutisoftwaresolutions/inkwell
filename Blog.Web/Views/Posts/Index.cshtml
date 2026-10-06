@@ -25,6 +25,8 @@
                 <!option value="published" @(status == "published" ? "selected" : "")>Published</!option>
                 <!option value="draft" @(status == "draft" ? "selected" : "")>Draft</!option>
                 <!option value="scheduled" @(status == "scheduled" ? "selected" : "")>Scheduled</!option>
+                <!option value="review" @(status == "review" ? "selected" : "")>In review</!option>
+                <!option value="changes" @(status == "changes" ? "selected" : "")>Needs changes</!option>
             </select>
             
             <button type="submit" class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors font-medium text-sm border border-border">Filter</button>
@@ -48,9 +50,36 @@
             <div class="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             </div>
-            <h3 class="text-lg font-medium text-foreground mb-1">No posts found</h3>
-            <p class="mb-4">Get started by creating a new post.</p>
-            <a href="/admin/posts/create" class="text-primary hover:underline font-medium">Create your first post →</a>
+            @{
+                var emptyStatus = ViewBag.Status as string;
+                var emptySearch = ViewBag.Search as string;
+            }
+            @if (!string.IsNullOrWhiteSpace(emptySearch))
+            {
+                <h3 class="text-lg font-medium text-foreground mb-1">No matches for “@emptySearch”</h3>
+                <a href="/admin/posts@(string.IsNullOrEmpty(emptyStatus) ? "" : "?status=" + emptyStatus)" class="text-primary hover:underline font-medium">Clear the search</a>
+            }
+            else if (emptyStatus == "review")
+            {
+                <h3 class="text-lg font-medium text-foreground mb-1">Nothing is waiting for review</h3>
+                <a href="/admin/posts" class="text-primary hover:underline font-medium">Show all posts</a>
+            }
+            else if (emptyStatus == "changes")
+            {
+                <h3 class="text-lg font-medium text-foreground mb-1">No posts are waiting on changes</h3>
+                <a href="/admin/posts" class="text-primary hover:underline font-medium">Show all posts</a>
+            }
+            else if (!string.IsNullOrEmpty(emptyStatus))
+            {
+                <h3 class="text-lg font-medium text-foreground mb-1">No posts with this status</h3>
+                <a href="/admin/posts" class="text-primary hover:underline font-medium">Show all posts</a>
+            }
+            else
+            {
+                <h3 class="text-lg font-medium text-foreground mb-1">No posts yet</h3>
+                <p class="mb-4">Get started by creating a new post.</p>
+                <a href="/admin/posts/create" class="text-primary hover:underline font-medium">Create your first post →</a>
+            }
         </div>
     }
     else
@@ -112,6 +141,11 @@
                                                 <span class="font-medium text-foreground block">@post.Title</span>
                                             }
                                             <div class="text-xs text-muted-foreground mt-0.5">/@post.Slug</div>
+                                            @if (post.Status == Blog.Core.Domain.PostStatus.NeedsChanges && !string.IsNullOrWhiteSpace(post.ReviewNote)
+                                                 && ((bool?)ViewBag.CanPublish == true || post.AuthorId == (Guid)ViewBag.CurrentUserId))
+                                            {
+                                                <div class="text-xs text-muted-foreground mt-0.5 line-clamp-1">Editor's note: @post.ReviewNote</div>
+                                            }
                                         </div>
                                     </div>
                                 </td>
@@ -123,10 +157,17 @@
                                             displayStatus = Blog.Core.Domain.PostStatus.Published;
                                         }
                                     }
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                                        @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "bg-green-100 text-green-800" :
-                                          displayStatus == Blog.Core.Domain.PostStatus.Draft ? "bg-yellow-100 text-yellow-800" : "bg-blue-100 text-blue-800")">
-                                        @displayStatus
+                                    @* Dark-safe tinted pills (admin.css); fixed palette classes did not follow the colour scheme. *@
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium
+                                        @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "pill-ok" :
+                                          displayStatus == Blog.Core.Domain.PostStatus.Draft ? "pill-warn" :
+                                          displayStatus == Blog.Core.Domain.PostStatus.NeedsChanges ? "pill-bad" : "pill-info")">
+                                        @(displayStatus switch
+                                        {
+                                            Blog.Core.Domain.PostStatus.InReview => "In review",
+                                            Blog.Core.Domain.PostStatus.NeedsChanges => "Needs changes",
+                                            _ => displayStatus.ToString(),
+                                        })
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-muted-foreground hidden md:table-cell">
@@ -155,7 +196,7 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-muted-foreground hidden lg:table-cell">
-                                    <span title="@post.CreatedAt">@post.CreatedAt.ToString("MMM d, yyyy")</span>
+                                    <span title="@Dates.DateTimeSeconds(post.CreatedAt)">@Dates.Medium(post.CreatedAt)</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-2 transition-opacity">

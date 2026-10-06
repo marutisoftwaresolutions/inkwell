@@ -28,12 +28,19 @@ public class PostsController : Controller
     private readonly IUserRepository _users;
     private readonly IWebHostEnvironment _env;
 
+    private readonly Blog.Web.Services.Webhooks.WebhookPublisher _webhooks;
+
+    /// <summary>May publish (and so approve or return posts in review).</summary>
+    private bool CanPublish => User.HasClaim("Permission", "posts.publish");
+
     public PostsController(IPostRepository posts, ICategoryRepository categories,
         ITagRepository tags, IMediaRepository media, PostService postService, AuditService audit,
         IndexNowService indexNow, ILinkSuggestionRepository links, ITenantContext tenantContext,
         Blog.Web.Services.SearchConsole.SearchPerformanceService search, RevisionService revisions,
-        ISettingRepository settings, IUserRepository users, IWebHostEnvironment env)
+        ISettingRepository settings, IUserRepository users, IWebHostEnvironment env,
+        Blog.Web.Services.Webhooks.WebhookPublisher webhooks)
     {
+        _webhooks = webhooks;
         _env = env;
         _settings = settings;
         _users = users;
@@ -90,13 +97,19 @@ public class PostsController : Controller
             "published" => PostStatus.Published,
             "draft" => PostStatus.Draft,
             "scheduled" => PostStatus.Scheduled,
+            "review" => PostStatus.InReview,
+            "changes" => PostStatus.NeedsChanges,
             _ => null
         };
 
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        // Review filters: editors see everyone's queue; an author sees only their own posts there (and their notes).
+        var workflowFilter = statusFilter is PostStatus.InReview or PostStatus.NeedsChanges;
         var result = await _posts.GetPostsAsync(new PostFilter
         {
-            Search = search, Status = statusFilter, AuthorId = null, Page = page, PageSize = 20
+            Search = search, Status = statusFilter, AuthorId = workflowFilter && !CanPublish ? currentUserId : null, Page = page, PageSize = 20
         });
+        ViewBag.CanPublish = CanPublish;
 
         ViewBag.Search = search;
         ViewBag.Status = status;
@@ -107,17 +120,36 @@ public class PostsController : Controller
     }
 
     [HttpGet("create")]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Create(string? mode = null)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         ViewBag.Categories = await _categories.GetAllAsync(userId);
         ViewBag.Tags = await _tags.GetAllAsync(userId);
-        return View(new Post());
+        CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), new Dictionary<string, string>());
+        return View(new Post { EditorMode = EditorModes.Normalize(mode) });
+    }
+
+    private Task<IReadOnlyList<CustomFieldDefinition>> CustomFieldDefinitionsAsync() =>
+        HttpContext.RequestServices.GetRequiredService<CustomFieldsEditor>().DefinitionsAsync(User, pages: false);
+
+    /// <summary>
+    /// Validates the posted custom fields onto <paramref name="post"/> (ADR-0025) and fills the panel's
+    /// ViewData either way, so a re-rendered editor shows what was typed. False when a value needs fixing.
+    /// </summary>
+    private async Task<bool> ApplyCustomFieldsAsync(Post post, IDictionary<string, string?>? posted, string? existingJson)
+    {
+        var defs = await CustomFieldDefinitionsAsync();
+        var result = CustomFields.Clean(defs, posted, existingJson);
+        post.CustomFieldsJson = result.Json;
+        CustomFieldsEditor.Show(ViewData, defs, result.Values, result.Errors);
+        if (result.Errors.Count == 0) return true;
+        ModelState.AddModelError("", "Some custom fields need attention. Correct them under Custom fields and save again.");
+        return false;
     }
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Post post, List<Guid> categoryIds, string tagNames, string submitAction)
+    public async Task<IActionResult> Create(Post post, List<Guid> categoryIds, string tagNames, string submitAction, Dictionary<string, string?>? cf)
     {
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
@@ -130,26 +162,20 @@ public class PostsController : Controller
         post.AuthorId = userId;
         await NormaliseScheduleAsync(post);
 
-        if (submitAction == "publish") 
-        {
-            if (!User.HasClaim("Permission", "posts.publish"))
-            {
-                TempData["Error"] = "You do not have permission to publish posts. Saved as draft instead.";
-                post.Status = PostStatus.Draft;
-            }
-            else
-            {
-                post.Status = post.ScheduledAt.HasValue && post.ScheduledAt.Value > DateTime.UtcNow 
-                    ? PostStatus.Scheduled 
-                    : PostStatus.Published;
-            }
-        }
-        else if (submitAction == "draft")
-        {
-            post.Status = PostStatus.Draft;
-        }
+        // The server decides the status from the button and the permission — never from a posted Status.
+        var decision = EditorialWorkflow.DecideOnSave(null, submitAction, CanPublish, post.ScheduledAt, DateTime.UtcNow);
+        post.Status = decision.Status;
+        post.ReviewNote = null;
 
         ApplyStructuredDataGate(post);
+        ApplyEditorMode(post, post.EditorMode);
+
+        if (!await ApplyCustomFieldsAsync(post, cf, null))
+        {
+            ViewBag.Categories = await _categories.GetAllAsync(userId);
+            ViewBag.Tags = await _tags.GetAllAsync(userId);
+            return View(post);
+        }
 
         var tags = (tagNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
                                    .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
@@ -163,20 +189,85 @@ public class PostsController : Controller
             return View(post);
         }
 
-        var auditAction = post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
+        post.Id = id;
+        if (decision.SubmittedForReview)
+            await _posts.SetWorkflowAsync(id, PostStatus.InReview, null, DateTime.UtcNow, null);
+
+        var auditAction = decision.SubmittedForReview ? AuditActions.PostSubmittedForReview
+            : post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
             : post.Status == PostStatus.Published ? AuditActions.PostPublished
             : AuditActions.PostCreated;
         await _audit.LogAsync(auditAction, "Post", id.ToString(), post.Title);
-        post.Id = id;
         await _revisions.RecordAsync(post, "Created", User);
+        await _webhooks.PostSavedAsync(HttpContext, null, post);
         await PingIndexNowAsync(id);
 
-        if (post.Status == PostStatus.Scheduled)
-            TempData["Success"] = "Post scheduled.";
-        else
-            TempData["Success"] = submitAction == "publish" && post.Status == PostStatus.Published ? "Post published." : "Draft saved.";
+        TempData["Success"] = decision.Notice
+            ?? (post.Status == PostStatus.Scheduled ? "Post scheduled."
+                : post.Status == PostStatus.Published ? "Post published." : "Draft saved.");
 
         return RedirectToAction("Index");
+    }
+
+    /// <summary>An Editor or Admin approves a post in review: it is published (or scheduled, if its time is ahead).</summary>
+    [HttpPost("{id:guid}/approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Approve(Guid id)
+    {
+        var post = await _posts.GetByIdAsync(id, null);
+        if (post is null) return NotFound();
+        if (!CanPublish) return Forbid();
+        if (!EditorialWorkflow.CanReview(post.Status, CanPublish))
+        {
+            TempData["Error"] = "This post is not waiting for review, so there is nothing to approve.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        var before = new Post { Status = post.Status, ScheduledAt = post.ScheduledAt };
+        var now = DateTime.UtcNow;
+        var status = post.ScheduledAt > now ? PostStatus.Scheduled : PostStatus.Published;
+        await _posts.SetWorkflowAsync(id, status, null, null, status == PostStatus.Published ? now : null);
+        post.Status = status;
+        post.PublishedAt ??= status == PostStatus.Published ? now : null;
+
+        await _audit.LogAsync(AuditActions.PostApproved, "Post", id.ToString(), post.Title);
+        await _audit.LogAsync(status == PostStatus.Scheduled ? AuditActions.PostScheduled : AuditActions.PostPublished, "Post", id.ToString(), post.Title);
+        await _revisions.RecordAsync(post, "Approved", User);
+        await _webhooks.PostSavedAsync(HttpContext, before, post);
+        await PingIndexNowAsync(id);
+
+        TempData["Success"] = status == PostStatus.Scheduled
+            ? $"Approved. “{post.Title}” is scheduled for its publish time."
+            : $"Approved and published: “{post.Title}”.";
+        return RedirectToAction(nameof(Index), new { status = "review" });
+    }
+
+    /// <summary>An Editor or Admin returns a post in review to its author, with a note saying what to change.</summary>
+    [HttpPost("{id:guid}/request-changes")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RequestChanges(Guid id, string? note)
+    {
+        var post = await _posts.GetByIdAsync(id, null);
+        if (post is null) return NotFound();
+        if (!CanPublish) return Forbid();
+        if (!EditorialWorkflow.CanReview(post.Status, CanPublish))
+        {
+            TempData["Error"] = "This post is not waiting for review, so it cannot be sent back.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+        if (EditorialWorkflow.ValidateNote(note) is { } noteError)
+        {
+            TempData["Error"] = noteError;
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        var trimmed = note!.Trim();
+        await _posts.SetWorkflowAsync(id, PostStatus.NeedsChanges, trimmed, post.ReviewRequestedAt, null);
+        await _audit.LogAsync(AuditActions.PostChangesRequested, "Post", id.ToString(),
+            $"{post.Title} — {(trimmed.Length > 120 ? trimmed[..120] + "…" : trimmed)}");
+
+        TempData["Success"] = $"Sent back to {(string.IsNullOrWhiteSpace(post.AuthorName) ? "the author" : post.AuthorName)} with your note.";
+        return RedirectToAction(nameof(Index), new { status = "review" });
     }
 
     [HttpGet("edit/{id}")]
@@ -196,14 +287,17 @@ public class PostsController : Controller
         ViewBag.Tags = await _tags.GetAllAsync(userId);
         ViewBag.SelectedCategoryIds = post.Categories.Select(c => c.Id).ToList();
         ViewBag.SelectedTagNames = string.Join(", ", post.Tags.Select(t => t.Name));
+        var displayZone = await DisplayTimeZoneAsync();
+        ViewBag.DisplayTimeZone = displayZone;   // the review panel compares the schedule with "now" in the same zone
         if (post.ScheduledAt.HasValue) // the editor shows and reads the display zone; storage is UTC
-            post.ScheduledAt = TimeZoneHelper.ToDisplay(post.ScheduledAt.Value, await DisplayTimeZoneAsync());
+            post.ScheduledAt = TimeZoneHelper.ToDisplay(post.ScheduledAt.Value, displayZone);
+        CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), CustomFields.Parse(post.CustomFieldsJson));
         return View(post);
     }
 
     [HttpPost("edit/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Post post, List<Guid> categoryIds, string tagNames, string submitAction)
+    public async Task<IActionResult> Edit(Guid id, Post post, List<Guid> categoryIds, string tagNames, string submitAction, Dictionary<string, string?>? cf)
     {
         var existingPost = await _posts.GetByIdAsync(id, null);
         if (existingPost == null) return NotFound();
@@ -219,26 +313,20 @@ public class PostsController : Controller
         post.Id = id;
         await NormaliseScheduleAsync(post);
 
-        if (submitAction == "publish") 
-        {
-            if (!User.HasClaim("Permission", "posts.publish"))
-            {
-                TempData["Error"] = "You do not have permission to publish posts. Saved as draft instead.";
-                post.Status = PostStatus.Draft;
-            }
-            else
-            {
-                post.Status = post.ScheduledAt.HasValue && post.ScheduledAt.Value > DateTime.UtcNow 
-                    ? PostStatus.Scheduled 
-                    : PostStatus.Published;
-            }
-        }
-        else if (submitAction == "draft")
-        {
-            post.Status = PostStatus.Draft;
-        }
+        // The server decides the status from the button and the permission — never from a posted Status
+        // (a crafted Status=Published used to publish for a user without the publish permission).
+        var decision = EditorialWorkflow.DecideOnSave(existingPost.Status, submitAction, CanPublish, post.ScheduledAt, DateTime.UtcNow);
+        post.Status = decision.Status;
 
         ApplyStructuredDataGate(post);
+        ApplyEditorMode(post, existingPost.EditorMode);
+
+        if (!await ApplyCustomFieldsAsync(post, cf, existingPost.CustomFieldsJson))
+        {
+            ViewBag.Categories = await _categories.GetAllAsync(userId);
+            ViewBag.Tags = await _tags.GetAllAsync(userId);
+            return View(post);
+        }
 
         var tags = (tagNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
                                    .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
@@ -255,20 +343,32 @@ public class PostsController : Controller
         Blog.Web.Services.OgImageCache.Invalidate(_env, post.Slug);
         if (!string.Equals(existingPost.Slug, post.Slug, StringComparison.OrdinalIgnoreCase)) Blog.Web.Services.OgImageCache.Invalidate(_env, existingPost.Slug);
 
-        var editAuditAction = post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
+        // Workflow fields: a (re)submission stamps the request time and clears the old note; leaving the
+        // workflow (published, scheduled, draft) clears both; a returned post keeps its note while edited.
+        if (decision.SubmittedForReview)
+            await _posts.SetWorkflowAsync(id, PostStatus.InReview, null, DateTime.UtcNow, null);
+        else if (!EditorialWorkflow.IsInWorkflow(post.Status) && (existingPost.ReviewNote is not null || existingPost.ReviewRequestedAt is not null))
+            await _posts.SetWorkflowAsync(id, post.Status, null, null, null);
+
+        var approvedFromReview = existingPost.Status == PostStatus.InReview && EditorialWorkflow.IsLive(post.Status, post.ScheduledAt, DateTime.MaxValue);
+        var editAuditAction = decision.SubmittedForReview ? AuditActions.PostSubmittedForReview
+            : post.Status == PostStatus.Scheduled ? AuditActions.PostScheduled
             : post.Status == PostStatus.Published ? AuditActions.PostPublished
             : AuditActions.PostUpdated;
         await _audit.LogAsync(editAuditAction, "Post", id.ToString(), post.Title);
+        if (approvedFromReview) await _audit.LogAsync(AuditActions.PostApproved, "Post", id.ToString(), post.Title);
+        await _webhooks.PostSavedAsync(HttpContext, existingPost, post);
         await _revisions.RecordAsync(post,
-            post.Status == PostStatus.Published ? "Published" : post.Status == PostStatus.Scheduled ? "Scheduled" : "Saved", User);
+            post.Status == PostStatus.Published ? "Published" : post.Status == PostStatus.Scheduled ? "Scheduled"
+            : post.Status == PostStatus.InReview ? "Submitted for review" : "Saved", User);
         await PingIndexNowAsync(id);
 
-        if (post.Status == PostStatus.Scheduled)
-            TempData["Success"] = "Post scheduled.";
-        else
-            TempData["Success"] = submitAction == "publish" && post.Status == PostStatus.Published ? "Post published." : "Saved.";
+        TempData["Success"] = decision.Notice
+            ?? (post.Status == PostStatus.Scheduled ? "Post scheduled."
+                : post.Status == PostStatus.Published && submitAction == EditorialWorkflow.Actions.Publish ? "Post published." : "Saved.");
 
-        return RedirectToAction("Index");
+        // An editor who published from review goes back to the queue for the next one.
+        return approvedFromReview ? RedirectToAction("Index", new { status = "review" }) : RedirectToAction("Index");
     }
 
     [HttpPost("delete/{id}")]
@@ -294,17 +394,49 @@ public class PostsController : Controller
         return RedirectToAction("Index");
     }
 
-    // HTMX auto-save endpoint
-    [HttpPost("autosave/{id}")]
-    public async Task<IActionResult> AutoSave(Guid id, [FromForm] string content, [FromForm] string title)
+    // Markdown authoring (ADR-0022) ────────────────────────────────────────────────
+
+    /// <summary>The editor's preview: the same renderer the save uses, so the preview is what readers get.</summary>
+    [HttpPost("markdown-preview")]
+    [ValidateAntiForgeryToken]
+    public IActionResult MarkdownPreview([FromForm] string? markdown) =>
+        Content(MarkdownRenderer.ToHtml(markdown), "text/html; charset=utf-8");
+
+    /// <summary>
+    /// Switches a saved post between the visual editor and Markdown. Visual → Markdown is lossless: the HTML
+    /// becomes the Markdown source unchanged (Markdown passes HTML through). Markdown → visual keeps the
+    /// rendered HTML and drops the Markdown source; the confirmation says so.
+    /// </summary>
+    [HttpPost("{id:guid}/editor-mode")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SwitchEditorMode(Guid id, string mode)
     {
-        var post = await _posts.GetByIdAsync(id);
+        var post = await _posts.GetByIdAsync(id, null);
         if (post == null) return NotFound();
-        post.Title = title;
-        post.Html = content;
-        post.Plaintext = content; // autosave sets both temporarily or simplistic
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (post.AuthorId != userId && !(User.IsInRole("Admin") || User.IsInRole("Editor"))) return Forbid();
+
+        var target = EditorModes.Normalize(mode);
+        if (target == EditorModes.Normalize(post.EditorMode)) return RedirectToAction(nameof(Edit), new { id });
+        if (target == EditorModes.Markdown)
+        {
+            // Markdown passes HTML through, but a blank line inside an HTML block can end it early and turn
+            // indented lines into code. Check first: the switch never changes how a post looks.
+            var html = post.Html ?? string.Empty;
+            if (!MarkdownRenderer.RendersUnchanged(html))
+            {
+                TempData["Error"] = "This post can't be switched to Markdown without changing how it looks: some of its HTML has blank lines inside a block. Remove those blank lines in the visual editor, save, then try again.";
+                return RedirectToAction(nameof(Edit), new { id });
+            }
+            post.Markdown = html;
+        }
+        ApplyEditorMode(post, target);
         await _posts.UpdateAsync(post);
-        return Content("Saved", "text/plain");
+        await _audit.LogAsync(AuditActions.PostUpdated, "Post", id.ToString(), post.Title,
+            newValues: target == EditorModes.Markdown ? "Editor: switched to Markdown" : "Editor: switched to the visual editor");
+        await _revisions.RecordAsync(post, target == EditorModes.Markdown ? "Switched to Markdown" : "Switched to the visual editor", User);
+        TempData["Success"] = target == EditorModes.Markdown ? "This post is now written in Markdown." : "This post now uses the visual editor.";
+        return RedirectToAction(nameof(Edit), new { id });
     }
 
 
@@ -366,6 +498,7 @@ public class PostsController : Controller
             var post = await _posts.GetByIdAsync(id, null);
             if (post is null) { refused++; continue; }
             if (post.AuthorId != userId && !isPrivileged) { refused++; continue; }
+            var before = new Post { Status = post.Status, ScheduledAt = post.ScheduledAt };
 
             switch (action)
             {
@@ -376,6 +509,8 @@ public class PostsController : Controller
                     post.ScheduledAt = null;
                     await _posts.UpdateAsync(post);
                     await _audit.LogAsync(AuditActions.PostPublished, "Post", id.ToString(), post.Title + " (bulk)");
+                    if (EditorialWorkflow.IsInWorkflow(before.Status)) await _posts.SetWorkflowAsync(id, PostStatus.Published, null, null, null);
+                    await _webhooks.PostSavedAsync(HttpContext, before, post);
                     if (!string.IsNullOrEmpty(post.Slug)) publishedUrls.Add($"{Request.Scheme}://{Request.Host}/{post.Slug}");
                     done++;
                     break;
@@ -384,6 +519,8 @@ public class PostsController : Controller
                     post.Status = PostStatus.Draft;
                     await _posts.UpdateAsync(post);
                     await _audit.LogAsync(AuditActions.PostUnpublished, "Post", id.ToString(), post.Title + " (bulk)");
+                    if (EditorialWorkflow.IsInWorkflow(before.Status)) await _posts.SetWorkflowAsync(id, PostStatus.Draft, null, null, null);
+                    await _webhooks.PostSavedAsync(HttpContext, before, post);
                     done++;
                     break;
                 case "delete":
@@ -461,6 +598,23 @@ public class PostsController : Controller
     /// keeps their work but invalid or self-serving schema does not ship. Warnings are surfaced and
     /// allowed through - they are judgement calls, not defects.
     /// </summary>
+    /// <summary>
+    /// Markdown authoring (ADR-0022): a Markdown post's HTML and searchable text are always rendered here from
+    /// its Markdown, never taken from the form, so every page, feed and export reads the same HTML as before.
+    /// The mode itself changes only through <see cref="SwitchEditorMode"/>; a save keeps the stored one.
+    /// </summary>
+    private static void ApplyEditorMode(Post post, string? mode)
+    {
+        post.EditorMode = EditorModes.Normalize(mode);
+        if (post.IsMarkdown)
+        {
+            post.Markdown ??= string.Empty;
+            post.Html = MarkdownRenderer.ToHtml(post.Markdown);
+            post.Plaintext = MarkdownRenderer.ToPlaintext(post.Html);
+        }
+        else post.Markdown = null;
+    }
+
     private void ApplyStructuredDataGate(Post post)
     {
         if (post.Status != PostStatus.Published && post.Status != PostStatus.Scheduled) return;

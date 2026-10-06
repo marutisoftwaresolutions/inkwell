@@ -1,5 +1,6 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Core.Services;
 using Blog.Infrastructure.Data; // For SlugHelper
 using Blog.Web.Services;
 using Microsoft.AspNetCore.Authentication;
@@ -20,9 +21,12 @@ public class PagesController : Controller
     private readonly RevisionService _revisions;
     private readonly IndexNowService _indexNow;
 
+    private readonly Blog.Web.Services.Webhooks.WebhookPublisher _webhooks;
+
     public PagesController(IPageRepository pages, IMediaRepository media, IUserRepository users, AuditService audit,
-        RevisionService revisions, IndexNowService indexNow)
+        RevisionService revisions, IndexNowService indexNow, Blog.Web.Services.Webhooks.WebhookPublisher webhooks)
     {
+        _webhooks = webhooks;
         _pages = pages;
         _media = media;
         _users = users;
@@ -50,15 +54,33 @@ public class PagesController : Controller
     }
 
     [HttpGet("create")]
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
+        CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), new Dictionary<string, string>());
         return View(new Page { IsPublished = true });
+    }
+
+    private Task<IReadOnlyList<CustomFieldDefinition>> CustomFieldDefinitionsAsync() =>
+        HttpContext.RequestServices.GetRequiredService<CustomFieldsEditor>().DefinitionsAsync(User, pages: true);
+
+    /// <summary>Validates the posted custom fields onto <paramref name="page"/> (ADR-0025); false when one needs fixing.</summary>
+    private async Task<bool> ApplyCustomFieldsAsync(Page page, IDictionary<string, string?>? posted, string? existingJson)
+    {
+        var defs = await CustomFieldDefinitionsAsync();
+        var result = CustomFields.Clean(defs, posted, existingJson);
+        page.CustomFieldsJson = result.Json;
+        CustomFieldsEditor.Show(ViewData, defs, result.Values, result.Errors);
+        if (result.Errors.Count == 0) return true;
+        TempData["Error"] = "Some custom fields need attention. Correct them under Custom fields and save again.";
+        return false;
     }
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Page page, string action)
+    public async Task<IActionResult> Create(Page page, string action, Dictionary<string, string?>? cf)
     {
+        // Early returns (missing title, taken slug) redisplay what was typed in the custom fields.
+        CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), (cf ?? new()).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value!));
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
         {
@@ -90,10 +112,13 @@ public class PagesController : Controller
             }
 
             page.PublishedAt = page.IsPublished ? DateTime.UtcNow : null;
+            if (!await ApplyCustomFieldsAsync(page, cf, null)) return View(page);
             
             var id = await _pages.CreateAsync(page);
             await _audit.LogAsync(page.IsPublished ? AuditActions.PageCreated : AuditActions.PageCreated,
                 "Page", id.ToString(), page.Title);
+            page.Id = id;
+            await _webhooks.PageSavedAsync(HttpContext, page);
             if (page.IsPublished) await PingIndexNowAsync(id, userId);
             TempData["Success"] = page.IsPublished ? "Page published!" : "Draft saved.";
             return RedirectToAction("Edit", new { id });
@@ -111,13 +136,16 @@ public class PagesController : Controller
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var page = await _pages.GetByIdAsync(id, userId);
         if (page == null) return NotFound();
+        CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), CustomFields.Parse(page.CustomFieldsJson));
         return View(page);
     }
 
     [HttpPost("edit/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Page page, string action)
+    public async Task<IActionResult> Edit(Guid id, Page page, string action, Dictionary<string, string?>? cf)
     {
+        // Early returns (missing title, taken slug) redisplay what was typed in the custom fields.
+        CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), (cf ?? new()).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value!));
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
         {
@@ -142,6 +170,17 @@ public class PagesController : Controller
             existing.FeaturedImageId = page.FeaturedImageId;
             existing.ParentId = page.ParentId;
             existing.SortOrder = page.SortOrder;
+            // The SEO and social fields are on the edit form too; they were only ever saved on create.
+            existing.MetaTitle = page.MetaTitle;
+            existing.MetaDescription = page.MetaDescription;
+            existing.CanonicalUrl = page.CanonicalUrl;
+            existing.OgTitle = page.OgTitle;
+            existing.OgDescription = page.OgDescription;
+            existing.OgImage = page.OgImage;
+            existing.TwitterTitle = page.TwitterTitle;
+            existing.TwitterDescription = page.TwitterDescription;
+            existing.TwitterImage = page.TwitterImage;
+            if (!await ApplyCustomFieldsAsync(existing, cf, existing.CustomFieldsJson)) { page.CustomFieldsJson = existing.CustomFieldsJson; return View(page); }
 
             if (action == "publish")
             {
@@ -162,6 +201,7 @@ public class PagesController : Controller
             await _pages.UpdateAsync(existing);
             await _audit.LogAsync(AuditActions.PageUpdated, "Page", id.ToString(), existing.Title);
             await _revisions.RecordAsync(existing, action == "publish" ? "Published" : "Saved", User);
+            await _webhooks.PageSavedAsync(HttpContext, existing);
             if (existing.IsPublished) await PingIndexNowAsync(id, userId);
             TempData["Success"] = "Page updated.";
             return RedirectToAction("Edit", new { id });

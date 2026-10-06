@@ -19,7 +19,7 @@
     <div class="flex-1">
         <div class="flex items-baseline justify-between mb-1">
             <strong>@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)</strong>
-            <time class="text-xs" style="color: var(--muted-foreground);">@Model.CreatedAt.ToString("MMM d, yyyy")</time>
+            <time class="text-xs" style="color: var(--muted-foreground);" datetime="@Dates.IsoInstant(Model.CreatedAt)">@Dates.Medium(Model.CreatedAt)</time>
         </div>
         <p style="color: var(--muted-foreground);">@Model.Content</p>
 

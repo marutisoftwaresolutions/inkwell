@@ -204,6 +204,63 @@ public class MediaController : Controller
         });
     }
 
+    public const int MaxAltLength = 300;
+    public const int MaxCaptionLength = 500;
+
+    /// <summary>Alt text and caption for one file. The editors copy them in when the file is placed.</summary>
+    [HttpGet("details/{id:guid}")]
+    public async Task<IActionResult> Details(Guid id, string? folder, string? q, int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var item = await _media.GetByIdAsync(id, userId);
+        if (item == null || !item.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        ViewData["MediaFolder"] = NormalizeFolder(folder);
+        ViewData["MediaQuery"] = q;
+        ViewData["MediaPage"] = page;
+        return View(item);
+    }
+
+    [HttpPost("details/{id:guid}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Details(Guid id, [FromForm] string? altText, [FromForm] string? caption,
+        [FromForm] string? folder, [FromForm] string? q, [FromForm] int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var item = await _media.GetByIdAsync(id, userId);
+        if (item == null) return NotFound();
+
+        altText = string.IsNullOrWhiteSpace(altText) ? null : altText.Trim();
+        caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
+        if (altText?.Length > MaxAltLength)
+            ModelState.AddModelError("AltText", $"Keep the alt text under {MaxAltLength} characters; describe what the image shows.");
+        if (caption?.Length > MaxCaptionLength)
+            ModelState.AddModelError("Caption", $"Keep the caption under {MaxCaptionLength} characters.");
+        if (!ModelState.IsValid)
+        {
+            item.AltText = altText;
+            item.Caption = caption;
+            ViewData["MediaFolder"] = NormalizeFolder(folder);
+            ViewData["MediaQuery"] = q;
+            ViewData["MediaPage"] = page;
+            return View(item);
+        }
+
+        var before = new { item.AltText, item.Caption };
+        await _media.UpdateDetailsAsync(id, userId, altText, caption);
+        await _audit.LogAsync(AuditActions.MediaUpdated, "Media", id.ToString(), item.FileName,
+            oldValues: System.Text.Json.JsonSerializer.Serialize(before),
+            newValues: System.Text.Json.JsonSerializer.Serialize(new { AltText = altText, Caption = caption }));
+        TempData["Success"] = "Image details saved.";
+
+        var folderKey = NormalizeFolder(folder);
+        return RedirectToAction("Index", new
+        {
+            folder = folderKey.Length > 0 ? folderKey : null,
+            q = string.IsNullOrWhiteSpace(q) ? null : q.Trim(),
+            page = page > 1 ? page : (int?)null
+        });
+    }
+
     [HttpGet("api")]
     public async Task<IActionResult> GetMediaApi(int page = 1)
     {
@@ -217,7 +274,11 @@ public class MediaController : Controller
                 url = m.Url,
                 fileName = m.FileName,
                 originalFileName = m.OriginalFileName,
-                contentType = m.ContentType
+                contentType = m.ContentType,
+                altText = m.AltText,
+                caption = m.Caption,
+                width = m.Width,
+                height = m.Height
             }),
             total = total,
             page = page

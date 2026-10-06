@@ -1,0 +1,36 @@
+@using Blog.Core.Services
+@*
+    Custom fields marked "Show to readers" (ADR-0025), as a definition list after "At a glance" on posts and
+    after the content on pages. BlogController puts the values in ViewBag.CustomFields; nothing renders
+    when there are none, so sites without custom fields see no change. The same values are emitted as
+    additionalProperty in the page's structured data.
+*@
+@{
+    var items = ViewBag.CustomFields as IReadOnlyList<CustomFields.Display>;
+}
+@if (items is { Count: > 0 })
+{
+    <aside class="ink-details" aria-labelledby="ink-details-title">
+        <h2 id="ink-details-title" class="ink-details-title">Details</h2>
+        <dl>
+            @foreach (var f in items)
+            {
+                <dt>@f.Label</dt>
+                <dd>
+                    @if (f.Type == Blog.Core.Domain.CustomFieldTypes.Url)
+                    {
+                        <a href="@f.Value" rel="nofollow noopener">@f.Text</a>
+                    }
+                    else if (f.Type == Blog.Core.Domain.CustomFieldTypes.Date)
+                    {
+                        <time datetime="@f.Value">@f.Text</time>
+                    }
+                    else
+                    {
+                        @f.Text
+                    }
+                </dd>
+            }
+        </dl>
+    </aside>
+}

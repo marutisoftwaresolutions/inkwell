@@ -1,0 +1,66 @@
+@using Blog.Core.Domain
+@using Blog.Core.Services
+@*
+    Custom fields in the post and page editors (ADR-0025). The controller puts the fields that apply here in
+    ViewData["CustomFieldDefinitions"], the values to show in ViewData["CustomFieldValues"] and any errors in
+    ViewData["CustomFieldErrors"]. Inputs post as cf[key]; the server validates and stores them. Renders
+    nothing when the site has no fields for this content type.
+*@
+@{
+    var defs = ViewData["CustomFieldDefinitions"] as IReadOnlyList<CustomFieldDefinition> ?? Array.Empty<CustomFieldDefinition>();
+    var values = ViewData["CustomFieldValues"] as IReadOnlyDictionary<string, string> ?? new Dictionary<string, string>();
+    var errors = ViewData["CustomFieldErrors"] as IReadOnlyDictionary<string, string> ?? new Dictionary<string, string>();
+    var inputCls = "w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    string TypeName(string t) => t switch { CustomFieldTypes.Number => "a number", CustomFieldTypes.Date => "a date", CustomFieldTypes.Url => "a web address", CustomFieldTypes.YesNo => "yes or no", _ => "text" };
+}
+@if (defs.Count > 0)
+{
+    var misfits = defs.Count(d => values.TryGetValue(d.Key, out var mv) && !CustomFields.Fits(d.Type, mv) && !errors.ContainsKey(d.Key));
+    <details class="group border-t border-border" data-desk-section="custom-fields" open="@(errors.Count > 0 || values.Count > 0 ? "open" : null)">
+        <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
+            <span>Custom fields @if (errors.Count + misfits > 0) { <span class="pill-bad text-[10px] px-1.5 py-0.5 rounded-full border ml-1">@(errors.Count + misfits) to fix</span> }</span>
+            <svg class="transition-transform group-open:rotate-180 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="space-y-4 pt-2 pb-4">
+            @foreach (var d in defs)
+            {
+                var id = "cf-" + d.Key;
+                values.TryGetValue(d.Key, out var v);
+                errors.TryGetValue(d.Key, out var err);
+                // A value saved before the field's type changed is shown as it is, not blanked by a typed input.
+                if (err == null && !CustomFields.Fits(d.Type, v))
+                    err = $"“{v}” was saved before this field became {TypeName(d.Type)}. Correct it or clear it, then save.";
+                var showAsText = err != null && d.Type != CustomFieldTypes.YesNo;
+                var described = string.Join(" ", new[] { err != null ? id + "-error" : null, d.ShowOnPage ? null : id + "-hint" }.Where(x => x != null));
+                <div class="space-y-1">
+                    <label class="block text-xs font-medium" for="@id">@d.Label</label>
+                    @if (d.Type == CustomFieldTypes.YesNo)
+                    {
+                        <select id="@id" name="cf[@d.Key]" class="@inputCls" aria-invalid="@(err != null ? "true" : null)" aria-describedby="@(described.Length > 0 ? described : null)">
+                            <option value="" selected="@(v is not ("true" or "false"))">Not set</option>
+                            <option value="true" selected="@(v == "true")">Yes</option>
+                            <option value="false" selected="@(v == "false")">No</option>
+                        </select>
+                    }
+                    else
+                    {
+                        var type = showAsText ? "text" : d.Type switch { CustomFieldTypes.Number => "number", CustomFieldTypes.Date => "date", CustomFieldTypes.Url => "url", _ => "text" };
+                        <input type="@type" id="@id" name="cf[@d.Key]" value="@v" class="@inputCls"
+                               step="@(type == "number" ? "any" : null)" maxlength="@(type == "text" ? CustomFields.MaxTextLength : null)"
+                               placeholder="@(type == "url" ? "https://" : null)"
+                               aria-invalid="@(err != null ? "true" : null)" aria-describedby="@(described.Length > 0 ? described : null)" />
+                    }
+                    @if (err != null)
+                    {
+                        <p id="@id-error" class="text-xs text-destructive">@err</p>
+                    }
+                    @if (!d.ShowOnPage)
+                    {
+                        <p id="@id-hint" class="text-xs text-muted-foreground">Internal: not shown to readers.</p>
+                    }
+                </div>
+            }
+            <p class="text-xs text-muted-foreground">Fields are set up in <a href="/admin/settings#s-fields" target="_blank" rel="noopener" class="underline hover:text-foreground">Settings → Custom fields<span class="sr-only"> (opens in a new tab)</span></a>. Leave a field empty to leave it out.</p>
+        </div>
+    </details>
+}

@@ -138,7 +138,7 @@ public class TrafficRecordingTests : IClassFixture<WebApplicationFactory<Program
         var path = "/no-such-page-" + marker;
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        using var request = new HttpRequestMessage(HttpMethod.Get, path + "?page=3&ref=" + marker);
         request.Headers.TryAddWithoutValidation("User-Agent", $"Mozilla/5.0 (compatible; GPTBot/1.1; +https://openai.com/gptbot; {marker})");
         var response = await client.SendAsync(request);
         Assert.Equal(404, (int)response.StatusCode);
@@ -148,13 +148,14 @@ public class TrafficRecordingTests : IClassFixture<WebApplicationFactory<Program
         await using var conn = new SqlConnection(cs);
         try
         {
-            var rows = (await conn.QueryAsync<(string Path, int StatusCode)>(
-                "SELECT Path, StatusCode FROM CrawlerVisits WHERE UserAgent LIKE @m",
+            var rows = (await conn.QueryAsync<(string Path, int StatusCode, string? Query)>(
+                "SELECT Path, StatusCode, Query FROM CrawlerVisits WHERE UserAgent LIKE @m",
                 new { m = "%" + marker + "%" })).ToList();
 
             var row = Assert.Single(rows);                 // not a second /error/404 row
             Assert.Equal(path, row.Path);
             Assert.Equal(404, row.StatusCode);
+            Assert.Equal("page=3&ref=" + marker, row.Query);          // the query string is kept, without its "?"
         }
         finally
         {

@@ -1582,6 +1582,20 @@ body.setup-body {
 }
 .setup-body .setup-alert-title { font-weight: 600; margin: 0 0 4px; }
 .setup-body .setup-alert ul { margin: 0 0 0 18px; padding: 0; }
+/* A to-do or note after a step, not an error: primary tint instead of destructive. */
+.setup-body .setup-alert.setup-notice {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+}
+/* Restore: one row per backup file, radio beside a two-line label. */
+.setup-body fieldset.form-group { border: 0; padding: 0; margin: 0 0 20px; text-align: left; }
+.setup-body fieldset.form-group legend { font-weight: 600; margin-bottom: 8px; }
+.setup-body fieldset.has-error .restore-option label { color: inherit; }
+.setup-body fieldset.has-error legend { color: var(--destructive, #8C2A1F); }
+.setup-body .restore-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--color-border, var(--border)); }
+.setup-body .restore-option input { margin-top: 4px; }
+.setup-body .restore-option label { display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.setup-body .restore-option input:disabled + label { cursor: default; opacity: .7; }
 .setup-body .field-error { margin: 6px 0 0; font-size: .8rem; color: var(--destructive, #8C2A1F); text-align: left; }
 .setup-body .field-hint  { margin: 6px 0 0; font-size: .75rem; color: var(--color-text-muted); text-align: left; }
 .setup-body .has-error .form-control { border-bottom-color: var(--destructive, #8C2A1F); }
@@ -1605,3 +1619,98 @@ body.setup-body {
   .setup-body .review-item { flex-direction: column; gap: 2px; }
   .setup-body .review-value { text-align: left; }
 }
+
+/* Two-factor setup QR code: always dark on white, in both colour schemes, because phone cameras
+   read that most reliably. The one deliberate fixed colour in the Desk. */
+.qr-box { background: #ffffff; }
+.qr-box svg { display: block; width: 100%; height: 100%; }
+
+/* Recovery codes page: print only the codes card, not the Desk around it. */
+@media print {
+  body:has(.print-only-area) * { visibility: hidden; }
+  body:has(.print-only-area) .print-only-area, body:has(.print-only-area) .print-only-area * { visibility: visible; }
+  body:has(.print-only-area) .print-only-area { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
+  body:has(.print-only-area) .print-only-area button, body:has(.print-only-area) .print-only-area a { display: none; }
+}
+
+/* Markdown editor (EasyMDE, ADR-0022). easymde.min.css loads after this file and assumes a white page, so
+   every rule here is scoped under `html` to win the cascade, and maps the editor onto the Desk tokens for
+   both colour schemes, including side-by-side (fullscreen) mode and syntax colours. */
+html .EasyMDEContainer .editor-toolbar,
+html .editor-toolbar.fullscreen { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 2px; padding: 4px 6px;
+  border-color: var(--border); background: var(--card); opacity: 1; }
+html .EasyMDEContainer .editor-toolbar button,
+html .editor-toolbar.fullscreen button { color: var(--foreground); border-color: transparent; display: inline-flex; align-items: center;
+  justify-content: center; min-width: 2.5rem; min-height: 2.5rem; background: transparent; }
+html .EasyMDEContainer .editor-toolbar button:hover,
+html .EasyMDEContainer .editor-toolbar button.active,
+html .editor-toolbar.fullscreen button:hover,
+html .editor-toolbar.fullscreen button.active { background: var(--muted); border-color: var(--border); }
+html .EasyMDEContainer .editor-toolbar button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+html .EasyMDEContainer .editor-toolbar i.separator { border-left-color: var(--border); border-right-color: transparent; }
+html .EasyMDEContainer .CodeMirror,
+html .EasyMDEContainer .CodeMirror-fullscreen { background: var(--background); color: var(--foreground); border-color: var(--border);
+  font-family: 'Geist Mono', ui-monospace, monospace; font-size: .9rem; }
+html .EasyMDEContainer .CodeMirror-cursor { border-left-color: var(--foreground); }
+html .EasyMDEContainer .CodeMirror-selected,
+html .EasyMDEContainer .CodeMirror-focused .CodeMirror-selected,
+html .EasyMDEContainer .CodeMirror-line::selection,
+html .EasyMDEContainer .CodeMirror-line > span::selection { background: var(--accent); }
+html .EasyMDEContainer .cm-s-easymde .cm-link,
+html .EasyMDEContainer .cm-s-easymde .cm-url,
+html .EasyMDEContainer .cm-s-easymde .cm-string { color: var(--primary); }
+html .EasyMDEContainer .cm-s-easymde .cm-tag,
+html .EasyMDEContainer .cm-s-easymde .cm-header { color: var(--foreground); }
+html .EasyMDEContainer .cm-s-easymde .cm-attribute,
+html .EasyMDEContainer .cm-s-easymde .cm-quote,
+html .EasyMDEContainer .cm-s-easymde .cm-comment { color: var(--muted-foreground); background: transparent; }
+html .EasyMDEContainer .editor-statusbar { color: var(--muted-foreground); }
+html .EasyMDEContainer .editor-preview,
+html .EasyMDEContainer .editor-preview-side,
+html .editor-preview-side.editor-preview-active-side { background: var(--card); color: var(--foreground); border-color: var(--border); }
+/* The preview is styled like a post, so it shows what readers get (the Desk has no typography plugin). */
+html .editor-preview h1, html .editor-preview-side h1 { font-size: 1.8rem; font-weight: 700; margin: 1.2em 0 .5em; }
+html .editor-preview h2, html .editor-preview-side h2 { font-size: 1.45rem; font-weight: 700; margin: 1.2em 0 .5em; }
+html .editor-preview h3, html .editor-preview-side h3 { font-size: 1.2rem; font-weight: 600; margin: 1em 0 .4em; }
+html .editor-preview h4, html .editor-preview-side h4 { font-size: 1.05rem; font-weight: 600; margin: 1em 0 .4em; }
+html .editor-preview p, html .editor-preview-side p { margin: 0 0 1em; line-height: 1.7; }
+html .editor-preview ul, html .editor-preview-side ul { list-style: disc; padding-left: 1.5em; margin: 0 0 1em; }
+html .editor-preview ol, html .editor-preview-side ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 1em; }
+html .editor-preview blockquote, html .editor-preview-side blockquote { border-left: 3px solid var(--border); padding-left: 1em; color: var(--muted-foreground); margin: 0 0 1em; }
+html .editor-preview a, html .editor-preview-side a { color: var(--primary); text-decoration: underline; }
+html .editor-preview table, html .editor-preview-side table { border-collapse: collapse; margin: 0 0 1em; }
+html .editor-preview th, html .editor-preview td,
+html .editor-preview-side th, html .editor-preview-side td { border: 1px solid var(--border); padding: .35em .6em; }
+html .editor-preview pre, html .editor-preview-side pre,
+html .editor-preview code, html .editor-preview-side code { background: var(--muted); color: var(--foreground); }
+html .editor-preview pre, html .editor-preview-side pre { padding: .8em 1em; border-radius: var(--radius); overflow-x: auto; }
+
+/* In Markdown mode the visual editor's palette and canvas stay in the page for its script but are hidden.
+   Tailwind's .flex outranks the [hidden] attribute, hence the explicit rule. */
+#componentPalette[hidden], #canvasScroll[hidden], #editor-container[hidden] { display: none !important; }
+
+/* ── Gallery block in the editors (inkwell-gallery-editor.js) ── */
+.comp-gallery { display: grid; grid-template-columns: repeat(var(--gallery-cols, 3), minmax(0, 1fr)); gap: .5rem; margin: .5rem 0; }
+.comp-gallery[data-columns="2"] { --gallery-cols: 2; }
+.comp-gallery[data-columns="4"] { --gallery-cols: 4; }
+.comp-gallery:empty { min-height: 4rem; border: 2px dashed var(--border); border-radius: .5rem; display: flex; align-items: center; justify-content: center; }
+.comp-gallery:empty::before { content: "Empty gallery: add images in its settings"; font-size: .8125rem; color: var(--muted-foreground); }
+.comp-gallery-item { margin: 0; }
+.comp-gallery-item img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .375rem; background: var(--muted); }
+.comp-gallery-item figcaption { font-size: .75rem; color: var(--muted-foreground); margin-top: .25rem; }
+.comp-gallery a { cursor: default; }
+.gallery-editor { display: flex; flex-direction: column; gap: .75rem; }
+.gallery-editor .gallery-add { align-self: flex-start; min-height: 2.5rem; padding: 0 .75rem; border: 1px solid var(--border); border-radius: .375rem; font-size: .8125rem; background: var(--background); color: var(--foreground); }
+.gallery-editor .gallery-add:hover { background: var(--muted); }
+.gallery-editor .gallery-hint { font-size: .75rem; color: var(--muted-foreground); margin-top: .25rem; }
+.gallery-editor .gallery-warn { font-size: .75rem; color: var(--destructive); }
+.gallery-editor .gallery-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .75rem; }
+.gallery-editor .gallery-row { display: flex; gap: .5rem; padding-bottom: .75rem; border-bottom: 1px solid var(--border); }
+.gallery-editor .gallery-thumb { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: .25rem; flex-shrink: 0; background: var(--muted); }
+.gallery-editor .gallery-fields { display: flex; flex-direction: column; gap: .25rem; min-width: 0; flex: 1; }
+.gallery-editor .gallery-fields label { font-size: .75rem; font-weight: 500; color: var(--foreground); }
+.gallery-editor .gallery-fields input { width: 100%; padding: .375rem .5rem; font-size: .8125rem; border: 1px solid var(--input); border-radius: .375rem; background: var(--background); color: var(--foreground); }
+.gallery-editor .gallery-actions { display: flex; gap: .25rem; margin-top: .25rem; }
+.gallery-editor .gallery-actions button { min-width: 2.5rem; min-height: 2.5rem; padding: 0 .5rem; font-size: .75rem; border: 1px solid var(--border); border-radius: .375rem; background: var(--background); color: var(--foreground); }
+.gallery-editor .gallery-actions button:disabled { opacity: .4; }
+.gallery-editor button:focus-visible, .gallery-editor input:focus-visible, .gallery-editor select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }

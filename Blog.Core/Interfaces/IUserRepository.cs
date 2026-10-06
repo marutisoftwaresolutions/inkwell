@@ -21,4 +21,16 @@ public interface IUserRepository
     /// <summary>Assigns a unique slug to every user that currently has none (NULL/empty). Idempotent.
     /// Returns the number of users updated. Enables author E-E-A-T pages for pre-existing users.</summary>
     Task<int> BackfillMissingSlugsAsync();
+
+    // ── Two-factor sign-in (ADR-0021) ─────────────────────────────────────────
+    Task<UserTwoFactor?> GetTwoFactorAsync(Guid userId);
+    /// <summary>Turns two-factor on with a new secret and recovery codes (replacing any previous ones).</summary>
+    Task EnableTwoFactorAsync(Guid userId, string secretProtected, IReadOnlyList<string> recoveryHashes, long firstStep, DateTime enabledAtUtc);
+    Task DisableTwoFactorAsync(Guid userId);
+    Task SaveRecoveryHashesAsync(Guid userId, IReadOnlyList<string> recoveryHashes);
+    /// <summary>
+    /// Records an accepted code's time step, only if it is newer than the last one. False when another request
+    /// already used this or a later step, so one code can never sign in twice, even in a race.
+    /// </summary>
+    Task<bool> TryAdvanceTwoFactorStepAsync(Guid userId, long step);
 }

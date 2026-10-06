@@ -89,6 +89,33 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Blog.Web.Services.
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.CrawlerVisitRetentionJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PasswordResetTokenPruneJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.OgCachePruneJob>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.WebhookDeliveryJob>();
+builder.Services.AddScoped<Blog.Web.Services.Jobs.WebhookDeliveryJob>();
+// Webhooks: publishing only queues (WebhookPublisher); the job above sends through the SSRF-guarded sender.
+builder.Services.AddScoped<Blog.Web.Services.Webhooks.WebhookPublisher>();
+builder.Services.AddScoped<Blog.Web.Services.MenuService>();
+builder.Services.AddSingleton<Blog.Web.Services.Webhooks.IWebhookSender, Blog.Web.Services.Webhooks.WebhookSender>();
+// Backups (ADR-0019): ZIPs outside the web root (Backups:Path, default App_Data/backups), made by the job.
+builder.Services.AddSingleton(sp =>
+{
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+    var folder = builder.Configuration["Backups:Path"];
+    if (string.IsNullOrWhiteSpace(folder)) folder = Path.Combine(env.ContentRootPath, "App_Data", "backups");
+    var keep = builder.Configuration.GetValue<int?>("Backups:Keep") ?? 10;
+    return new Blog.Web.Services.Backups.BackupPaths(folder, Path.Combine(env.WebRootPath, "uploads"), Math.Max(1, keep));
+});
+builder.Services.AddScoped<Blog.Web.Services.Backups.BackupService>();
+// Content export (ADR-0020): WordPress WXR / Ghost ZIP downloads, written to App_Data/exports and deleted on close.
+builder.Services.AddScoped<Blog.Web.Services.Export.ExportService>();
+// Two-factor sign-in (ADR-0021) and the one place a sign-in cookie is issued.
+builder.Services.AddScoped<Blog.Web.Services.TwoFactorService>();
+builder.Services.AddScoped<Blog.Web.Services.CustomFieldsEditor>();   // custom fields in the post and page editors (ADR-0025)
+builder.Services.AddScoped<Blog.Web.Services.SiteDates>();   // every human-readable date: site time zone + locale (ADR-0027)
+builder.Services.AddScoped<Blog.Web.Services.DateSettingsCatalog>();   // countries, zones and date formats offered in Settings (ADR-0027)
+builder.Services.AddScoped<Blog.Web.Services.UserSignInService>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.BackupJob>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.NewsletterSendJob>();   // queued newsletters, in batches (ADR-0028)
+builder.Services.AddScoped<Blog.Web.Services.Newsletter.NewsletterService>();
 
 // ── Search Console ───────────────────────────────────────────────────────────
 // Per-tenant service-account credentials (Data-Protection-encrypted), a two-endpoint HTTP client,
@@ -370,6 +397,8 @@ app.UseHeadRequests();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+// Two-factor requirement (ADR-0021): needs the signed-in user, so it sits right after authorization.
+app.UseMiddleware<Blog.Web.Middleware.TwoFactorEnforcementMiddleware>();
 app.UseTenantResolution();
 app.UseCrawlerVisitTracking();
 

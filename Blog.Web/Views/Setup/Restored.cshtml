@@ -1,0 +1,48 @@
+@model Blog.Web.Services.Backups.RestoreOutcome
+@{
+    Layout = "_SetupLayout";
+    ViewData["Title"] = "Backup Restored";
+    long Rows(string t) => Model.Rows.TryGetValue(t, out var n) ? n : 0;
+}
+
+<div class="setup-container">
+    <div class="setup-card setup-complete">
+        <div class="setup-logo">
+            <svg class="setup-mark" width="72" height="72" viewBox="0 0 72 72" fill="none" aria-hidden="true" focusable="false"><circle cx="36" cy="36" r="36"/><path d="M20 36l10 10 22-22" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h1 class="setup-title">Backup Restored</h1>
+        <p class="setup-subtitle">Sign in with an account from the backup. Its password is the same as on the old site.</p>
+
+        <dl class="review-list">
+            <div class="review-item"><dt class="review-label">Posts</dt><dd class="review-value">@Rows("Posts")</dd></div>
+            <div class="review-item"><dt class="review-label">Pages</dt><dd class="review-value">@Rows("Pages")</dd></div>
+            <div class="review-item"><dt class="review-label">Users</dt><dd class="review-value">@Rows("Users")</dd></div>
+            <div class="review-item"><dt class="review-label">Uploaded files</dt><dd class="review-value">@Model.MediaFiles</dd></div>
+            <div class="review-item"><dt class="review-label">Made by</dt><dd class="review-value">Inkwell @(string.IsNullOrEmpty(Model.Manifest.AppVersion) ? "(version unknown)" : Model.Manifest.AppVersion) on @Model.Manifest.CreatedAtUtc.ToString("d MMM yyyy, HH:mm") UTC</dd></div>
+        </dl>
+
+        <div class="alert setup-alert setup-notice" role="status">
+            <p class="setup-alert-title">Two things to do after signing in</p>
+            <ul>
+                <li>Reconnect Search Console in Settings → Analytics &amp; Search, if the old site used it.</li>
+                <li>Enter a new signing secret for each webhook, and update the receiving service to match.</li>
+            </ul>
+        </div>
+
+        @if (Model.Warnings.Count > 0)
+        {
+            <div class="alert setup-alert setup-notice" role="status">
+                <p class="setup-alert-title">Notes from the restore</p>
+                <ul>
+                    @foreach (var w in Model.Warnings)
+                    {
+                        <li>@w</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <a href="/account/login" class="btn btn-primary btn-lg">Sign in</a>
+        <a href="/" class="btn btn-ghost">View the site</a>
+    </div>
+</div>

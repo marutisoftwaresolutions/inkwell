@@ -1,0 +1,261 @@
+@model Blog.Web.Controllers.MenusViewModel
+@using System.Text.Json
+@using Blog.Core.Domain
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Menus";
+    var json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    var targetsJson = JsonSerializer.Serialize(Model.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Select(t => new { id = t.Id, title = t.Title, path = t.Path })), json);
+    var btn = "inline-flex items-center justify-center min-w-10 min-h-10 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30 disabled:hover:bg-transparent";
+    var field = "px-2 py-2 bg-background border border-input rounded-md text-sm text-foreground w-full";
+}
+
+<div class="flex flex-col gap-6 max-w-4xl">
+    <p class="text-sm text-muted-foreground max-w-2xl">
+        Choose the links in your site's header and footer. Until you save a header menu, the header shows the pages
+        marked “Show in navigation”, as it always has. Every theme keeps its own Home link in the header.
+    </p>
+
+    @foreach (var (location, title, rows, help) in new[]
+    {
+        (MenuLocations.Header, "Header menu", Model.Header, "Top-level items appear in the header bar. Nested items appear in the theme's menu and on phones in most themes; the Feed header shows top-level items only."),
+        (MenuLocations.Footer, "Footer menu", Model.Footer, "Shown as a row of links above the copyright line, with nested items beneath their parent. Nothing is shown until you add an item."),
+    })
+    {
+        var rowsJson = JsonSerializer.Serialize(rows, json);
+        var failed = Model.ErrorLocation == location;
+
+        <form method="post" action="/admin/menus/save" data-track-changes
+              class="bg-card rounded-lg border border-border p-4 space-y-4"
+              x-data="menuEditor('@location', @rowsJson)"
+              @@submit="confirmSave($event)"
+              aria-labelledby="menu-@location-title">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="location" value="@location" />
+            <input type="hidden" name="itemsJson" x-ref="payload" :value="payload()" />
+            @* Screen-reader announcements for moves, nesting and removals. *@
+            <p class="sr-only" aria-live="polite" x-text="announcement"></p>
+
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 id="menu-@location-title" class="text-base font-semibold text-foreground scroll-mt-16">@title</h2>
+                    <p class="text-xs text-muted-foreground mt-0.5 max-w-xl">@help</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span data-dirty-indicator hidden class="text-xs text-muted-foreground">Unsaved changes</span>
+                    <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Save @title.ToLowerInvariant()</button>
+                </div>
+            </div>
+
+            @if (failed)
+            {
+                <div asp-validation-summary="ModelOnly" class="text-sm text-destructive"></div>
+                <p class="text-sm text-destructive">This menu was not saved. Fix the items marked below, then save again.</p>
+            }
+
+            <p x-show="rows.length === 0" class="text-sm text-muted-foreground py-2">
+                @(location == MenuLocations.Header
+                    ? "No header menu yet. The header shows your navigation pages. Add an item to take control of the header links."
+                    : "No footer menu yet. Add an item to show links above the copyright line.")
+            </p>
+
+            <ol class="space-y-2" x-show="rows.length > 0">
+                <template x-for="(row, i) in rows" :key="row.uid">
+                    <li class="rounded-md border border-border p-3" :class="row.child ? 'ml-6 md:ml-10 border-dashed' : ''"
+                        role="group" :aria-label="'Item ' + (i + 1) + (row.child ? ', nested' : '') + ', ' + describe(row)">
+                        <div class="flex flex-wrap items-end gap-2">
+                            <label class="flex flex-col gap-1 text-xs text-muted-foreground">
+                                <span>Links to</span>
+                                <select x-model="row.type" @@change="row.targetId = null; changed(row)" :data-row="row.uid" data-first
+                                        :aria-invalid="row.error ? 'true' : null" :aria-describedby="row.error ? 'menu-@location-err-' + row.uid : null"
+                                        class="px-2 py-2 bg-background border border-input rounded-md text-sm text-foreground">
+                                    <template x-for="t in types" :key="t.value"><option :value="t.value" x-text="t.label" :selected="t.value === row.type"></option></template>
+                                </select>
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs text-muted-foreground min-w-0 flex-1 basis-48" x-show="needsTarget(row)">
+                                <span x-text="targetLabel(row)"></span>
+                                <select x-model="row.targetId" @@change="changed(row)" class="@field">
+                                    <option value="">Choose…</option>
+                                    <template x-for="t in (targets[row.type] || [])" :key="t.id"><option :value="t.id" x-text="t.title" :selected="t.id === row.targetId"></option></template>
+                                </select>
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs text-muted-foreground min-w-0 flex-1 basis-48" x-show="row.type === 'custom'">
+                                <span>Address</span>
+                                <input type="text" x-model="row.url" @@input="changed(row)" placeholder="/about or https://example.com" class="@field font-mono" />
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs text-muted-foreground min-w-0 flex-1 basis-40">
+                                <span>Label</span>
+                                <input type="text" x-model="row.label" @@input="changed(row)" maxlength="40" :placeholder="labelPlaceholder(row)" class="@field" />
+                            </label>
+
+                            <label class="flex items-center gap-1.5 text-xs text-muted-foreground min-h-10">
+                                <input type="checkbox" x-model="row.newTab" @@change="changed(row)" class="h-4 w-4 rounded border-input" /> New tab
+                            </label>
+
+                            <div class="flex items-center gap-0.5 ml-auto">
+                                <button type="button" data-act="up" @@click="move(i, -1)" :disabled="!canMove(i, -1)" class="@btn" :aria-label="'Move ' + describe(row) + ' up'">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+                                </button>
+                                <button type="button" data-act="down" @@click="move(i, 1)" :disabled="!canMove(i, 1)" class="@btn" :aria-label="'Move ' + describe(row) + ' down'">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                                <button type="button" data-act="nest" @@click="toggleNest(i)" :disabled="!canNest(i)" class="@btn"
+                                        :aria-label="'Nest ' + describe(row) + ' under the item above'" :aria-pressed="row.child ? 'true' : 'false'">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+                                </button>
+                                <button type="button" data-act="remove" @@click="remove(i)" class="@btn text-destructive hover:bg-destructive/10" :aria-label="'Remove ' + describe(row)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <p x-show="row.error" x-text="row.error" :id="'menu-@location-err-' + row.uid" class="field-validation-error text-xs text-destructive mt-2"></p>
+                        <p x-show="!row.error && row.unavailable" class="text-xs text-muted-foreground mt-2">
+                            This content is no longer published, so the link is hidden on the site until it is published again or you choose something else.
+                        </p>
+                        <p x-show="!row.error && !row.unavailable && pathOf(row)" class="text-[11px] text-muted-foreground font-mono mt-1 break-all" x-text="pathOf(row)"></p>
+                    </li>
+                </template>
+            </ol>
+
+            <button type="button" x-ref="add" @@click="add()" class="px-3 py-2 rounded-md text-sm border border-input hover:bg-muted">Add item</button>
+        </form>
+    }
+</div>
+
+<script>
+    // One editor per menu. The whole menu is posted as JSON in the hidden "itemsJson" field; the Desk's
+    // unsaved-changes guard serialises that field, so every change dispatches an input event on it.
+    // Rows are keyed by a stable uid (not their index) so focus and messages stay with the right item.
+    window.menuTargets = @Html.Raw(targetsJson);
+    window.menuEditors = window.menuEditors || {};
+    function menuEditor(location, initialRows) {
+        const typeLabels = { home: 'Home', page: 'Page', category: 'Category', tag: 'Tag', series: 'Series', custom: 'Custom link' };
+        const allowed = location === 'header' ? ['page', 'category', 'tag', 'series', 'custom'] : ['home', 'page', 'category', 'tag', 'series', 'custom'];
+        let next = 0;
+        const withUid = r => Object.assign({ label: '', url: '', newTab: false, child: false, error: null, unavailable: false }, r, { uid: 'r' + (next++) });
+        return {
+            rows: initialRows.map(withUid),
+            hadItems: initialRows.length > 0,
+            saved: null,
+            announcement: '',
+            targets: window.menuTargets,
+            types: allowed.map(v => ({ value: v, label: typeLabels[v] })),
+            init() {
+                window.menuEditors[location] = this;
+                this.saved = this.payload();
+            },
+            payload() {
+                return JSON.stringify(this.rows.map(r => ({ type: r.type, targetId: r.targetId || null, label: r.label || null, url: r.url || null, newTab: !!r.newTab, child: !!r.child })));
+            },
+            isDirty() { return this.payload() !== this.saved; },
+            changed(row) {
+                if (row) { row.error = null; row.unavailable = false; }
+                if (this.rows.length && this.rows[0].child) this.rows[0].child = false;   // nothing above the first row to nest under
+                this.$nextTick(() => this.$refs.payload.dispatchEvent(new Event('input', { bubbles: true })));
+            },
+            say(text) { this.announcement = ''; this.$nextTick(() => { this.announcement = text; }); },
+            focusRow(uid, act) {
+                this.$nextTick(() => {
+                    const li = uid ? this.$root.querySelector('[data-row="' + uid + '"]')?.closest('li') : null;
+                    if (!li) { this.$refs.add.focus(); return; }
+                    let el = act ? li.querySelector('[data-act="' + act + '"]') : null;
+                    if (el && el.disabled) el = li.querySelector('[data-act="' + (act === 'up' ? 'down' : 'up') + '"]');
+                    if (!el || el.disabled) el = li.querySelector('[data-first]');
+                    el.focus();
+                });
+            },
+            needsTarget(r) { return ['page', 'category', 'tag', 'series'].includes(r.type); },
+            targetLabel(r) { return typeLabels[r.type] || 'Target'; },
+            find(r) { return (this.targets[r.type] || []).find(t => t.id === r.targetId); },
+            describe(r) { const t = this.find(r); return '“' + (r.label || (t && t.title) || (r.type === 'home' ? 'Home' : r.url) || 'new item') + '”'; },
+            labelPlaceholder(r) { const t = this.find(r); return t ? t.title : (r.type === 'home' ? 'Home' : r.type === 'custom' ? 'Required' : 'Uses the linked item’s title'); },
+            pathOf(r) { if (r.type === 'home') return '/'; if (r.type === 'custom') return r.url || ''; const t = this.find(r); return t ? t.path : ''; },
+
+            // A top-level row moves together with the nested rows under it, so children never change parent by accident.
+            block(i) { let end = i + 1; if (!this.rows[i].child) while (end < this.rows.length && this.rows[end].child) end++; return [i, end]; },
+            canMove(i, d) {
+                const r = this.rows[i];
+                if (r.child) { const j = i + d; return j >= 0 && j < this.rows.length && this.rows[j].child; }
+                if (d < 0) { let j = i - 1; while (j >= 0 && this.rows[j].child) j--; return j >= 0; }
+                const [, end] = this.block(i); return end < this.rows.length;
+            },
+            // A row can be nested when there is a row above it; a top-level row that already has nested rows cannot (one level only).
+            canNest(i) { return i > 0 && (this.rows[i].child || !(this.rows[i + 1] && this.rows[i + 1].child)); },
+            move(i, d) {
+                if (!this.canMove(i, d)) return;
+                const row = this.rows[i];
+                if (row.child) {
+                    const j = i + d;
+                    [this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]];
+                } else {
+                    const [start, end] = this.block(i);
+                    const moving = this.rows.splice(start, end - start);
+                    let at;
+                    if (d < 0) { at = start - 1; while (at > 0 && this.rows[at].child) at--; }
+                    else { const [, afterNext] = this.block(start); at = afterNext; }
+                    this.rows.splice(at, 0, ...moving);
+                }
+                this.say(this.describe(row) + ' moved to position ' + (this.rows.indexOf(row) + 1) + ' of ' + this.rows.length + '.');
+                this.changed();
+                this.focusRow(row.uid, d < 0 ? 'up' : 'down');
+            },
+            toggleNest(i) {
+                if (!this.canNest(i)) return;
+                const row = this.rows[i];
+                row.child = !row.child;
+                this.say(this.describe(row) + (row.child ? ' nested under the item above.' : ' moved back to the top level.'));
+                this.changed(row);
+                this.focusRow(row.uid, 'nest');
+            },
+            remove(i) {
+                const row = this.rows[i];
+                let promoted = 0;
+                if (!row.child) for (let k = i + 1; k < this.rows.length && this.rows[k].child; k++) { this.rows[k].child = false; promoted++; }
+                this.rows.splice(i, 1);
+                this.say(this.describe(row) + ' removed.' + (promoted ? ' Its ' + promoted + ' nested item' + (promoted > 1 ? 's' : '') + ' moved to the top level.' : ''));
+                this.changed();
+                const nextRow = this.rows[i] || this.rows[i - 1];
+                this.focusRow(nextRow ? nextRow.uid : null, null);
+            },
+            add() {
+                const row = withUid({ type: allowed[0], targetId: null });
+                this.rows.push(row);
+                this.say('New item added at position ' + this.rows.length + '.');
+                this.changed();
+                this.focusRow(row.uid, null);
+            },
+
+            confirmSave(e) {
+                const form = e.target;
+                if (form.dataset.confirmed === '1' || !window.InkwellDialog) return;
+                const other = window.menuEditors[location === 'header' ? 'footer' : 'header'];
+                const removing = this.rows.length === 0 && this.hadItems;
+                const losingOther = other && other.isDirty();
+                if (!removing && !losingOther) return;
+
+                e.preventDefault();
+                const submitter = e.submitter;   // keep it, so the busy state disables the right button
+                const name = location;
+                const otherName = location === 'header' ? 'footer' : 'header';
+                const ask = removing
+                    ? InkwellDialog.confirm({
+                        title: 'Remove this menu?',
+                        body: location === 'header'
+                            ? 'The header goes back to showing your navigation pages, as it did before you built a menu. Pages themselves are untouched.'
+                            : 'The footer link row disappears. Pages themselves are untouched.',
+                        action: 'Remove menu', tone: 'warning' })
+                    : Promise.resolve(true);
+                ask.then(ok => {
+                    if (!ok || !losingOther) return ok;
+                    return InkwellDialog.confirm({
+                        title: 'Save the ' + name + ' menu only?',
+                        body: 'Your unsaved ' + otherName + ' menu changes will be lost. Save the ' + otherName + ' menu first to keep them.',
+                        action: 'Save ' + name + ' menu', tone: 'warning' });
+                }).then(ok => { if (ok) { form.dataset.confirmed = '1'; form.requestSubmit(submitter); } });
+            },
+        };
+    }
+</script>

@@ -1,0 +1,44 @@
+@model IReadOnlyList<Blog.Core.Domain.NavLink>?
+@* Footer menu from Admin → Menus. Renders nothing when the site has no footer menu, so every footer
+   looks exactly as it did before menus existed.
+   Tone: default uses the footer's muted text on its muted background. A footer drawn on the brand
+   colour (Magazine) passes ViewData["FooterMenuTone"] = "inverse" and gets the same colours as its own
+   copyright line, so the links keep their contrast in every preset and both colour schemes.
+   Nested items (Depth 1) are a list inside their parent's item, not a dash in the text.
+   Only classes present in the precompiled wwwroot/css/tailwind.css are used; keyboard focus uses the
+   reader-wide :focus-visible ring from inkwell.css, recoloured to the link colour inline. *@
+@{
+    var inverse = (ViewData["FooterMenuTone"] as string) == "inverse";
+    var linkColor = inverse ? "color-mix(in srgb, var(--primary-foreground) 85%, transparent)" : "var(--muted-foreground)";
+    var ruleColor = inverse ? "color-mix(in srgb, var(--primary-foreground) 20%, transparent)" : "var(--border)";
+    var groups = new List<(Blog.Core.Domain.NavLink Parent, List<Blog.Core.Domain.NavLink> Children)>();
+    foreach (var link in Model ?? [])
+    {
+        if (link.Depth > 0 && groups.Count > 0) groups[^1].Children.Add(link);
+        else groups.Add((link, new List<Blog.Core.Domain.NavLink>()));
+    }
+}
+@if (groups.Count > 0)
+{
+    <nav aria-label="Footer" class="border-t border-dashed" style="border-color: @ruleColor;">
+        <ul class="container xl:max-w-6xl mx-auto px-4 py-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            @foreach (var (parent, children) in groups)
+            {
+                <li>
+                    <a href="@parent.Href" target="@(parent.OpenInNewTab ? "_blank" : null)" rel="@(parent.OpenInNewTab ? "noopener" : null)"
+                       class="inline-block py-1.5 hover:opacity-60 transition-opacity" style="color: @linkColor; outline-color: currentColor;">@parent.Title</a>
+                    @if (children.Count > 0)
+                    {
+                        <ul class="flex flex-wrap gap-x-5 text-xs">
+                            @foreach (var child in children)
+                            {
+                                <li><a href="@child.Href" target="@(child.OpenInNewTab ? "_blank" : null)" rel="@(child.OpenInNewTab ? "noopener" : null)"
+                                       class="inline-block py-1 hover:opacity-60 transition-opacity" style="color: @linkColor; outline-color: currentColor;">@child.Title</a></li>
+                            }
+                        </ul>
+                    }
+                </li>
+            }
+        </ul>
+    </nav>
+}

@@ -41,10 +41,11 @@
                 </div>
             </div>
         </div>
+        <partial name="_FooterMenu" model="(IReadOnlyList<Blog.Core.Domain.NavLink>?)ViewBag.FooterLinks" view-data='new ViewDataDictionary(ViewData) { ["FooterMenuTone"] = "inverse" }' />
         @* Copyright *@
         <div class="border-t py-4 text-xs" style="border-color: color-mix(in srgb, var(--primary-foreground) 20%, transparent); color: color-mix(in srgb, var(--primary-foreground) 60%, transparent);">
             <div class="container xl:max-w-6xl mx-auto px-4 flex items-center justify-between">
-                <span>Copyright &copy; @DateTime.Now.Year @siteName. All rights reserved.</span>
+                <span>Copyright &copy; @Dates.Year @siteName. All rights reserved.</span>
                 <a href="/" class="hover:opacity-60 transition-opacity uppercase tracking-widest text-[10px]" style="color: var(--primary-foreground);">Home</a>
             </div>
         </div>

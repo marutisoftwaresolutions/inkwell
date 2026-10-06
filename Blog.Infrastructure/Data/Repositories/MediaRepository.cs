@@ -50,6 +50,14 @@ public class MediaRepository : IMediaRepository
         await conn.ExecuteAsync(sql, new { Id = id, UploadedBy = uploadedBy });
     }
 
+    public async Task<bool> UpdateDetailsAsync(Guid id, Guid uploadedBy, string? altText, string? caption)
+    {
+        using var conn = _ctx.CreateConnection();
+        return await conn.ExecuteAsync(
+            "UPDATE Media SET AltText = @AltText, Caption = @Caption WHERE Id = @Id AND UploadedBy = @UploadedBy",
+            new { Id = id, UploadedBy = uploadedBy, AltText = altText, Caption = caption }) > 0;
+    }
+
     public async Task<int> GetTotalCountAsync(Guid? uploadedBy = null)
     {
         using var conn = _ctx.CreateConnection();

@@ -135,6 +135,10 @@ public sealed class TrafficRecorder
             await ResolveGeoAsync(views);
             try { written += await sp.GetRequiredService<IPageViewRepository>().RecordManyAsync(views.Select(v => v.View).ToList()); }
             catch (Exception ex) { _log.LogDebug(ex, "Page view batch not recorded (non-fatal)."); }
+
+            // "Most read" counts the same beacons, added per post in one pass for the whole batch.
+            try { await sp.GetRequiredService<IPostRepository>().AddViewCountsAsync(PostViewTally.Count(views.Select(v => (v.View.OwnerId, v.View.Path)))); }
+            catch (Exception ex) { _log.LogDebug(ex, "Post view counts not updated (non-fatal)."); }
         }
 
         return written;
@@ -169,7 +173,7 @@ public sealed class TrafficRecorder
     /// </summary>
     public static Guid OwnerOf(HttpContext context)
     {
-        var tenant = context.RequestServices.GetService<ITenantContext>();
+        var tenant = context.RequestServices?.GetService<ITenantContext>();
         return tenant is { IsCloudMode: true, IsResolved: true } ? tenant.UserId : Guid.Empty;
     }
 

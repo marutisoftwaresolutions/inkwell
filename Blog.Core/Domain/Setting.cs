@@ -26,6 +26,18 @@ public class UserSettings
     // Analytics
     public string GoogleAnalyticsId { get; set; } = string.Empty;
 
+    // Cookie-consent banner on the public site (v1.0.8). On by default, including for existing sites
+    // whose stored settings predate the field: Google Analytics then loads only after a reader accepts.
+    // Off restores the earlier behaviour (Analytics on every page, no banner).
+    public bool CookieConsentEnabled { get; set; } = true;
+
+    // Roles that must use two-factor sign-in (v1.0.8, ADR-0021). Empty by default: two-factor is
+    // optional for everyone until an Admin requires it for a role in Settings → Notifications & housekeeping.
+    public List<string> TwoFactorRequiredRoles { get; set; } = new();
+
+    /// <summary>The site's custom fields (ADR-0025). Empty by default: no field appears anywhere until one is defined.</summary>
+    public List<CustomFieldDefinition> CustomFields { get; set; } = new();
+
     // Search-engine ownership verification — rendered as <meta> tags in the public <head>.
     // Store just the token/content value (not the full meta tag).
     public string GoogleSiteVerification { get; set; } = string.Empty;
@@ -90,6 +102,24 @@ public class UserSettings
     /// UTC. A Windows or IANA id the host recognises; empty or unknown means UTC.
     /// </summary>
     public string DisplayTimeZoneId { get; set; } = "UTC";
+
+    /// <summary>
+    /// The site's country (ISO 3166-1 alpha-2, from the Countries table), which narrows the time zone and date
+    /// format choices in Settings (ADR-0027). Empty until chosen; nothing depends on it at render time.
+    /// </summary>
+    public string Country { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The locale whose date conventions every human-readable date follows (BCP-47, from the DateLocales table,
+    /// e.g. "en-IN"). Default "en-US": the month-first long dates most layouts showed before (ADR-0027).
+    /// </summary>
+    public string DateLocale { get; set; } = "en-US";
+
+    /// <summary>"locale" (the locale's own patterns) or "iso8601" (2026-10-05 everywhere).</summary>
+    public string DateFormat { get; set; } = "locale";
+
+    /// <summary>"locale", "24h" or "12h": the clock used wherever a time of day is shown.</summary>
+    public string ClockFormat { get; set; } = "locale";
 
     /// <summary>Revisions kept per post or page; the oldest are pruned as new ones are written. 1–200.</summary>
     public int RevisionsPerItem { get; set; } = 25;

@@ -24,7 +24,7 @@
         <div class="flex items-center gap-2 text-xs" style="color: var(--muted-foreground);">
             <span>@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)</span>
             <span>•</span>
-            <time datetime="@Model.PublishedAt?.ToString("yyyy-MM-dd")">@Model.PublishedAt?.ToString("MMM d, yyyy")</time>
+            <time datetime="@Dates.Iso(Model.PublishedAt)">@Dates.Medium(Model.PublishedAt)</time>
         </div>
 
         <h3 class="text-lg font-bold leading-snug">

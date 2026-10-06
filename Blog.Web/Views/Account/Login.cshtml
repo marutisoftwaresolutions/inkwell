@@ -12,6 +12,8 @@
         if (settings?.Theme is "light" or "dark") colorScheme = settings.Theme;
     }
     catch { }
+    // Messages from a redirect (an expired or exhausted two-factor step) arrive through TempData.
+    if (ViewBag.Error == null) { if (TempData["Error"] is string redirectedError) ViewBag.Error = redirectedError; }
     var hasError = ViewBag.Error != null;
 }
 <!DOCTYPE html>

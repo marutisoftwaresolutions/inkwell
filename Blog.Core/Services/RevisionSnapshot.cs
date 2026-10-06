@@ -14,8 +14,17 @@ public static class RevisionSnapshot
     public const string PostType = "Post";
     public const string PageType = "Page";
 
-    /// <summary>Inkwell-only blocks travel together as one JSON bag so the table stays flat.</summary>
-    private sealed record StructuredBag(string? FaqJson, string? KeyFactsJson, string? HowToJson, string? RoundupJson, string? AnswerCapsule);
+    /// <summary>
+    /// Inkwell-only blocks travel together as one JSON bag so the table stays flat. A Markdown post also keeps
+    /// its source and mode here (ADR-0022), so restoring a revision restores what the author wrote, not only its HTML.
+    /// </summary>
+    private sealed record StructuredBag(string? FaqJson, string? KeyFactsJson, string? HowToJson, string? RoundupJson, string? AnswerCapsule,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Markdown = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? EditorMode = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? CustomFieldsJson = null);
+
+    /// <summary>A page's bag holds only its custom field values (ADR-0025); a page without any has no bag, as before.</summary>
+    private sealed record PageBag(string? CustomFieldsJson);
 
     public static Revision FromPost(Post post, string reason, Guid authorId, string? authorName) => new()
     {
@@ -26,7 +35,8 @@ public static class RevisionSnapshot
         Html = post.Html ?? string.Empty,
         MetaTitle = post.MetaTitle,
         MetaDescription = post.MetaDescription,
-        StructuredJson = JsonSerializer.Serialize(new StructuredBag(post.FaqJson, post.KeyFactsJson, post.HowToJson, post.RoundupJson, post.AnswerCapsule)),
+        StructuredJson = JsonSerializer.Serialize(new StructuredBag(post.FaqJson, post.KeyFactsJson, post.HowToJson, post.RoundupJson, post.AnswerCapsule,
+            post.IsMarkdown ? post.Markdown : null, post.IsMarkdown ? EditorModes.Markdown : null, post.CustomFieldsJson)),
         Status = post.Status.ToString(),
         Reason = reason,
         AuthorId = authorId,
@@ -42,7 +52,7 @@ public static class RevisionSnapshot
         Html = page.Content ?? string.Empty,
         MetaTitle = page.MetaTitle,
         MetaDescription = page.MetaDescription,
-        StructuredJson = null,
+        StructuredJson = page.CustomFieldsJson is null ? null : JsonSerializer.Serialize(new PageBag(page.CustomFieldsJson)),
         Status = page.IsPublished ? "Published" : "Draft",
         Reason = reason,
         AuthorId = authorId,
@@ -75,6 +85,10 @@ public static class RevisionSnapshot
         post.HowToJson = bag.HowToJson;
         post.RoundupJson = bag.RoundupJson;
         post.AnswerCapsule = bag.AnswerCapsule;
+        post.EditorMode = EditorModes.Normalize(bag.EditorMode);
+        post.Markdown = post.IsMarkdown ? bag.Markdown : null;
+        // Revisions from before custom fields recorded none: restoring one keeps the current values.
+        if (bag.CustomFieldsJson is not null) post.CustomFieldsJson = bag.CustomFieldsJson;
     }
 
     /// <summary>Puts the revision's content back onto the page. Slug and publish state are untouched.</summary>
@@ -84,6 +98,13 @@ public static class RevisionSnapshot
         page.Content = revision.Html;
         page.MetaTitle = revision.MetaTitle;
         page.MetaDescription = revision.MetaDescription;
+        if (string.IsNullOrWhiteSpace(revision.StructuredJson)) return;
+        try
+        {
+            var bag = JsonSerializer.Deserialize<PageBag>(revision.StructuredJson);
+            if (bag?.CustomFieldsJson is not null) page.CustomFieldsJson = bag.CustomFieldsJson;
+        }
+        catch (JsonException) { }
     }
 
     private static StructuredBag ParseBag(string? json)

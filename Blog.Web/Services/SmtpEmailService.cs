@@ -50,6 +50,43 @@ public class SmtpEmailService : IEmailService
             _logger.LogError(ex, "Failed to send email to {Email}", toEmail);
         }
     }
+
+    public async Task<EmailSendResult> SendMessageAsync(EmailMessage m, CancellationToken ct = default)
+    {
+        if (!IsConfigured) return EmailSendResult.Failed("Outgoing email is not set up (Smtp:Host is empty).");
+        try
+        {
+            using var client = new SmtpClient(_settings.Host, _settings.Port)
+            {
+                EnableSsl = _settings.EnableSsl,
+                Credentials = new NetworkCredential(_settings.Username, _settings.Password)
+            };
+            using var message = new MailMessage(new MailAddress(_settings.FromEmail, _settings.FromName),
+                new MailAddress(m.ToEmail, m.ToName ?? string.Empty))
+            {
+                Subject = m.Subject,
+                SubjectEncoding = System.Text.Encoding.UTF8,
+                HeadersEncoding = System.Text.Encoding.UTF8,
+            };
+            // Plain text first, HTML last: mail clients show the last alternative they can render.
+            if (!string.IsNullOrEmpty(m.Text))
+                message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(m.Text, System.Text.Encoding.UTF8, "text/plain"));
+            message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(m.Html, System.Text.Encoding.UTF8, "text/html"));
+            foreach (var (name, value) in m.Headers ?? new Dictionary<string, string>())
+                message.Headers.Add(name, value);
+
+            await client.SendMailAsync(message, ct);
+            return EmailSendResult.Ok;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Email to {Email} not sent", m.ToEmail);
+            // The reason, without the stack: it is shown to the operator in the send log.
+            var reason = ex is SmtpException se ? $"{se.StatusCode}: {se.Message}" : ex.Message;
+            return EmailSendResult.Failed(reason.Length > 480 ? reason[..480] : reason);
+        }
+    }
 }
 
 public class SmtpSettings

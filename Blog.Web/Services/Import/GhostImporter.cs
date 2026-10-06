@@ -35,6 +35,8 @@ public class GhostImporter : IContentImporter
                 var hasHtml = first.TryGetProperty("html", out var h) && h.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(h.GetString());
                 if (!hasHtml) manifest.Warnings.Add("Posts have no rendered HTML — body converted from Lexical/Mobiledoc (formatting may be simplified).");
             }
+            // Posts written in Markdown (Ghost Markdown cards) can stay Markdown posts (ADR-0022).
+            manifest.MarkdownPosts = posts.EnumerateArray().Count(x => x.ValueKind == JsonValueKind.Object && GhostContent.MarkdownSource(x) is not null);
         }
         return manifest;
     }
@@ -110,6 +112,7 @@ public class GhostImporter : IContentImporter
                 var ghostStatus = (Str(p, "status") ?? "published").ToLowerInvariant();
                 var status = ghostStatus switch { "published" => "publish", "scheduled" => "future", _ => "draft" };
 
+                var markdown = ResolveGhostUrls(GhostContent.MarkdownSource(p), baseUrl);
                 var html = ResolveGhostUrls(GhostContent.ToHtml(p), baseUrl);
                 var feature = ResolveGhostUrls(Str(p, "feature_image"), baseUrl);
 
@@ -129,6 +132,7 @@ public class GhostImporter : IContentImporter
                     Slug = slug,
                     Html = html,
                     Excerpt = Str(p, "custom_excerpt"),
+                    Markdown = markdown,
                     Status = status,
                     PublishedAt = ParseDate(Str(p, "published_at")),
                     AuthorLogin = null,
@@ -229,6 +233,9 @@ internal static class GhostContent
     {
         var html = post.TryGetProperty("html", out var h) && h.ValueKind == JsonValueKind.String ? h.GetString() : null;
         if (!string.IsNullOrWhiteSpace(html)) return html!;
+        // No rendered HTML but a Markdown source: render it properly rather than flattening the cards.
+        var markdown = MarkdownSource(post);
+        if (markdown is not null) return Blog.Core.Services.MarkdownRenderer.ToHtml(markdown);
 
         try
         {
@@ -239,6 +246,56 @@ internal static class GhostContent
         }
         catch { /* fall through */ }
         return "";
+    }
+
+    private const string MarkdownSeparator = "\n\n";
+
+    /// <summary>
+    /// The post's Markdown source, when it was written in Markdown: Ghost 0.x's <c>markdown</c> field, or a
+    /// Mobiledoc or Lexical document made only of Markdown cards (how Ghost 1–5 store Markdown posts).
+    /// Null for anything else, so a mixed document is never reduced to its Markdown parts.
+    /// </summary>
+    public static string? MarkdownSource(JsonElement post)
+    {
+        try
+        {
+            if (post.TryGetProperty("markdown", out var md) && md.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(md.GetString()))
+                return md.GetString();
+
+            if (post.TryGetProperty("mobiledoc", out var mob) && mob.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(mob.GetString()))
+            {
+                using var doc = JsonDocument.Parse(mob.GetString()!);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("cards", out var cards) || !root.TryGetProperty("sections", out var sections)) return null;
+                var cardList = cards.EnumerateArray().ToList();
+                var parts = new List<string>();
+                foreach (var s in sections.EnumerateArray())
+                {
+                    var a = s.EnumerateArray().ToArray();
+                    // A card section is [10, cardIndex]; anything else (markup, lists, images) means it is not pure Markdown.
+                    if (a.Length < 2 || a[0].GetInt32() != 10) return null;
+                    var card = cardList[a[1].GetInt32()].EnumerateArray().ToArray();
+                    if (card.Length < 2 || card[0].GetString() != "markdown") return null;
+                    if (card[1].TryGetProperty("markdown", out var text) && text.ValueKind == JsonValueKind.String) parts.Add(text.GetString()!);
+                }
+                return parts.Count > 0 ? string.Join(MarkdownSeparator, parts) : null;
+            }
+
+            if (post.TryGetProperty("lexical", out var lex) && lex.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(lex.GetString()))
+            {
+                using var doc = JsonDocument.Parse(lex.GetString()!);
+                if (!doc.RootElement.TryGetProperty("root", out var root) || !root.TryGetProperty("children", out var children)) return null;
+                var parts = new List<string>();
+                foreach (var node in children.EnumerateArray())
+                {
+                    if (!node.TryGetProperty("type", out var t) || t.GetString() != "markdown") return null;
+                    if (node.TryGetProperty("markdown", out var text) && text.ValueKind == JsonValueKind.String) parts.Add(text.GetString()!);
+                }
+                return parts.Count > 0 ? string.Join(MarkdownSeparator, parts) : null;
+            }
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or IndexOutOfRangeException or ArgumentOutOfRangeException) { }
+        return null;
     }
 
     private static string FromLexical(string json)

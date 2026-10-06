@@ -30,6 +30,45 @@ public class SettingsController : Controller
         _searchRows = searchRows;
     }
 
+    /// <summary>
+    /// The time zones and date formats for a country (all of them when empty), with the zone and format to
+    /// suggest when the country has just been picked (ADR-0027). Read-only; used by the Display tab.
+    /// </summary>
+    [HttpGet("date-options")]
+    public async Task<IActionResult> DateOptions(string? country, string? zone, string? locale)
+    {
+        var catalog = HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.DateSettingsCatalog>();
+        var cc = (country ?? "").Trim().ToUpperInvariant();
+        var settings = await _settings.GetSettingsAsync(await GetSettingsUserIdAsync());
+        var (suggestZone, suggestLocale) = cc.Length == 2 ? await catalog.SuggestAsync(cc, settings.SiteLanguage) : (null, null);
+        return Json(new
+        {
+            zones = (await catalog.ZoneOptionsAsync(cc, zone)).Select(o => new { value = o.Value, label = o.Label }),
+            locales = (await catalog.LocaleOptionsAsync(cc, locale)).Select(o => new { value = o.Value, label = o.Label }),
+            suggestZone,
+            suggestLocale,
+        });
+    }
+
+    /// <summary>Today's date and time as the given settings would show it, for the live preview.</summary>
+    [HttpGet("date-preview")]
+    public IActionResult DatePreview(string? zone, string? locale, string? format, string? clock)
+    {
+        var o = Blog.Web.Services.SiteDates.From(new Blog.Core.Domain.UserSettings
+        {
+            DisplayTimeZoneId = zone ?? "UTC", DateLocale = locale ?? "en-US", DateFormat = format ?? "locale", ClockFormat = clock ?? "locale",
+        });
+        var now = DateTime.UtcNow;
+        return Json(new
+        {
+            known = Blog.Core.Services.TimeZoneHelper.IsKnown(o.TimeZoneId),
+            @long = Blog.Core.Services.DateDisplay.Format(now, o, Blog.Core.Services.DateStyle.Long),
+            medium = Blog.Core.Services.DateDisplay.Format(now, o, Blog.Core.Services.DateStyle.Medium),
+            @short = Blog.Core.Services.DateDisplay.Format(now, o, Blog.Core.Services.DateStyle.Short),
+            dateTime = Blog.Core.Services.DateDisplay.Format(now, o, Blog.Core.Services.DateStyle.DateTime),
+        });
+    }
+
     private async Task<Guid> GetSettingsUserIdAsync()
     {
         if (_tenantContext.IsCloudMode)
@@ -57,10 +96,17 @@ public class SettingsController : Controller
             CommentsEnabled = globalSettings.CommentsEnabled,
             CommentsModeration = globalSettings.CommentsModeration,
             CrawlerVisitRetentionDays = Blog.Web.Services.Jobs.CrawlerVisitRetentionJob.ClampDays(globalSettings.CrawlerVisitRetentionDays),
-            DisplayTimeZoneId = string.IsNullOrWhiteSpace(globalSettings.DisplayTimeZoneId) ? "UTC" : globalSettings.DisplayTimeZoneId,
+            DisplayTimeZoneId = Blog.Core.Services.TimeZoneHelper.ToIana(globalSettings.DisplayTimeZoneId),
+            Country = globalSettings.Country,
+            DateLocale = globalSettings.DateLocale,
+            DateFormat = globalSettings.DateFormat,
+            ClockFormat = globalSettings.ClockFormat,
             ColorScheme = globalSettings.Theme is "light" or "dark" ? globalSettings.Theme : "system",
             RevisionsPerItem = RevisionService.ClampKeep(globalSettings.RevisionsPerItem),
             GoogleAnalyticsId = globalSettings.GoogleAnalyticsId,
+            CookieConsentEnabled = globalSettings.CookieConsentEnabled,
+            TwoFactorRequiredRoles = globalSettings.TwoFactorRequiredRoles?.ToList() ?? new(),
+            CustomFieldsJson = System.Text.Json.JsonSerializer.Serialize(globalSettings.CustomFields ?? new()),
             GoogleSiteVerification = globalSettings.GoogleSiteVerification,
             BingSiteVerification = globalSettings.BingSiteVerification,
             IndexNowEnabled = globalSettings.IndexNowEnabled,
@@ -118,17 +164,57 @@ public class SettingsController : Controller
         globalSettings.CommentsModeration = model.CommentsModeration;
         globalSettings.CrawlerVisitRetentionDays = Blog.Web.Services.Jobs.CrawlerVisitRetentionJob.ClampDays(model.CrawlerVisitRetentionDays);
 
-        // Display zone must be one this host knows; a typo would silently show UTC and confuse.
-        var tz = (model.DisplayTimeZoneId ?? "UTC").Trim();
+        // Date and time (ADR-0027). The zone must be one this host knows (a typo would silently show UTC) and is
+        // stored as its IANA id, so a Windows id saved before keeps working and moves to the standard name.
+        var tz = Blog.Core.Services.TimeZoneHelper.ToIana(model.DisplayTimeZoneId);
         if (!Blog.Core.Services.TimeZoneHelper.IsKnown(tz))
-        {
-            ModelState.AddModelError(nameof(model.DisplayTimeZoneId), "Unknown time zone. Pick one from the list.");
-            return View("Index", model);
-        }
-        globalSettings.DisplayTimeZoneId = tz.Length == 0 ? "UTC" : tz;
+            ModelState.AddModelError(nameof(model.DisplayTimeZoneId), "This server does not know that time zone. Pick another from the list.");
+        var dateLocale = (model.DateLocale ?? "").Trim();
+        if (!Blog.Core.Services.DateDisplay.IsKnownLocale(dateLocale))
+            ModelState.AddModelError(nameof(model.DateLocale), "Pick a date format from the list.");
+        var country = (model.Country ?? "").Trim().ToUpperInvariant();
+        if (!await HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.DateSettingsCatalog>().IsKnownCountryAsync(country))
+            ModelState.AddModelError(nameof(model.Country), "Pick a country from the list, or leave it unset.");
+        if (!ModelState.IsValid) return View("Index", model);
+        globalSettings.DisplayTimeZoneId = tz;
+        globalSettings.Country = country;
+        globalSettings.DateLocale = dateLocale;
+        globalSettings.DateFormat = Blog.Core.Services.DateDisplay.IsKnownFormat(model.DateFormat) ? model.DateFormat! : Blog.Core.Services.DateDisplay.FormatLocale;
+        globalSettings.ClockFormat = Blog.Core.Services.DateDisplay.IsKnownClock(model.ClockFormat) ? model.ClockFormat! : Blog.Core.Services.DateDisplay.ClockLocale;
         globalSettings.Theme = model.ColorScheme is "light" or "dark" ? model.ColorScheme : "system";
         globalSettings.RevisionsPerItem = RevisionService.ClampKeep(model.RevisionsPerItem);
-        globalSettings.GoogleAnalyticsId = model.GoogleAnalyticsId ?? string.Empty;
+        globalSettings.GoogleAnalyticsId = (model.GoogleAnalyticsId ?? string.Empty).Trim();
+        globalSettings.CookieConsentEnabled = model.CookieConsentEnabled;
+
+        // Custom fields: existing fields keep their keys (and so their values); errors go back to the row.
+        if (model.CustomFieldsPosted)
+        {
+            List<Blog.Core.Domain.CustomFieldDefinition>? postedFields;
+            try
+            {
+                postedFields = System.Text.Json.JsonSerializer.Deserialize<List<Blog.Core.Domain.CustomFieldDefinition>>(
+                    string.IsNullOrWhiteSpace(model.CustomFieldsJson) ? "[]" : model.CustomFieldsJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (System.Text.Json.JsonException) { postedFields = null; }
+            var (fields, fieldErrors) = Blog.Core.Services.CustomFields.NormalizeDefinitions(postedFields, globalSettings.CustomFields);
+            if (postedFields is null || fieldErrors.Count > 0)
+            {
+                ViewData["CustomFieldErrors"] = fieldErrors;
+                ModelState.AddModelError(nameof(model.CustomFieldsJson), postedFields is null
+                    ? "The custom fields could not be read. Reload the page and try again."
+                    : "Some custom fields need attention.");
+                return View("Index", model);
+            }
+            globalSettings.CustomFields = fields;
+        }
+        // Only an Admin decides who must use two-factor; anyone else's save leaves it as it was.
+        if (model.TwoFactorRolesPosted && User.IsInRole("Admin"))
+        {
+            globalSettings.TwoFactorRequiredRoles = (model.TwoFactorRequiredRoles ?? new())
+                .Where(r => Blog.Core.Services.TwoFactor.Roles.Contains(r)).Distinct().ToList();
+            HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.TwoFactorService>().Forget(Guid.Empty);
+        }
         globalSettings.GoogleSiteVerification = (model.GoogleSiteVerification ?? string.Empty).Trim();
         globalSettings.BingSiteVerification = (model.BingSiteVerification ?? string.Empty).Trim();
 

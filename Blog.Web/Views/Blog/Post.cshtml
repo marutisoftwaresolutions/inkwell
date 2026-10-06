@@ -6,6 +6,8 @@
     ViewData["Description"] = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription : Blog.Core.Services.TextHelper.SmartTruncate(Model.Plaintext);
     ViewData["SiteName"] = ViewBag.SiteName ?? "Blog";
     ViewData["SiteLogoUrl"] = ViewBag.SiteLogoUrl ?? "";
+    // The gallery lightbox script is sent only to pages that have a gallery.
+    ViewData["HasGallery"] = Model.Html?.Contains("comp-gallery", StringComparison.Ordinal) == true;
 
     // Canonical is emitted once by _PublicLayout from this value — do not emit a second <link> here.
     ViewData["Canonical"] = !string.IsNullOrEmpty(Model.CanonicalUrl)
@@ -55,9 +57,9 @@
     <meta property="og:locale" content="@Blog.Core.Services.LocaleHelper.OgLocale((string?)ViewData["SiteLanguage"])" />
     @if (Model.PublishedAt.HasValue)
     {
-        <meta property="article:published_time" content="@Model.PublishedAt.Value.ToString("O")" />
+        <meta property="article:published_time" content="@Blog.Core.Services.DateDisplay.IsoUtc(Model.PublishedAt.Value)" />
     }
-    <meta property="article:modified_time" content="@Model.UpdatedAt.ToString("O")" />
+    <meta property="article:modified_time" content="@Blog.Core.Services.DateDisplay.IsoUtc(Model.UpdatedAt)" />
     @if (!string.IsNullOrEmpty(Model.AuthorName))
     {
         <meta property="article:author" content="@Model.AuthorName" />

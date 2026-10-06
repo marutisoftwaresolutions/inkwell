@@ -35,11 +35,11 @@
 					</div>
 				}
 
-				@if (Model.Pages?.Count > 0)
+				@if (Model.Links.Any(l => l.Depth == 0))
 				{
-					@foreach (var pageView in Model.Pages)
+					@foreach (var pageView in Model.Links.Where(l => l.Depth == 0))
 					{
-						<a href="/pages/@pageView.Slug" class="text-sm hover:opacity-75 transition">@pageView.Title</a>
+						<a href="@pageView.Href" target="@(pageView.OpenInNewTab ? "_blank" : null)" rel="@(pageView.OpenInNewTab ? "noopener" : null)" class="text-sm hover:opacity-75 transition">@if (pageView.Depth > 0) { <span aria-hidden="true">— </span> }@pageView.Title</a>
 					}
 				}
 			</div>

@@ -119,7 +119,7 @@
 					var hasDetail = row.OldValues != null || row.NewValues != null;
 					<tr class="hover:bg-muted/30 transition-colors">
 							<td class="px-4 py-2.5 text-muted-foreground whitespace-nowrap font-mono">
-								@row.CreatedAt.ToString("MM-dd HH:mm:ss")
+								@Dates.DateTimeSeconds(row.CreatedAt)
 							</td>
 							<td class="px-4 py-2.5 font-medium text-foreground">@row.UserName</td>
 							<td class="px-4 py-2.5">

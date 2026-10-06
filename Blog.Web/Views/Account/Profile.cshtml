@@ -10,6 +10,15 @@
         <p class="text-sm text-muted-foreground">Manage your account information and preferences.</p>
     </div>
 
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <p class="text-sm text-foreground">
+            Two-factor sign-in is <strong>@(Model.TwoFactorEnabled ? "on" : "off")</strong> for your account.
+        </p>
+        <a href="/account/security" class="px-3 min-h-10 inline-flex items-center rounded-md border border-input text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+            @(Model.TwoFactorEnabled ? "Manage two-factor sign-in" : "Set up two-factor sign-in")
+        </a>
+    </div>
+
     @if (!string.IsNullOrEmpty(ViewBag.Error as string))
     {
         <p id="form-error" role="alert" class="mb-6 p-3 rounded-md border border-destructive text-destructive text-sm">@ViewBag.Error</p>

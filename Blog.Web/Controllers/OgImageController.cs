@@ -41,7 +41,8 @@ public class OgImageController : Controller
             return PhysicalFile(cachePath, "image/png");
 
         var post = await _posts.GetBySlugAsync(slug);
-        if (post == null) return NotFound();
+        // The social card shows the title: only for a post readers can see (not a draft or a post in review).
+        if (post == null || !Blog.Core.Services.EditorialWorkflow.IsLive(post.Status, post.ScheduledAt, DateTime.UtcNow)) return NotFound();
 
         var ownerId = await GetOwnerIdAsync();
         var siteSettings = await _settings.GetSettingsAsync(ownerId);

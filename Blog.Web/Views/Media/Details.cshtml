@@ -1,0 +1,67 @@
+@model Blog.Core.Domain.Media
+@using Blog.Web.Controllers
+@{
+    ViewData["Title"] = "Image Details";
+    Layout = "_AdminLayout";
+    var display = string.IsNullOrEmpty(Model.OriginalFileName) ? Model.FileName : Model.OriginalFileName;
+    var folder = ViewData["MediaFolder"] as string ?? "";
+    var q = ViewData["MediaQuery"] as string;
+    var pageNo = ViewData["MediaPage"] as int? ?? 1;
+    var backUrl = "/admin/media" + QueryString.Create(new Dictionary<string, string?>
+    {
+        ["folder"] = folder.Length > 0 ? folder : null,
+        ["q"] = string.IsNullOrWhiteSpace(q) ? null : q,
+        ["page"] = pageNo > 1 ? pageNo.ToString() : null,
+    }.Where(kv => kv.Value != null));
+    var altError = ViewData.ModelState["AltText"]?.Errors.FirstOrDefault()?.ErrorMessage;
+    var captionError = ViewData.ModelState["Caption"]?.Errors.FirstOrDefault()?.ErrorMessage;
+}
+
+<form method="post" action="/admin/media/details/@Model.Id" data-track-changes class="max-w-4xl mx-auto space-y-6">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="folder" value="@folder" />
+    <input type="hidden" name="q" value="@q" />
+    <input type="hidden" name="page" value="@pageNo" />
+
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+            <a href="@backUrl" class="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">← Media library</a>
+            <h1 class="text-2xl font-semibold text-foreground mt-1">Image Details</h1>
+            <p class="text-sm text-muted-foreground truncate" title="@display">@display</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span data-dirty-indicator hidden class="pill-warn text-xs px-2 py-0.5 rounded-full">Unsaved changes</span>
+            <a href="@backUrl" class="px-4 min-h-10 inline-flex items-center rounded-md border border-border text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Cancel</a>
+            <button type="submit" class="px-4 min-h-10 bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Save</button>
+        </div>
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2">
+        <div class="rounded-lg border border-border bg-muted overflow-hidden flex items-center justify-center">
+            <img src="@Model.Url" alt="@(Model.AltText ?? "")" class="max-w-full max-h-96 object-contain" />
+        </div>
+        <div class="space-y-5">
+            <div class="space-y-1">
+                <label for="altText" class="text-sm font-medium text-foreground">Alt text</label>
+                <textarea id="altText" name="altText" rows="3" maxlength="@MediaController.MaxAltLength"
+                          aria-describedby="altText-help@(altError != null ? " altText-error" : "")" aria-invalid="@(altError != null ? "true" : null)"
+                          class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">@Model.AltText</textarea>
+                @if (altError != null) { <p id="altText-error" class="text-xs text-destructive">@altError</p> }
+                <p id="altText-help" class="text-xs text-muted-foreground">What the image shows, for readers who cannot see it and for search engines. Leave empty only for a purely decorative image.</p>
+            </div>
+            <div class="space-y-1">
+                <label for="caption" class="text-sm font-medium text-foreground">Caption</label>
+                <textarea id="caption" name="caption" rows="2" maxlength="@MediaController.MaxCaptionLength"
+                          aria-describedby="caption-help@(captionError != null ? " caption-error" : "")" aria-invalid="@(captionError != null ? "true" : null)"
+                          class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">@Model.Caption</textarea>
+                @if (captionError != null) { <p id="caption-error" class="text-xs text-destructive">@captionError</p> }
+                <p id="caption-help" class="text-xs text-muted-foreground">Shown under the image in a gallery. Optional.</p>
+            </div>
+            <p class="text-xs text-muted-foreground">Galleries and images you place from now on use these. Images already in a post keep the text they were placed with; edit those in the post.</p>
+            <dl class="text-xs text-muted-foreground grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dt>Size</dt><dd>@(Model.Width is int w && Model.Height is int h ? $"{w} × {h} px" : "Unknown")</dd>
+                <dt>Address</dt><dd class="font-mono break-all">@Model.Url</dd>
+            </dl>
+        </div>
+    </div>
+</form>

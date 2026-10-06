@@ -115,6 +115,16 @@ public class AccountController : Controller
             return View();
         }
 
+        // Second factor (ADR-0021): a user who has turned it on proves it before any sign-in cookie exists.
+        // Until then they hold only a five-minute ticket, so a stolen password alone reaches nothing.
+        var twoFactor = HttpContext.RequestServices.GetRequiredService<TwoFactorService>();
+        if ((await _users.GetTwoFactorAsync(user.Id))?.IsEnabled == true)
+        {
+            Response.Cookies.Append(TwoFactorService.TicketCookie, twoFactor.IssueTicket(user.Id, Url.IsLocalUrl(returnUrl) ? returnUrl : null),
+                new CookieOptions { HttpOnly = true, Secure = Request.IsHttps, SameSite = SameSiteMode.Lax, Path = "/account/two-factor", MaxAge = TwoFactorService.TicketLifetime });
+            return Redirect("/account/two-factor");
+        }
+
         await SignInUser(user);
         await _audit.LogAsync(AuditActions.AuthLoggedIn, "Auth",
             user.Id.ToString(), user.DisplayName ?? user.Email,
@@ -521,29 +531,8 @@ public class AccountController : Controller
         }
     }
 
-    private async Task SignInUser(User user)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.DisplayName ?? user.Email),
-            new(ClaimTypes.Role, user.Role ?? "Author")
-        };
-
-        // Load RBAC permissions from the database and add as claims
-        var permissions = await _roles.GetPermissionNamesForUserAsync(user.Id);
-        foreach (var permission in permissions)
-        {
-            claims.Add(new Claim("Permission", permission));
-        }
-        
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal,
-            new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7) });
-    }
+    private Task SignInUser(User user) =>
+        HttpContext.RequestServices.GetRequiredService<UserSignInService>().SignInAsync(HttpContext, user);
 
     private static string HashPassword(string password)
     {

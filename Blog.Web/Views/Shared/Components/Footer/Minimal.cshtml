@@ -36,10 +36,11 @@
             </div>
         </div>
     </div>
+    <partial name="_FooterMenu" model="(IReadOnlyList<Blog.Core.Domain.NavLink>?)ViewBag.FooterLinks" />
     @* Copyright — thin hairline above *@
     <div class="h-px mx-6" style="background: var(--border);"></div>
     <div class="container xl:max-w-6xl mx-auto px-6 py-5 flex items-center justify-between text-xs" style="color: var(--muted-foreground);">
-        <span>&copy; @DateTime.Now.Year @siteName</span>
+        <span>&copy; @Dates.Year @siteName</span>
         <a href="/" class="hover:opacity-50 transition-opacity uppercase tracking-[0.15em]">Home</a>
     </div>
 </footer>

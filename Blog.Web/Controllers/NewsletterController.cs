@@ -1,6 +1,7 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Web.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers;
@@ -14,11 +15,13 @@ public class NewsletterController : Controller
     private readonly ITenantContext _tenantContext;
     private readonly IUserRepository _users;
     private readonly ReCaptchaService _recaptcha;
+    private readonly IAntiforgery _antiforgery;
 
     public NewsletterController(IMemberRepository members, IEmailService email,
         ISettingRepository settings, ITenantContext tenantContext, IUserRepository users,
-        ReCaptchaService recaptcha)
+        ReCaptchaService recaptcha, IAntiforgery antiforgery)
     {
+        _antiforgery = antiforgery;
         _members = members;
         _email = email;
         _settings = settings;
@@ -27,26 +30,46 @@ public class NewsletterController : Controller
         _recaptcha = recaptcha;
     }
 
+    /// <summary>
+    /// The sign-up form's anti-forgery token, fetched by its script when the reader presses Subscribe.
+    /// The form is rendered without one, so the home page and posts carry no cookie and no
+    /// <c>no-store</c>, and a CDN can cache them. This response is never cached (the antiforgery
+    /// service marks it <c>no-store</c>).
+    /// </summary>
+    [HttpGet("token")]
+    public IActionResult Token()
+    {
+        Response.Headers["X-Robots-Tag"] = "noindex";
+        return Json(new { token = _antiforgery.GetAndStoreTokens(HttpContext).RequestToken });
+    }
+
+    // The anti-forgery check is made here rather than by [ValidateAntiForgeryToken], so that a form
+    // posted without a token (no JavaScript, or a page served from a cache) gets a page to finish on
+    // instead of a 400. Without a valid token nothing is written.
     [HttpPost("subscribe")]
-    [ValidateAntiForgeryToken]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Subscribe(string email, string? name)
     {
         email = email?.Trim().ToLowerInvariant() ?? string.Empty;
-        var referer = Request.Headers.Referer.ToString() is { Length: > 0 } rf ? rf : "/";
         var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
+
+        if (!await _antiforgery.IsRequestValidAsync(HttpContext))
+        {
+            if (isAjax)
+                return BadRequest(new { success = false, message = "The sign-up form has expired. Reload the page and try again." });
+            return View("Subscribe", new NewsletterSubscribeViewModel(email, name?.Trim(), null, false));
+        }
 
         IActionResult Fail(string msg)
         {
             if (isAjax) return Json(new { success = false, message = msg });
-            TempData["NewsletterError"] = msg;
-            return Redirect(referer);
+            return View("Subscribe", new NewsletterSubscribeViewModel(email, name?.Trim(), msg, false));
         }
 
         IActionResult Ok(string msg)
         {
             if (isAjax) return Json(new { success = true, message = msg });
-            TempData["NewsletterMessage"] = msg;
-            return Redirect(referer);
+            return View("Subscribe", new NewsletterSubscribeViewModel(email, name?.Trim(), msg, true));
         }
 
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
@@ -108,15 +131,37 @@ public class NewsletterController : Controller
         return View("NewsletterResult", new NewsletterResultViewModel($"You're confirmed! Welcome to {siteName}.", true));
     }
 
+    /// <summary>
+    /// The link in every newsletter and welcome email. It only asks: mail systems open links to scan them, and a
+    /// GET that unsubscribed would remove people who never clicked. The button posts to the action below.
+    /// </summary>
     [HttpGet("unsubscribe/{token}")]
     public async Task<IActionResult> Unsubscribe(string token)
     {
         var member = await _members.GetByUnsubscribeTokenAsync(token);
         if (member == null)
-            return View("NewsletterResult", new NewsletterResultViewModel("Invalid unsubscribe link.", false));
+            return View("NewsletterResult", new NewsletterResultViewModel("This unsubscribe link is not valid. It may already have been used to leave and rejoin.", false));
+        if (member.Status == "unsubscribed")
+            return View("NewsletterResult", new NewsletterResultViewModel("You are already unsubscribed. You will not get any more emails.", true));
+        Response.Headers["X-Robots-Tag"] = "noindex";
+        return View("Unsubscribe", new NewsletterUnsubscribeViewModel(token, member.Email));
+    }
 
-        await _members.UnsubscribeAsync(member.Id);
-        return View("NewsletterResult", new NewsletterResultViewModel("You've been unsubscribed. Sorry to see you go!", true));
+    /// <summary>
+    /// Unsubscribes. Also the RFC 8058 one-click target of the List-Unsubscribe-Post header, which mail providers
+    /// call without cookies, so there is no anti-forgery token: the unguessable token in the address is the proof.
+    /// </summary>
+    [HttpPost("unsubscribe/{token}")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> UnsubscribeConfirmed(string token)
+    {
+        var member = await _members.GetByUnsubscribeTokenAsync(token);
+        var oneClick = Request.HasFormContentType && Request.Form["List-Unsubscribe"] == "One-Click";
+        if (member == null)
+            return oneClick ? NotFound() : View("NewsletterResult", new NewsletterResultViewModel("This unsubscribe link is not valid.", false));
+        if (member.Status != "unsubscribed") await _members.UnsubscribeAsync(member.Id);
+        if (oneClick) return Content("Unsubscribed.", "text/plain");
+        return View("NewsletterResult", new NewsletterResultViewModel("You are unsubscribed. You will not get any more emails.", true));
     }
 
     private async Task<Guid> GetOwnerIdAsync()
@@ -129,7 +174,7 @@ public class NewsletterController : Controller
 
     private static string BuildConfirmEmail(string siteName, string confirmUrl, string? name)
     {
-        var greeting = string.IsNullOrEmpty(name) ? "Hi there" : $"Hi {name}";
+        var greeting = string.IsNullOrEmpty(name) ? "Hi there" : $"Hi {System.Net.WebUtility.HtmlEncode(name)}";   // the name is what the reader typed
         return $"""
             <!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;color:#111;line-height:1.6">
             <h2 style="margin-bottom:8px">{System.Net.WebUtility.HtmlEncode(siteName)}</h2>
@@ -139,7 +184,7 @@ public class NewsletterController : Controller
               <a href="{confirmUrl}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">Confirm Subscription</a>
             </p>
             <p style="font-size:13px;color:#666">Or paste this link into your browser:<br><a href="{confirmUrl}">{confirmUrl}</a></p>
-            <p style="font-size:12px;color:#999;margin-top:40px">If you didn't sign up, you can safely ignore this email.</p>
+            <p style="font-size:12px;color:#6b6b6b;margin-top:40px">If you didn't sign up, you can safely ignore this email.</p>
             </body></html>
             """;
     }
@@ -150,9 +195,9 @@ public class NewsletterController : Controller
             <!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;color:#111;line-height:1.6">
             <h2 style="margin-bottom:8px">Welcome to {System.Net.WebUtility.HtmlEncode(siteName)}!</h2>
             <p>Hi {System.Net.WebUtility.HtmlEncode(name)},</p>
-            <p>You're now subscribed. We'll notify you whenever new articles are published.</p>
-            <p style="font-size:12px;color:#999;margin-top:40px">
-              Don't want to hear from us? <a href="{unsubUrl}" style="color:#999">Unsubscribe</a>
+            <p>You're now subscribed. You'll get our newsletter whenever we send one.</p>
+            <p style="font-size:12px;color:#6b6b6b;margin-top:40px">
+              Don't want to hear from us? <a href="{unsubUrl}" style="color:#6b6b6b">Unsubscribe</a>
             </p>
             </body></html>
             """;
@@ -160,3 +205,9 @@ public class NewsletterController : Controller
 }
 
 public record NewsletterResultViewModel(string Message, bool Success);
+
+/// <summary>The sign-up page for a form posted without JavaScript: a confirm step, an error to fix, or the result.</summary>
+/// <summary>The unsubscribe confirmation page.</summary>
+public record NewsletterUnsubscribeViewModel(string Token, string Email);
+
+public record NewsletterSubscribeViewModel(string Email, string? Name, string? Message, bool Success);

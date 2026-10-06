@@ -9,6 +9,11 @@ public class Post
     
     public string? Html { get; set; }
     public string? Plaintext { get; set; }
+    /// <summary>Markdown source when <see cref="EditorMode"/> is "markdown"; <see cref="Html"/> is rendered from it on save (ADR-0022).</summary>
+    public string? Markdown { get; set; }
+    /// <summary>"rich" (the visual editor, the default) or "markdown". See <see cref="Blog.Core.Services.EditorModes"/>.</summary>
+    public string EditorMode { get; set; } = Blog.Core.Services.EditorModes.Rich;
+    public bool IsMarkdown => EditorMode == Blog.Core.Services.EditorModes.Markdown;
     public string? Type { get; set; } = "post";
     public string? Visibility { get; set; } = "public";
     public string? FeatureImage { get; set; }
@@ -37,6 +42,10 @@ public class Post
     public DateTime? LastVerifiedAt { get; set; }
     public DateTime? NextReviewAt { get; set; }
     public DateTime? ScheduledAt { get; set; }
+    /// <summary>The reviewer's note when a post is returned (NeedsChanges); cleared when it is resubmitted or approved.</summary>
+    public string? ReviewNote { get; set; }
+    /// <summary>When the post was last submitted for review; orders the review queue.</summary>
+    public DateTime? ReviewRequestedAt { get; set; }
     public int ViewCount { get; set; }
     
     public bool AllowComments { get; set; } = true;
@@ -70,6 +79,9 @@ public class Post
             : AnswerCapsule.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 
     public string? KeyFactsJson { get; set; }
+
+    /// <summary>Custom field values, a flat { key: value } JSON object (ADR-0025). Read through CustomFields.</summary>
+    public string? CustomFieldsJson { get; set; }
 
     [System.Text.Json.Serialization.JsonIgnore]
     public List<KeyFact> KeyFacts
@@ -140,6 +152,12 @@ public enum PostStatus
     Draft,
     Published,
     Scheduled,
+    // Editorial workflow (v1.0.8). Appended so existing values keep their numbers. Readers never see
+    // either: every public query lists Published / Scheduled explicitly (see EditorialWorkflow.IsLive).
+    /// <summary>Submitted by its author; waiting for an Editor or Admin.</summary>
+    InReview,
+    /// <summary>Returned by an Editor or Admin with a note (<see cref="Post.ReviewNote"/>).</summary>
+    NeedsChanges,
 }
 
 public record FaqItem(string Question, string Answer);

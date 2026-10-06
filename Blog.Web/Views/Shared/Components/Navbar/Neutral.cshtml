@@ -1,6 +1,6 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
-    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
+    var sortedPages = Model.Links;
 }
 
 @* NEUTRAL — Newspaper Masthead: thin metadata strip · large centered name · slim icon/nav bar *@
@@ -10,7 +10,7 @@
     <div class="border-b border-dashed" style="border-color: var(--border);">
         <div class="container xl:max-w-6xl mx-auto px-4 flex items-center justify-between py-1.5">
             <span class="text-[10px] uppercase tracking-[0.2em] font-medium" style="color: var(--muted-foreground);">
-                @DateTime.Now.ToString("dddd, MMMM d, yyyy")
+                @Dates.Today()
             </span>
             <div class="flex items-center gap-3">
                 @if (User.Identity != null && User.Identity.IsAuthenticated)
@@ -48,9 +48,9 @@
             @* Left: page links *@
             <div class="flex items-center gap-0 text-xs uppercase tracking-widest hidden md:flex">
                 <a href="/" class="px-3 py-1 hover:opacity-60 transition-opacity border-r border-dashed" style="border-color: var(--border);">Home</a>
-                @foreach (var navPage in sortedPages.Take(4))
+                @foreach (var navPage in sortedPages.Where(l => l.Depth == 0).Take(4))
                 {
-                    <a href="/@navPage.Slug" class="px-3 py-1 hover:opacity-60 transition-opacity border-r border-dashed" style="border-color: var(--border);">@navPage.Title</a>
+                    <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)" class="px-3 py-1 hover:opacity-60 transition-opacity border-r border-dashed" style="border-color: var(--border);">@if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title</a>
                 }
             </div>
 
@@ -82,8 +82,8 @@
                         </a>
                         @foreach (var p in sortedPages)
                         {
-                            <a href="/@p.Slug" class="flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider hover:opacity-60 border-b border-dashed" style="border-color: var(--border);">
-                                <i class="bi bi-dash text-xs" style="color: var(--muted-foreground);"></i> @p.Title
+                            <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider hover:opacity-60 border-b border-dashed" style="border-color: var(--border);">
+                                <i class="bi bi-dash text-xs" style="color: var(--muted-foreground);"></i> @if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title
                             </a>
                         }
                     </div>
@@ -99,7 +99,7 @@
             <a href="/" class="py-2.5 text-xs uppercase tracking-widest border-b border-dashed hover:opacity-60" style="border-color: var(--border);">Home</a>
             @foreach (var p in sortedPages)
             {
-                <a href="/@p.Slug" class="py-2.5 text-xs uppercase tracking-widest border-b border-dashed hover:opacity-60" style="border-color: var(--border);">@p.Title</a>
+                <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="py-2.5 text-xs uppercase tracking-widest border-b border-dashed hover:opacity-60" style="border-color: var(--border);">@if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title</a>
             }
         </div>
     </div>

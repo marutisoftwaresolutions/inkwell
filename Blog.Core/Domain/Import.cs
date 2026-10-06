@@ -82,6 +82,8 @@ public class ImportOptions
     public string SlugConflict { get; set; } = "Suffix";
     /// <summary>When set, every imported post is attributed to this user (authors not imported as new users).</summary>
     public Guid? DefaultAuthorId { get; set; }
+    /// <summary>Ghost posts written in Markdown stay Markdown posts (ADR-0022). Off by default: they import as HTML.</summary>
+    public bool KeepMarkdown { get; set; }
 }
 
 /// <summary>Lightweight preview of what an export contains (shown before the import runs).</summary>
@@ -97,6 +99,8 @@ public class ImportManifest
     public int Authors { get; set; }
     public int Comments { get; set; }
     public int Images { get; set; }
+    /// <summary>Posts whose source is Markdown (Ghost); the wizard offers to keep them as Markdown.</summary>
+    public int MarkdownPosts { get; set; }
     public string? DetectedFormat { get; set; }
     public List<string> Warnings { get; set; } = new();
 }
@@ -109,6 +113,8 @@ public class ParsedPost
     public string? Slug { get; set; }
     public string? Html { get; set; }
     public string? Excerpt { get; set; }
+    /// <summary>Markdown source, when the export has one (Ghost Markdown cards; ADR-0022). Used only with <see cref="ImportOptions.KeepMarkdown"/>.</summary>
+    public string? Markdown { get; set; }
     /// <summary>WordPress status: publish / draft / pending / private / future.</summary>
     public string Status { get; set; } = "publish";
     public DateTime? PublishedAt { get; set; }

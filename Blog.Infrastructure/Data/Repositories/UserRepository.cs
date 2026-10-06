@@ -138,4 +138,56 @@ public class UserRepository : IUserRepository
         await conn.ExecuteAsync("DELETE FROM RolesUsers WHERE UserId = @Id", new { Id = id });
         await conn.ExecuteAsync("DELETE FROM Users WHERE Id = @Id", new { Id = id });
     }
+
+    // ── Two-factor sign-in (ADR-0021) ─────────────────────────────────────────────
+
+    public async Task<UserTwoFactor?> GetTwoFactorAsync(Guid userId)
+    {
+        using var conn = _ctx.CreateConnection();
+        var row = await conn.QueryFirstOrDefaultAsync<(Guid Id, string? Secret, DateTime? EnabledAt, string? Hashes, long? LastStep)>(
+            "SELECT Id, TwoFactorSecretProtected, TwoFactorEnabledAt, TwoFactorRecoveryHashes, TwoFactorLastStep FROM Users WHERE Id = @userId",
+            new { userId });
+        if (row.Id == Guid.Empty) return null;
+        IReadOnlyList<string> hashes = Array.Empty<string>();
+        if (!string.IsNullOrWhiteSpace(row.Hashes))
+        {
+            try { hashes = System.Text.Json.JsonSerializer.Deserialize<List<string>>(row.Hashes) ?? new(); }
+            catch (System.Text.Json.JsonException) { hashes = Array.Empty<string>(); }
+        }
+        return new UserTwoFactor(row.Id, row.Secret, row.EnabledAt, hashes, row.LastStep);
+    }
+
+    public async Task EnableTwoFactorAsync(Guid userId, string secretProtected, IReadOnlyList<string> recoveryHashes, long firstStep, DateTime enabledAtUtc)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync(@"
+            UPDATE Users SET TwoFactorSecretProtected = @secretProtected, TwoFactorEnabledAt = @enabledAtUtc,
+                             TwoFactorRecoveryHashes = @hashes, TwoFactorLastStep = @firstStep, UpdatedAt = @enabledAtUtc
+            WHERE Id = @userId",
+            new { userId, secretProtected, enabledAtUtc, firstStep, hashes = System.Text.Json.JsonSerializer.Serialize(recoveryHashes) });
+    }
+
+    public async Task DisableTwoFactorAsync(Guid userId)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync(@"
+            UPDATE Users SET TwoFactorSecretProtected = NULL, TwoFactorEnabledAt = NULL,
+                             TwoFactorRecoveryHashes = NULL, TwoFactorLastStep = NULL, UpdatedAt = @now
+            WHERE Id = @userId", new { userId, now = DateTime.UtcNow });
+    }
+
+    public async Task SaveRecoveryHashesAsync(Guid userId, IReadOnlyList<string> recoveryHashes)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Users SET TwoFactorRecoveryHashes = @hashes WHERE Id = @userId",
+            new { userId, hashes = System.Text.Json.JsonSerializer.Serialize(recoveryHashes) });
+    }
+
+    public async Task<bool> TryAdvanceTwoFactorStepAsync(Guid userId, long step)
+    {
+        using var conn = _ctx.CreateConnection();
+        return await conn.ExecuteAsync(@"
+            UPDATE Users SET TwoFactorLastStep = @step
+            WHERE Id = @userId AND (TwoFactorLastStep IS NULL OR TwoFactorLastStep < @step)", new { userId, step }) == 1;
+    }
 }

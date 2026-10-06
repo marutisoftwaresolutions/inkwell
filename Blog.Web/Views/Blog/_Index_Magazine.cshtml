@@ -100,7 +100,7 @@
                         <h2 style="font-family:var(--serif);font-weight:500;font-size:26px;line-height:1.18;letter-spacing:-0.015em;color:var(--fg);margin:0 0 8px;">
                             <a href="/@post.Slug" style="color:inherit;text-decoration:none;">@post.Title</a>
                         </h2>
-                        <div class="byline">by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em> · @post.PublishedAt?.ToString("d MMMM yyyy")</div>
+                        <div class="byline">by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em> · @Dates.Long(post.PublishedAt)</div>
                     </article>
                 }
             </div>
@@ -120,7 +120,7 @@ else
     {
         <section class="ink-masthead">
             <div class="eyebrow" style="margin-bottom:14px;">
-                @(ViewBag.SiteName ?? "Inkwell") · @DateTime.Now.ToString("MMMM yyyy")
+                @(ViewBag.SiteName ?? "Inkwell") · @Dates.Today(Blog.Core.Services.DateStyle.MonthYear)
             </div>
             <h1 class="display" style="margin:0;max-width:14ch;">
                 @(ViewBag.Tagline ?? "Self-hosted blogging, beautifully crafted.")
@@ -192,7 +192,7 @@ else
                 }
                 <div class="byline">
                     by <em>@(string.IsNullOrEmpty(heroPost.AuthorName) ? "The editors" : heroPost.AuthorName)</em>
-                    · @heroPost.PublishedAt?.ToString("d MMMM yyyy")
+                    · @Dates.Long(heroPost.PublishedAt)
                     @{
                         var heroMinutes = Math.Max(1, (heroPost.Plaintext?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0) / 238);
                     }
@@ -226,7 +226,7 @@ else
                 }
                 <div class="byline">
                     by <em>@(string.IsNullOrEmpty(secondaryPost.AuthorName) ? "The editors" : secondaryPost.AuthorName)</em>
-                    · @secondaryPost.PublishedAt?.ToString("d MMMM yyyy")
+                    · @Dates.Long(secondaryPost.PublishedAt)
                 </div>
             </aside>
 
@@ -260,7 +260,7 @@ else
                         </h4>
                         <div class="byline">
                             by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em>
-                            · @post.PublishedAt?.ToString("MMM d")
+                            · @Dates.MonthDay(post.PublishedAt)
                         </div>
                     </article>
                 }
@@ -289,7 +289,7 @@ else
                         <h4 class="ink-card-title"><a href="/@post.Slug">@post.Title</a></h4>
                         <div class="byline">
                             by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em>
-                            · @post.PublishedAt?.ToString("MMM d")
+                            · @Dates.MonthDay(post.PublishedAt)
                         </div>
                     </article>
                 }
@@ -318,7 +318,7 @@ else
                             </h3>
                             <div class="byline">
                                 by <em>@(string.IsNullOrEmpty(post.AuthorName) ? "The editors" : post.AuthorName)</em>
-                                · @post.PublishedAt?.ToString("d MMMM yyyy") · @minRead min read
+                                · @Dates.Long(post.PublishedAt) · @minRead min read
                             </div>
                         </div>
                         @if (!string.IsNullOrEmpty(post.FeatureImage))
@@ -401,7 +401,7 @@ else
         </div>
     </div>
     <div class="ink-footer-bottom">
-        <span>© @(ViewBag.SiteName ?? "Inkwell") @DateTime.Now.Year · Self-hosted, open-source.</span>
+        <span>© @(ViewBag.SiteName ?? "Inkwell") @Dates.Year · Self-hosted, open-source.</span>
         <span style="font-family:var(--serif);font-style:italic;">Made with care.</span>
     </div>
 </footer>

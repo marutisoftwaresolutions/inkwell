@@ -41,10 +41,11 @@
             </div>
         </div>
     </div>
+    <partial name="_FooterMenu" model="(IReadOnlyList<Blog.Core.Domain.NavLink>?)ViewBag.FooterLinks" />
     @* Copyright *@
     <div class="border-t py-4 text-xs" style="border-color: var(--border); color: var(--muted-foreground);">
         <div class="container xl:max-w-6xl mx-auto px-4 flex items-center justify-between">
-            <span>Copyright &copy; @DateTime.Now.Year @siteName. All rights reserved.</span>
+            <span>Copyright &copy; @Dates.Year @siteName. All rights reserved.</span>
             <a href="/" class="hover:opacity-60 transition-opacity">Home</a>
         </div>
     </div>

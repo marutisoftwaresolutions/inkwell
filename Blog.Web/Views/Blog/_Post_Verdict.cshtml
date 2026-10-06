@@ -65,8 +65,8 @@ else
 
                     @if (Model.PublishedAt.HasValue)
                     {
-                        <time datetime="@Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt.Value, (string?)ViewBag.DisplayTimeZone).ToString("yyyy-MM-dd")">
-                            @Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt.Value, (string?)ViewBag.DisplayTimeZone).ToString("d MMM yyyy")
+                        <time datetime="@Dates.Iso(Model.PublishedAt)">
+                            @Dates.Medium(Model.PublishedAt)
                         </time>
                     }
                     <span class="vd-reading-time">@Blog.Core.Services.TextHelper.ReadingMinutes(Model.Plaintext, Model.Html) min read</span>
@@ -85,7 +85,7 @@ else
                     {
                         <span class="vd-trust-badge">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            Verified @Model.LastVerifiedAt.Value.ToString("d MMM yyyy")
+                            Verified @Dates.CalendarDate(Model.LastVerifiedAt, Blog.Core.Services.DateStyle.Medium)
                         </span>
                     }
                 </div>
@@ -121,6 +121,7 @@ else
             <div style="max-width:75ch;">
                 <partial name="_AnswerCapsule" model="Model" />
                 <partial name="_KeyFacts" model="Model" />
+                <partial name="_CustomFieldDetails" />
                 <partial name="_HowTo" model="Model" />
             </div>
 

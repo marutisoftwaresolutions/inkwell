@@ -63,6 +63,15 @@ public class CrawlerVisitMiddleware
         TrackCrawler(context, context.Response.StatusCode);
     }
 
+    /// <summary>The query string without its "?", capped at the column size; null when there is none.</summary>
+    public static string? QueryOf(HttpContext context)
+    {
+        var q = context.Request.QueryString.Value;
+        if (string.IsNullOrEmpty(q) || q == "?") return null;
+        q = q[0] == '?' ? q[1..] : q;
+        return q.Length > 512 ? q[..512] : q;
+    }
+
     public static bool IsErrorReExecution(HttpContext context) =>
         context.Features.Get<IStatusCodeReExecuteFeature>() is not null
         || context.Features.Get<IExceptionHandlerFeature>() is not null;
@@ -92,6 +101,7 @@ public class CrawlerVisitMiddleware
                 Operator   = identity.Operator,
                 IsAi       = identity.IsAi,
                 Path       = path.Length > 1024 ? path[..1024] : path,
+                Query      = QueryOf(context),
                 StatusCode = status,
                 UserAgent  = ua.Length > 512 ? ua[..512] : ua,
                 VisitedAt  = DateTime.UtcNow

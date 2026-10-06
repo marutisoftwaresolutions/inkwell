@@ -19,12 +19,17 @@ public class AuthApiController : ControllerBase
     private readonly AuthService _auth;
     private readonly IUserRepository _users;
     private readonly IConfiguration _config;
+    private readonly Blog.Web.Services.TwoFactorService _twoFactor;
+    private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
 
-    public AuthApiController(AuthService auth, IUserRepository users, IConfiguration config)
+    public AuthApiController(AuthService auth, IUserRepository users, IConfiguration config,
+        Blog.Web.Services.TwoFactorService twoFactor, Blog.Web.Services.Security.IpFirewallService firewall)
     {
         _auth = auth;
         _users = users;
         _config = config;
+        _twoFactor = twoFactor;
+        _firewall = firewall;
     }
 
     [HttpPost("auth/login")]
@@ -32,7 +37,27 @@ public class AuthApiController : ControllerBase
     {
         var (user, error) = await _auth.ValidateLoginAsync(req.Email, req.Password);
         if (user == null)
+        {
+            await _firewall.RegisterFailedLoginAsync(HttpContext);
             return Unauthorized(ApiError(401, error ?? "Invalid credentials."));
+        }
+
+        // Two-factor (ADR-0021): a token is a sign-in too, so it needs the same second step as the Desk.
+        // App codes only; recovery codes are for getting back into the Desk after losing a phone.
+        if ((await _users.GetTwoFactorAsync(user.Id))?.IsEnabled == true)
+        {
+            if (string.IsNullOrWhiteSpace(req.Code))
+                return Unauthorized(ApiError(401, "Two-factor code required. Send the 6-digit code from your authenticator app as \"code\"."));
+            if (await _twoFactor.VerifyAsync(user.Id, req.Code, allowRecoveryCode: false) != Blog.Web.Services.TwoFactorCheck.Ok)
+            {
+                await _firewall.RegisterFailedLoginAsync(HttpContext);
+                return Unauthorized(ApiError(401, "Invalid two-factor code."));
+            }
+        }
+        else if (await _twoFactor.MustEnrolAsync(user.Id, user.Role))
+        {
+            return StatusCode(403, ApiError(403, "Two-factor sign-in is required for your role. Set it up in the Desk first."));
+        }
 
         var accessToken = GenerateAccessToken(user);
 
@@ -76,4 +101,4 @@ public class AuthApiController : ControllerBase
         new { statusCode = code, error, traceId = System.Diagnostics.Activity.Current?.Id };
 }
 
-public record LoginRequest(string Email, string Password);
+public record LoginRequest(string Email, string Password, string? Code = null);

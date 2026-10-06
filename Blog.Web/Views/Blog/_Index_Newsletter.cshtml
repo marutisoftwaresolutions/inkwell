@@ -63,8 +63,8 @@
                 <article style="display:grid;grid-template-columns:auto 1fr auto;gap:var(--sp-6);padding:var(--sp-8) 0;border-bottom:1px solid var(--border);align-items:start;">
                     @* Issue date *@
                     <div style="width:72px;flex-shrink:0;text-align:center;padding:var(--sp-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-1);">
-                        <div style="font-family:var(--sans);font-size:18px;font-weight:700;line-height:1;color:var(--fg);">@post.PublishedAt?.ToString("dd")</div>
-                        <div style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);margin-top:2px;">@post.PublishedAt?.ToString("MMM yyyy")</div>
+                        <div style="font-family:var(--sans);font-size:18px;font-weight:700;line-height:1;color:var(--fg);">@Dates.Day(post.PublishedAt)</div>
+                        <div style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);margin-top:2px;">@Dates.ShortMonthYear(post.PublishedAt)</div>
                     </div>
                     @* Content *@
                     <div style="min-width:0;">

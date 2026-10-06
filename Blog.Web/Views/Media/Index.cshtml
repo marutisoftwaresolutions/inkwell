@@ -141,6 +141,12 @@
                             <p class="text-white text-xs truncate" title="@display">@display</p>
                             <p class="text-white/70 text-[11px] mb-2">@(used > 0 ? $"Used in {used} {(used == 1 ? "item" : "items")}" : "Not in use")</p>
                             <div class="flex items-center gap-2">
+                                @if (isImage)
+                                {
+                                    <a href="/admin/media/details/@item.Id@(QueryString.Create(new Dictionary<string, string?> { ["folder"] = string.IsNullOrEmpty(folder) ? null : folder, ["q"] = string.IsNullOrEmpty(q) ? null : q, ["page"] = page > 1 ? page.ToString() : null }.Where(kv => kv.Value != null)))"
+                                       aria-label="@(string.IsNullOrEmpty(item.AltText) ? "Add alt text for" : "Details for") @display" title="Alt text and caption"
+                                       class="inline-flex items-center min-h-10 px-2 bg-white/20 hover:bg-white/30 text-white text-xs rounded backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">@(string.IsNullOrEmpty(item.AltText) ? "Add alt" : "Details")</a>
+                                }
                                 <button type="button" data-copy-url="@item.Url" aria-label="Copy URL of @display"
                                         class="flex-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded backdrop-blur-sm transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
                                     Copy URL

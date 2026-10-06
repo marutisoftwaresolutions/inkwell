@@ -1,6 +1,6 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
-    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
+    var sortedPages = Model.Links;
 }
 
 @* MAGAZINE — Full-bleed bold header: inverted primary background, large site brand, icon cluster right *@
@@ -57,8 +57,8 @@
                             </a>
                             @foreach (var p in sortedPages)
                             {
-                                <a href="/@p.Slug" class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-70 border-b" style="border-color: var(--border); color: var(--foreground);">
-                                    <i class="bi bi-arrow-right-short text-base" style="color: var(--primary);"></i> @p.Title
+                                <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-70 border-b" style="border-color: var(--border); color: var(--foreground);">
+                                    <i class="bi bi-arrow-right-short text-base" style="color: var(--primary);"></i> @if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title
                                 </a>
                             }
                         </div>
@@ -90,7 +90,7 @@
             <a href="/" class="py-2.5 text-sm font-semibold border-b hover:opacity-60" style="border-color: color-mix(in srgb, var(--primary-foreground) 20%, transparent); color: var(--primary-foreground);">Home</a>
             @foreach (var p in sortedPages)
             {
-                <a href="/@p.Slug" class="py-2.5 text-sm border-b hover:opacity-60" style="border-color: color-mix(in srgb, var(--primary-foreground) 20%, transparent); color: var(--primary-foreground);">@p.Title</a>
+                <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="py-2.5 text-sm border-b hover:opacity-60" style="border-color: color-mix(in srgb, var(--primary-foreground) 20%, transparent); color: var(--primary-foreground);">@if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title</a>
             }
             @if (User.Identity != null && User.Identity.IsAuthenticated)
             {

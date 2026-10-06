@@ -28,11 +28,27 @@ public interface IPostRepository
 {
     Task<PagedResult<Post>> GetPostsAsync(PostFilter filter);
     Task<Post?> GetByIdAsync(Guid id, Guid? authorId = null);
+
+    /// <summary>
+    /// Scheduled posts whose time arrived in the window (fromUtc, toUtc]. They go live on read, not
+    /// through a save, so this is how the webhook job notices them. Title, slug and dates only.
+    /// </summary>
+    Task<IReadOnlyList<Post>> GetScheduledReachedAsync(DateTime fromUtc, DateTime toUtc);
+
+    /// <summary>
+    /// Writes only the editorial-workflow fields: status, the reviewer's note, when review was requested
+    /// and (when publishing) the publish time if the post has none yet.
+    /// </summary>
+    Task SetWorkflowAsync(Guid id, PostStatus status, string? reviewNote, DateTime? reviewRequestedAt, DateTime? publishedAt);
+
+    /// <summary>Posts waiting for review, oldest submission first, with their author's name.</summary>
+    Task<IReadOnlyList<Post>> GetReviewQueueAsync(int take, Guid? authorId = null);
     Task<Post?> GetBySlugAsync(string slug, Guid? authorId = null);
     Task<Guid> CreateAsync(Post post);
     Task UpdateAsync(Post post);
     Task DeleteAsync(Guid id, Guid? authorId = null);
-    Task IncrementViewCountAsync(Guid id);
+    /// <summary>Adds beacon-counted views to published posts (ADR-0014): one statement per post in the batch, on one connection.</summary>
+    Task<int> AddViewCountsAsync(IReadOnlyList<Blog.Core.Services.PostViewCount> counts);
     Task<bool> SlugExistsAsync(string slug, Guid? excludeId = null);
     Task<int> GetTotalCountAsync(PostStatus? status = null, Guid? authorId = null);
     Task<int> GetViewsTodayAsync(Guid? authorId = null);

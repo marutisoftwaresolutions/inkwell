@@ -3,13 +3,25 @@
     Layout = "_AdminLayout";
     ViewData["Title"] = $"Edit: {Model.Title}";
     var formAction = $"/admin/posts/edit/{Model.Id}";
+    // Editorial workflow: who may publish decides what the main button does; the server enforces it too.
+    var canPublish = User.HasClaim("Permission", "posts.publish");
+    var publishLabel = canPublish ? (Model.Status == Blog.Core.Domain.PostStatus.Published ? "Update" : "Publish") : "Submit for review";
+    var modalTitle = canPublish ? "Ready to publish?" : "Submit for review?";
+    var modalDesc = canPublish ? "This post becomes visible to every visitor."
+        : Model.Status == Blog.Core.Domain.PostStatus.Published ? "This post is live. Submitting changes takes it off the site until an editor approves them."
+        : "An editor will read it, then publish it or send it back with notes.";
+    var modalConfirm = canPublish ? "Confirm Publish" : "Submit for review";
 }
 
+@* Editorial workflow: review banner and actions (their own forms, outside the tracked editor form). Above the
+   fixed-height editor, so opening "Request changes" on a phone does not squeeze the canvas. *@
+<partial name="_ReviewPanel" model="Model" />
 <div class="h-[calc(100vh-8rem)] flex flex-col">
     <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" value="@Model.Html" />
         <input type="hidden" name="Plaintext" id="postPlaintext" value="@Model.Plaintext" />
+        <input type="hidden" name="EditorMode" value="@Model.EditorMode" />
 
         <!-- Toolbar -->
         <div class="flex items-center justify-between mb-4 gap-4">
@@ -21,11 +33,14 @@
                 <span id="autosaveStatus" class="text-xs text-muted-foreground"></span> <span data-dirty-indicator hidden>Unsaved changes</span>
             </div>
             <div class="flex items-center gap-2">
+                <button type="submit" form="editorModeForm" data-editor-switch class="hidden md:inline-flex px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+                    @(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")
+                </button>
                 <button type="submit" name="submitAction" value="draft" class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">
                     Save Draft
                 </button>
                 <button type="button" id="publishBtn" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">
-                    @(Model.Status == Blog.Core.Domain.PostStatus.Published ? "Update" : "Publish")
+                    @publishLabel
                 </button>
                 <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-2 border border-input rounded-md">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -35,10 +50,11 @@
 
         <div class="flex-1 flex gap-0 overflow-hidden rounded-xl border border-border shadow-sm">
             <!-- LEFT: Component Palette -->
-            <div class="w-14 bg-card border-r border-border flex flex-col items-center py-3 gap-1 shrink-0 overflow-y-auto" id="componentPalette">
+            <div class="w-14 bg-card border-r border-border flex flex-col items-center py-3 gap-1 shrink-0 overflow-y-auto" id="componentPalette" hidden="@Model.IsMarkdown">
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading" aria-label="Heading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg></button>
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text" aria-label="Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image" aria-label="Image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="gallery" draggable="true" title="Gallery" aria-label="Gallery"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button" aria-label="Button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero" aria-label="Hero"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="10" y1="13" x2="14" y2="13"/></svg></button>
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text" aria-label="Image + Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="9" height="18" rx="1"/><line x1="14" y1="8" x2="22" y2="8"/><line x1="14" y1="12" x2="22" y2="12"/><line x1="14" y1="16" x2="20" y2="16"/></svg></button>
@@ -51,7 +67,11 @@
             <div class="flex-1 flex flex-col bg-card overflow-hidden">
                 <input type="text" name="Title" id="postTitle" value="@Model.Title" aria-label="Title" placeholder="Post Title" required
                        class="w-full px-6 py-4 text-3xl font-bold bg-transparent focus:outline-none placeholder:text-muted/50 border-b border-border" />
-                <div class="flex-1 overflow-y-auto bg-muted/20" id="canvasScroll">
+                @if (Model.IsMarkdown)
+                {
+                    <partial name="_MarkdownPane" model="Model" />
+                }
+                <div class="flex-1 overflow-y-auto bg-muted/20" id="canvasScroll" hidden="@Model.IsMarkdown">
                     <div class="max-w-3xl mx-auto py-8 px-6 min-h-full" id="canvas">
                         <div id="canvasEmpty" class="flex flex-col items-center justify-center py-20 text-center">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-muted-foreground/30 mb-4"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -69,6 +89,9 @@
                         <button type="button" data-settings-close onclick="toggleSettingsPanel(false)" aria-label="Close post settings" class="md:hidden h-8 w-8 inline-flex items-center justify-center rounded-md border border-input hover:bg-muted">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
+                    </div>
+                    <div class="md:hidden mb-4">
+                        <button type="submit" form="editorModeForm" data-editor-switch class="w-full min-h-10 px-3 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</button>
                     </div>
                     
                     <details class="group" data-desk-section="post-publishing" open>
@@ -292,6 +315,8 @@
                     </div>
                     </details>
 
+                    <partial name="_CustomFieldsPanel" />
+
                     <!-- SEO & Social settings -->
                     <details class="group border-t border-border" data-desk-section="post-seo">
                     <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
@@ -506,6 +531,7 @@
             </aside>
         </div>
     </form>
+    <partial name="_EditorModeForm" model="Model" />
 </div>
 
 <partial name="_MediaSelectorModal" />
@@ -539,8 +565,8 @@
 <!-- Publish Modal -->
 <div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
     <div class="bg-card w-full max-w-sm rounded-lg shadow-lg border border-border p-6 transform transition-all scale-100">
-        <h3 id="modalTitle" class="text-lg font-semibold mb-2">Ready to publish?</h3>
-        <p id="modalDesc" class="text-muted-foreground mb-6">This will make your post publicly visible to all visitors.</p>
+        <h3 id="modalTitle" class="text-lg font-semibold mb-2">@modalTitle</h3>
+        <p id="modalDesc" class="text-muted-foreground mb-6">@modalDesc</p>
         <div class="flex justify-end gap-3">
             <button type="button" onclick="document.getElementById('publishModal').classList.add('hidden')" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Cancel</button>
             <button type="button" id="modalConfirmBtn" onclick="confirmPublish()" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Confirm Publish</button>
@@ -584,6 +610,11 @@
 </style>
 
 @section Scripts {
+    <partial name="_EditorSwitchGuard" />
+    @if (Model.IsMarkdown)
+    {
+        <partial name="_MarkdownEditorScripts" />
+    }
     <script>
         window.categoriesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.Categories ?? new List<Blog.Core.Domain.Category>()));
         window.selectedCategoryIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.SelectedCategoryIds ?? new List<Guid>()));
@@ -650,6 +681,7 @@
             const C={
                 heading:()=>`<h2 contenteditable="true" style="font-size:1.8rem;font-weight:700;color:var(--foreground);">Your Heading Here</h2>`,
                 text:()=>`<p contenteditable="true" style="font-size:1rem;line-height:1.8;color:var(--foreground);">Click to edit this text block.</p>`,
+                gallery: () => InkwellGallery.pick(),
                 image:()=>`<div class="comp-image"><div class="img-placeholder" onclick="selectBlockImage(this)"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto .5rem;display:block;color:var(--muted-foreground)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="color:var(--muted-foreground);font-size:.85rem;">Click to select image</span></div></div>`,
                 button:()=>`<div class="comp-button"><a href="#" contenteditable="true">Click Me</a></div>`,
                 hero:()=>`<div class="comp-hero"><h2 contenteditable="true">Welcome</h2><p contenteditable="true">A brief description.</p><a href="#" contenteditable="true">Get Started</a></div>`,
@@ -662,6 +694,7 @@
                     return InkwellDialog.prompt({title:'Embed a video',body:'Paste a YouTube or Vimeo link. The player is embedded lazily and never blocks the page.',label:'Video URL',placeholder:'https://www.youtube.com/watch?v=…',action:'Embed video',validate:v=>v.trim()&&!embed(v.trim())?'That is not a YouTube or Vimeo URL.':null,valid:'Looks good.'}).then(u=>{if(!u)return null;const e=embed(u);return e?`<div class="comp-video"><iframe src="${e}" allowfullscreen loading="lazy"></iframe></div>`:null;});}
             };
             const settingsDefs = {
+                gallery: (b) => InkwellGallery.settings(b),
                 heading: (b) => { const h=b.querySelector('h1,h2,h3,h4,h5,h6'); return `<div class="setting-field"><label>Heading Text</label><input type="text" value="${h?.textContent||''}" oninput="updateBlockText(this.value, 'h1,h2,h3,h4,h5,h6')" /></div><div class="setting-field"><label>Heading Level</label><select onchange="changeHeadingLevel(this.value)"><option value="h1" ${h?.tagName==='H1'?'selected':''}>H1 - Large</option><option value="h2" ${h?.tagName==='H2'?'selected':''}>H2 - Medium</option><option value="h3" ${h?.tagName==='H3'?'selected':''}>H3 - Small</option></select></div><div class="setting-field"><label>Alignment</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(h?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${h?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${h?.style.textAlign==='right'?'selected':''}>Right</option></select></div>`; },
                 text: (b) => { const p=b.querySelector('p'); return `<div class="setting-field"><label>Text Content</label><textarea rows="3" oninput="updateBlockText(this.value, 'p')">${p?.textContent||''}</textarea></div><div class="setting-field"><label>Alignment</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(p?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${p?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${p?.style.textAlign==='right'?'selected':''}>Right</option><option value="justify" ${p?.style.textAlign==='justify'?'selected':''}>Justify</option></select></div>`; },
                 button: (b) => { const a=b.querySelector('.comp-button a'); return `<div class="setting-field"><label>Button Label</label><input type="text" value="${a?.textContent||''}" oninput="updateBtnLabel(this.value)" /></div><div class="setting-field"><label>Link URL</label><input type="text" value="${a?.getAttribute('href')||'#'}" oninput="updateBtnUrl(this.value)" placeholder="https://..." /></div><div class="setting-field"><label>Style</label><select onchange="updateBtnStyle(this.value)"><option value="filled" ${a?.style.background?'selected':''}>Filled</option><option value="outline">Outline</option></select></div>`; },
@@ -677,7 +710,7 @@
             window.showPostSettings = function() { deselectBlock(); postSettingsView.classList.remove('hidden'); compSettingsView.classList.add('hidden'); };
             function showComponentSettings(block) {
                 const type = block.dataset.type; const content = block.querySelector('.block-content');
-                const titleMap = { heading:'Heading', text:'Text', image:'Image', button:'Button', hero:'Hero', imagetext:'Image + Text', quote:'Quote', divider:'Divider', spacer:'Spacer', video:'Video' };
+                const titleMap = { heading:'Heading', text:'Text', image:'Image', button:'Button', hero:'Hero', imagetext:'Image + Text', quote:'Quote', divider:'Divider', spacer:'Spacer', video:'Video', gallery:'Gallery' };
                 compSettingsTitle.textContent = titleMap[type] || 'Component';
                 compSettingsBody.innerHTML = settingsDefs[type] ? settingsDefs[type](content) : '<p class="text-xs text-muted-foreground">No settings available.</p>';
                 postSettingsView.classList.add('hidden'); compSettingsView.classList.remove('hidden');
@@ -739,6 +772,7 @@
                     else if (el.classList.contains('comp-divider')){ type='divider'; html=el.outerHTML; }
                     else if (el.classList.contains('comp-spacer')) { type='spacer'; el.innerHTML='<span>spacer</span>'; html=el.outerHTML; }
                     else if (el.classList.contains('comp-video')) { type='video'; html=el.outerHTML; }
+                    else if (el.classList.contains('comp-gallery')) { type='gallery'; html=el.outerHTML; }
                     else if (el.classList.contains('comp-image') || (el.tagName==='IMG')) { type='image'; if(el.tagName==='IMG') html=`<div class="comp-image">${el.outerHTML}</div>`; else html=el.outerHTML; }
                     else if (el.tagName?.match(/^H[1-6]$/))      { type='heading'; el.contentEditable='true'; html=el.outerHTML; }
                     else { type='text'; el.contentEditable='true'; html=el.outerHTML; }
@@ -754,10 +788,10 @@
 
             // Publish/Schedule
             var pBtn=document.getElementById('publishBtn'),sI=document.querySelector('input[name="ScheduledAt"]'),mT=document.getElementById('modalTitle'),mD=document.getElementById('modalDesc'),mC=document.getElementById('modalConfirmBtn');
-            function upb(){if(sI&&sI.value&&new Date(sI.value)>new Date()){pBtn.innerText='Update Schedule';mT.innerText='Ready to schedule?';mD.innerText='This will schedule your post.';mC.innerText='Confirm Schedule';return;}pBtn.innerText='@(Model.Status == Blog.Core.Domain.PostStatus.Published ? "Update" : "Publish")';mT.innerText='Ready to publish?';mD.innerText='This will make your post publicly visible.';mC.innerText='Confirm Publish';}
+            function upb(){if(@(canPublish ? "true" : "false")&&sI&&sI.value&&new Date(sI.value)>new Date()){pBtn.innerText='Update Schedule';mT.innerText='Ready to schedule?';mD.innerText='This will schedule your post.';mC.innerText='Confirm Schedule';return;}pBtn.innerText=@Json.Serialize(publishLabel);mT.innerText=@Json.Serialize(modalTitle);mD.innerText=@Json.Serialize(modalDesc);mC.innerText=@Json.Serialize(modalConfirm);}
             if(sI){sI.addEventListener('input',upb);upb();}
             pBtn.addEventListener('click',function(){document.getElementById('publishModal').classList.remove('hidden');});
-            window.confirmPublish=async function(){document.getElementById('postContent').value=exH();document.getElementById('postPlaintext').value=exP();mC.disabled=true;mC.innerText='Publishing...';await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='publish';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='publish';f.appendChild(a);}f.submit();};
+            window.confirmPublish=async function(){document.getElementById('postContent').value=exH();document.getElementById('postPlaintext').value=exP();mC.disabled=true;mC.innerText='@(canPublish ? "Publishing..." : "Submitting...")';await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='publish';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='publish';f.appendChild(a);}f.submit();};
             document.querySelector('button[value="draft"]').addEventListener('click',async function(e){e.preventDefault();this.innerText='Saving...';this.disabled=true;document.getElementById('postContent').value=exH();document.getElementById('postPlaintext').value=exP();await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='draft';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='draft';f.appendChild(a);}f.submit();});
         })();
         // OG/Twitter uploads

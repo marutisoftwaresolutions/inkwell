@@ -1,4 +1,5 @@
 using Blog.Core.Interfaces;
+using Blog.Core.Services;
 using Blog.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -9,6 +10,7 @@ namespace Blog.Web.Controllers;
 
 public class BlogController : Controller
 {
+    private readonly Blog.Web.Services.Webhooks.WebhookPublisher _webhooks;
     private readonly IPostRepository _posts;
     private readonly IPageRepository _pages;
     private readonly ICategoryRepository _categories;
@@ -33,8 +35,10 @@ public class BlogController : Controller
         Blog.Web.Services.CommentFormTokenService commentToken,
         Blog.Web.Services.Security.IpFirewallService firewall,
         ILogger<BlogController> log,
-        Blog.Web.Services.PreviewLinkService previewLinks)
+        Blog.Web.Services.PreviewLinkService previewLinks,
+        Blog.Web.Services.Webhooks.WebhookPublisher webhooks)
     {
+        _webhooks = webhooks;
         _previewLinks = previewLinks;
         _commentToken = commentToken;
         _firewall = firewall;
@@ -71,6 +75,7 @@ public class BlogController : Controller
     }
 
     [HttpGet("")]
+    [CanonicalListingQuery]
     public async Task<IActionResult> Index([FromQuery] string? search, [FromQuery] string? category, [FromQuery] string? tags, int page = 1)
     {
         // Home-feed filter URLs (/?tags=x, /?category=y) duplicate the canonical /tag/{slug} and
@@ -116,6 +121,9 @@ public class BlogController : Controller
         }
 
         var result = await _posts.GetPostsAsync(filter);
+        // A page past the last one is not a page: answering 200 with an empty listing gave crawlers an
+        // unbounded run of URLs (/?page=2 … /?page=99999). Page 1 always renders, empty or not.
+        if (ListingQuery.IsPastLastPage(page, result.TotalItems, pageSize)) return NotFound();
         
         ViewBag.SiteName = userSettings.SiteName;
         ViewBag.Tagline = userSettings.SiteDescription;
@@ -196,9 +204,15 @@ public class BlogController : Controller
     // Dedicated search route — backs the WebSite SearchAction (sitelinks search box). Reuses the
     // home listing with the search filter applied; results are noindex,follow (set by Index).
     [HttpGet("search")]
-    public Task<IActionResult> Search([FromQuery] string? q, int page = 1) => Index(q, null, null, page);
+    [CanonicalListingQuery]
+    // Also accepts "search": every listing layout builds its pager as "?page=N&search=…" (the home
+    // feed's parameter), so on /search page 2 onwards used to arrive without "q" and list every post.
+    // Results pages are noindex, so a second name for the same query costs nothing.
+    public Task<IActionResult> Search([FromQuery] string? q, [FromQuery] string? search, int page = 1) =>
+        Index(string.IsNullOrWhiteSpace(q) ? search : q, null, null, page);
 
     [HttpGet("category/{slug}")]
+    [CanonicalListingQuery]
     public async Task<IActionResult> Category(string slug, int page = 1)
     {
         var ownerId = await GetOwnerUserIdAsync(_users);
@@ -217,6 +231,7 @@ public class BlogController : Controller
             Status = Blog.Core.Domain.PostStatus.Published,
             AuthorId = ownerId == Guid.Empty ? null : ownerId
         });
+        if (ListingQuery.IsPastLastPage(page, posts.TotalItems, settings.PostsPerPage)) return NotFound();
 
         ViewBag.CurrentCategory = slug;
         // Same as the tag archive: seed the chip state so multi-select keeps working from here.
@@ -238,6 +253,7 @@ public class BlogController : Controller
     }
 
     [HttpGet("tag/{slug}")]
+    [CanonicalListingQuery]
     public async Task<IActionResult> Tag(string slug, int page = 1)
     {
         var ownerId = await GetOwnerUserIdAsync(_users);
@@ -258,6 +274,7 @@ public class BlogController : Controller
             Status = Blog.Core.Domain.PostStatus.Published,
             AuthorId = ownerId == Guid.Empty ? null : ownerId
         });
+        if (ListingQuery.IsPastLastPage(page, posts.TotalItems, settings.PostsPerPage)) return NotFound();
 
         ViewBag.CurrentTag = slug;
         // The filter chips build their links from SelectedTags. Now that /?tags={slug} 301s here,
@@ -286,6 +303,7 @@ public class BlogController : Controller
 
     // Series index — lists every series (ordered post collections / multi-part guides).
     [HttpGet("series")]
+    [CanonicalListingQuery]
     public async Task<IActionResult> SeriesIndex()
     {
         var ownerId = await GetOwnerUserIdAsync(_users);
@@ -305,6 +323,7 @@ public class BlogController : Controller
 
     // A single series reading page — its posts in the author-defined order.
     [HttpGet("series/{slug}")]
+    [CanonicalListingQuery]
     public async Task<IActionResult> Series(string slug)
     {
         var ownerId = await GetOwnerUserIdAsync(_users);
@@ -331,6 +350,7 @@ public class BlogController : Controller
     // Author E-E-A-T page — establishes authorship/expertise for Google & AI answer engines
     // via Person structured data, and lists the author's published work.
     [HttpGet("author/{slug}")]
+    [CanonicalListingQuery]
     public async Task<IActionResult> Author(string slug, int page = 1)
     {
         var author = await _users.GetBySlugAsync(slug);
@@ -349,6 +369,7 @@ public class BlogController : Controller
 
         // Avoid thin/empty author pages (and cross-tenant authors with no posts here) — 404 if nothing published.
         if (posts.TotalItems == 0) return NotFound();
+        if (ListingQuery.IsPastLastPage(page, posts.TotalItems, settings.PostsPerPage)) return NotFound();
 
         var themeSettings = await _themeSettings.GetAllAsync(ownerId);
         ViewBag.LayoutPostCard = themeSettings.FirstOrDefault(s => s.SettingKey == "layout-postcard")?.EffectiveValue ?? "Neutral";
@@ -371,7 +392,13 @@ public class BlogController : Controller
 
         // Check if it's a page first
         var page = await _pages.GetBySlugAsync(slug);
-        if (page != null) return View("Page", page);
+        if (page != null)
+        {
+            // Custom fields shown to readers (ADR-0025); optional, so a settings failure only hides them.
+            try { var ps = await _settings.GetSettingsAsync(ownerId); ViewBag.CustomFields = Blog.Core.Services.CustomFields.Visible(ps.CustomFields, pages: true, page.CustomFieldsJson, Blog.Web.Services.SiteDates.From(ps)); }
+            catch { ViewBag.CustomFields = null; }
+            return View("Page", page);
+        }
 
         var post = await _posts.GetBySlugAsync(slug);
         if (post == null || (post.Status != Blog.Core.Domain.PostStatus.Published && !(post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)))
@@ -454,6 +481,7 @@ public class BlogController : Controller
         var userSettings = await _settings.GetSettingsAsync(settingsId);
         ViewBag.CommentsEnabled = userSettings.CommentsEnabled && !isPreview;
         ViewBag.DisplayTimeZone = userSettings.DisplayTimeZoneId;
+        ViewBag.CustomFields = Blog.Core.Services.CustomFields.Visible(userSettings.CustomFields, pages: false, post.CustomFieldsJson, Blog.Web.Services.SiteDates.From(userSettings));
         ViewBag.SiteLogoUrl = userSettings.SiteLogoUrl;
         ViewBag.SiteTwitter = userSettings.SocialTwitter;
         ViewData["SiteLanguage"] = string.IsNullOrWhiteSpace(userSettings.SiteLanguage) ? "en" : userSettings.SiteLanguage;
@@ -464,17 +492,9 @@ public class BlogController : Controller
 
         // Conditional GET for anonymous readers and crawlers. The validators cover everything that
         // changes the markup — the post, its approved comments, the theme, the site settings and the
-        // deployed build — so a 304 only ever stands in for a byte-identical page. Cache-Control is
-        // Only count views from anonymous visitors — skip admin/editor sessions and previews. Counted
-        // before the validator check so a returning reader who gets a 304 still counts (the ETag folds
-        // in ViewCount/100, so the count itself does not defeat caching). Crawlers and scripts are not
-        // readers: without this, every GPTBot or Googlebot fetch raised "most read".
-        if (!isPreview && User.Identity?.IsAuthenticated != true
-            && !Blog.Core.Services.BotUserAgent.IsBot(Request.Headers.UserAgent.ToString()))
-        {
-            await _posts.IncrementViewCountAsync(post.Id);
-            post.ViewCount += 1;
-        }
+        // deployed build — so a 304 only ever stands in for a byte-identical page. "Most read" is not
+        // counted here: the page-view beacon counts it (TrafficRecorder → PostViewTally, ADR-0014), so
+        // a crawler, a script or a revalidation adds nothing, and both view figures mean the same.
 
         // no-cache: every request still revalidates, it just skips the render and the transfer when
         // nothing changed. Signed-in staff and previews are never served from a validator.
@@ -488,6 +508,9 @@ public class BlogController : Controller
                 string.Join(";", settings.OrderBy(s => s.SettingKey, StringComparer.Ordinal).Select(s => s.SettingKey + "=" + s.EffectiveValue)),
                 userSettings.SiteName, userSettings.SiteLogoUrl, userSettings.SiteLanguage, userSettings.DisplayTimeZoneId,
                 userSettings.CommentsEnabled, userSettings.SocialTwitter,
+                userSettings.CookieConsentEnabled, userSettings.GoogleAnalyticsId,
+                userSettings.DateLocale, userSettings.DateFormat, userSettings.ClockFormat,
+                System.Text.Json.JsonSerializer.Serialize(userSettings.CustomFields),
                 typeof(Program).Assembly.GetName().Version?.ToString());
 
             Response.Headers.ETag = etag;
@@ -539,7 +562,8 @@ public class BlogController : Controller
     public async Task<IActionResult> AddComment(string slug, string authorName, string authorEmail, string content, Guid? parentId)
     {
         var post = await _posts.GetBySlugAsync(slug);
-        if (post == null) return NotFound();
+        // Only a post readers can see takes comments: drafts and posts in review are not public.
+        if (post == null || !EditorialWorkflow.IsLive(post.Status, post.ScheduledAt, DateTime.UtcNow)) return NotFound();
 
         // Every outcome lands the reader on the comments block, where the message and the form are,
         // not at the top of the article. A rejected submission also carries the draft back so the
@@ -625,6 +649,7 @@ public class BlogController : Controller
         };
 
         await _comments.CreateAsync(comment);
+        await _webhooks.CommentCreatedAsync(HttpContext, comment, post);
         TempData["CommentSuccess"] = moderation
             ? "Your comment is awaiting moderation."
             : "Comment posted.";

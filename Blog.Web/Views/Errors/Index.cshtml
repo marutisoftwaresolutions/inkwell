@@ -103,8 +103,8 @@
                         }
                     </td>
                     <td class="px-4 py-2 text-right font-semibold text-foreground">@e.OccurrenceCount.ToString("N0")</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@e.FirstSeenAt.ToString("u")">@Ago(e.FirstSeenAt)</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@e.LastSeenAt.ToString("u")">@Ago(e.LastSeenAt)</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(e.FirstSeenAt)">@Ago(e.FirstSeenAt)</td>
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(e.LastSeenAt)">@Ago(e.LastSeenAt)</td>
                     <td class="px-4 py-2 whitespace-nowrap">
                         @if (string.IsNullOrEmpty(e.LastIpAddress))
                         {

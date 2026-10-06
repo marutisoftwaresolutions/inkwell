@@ -53,6 +53,14 @@
                 <label class="flex items-center gap-2"><input type="checkbox" name="ConvertToWebP" value="true" checked /> Convert imported images to WebP</label>
                 <label class="flex items-center gap-2"><input type="checkbox" name="SanitizeHtml" value="true" checked /> Sanitize imported HTML (recommended)</label>
                 <label class="flex items-center gap-2"><input type="checkbox" name="CreateRedirects" value="true" checked /> Create redirects from old URLs (preserves SEO)</label>
+                @if (Model.Source == Blog.Core.Domain.ImportSource.Ghost)
+                {
+                    <label class="flex items-start gap-2"><input type="checkbox" name="KeepMarkdown" value="true" class="mt-1" />
+                        <span>Keep posts written in Markdown as Markdown
+                            <span class="block text-xs text-muted-foreground">Ghost posts made of Markdown cards open in the Markdown editor. Everything else imports as HTML either way.</span>
+                        </span>
+                    </label>
+                }
             </div>
         </div>
 

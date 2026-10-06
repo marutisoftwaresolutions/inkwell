@@ -25,6 +25,11 @@ public class DeskAccessibilityTests
         "Views/Tags/Index.cshtml",
         "Views/Series/Index.cshtml",
         "Views/Series/Edit.cshtml",
+        "Views/Webhooks/Index.cshtml",
+        "Views/Webhooks/Edit.cshtml",
+        "Views/Webhooks/Deliveries.cshtml",
+        "Views/Menus/Index.cshtml",
+        "Views/Posts/_ReviewPanel.cshtml",
         "Views/Pages/Index.cshtml",
         "Views/Redirects/Index.cshtml",
         "Views/Shared/_MediaSelectorModal.cshtml",
@@ -221,12 +226,113 @@ public class DeskAccessibilityTests
         Assert.Contains("aria-label=\"View @post.Title\"", dash);
     }
 
+    /// <summary>
+    /// An explicit <c>id</c> on an <c>asp-for</c> input replaces the generated one, so a
+    /// <c>&lt;label asp-for&gt;</c> beside it points at nothing: screen readers announce an unnamed
+    /// field and clicking the label does nothing. Found on the webhook secret and three Settings image
+    /// fields (2026-09-27). Any such input needs a label written for that id.
+    /// </summary>
+    [Fact]
+    public void Inputs_with_a_custom_id_have_a_label_for_that_id()
+    {
+        var root = Path.Combine(Root(), "Blog.Web", "Views");
+        var control = new Regex("<(input|select|textarea)\\b[^>]*\\basp-for=\"[^\"]+\"[^>]*>", RegexOptions.IgnoreCase);
+        var idAttr = new Regex("\\bid=\"([^\"@]+)\"");
+        var offenders = new List<string>();
+        foreach (var path in Directory.EnumerateFiles(root, "*.cshtml", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(root, path).Replace('\\', '/');
+            if (rel.StartsWith("Blog/")) continue;   // reader views are covered by ReaderAccessibilityTests
+            var html = File.ReadAllText(path);
+            foreach (Match m in control.Matches(html))
+            {
+                if (m.Value.Contains("type=\"hidden\"") || m.Value.Contains("aria-label")) continue;
+                var id = idAttr.Match(m.Value);
+                if (id.Success && !html.Contains($"for=\"{id.Groups[1].Value}\""))
+                    offenders.Add($"{rel}: id=\"{id.Groups[1].Value}\"");
+            }
+        }
+        Assert.True(offenders.Count == 0, "asp-for inputs whose custom id has no <label for>:\n" + string.Join('\n', offenders));
+    }
+
+    /// <summary>
+    /// Menus editor (2026-09-27 review): rows keyed by index moved keyboard focus to the wrong item after a
+    /// reorder, and the icon font the buttons first used is not loaded in the Desk (blank buttons).
+    /// </summary>
+    [Fact]
+    public void Menu_editor_keys_rows_stably_and_uses_inline_icons()
+    {
+        var view = Web("Views/Menus/Index.cshtml");
+        Assert.DoesNotContain(":key=\"i\"", view);
+        Assert.Contains(":key=\"row.uid\"", view);
+        Assert.Contains("aria-live=\"polite\"", view);
+        Assert.DoesNotContain("class=\"bi ", view);   // Bootstrap Icons is a reader-side font; the Desk does not load it
+        Assert.Contains("field-validation-error", view);   // row errors are found by the layout's scroll-to-first-error
+    }
+
+    /// <summary>
+    /// The unsaved-changes guard disarmed itself on a submit that a confirmation dialog then cancelled, so
+    /// leaving the page afterwards lost work without a prompt (every tracked form with a confirmation).
+    /// </summary>
+    [Fact]
+    public void Unsaved_changes_guard_ignores_a_cancelled_submit()
+    {
+        var script = Web("wwwroot/js/inkwell-desk.js");
+        Assert.Matches(new Regex(@"addEventListener\('submit',[^;]*defaultPrevented", RegexOptions.Singleline), script);
+    }
+
+    /// <summary>The footer menu row must be available in every footer layout (it renders nothing without a menu).</summary>
+    [Theory]
+    [InlineData("Classic")]
+    [InlineData("Grid")]
+    [InlineData("Magazine")]
+    [InlineData("Minimal")]
+    [InlineData("Modern")]
+    [InlineData("Neutral")]
+    public void Every_footer_layout_renders_the_footer_menu(string layout)
+    {
+        var view = Web($"Views/Shared/Components/Footer/{layout}.cshtml");
+        Assert.Contains("<partial name=\"_FooterMenu\"", view);
+        if (layout == "Magazine") Assert.Contains("\"FooterMenuTone\"] = \"inverse\"", view);   // drawn on the brand colour
+    }
+
+    /// <summary>
+    /// The Desk's Tailwind colours are bare var() values, so an opacity modifier (bg-primary/5,
+    /// border-destructive/40) generates no CSS: the review panel and status badges first rendered as
+    /// untinted boxes. Tinted boxes and badges use the dark-safe pill-* classes in admin.css.
+    /// </summary>
+    [Theory]
+    [InlineData("Views/Posts/_ReviewPanel.cshtml")]
+    [InlineData("Views/Posts/Index.cshtml")]
+    public void Tinted_boxes_and_badges_use_the_pill_classes(string view)
+    {
+        var html = Web(view);
+        var inert = Regex.Matches(html, @"(?<![\w:-])(bg|border|text)-(primary|destructive|muted|accent|secondary)/\d+");
+        Assert.True(inert.Count == 0, $"{view}: opacity-modified theme colours generate no CSS in the Desk: " + string.Join(", ", inert.Select(m => m.Value)));
+        Assert.DoesNotMatch(new Regex(@"\b(bg|text)-(green|yellow|blue|red)-\d{3}\b"), html.Replace("hover:text-green-600", ""));   // fixed palette ignores dark mode
+    }
+
+    [Fact]
+    public void Request_changes_toggle_is_keyboard_complete()
+    {
+        var panel = Web("Views/Posts/_ReviewPanel.cshtml");
+        Assert.Contains("aria-expanded=\"false\"", panel);         // correct before Alpine boots
+        Assert.Contains("aria-controls=\"review-send-back\"", panel);
+        Assert.Contains("keydown.escape", panel);                  // Escape closes it
+        Assert.Contains("$refs.sendBackBtn.focus()", panel);       // and focus returns to the toggle
+        Assert.Contains("id=\"review-note-error\"", panel);        // a blank note is refused at the field
+    }
+
     [Fact]
     public void AiCrawlers_chart_is_described_and_the_search_crawler_table_has_a_header()
     {
         var view = Web("Views/AiCrawlers/Index.cshtml");
         Assert.Matches(new Regex("<div class=\"flex items-end gap-1 h-24\" role=\"img\" aria-label=\"AI crawler visits per day:"), view);
-        Assert.Equal(3, Regex.Matches(view, "<thead>").Count);
+        // Every table has a header row (the count grew when the query-string table was added; the
+        // invariant is one <thead> per <table>, not a fixed number).
+        var tables = Regex.Matches(view, "<table\\b").Count;
+        Assert.True(tables >= 4, "AI Crawlers should render its four tables.");
+        Assert.Equal(tables, Regex.Matches(view, "<thead>").Count);
         Assert.DoesNotContain("🎉", Web("Views/Errors/Index.cshtml"));
     }
 

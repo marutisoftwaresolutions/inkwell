@@ -56,7 +56,7 @@ else
                 <h1 style="font-family:var(--serif);font-size:clamp(1.75rem,4vw,3rem);font-weight:700;line-height:1.15;color:#fff;margin:0;">@heroPost.Title</h1>
                 @if (!string.IsNullOrEmpty(heroPost.AuthorName))
                 {
-                    <p style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.65);margin:var(--sp-4) 0 0;">by @heroPost.AuthorName · @heroPost.PublishedAt?.ToString("MMM d, yyyy")</p>
+                    <p style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.65);margin:var(--sp-4) 0 0;">by @heroPost.AuthorName · @Dates.Medium(heroPost.PublishedAt)</p>
                 }
             </div>
         </a>

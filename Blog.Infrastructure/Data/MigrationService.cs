@@ -522,6 +522,147 @@ public class MigrationService
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CrawlerVisits') AND name = 'Verified')
                 BEGIN
                     ALTER TABLE CrawlerVisits ADD Verified BIT NULL;
+                END
+
+                -- Query string of crawler visits (DBScripts/2026-09-27_add-query-to-crawlervisits.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CrawlerVisits') AND name = 'Query')
+                BEGIN
+                    ALTER TABLE CrawlerVisits ADD Query NVARCHAR(512) NULL;
+                END
+
+                -- Outbound webhooks and their delivery log (DBScripts/2026-09-27_create-webhooks-tables.sql)
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Webhooks')
+                BEGIN
+                    CREATE TABLE Webhooks (
+                        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        OwnerId         UNIQUEIDENTIFIER NOT NULL,
+                        Name            NVARCHAR(100)    NOT NULL,
+                        Url             NVARCHAR(2048)   NOT NULL,
+                        SecretProtected NVARCHAR(MAX)    NOT NULL,
+                        Events          NVARCHAR(400)    NOT NULL,
+                        IsEnabled       BIT              NOT NULL CONSTRAINT DF_Webhooks_IsEnabled DEFAULT 1,
+                        SiteBaseUrl     NVARCHAR(300)    NULL,
+                        CreatedAt       DATETIME2        NOT NULL CONSTRAINT DF_Webhooks_CreatedAt DEFAULT SYSUTCDATETIME(),
+                        UpdatedAt       DATETIME2        NOT NULL CONSTRAINT DF_Webhooks_UpdatedAt DEFAULT SYSUTCDATETIME()
+                    );
+                    CREATE INDEX IX_Webhooks_OwnerId ON Webhooks (OwnerId);
+                END
+                
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'WebhookDeliveries')
+                BEGIN
+                    CREATE TABLE WebhookDeliveries (
+                        Id              BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        WebhookId       UNIQUEIDENTIFIER NOT NULL
+                                        CONSTRAINT FK_WebhookDeliveries_Webhooks REFERENCES Webhooks(Id) ON DELETE CASCADE,
+                        OwnerId         UNIQUEIDENTIFIER NOT NULL,
+                        EventId         UNIQUEIDENTIFIER NOT NULL,
+                        EventType       NVARCHAR(50)     NOT NULL,
+                        EventKey        NVARCHAR(200)    NULL,
+                        PayloadJson     NVARCHAR(MAX)    NOT NULL,
+                        Status          NVARCHAR(20)     NOT NULL,
+                        Attempts        INT              NOT NULL CONSTRAINT DF_WebhookDeliveries_Attempts DEFAULT 0,
+                        NextAttemptAt   DATETIME2        NOT NULL,
+                        LastAttemptAt   DATETIME2        NULL,
+                        ResponseCode    INT              NULL,
+                        ResponseSnippet NVARCHAR(500)    NULL,
+                        Error           NVARCHAR(500)    NULL,
+                        CreatedAt       DATETIME2        NOT NULL CONSTRAINT DF_WebhookDeliveries_CreatedAt DEFAULT SYSUTCDATETIME()
+                    );
+                    CREATE INDEX IX_WebhookDeliveries_Due ON WebhookDeliveries (Status, NextAttemptAt);
+                    CREATE INDEX IX_WebhookDeliveries_Webhook_CreatedAt ON WebhookDeliveries (WebhookId, CreatedAt DESC);
+                END
+
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('WebhookDeliveries') AND name = 'UX_WebhookDeliveries_Webhook_EventKey')
+                    EXEC (N'SET QUOTED_IDENTIFIER ON; CREATE UNIQUE INDEX UX_WebhookDeliveries_Webhook_EventKey ON WebhookDeliveries (WebhookId, EventKey) WHERE EventKey IS NOT NULL;');
+
+                -- Header and footer navigation menus (DBScripts/2026-09-27_create-menu-items-table.sql)
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'MenuItems')
+                BEGIN
+                    CREATE TABLE MenuItems (
+                        Id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        OwnerId      UNIQUEIDENTIFIER NOT NULL,
+                        Location     NVARCHAR(20)     NOT NULL,
+                        ParentId     UNIQUEIDENTIFIER NULL,
+                        SortOrder    INT              NOT NULL CONSTRAINT DF_MenuItems_SortOrder DEFAULT 0,
+                        Label        NVARCHAR(100)    NULL,
+                        LinkType     NVARCHAR(20)     NOT NULL,
+                        TargetId     UNIQUEIDENTIFIER NULL,
+                        Url          NVARCHAR(2048)   NULL,
+                        OpenInNewTab BIT              NOT NULL CONSTRAINT DF_MenuItems_OpenInNewTab DEFAULT 0,
+                        CreatedAt    DATETIME2        NOT NULL CONSTRAINT DF_MenuItems_CreatedAt DEFAULT SYSUTCDATETIME(),
+                        UpdatedAt    DATETIME2        NOT NULL CONSTRAINT DF_MenuItems_UpdatedAt DEFAULT SYSUTCDATETIME()
+                    );
+                    CREATE INDEX IX_MenuItems_Owner_Location ON MenuItems (OwnerId, Location, SortOrder);
+                END
+
+                -- Editorial workflow review note and request time (DBScripts/2026-09-27_add-review-workflow-to-posts.sql)
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'ReviewNote')
+                BEGIN
+                    ALTER TABLE Posts ADD ReviewNote NVARCHAR(1000) NULL;
+                END
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Posts') AND name = 'ReviewRequestedAt')
+                BEGIN
+                    ALTER TABLE Posts ADD ReviewRequestedAt DATETIME2 NULL;
+                END
+
+                -- Two-factor sign-in (DBScripts/2026-10-05_add-two-factor-to-users.sql, ADR-0021)
+                IF COL_LENGTH('Users', 'TwoFactorSecretProtected') IS NULL ALTER TABLE Users ADD TwoFactorSecretProtected NVARCHAR(1000) NULL;
+                IF COL_LENGTH('Users', 'TwoFactorEnabledAt') IS NULL ALTER TABLE Users ADD TwoFactorEnabledAt DATETIME2 NULL;
+                IF COL_LENGTH('Users', 'TwoFactorRecoveryHashes') IS NULL ALTER TABLE Users ADD TwoFactorRecoveryHashes NVARCHAR(MAX) NULL;
+                IF COL_LENGTH('Users', 'TwoFactorLastStep') IS NULL ALTER TABLE Users ADD TwoFactorLastStep BIGINT NULL;
+
+                -- Markdown authoring (DBScripts/2026-10-05_add-markdown-to-posts.sql, ADR-0022)
+                IF COL_LENGTH('Posts', 'Markdown') IS NULL ALTER TABLE Posts ADD Markdown NVARCHAR(MAX) NULL;
+                IF COL_LENGTH('Posts', 'EditorMode') IS NULL ALTER TABLE Posts ADD EditorMode NVARCHAR(20) NOT NULL CONSTRAINT DF_Posts_EditorMode DEFAULT 'rich' WITH VALUES;
+
+                -- Custom fields (DBScripts/2026-10-05_add-custom-fields-to-posts-and-pages.sql, ADR-0025)
+                IF COL_LENGTH('Posts', 'CustomFieldsJson') IS NULL ALTER TABLE Posts ADD CustomFieldsJson NVARCHAR(MAX) NULL;
+                IF COL_LENGTH('Pages', 'CustomFieldsJson') IS NULL ALTER TABLE Pages ADD CustomFieldsJson NVARCHAR(MAX) NULL;
+
+                -- Newsletter sending (DBScripts/2026-10-05_create-newsletter-issues-and-deliveries.sql, ADR-0028)
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'NewsletterIssues')
+                BEGIN
+                    CREATE TABLE NewsletterIssues (
+                        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        OwnerId         UNIQUEIDENTIFIER NOT NULL,
+                        Subject         NVARCHAR(200)    NOT NULL,
+                        Preheader       NVARCHAR(200)    NULL,
+                        IntroMarkdown   NVARCHAR(MAX)    NULL,
+                        PostIds         NVARCHAR(1000)   NULL,
+                        Status          NVARCHAR(20)     NOT NULL CONSTRAINT DF_NewsletterIssues_Status DEFAULT 'Draft',
+                        SiteBaseUrl     NVARCHAR(300)    NULL,
+                        RenderedHtml    NVARCHAR(MAX)    NULL,
+                        RenderedText    NVARCHAR(MAX)    NULL,
+                        RecipientCount  INT              NOT NULL CONSTRAINT DF_NewsletterIssues_RecipientCount DEFAULT 0,
+                        SentCount       INT              NOT NULL CONSTRAINT DF_NewsletterIssues_SentCount DEFAULT 0,
+                        FailedCount     INT              NOT NULL CONSTRAINT DF_NewsletterIssues_FailedCount DEFAULT 0,
+                        CreatedBy       UNIQUEIDENTIFIER NOT NULL,
+                        QueuedBy        UNIQUEIDENTIFIER NULL,
+                        QueuedByName    NVARCHAR(200)    NULL,
+                        CreatedAt       DATETIME2        NOT NULL CONSTRAINT DF_NewsletterIssues_CreatedAt DEFAULT SYSUTCDATETIME(),
+                        UpdatedAt       DATETIME2        NOT NULL CONSTRAINT DF_NewsletterIssues_UpdatedAt DEFAULT SYSUTCDATETIME(),
+                        QueuedAt        DATETIME2        NULL,
+                        FinishedAt      DATETIME2        NULL
+                    );
+                    CREATE INDEX IX_NewsletterIssues_Owner_Status ON NewsletterIssues (OwnerId, Status);
+                END
+
+                IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'NewsletterDeliveries')
+                BEGIN
+                    CREATE TABLE NewsletterDeliveries (
+                        Id              BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        IssueId         UNIQUEIDENTIFIER NOT NULL
+                                        CONSTRAINT FK_NewsletterDeliveries_Issues REFERENCES NewsletterIssues(Id) ON DELETE CASCADE,
+                        MemberId        UNIQUEIDENTIFIER NOT NULL,
+                        Email           NVARCHAR(255)    NOT NULL,
+                        Status          NVARCHAR(20)     NOT NULL CONSTRAINT DF_NewsletterDeliveries_Status DEFAULT 'Pending',
+                        Attempts        INT              NOT NULL CONSTRAINT DF_NewsletterDeliveries_Attempts DEFAULT 0,
+                        NextAttemptAt   DATETIME2        NOT NULL CONSTRAINT DF_NewsletterDeliveries_NextAttemptAt DEFAULT SYSUTCDATETIME(),
+                        SentAt          DATETIME2        NULL,
+                        Error           NVARCHAR(500)    NULL,
+                        CONSTRAINT UX_NewsletterDeliveries_Issue_Member UNIQUE (IssueId, MemberId)
+                    );
+                    CREATE INDEX IX_NewsletterDeliveries_Due ON NewsletterDeliveries (IssueId, Status, NextAttemptAt);
                 END";
             
             await Dapper.SqlMapper.ExecuteAsync(connection, sql);
@@ -530,6 +671,38 @@ public class MigrationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "MigrationService: Error applying schema updates.");
+        }
+        await SeedReferenceDataAsync();
+    }
+
+    /// <summary>
+    /// Countries, time zones and date locales (ADR-0027): runs the embedded dated script when a table is missing
+    /// or holds fewer rows than the script carries (a fresh database, or a newer tzdata/CLDR release). The
+    /// script is an idempotent MERGE, so running it is always safe; skipping it when nothing changed saves
+    /// startup time. Fails open: without the catalogs Settings falls back to the runtime's own lists.
+    /// </summary>
+    private async Task SeedReferenceDataAsync()
+    {
+        try
+        {
+            await using var stream = typeof(MigrationService).Assembly.GetManifestResourceStream("Blog.Infrastructure.ReferenceData.sql");
+            if (stream is null) { _logger.LogWarning("MigrationService: reference data script is not embedded."); return; }
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+            var script = await reader.ReadToEndAsync();
+            var rows = System.Text.RegularExpressions.Regex.Match(script, @"Rows: (\d+) countries, (\d+) time zones, (\d+) date locales");
+            using var connection = _context.CreateConnection();
+            var have = await Dapper.SqlMapper.QuerySingleAsync<(int Countries, int Zones, int Locales)>(connection, @"
+                SELECT CASE WHEN OBJECT_ID('Countries', 'U') IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM Countries) END,
+                       CASE WHEN OBJECT_ID('TimeZones', 'U') IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM TimeZones) END,
+                       CASE WHEN OBJECT_ID('DateLocales', 'U') IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM DateLocales) END");
+            if (rows.Success && have.Countries >= int.Parse(rows.Groups[1].Value) && have.Zones >= int.Parse(rows.Groups[2].Value)
+                && have.Locales >= int.Parse(rows.Groups[3].Value)) return;
+            await Dapper.SqlMapper.ExecuteAsync(connection, script, commandTimeout: 180);
+            _logger.LogInformation("MigrationService: countries, time zones and date locales seeded.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "MigrationService: Error seeding reference data (Settings falls back to the runtime's lists).");
         }
     }
 }

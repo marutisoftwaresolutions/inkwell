@@ -45,7 +45,7 @@
             <noscript>
                 <a href="#s-general">General</a> <a href="#s-display">Display</a> <a href="#s-comments">Comments</a>
                 <a href="#s-analytics">Search &amp; analytics</a> <a href="#s-housekeeping">Notifications &amp; housekeeping</a>
-                <a href="#s-social">Social</a> <a href="#s-identity">Identity</a>
+                <a href="#s-social">Social</a> <a href="#s-identity">Identity</a> <a href="#s-fields">Custom fields</a>
             </noscript>
         </nav>
 
@@ -86,7 +86,7 @@
 
                 <div class="grid gap-6 md:grid-cols-2 pt-2 border-t border-border">
                     <div class="space-y-2">
-                        <label asp-for="SiteLogoUrl" class="@labelCls"></label>
+                        <label for="SiteLogoInput" class="@labelCls">@Html.DisplayNameFor(m => m.SiteLogoUrl)</label>
                         <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteLogoUrl) ? "hidden" : "")" id="SiteLogoPreviewWrapper">
                             <img id="SiteLogoPreview" src="@Model.SiteLogoUrl" alt="Site logo preview" class="w-full h-auto max-h-32 object-contain rounded border" />
                         </div>
@@ -99,7 +99,7 @@
                         <p class="@helpCls">Header logo. Pick from the media library or paste a URL; leave blank to show the site name as text. A transparent PNG or SVG about 400 × 100 px works best.</p>
                     </div>
                     <div class="space-y-2">
-                        <label asp-for="SiteFaviconUrl" class="@labelCls"></label>
+                        <label for="SiteFaviconInput" class="@labelCls">@Html.DisplayNameFor(m => m.SiteFaviconUrl)</label>
                         <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteFaviconUrl) ? "hidden" : "")" id="SiteFaviconPreviewWrapper">
                             <img id="SiteFaviconPreview" src="@Model.SiteFaviconUrl" alt="Favicon preview" class="w-16 h-16 object-contain rounded border" />
                         </div>
@@ -114,7 +114,7 @@
                 </div>
 
                 <div class="space-y-2">
-                    <label asp-for="SiteCoverUrl" class="@labelCls"></label>
+                    <label for="SiteCoverInput" class="@labelCls">@Html.DisplayNameFor(m => m.SiteCoverUrl)</label>
                     <div class="flex gap-2 mb-2 @(string.IsNullOrEmpty(Model.SiteCoverUrl) ? "hidden" : "")" id="SiteCoverPreviewWrapper">
                         <img id="SiteCoverPreview" src="@Model.SiteCoverUrl" alt="Cover image preview" class="w-full h-32 object-cover rounded border" />
                     </div>
@@ -133,7 +133,7 @@
                      class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
                 <header>
                     <h2 class="text-base font-semibold text-foreground">Display</h2>
-                    <p class="@helpCls mt-1">How lists, dates and colours are shown. Layouts, presets and fonts live under <a href="/admin/theme" class="underline">Theme</a>.</p>
+                    <p class="@helpCls mt-1">How lists, dates and times, and colours are shown. Layouts, presets and fonts live under <a href="/admin/theme" class="underline">Theme</a>.</p>
                 </header>
                 <div class="grid gap-6 md:grid-cols-2">
                     <div class="space-y-2">
@@ -151,19 +151,7 @@
                         </select>
                         <p class="@helpCls">Applies to the public site and this Desk. Presets that are already dark (Ink, Onyx) keep their own palette.</p>
                     </div>
-                    <div class="space-y-2 md:col-span-2">
-                        <label asp-for="DisplayTimeZoneId" class="@labelCls"></label>
-                        <select asp-for="DisplayTimeZoneId" class="@inputCls">
-                            <option value="UTC">UTC</option>
-                            @foreach (var z in TimeZoneInfo.GetSystemTimeZones().OrderBy(z => z.BaseUtcOffset).ThenBy(z => z.DisplayName))
-                            {
-                                if (z.Id == "UTC") { continue; }
-                                <option value="@z.Id" selected="@(z.Id == Model.DisplayTimeZoneId)">@z.DisplayName</option>
-                            }
-                        </select>
-                        <p class="@helpCls">Dates are stored in UTC and shown in this zone on the public site and in the Desk; a schedule time you type in the editor is read in this zone.</p>
-                        <span asp-validation-for="DisplayTimeZoneId" class="@errCls"></span>
-                    </div>
+                    @await Component.InvokeAsync("DateSettings", new { country = Model.Country, zone = Model.DisplayTimeZoneId, locale = Model.DateLocale, format = Model.DateFormat, clock = Model.ClockFormat })
                 </div>
             </section>
 
@@ -222,6 +210,14 @@
                         <label asp-for="GoogleAnalyticsId" class="@labelCls"></label>
                         <input asp-for="GoogleAnalyticsId" class="@inputCls" placeholder="G-XXXXXXXXXX" />
                         <p class="@helpCls">GA4 Measurement ID from Google Analytics → Admin → Data Streams. Leave blank to load no tracker at all; the built-in <a href="/admin/analytics" class="underline">Analytics</a> works either way.</p>
+                        <span asp-validation-for="GoogleAnalyticsId" class="@errCls"></span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <input asp-for="CookieConsentEnabled" type="checkbox" class="@checkCls" aria-describedby="cookie-consent-help" />
+                        <div>
+                            <label asp-for="CookieConsentEnabled" class="@labelCls"></label>
+                            <p id="cookie-consent-help" class="@helpCls mt-1">On by default. Readers see a banner with equal Accept and Reject buttons, and Google Analytics loads only after they accept; the choice is remembered for @Blog.Core.Services.CookieConsent.RememberDays days and can be changed from the “Cookie settings” link at the foot of every page. With no Measurement ID set, the banner only says the site uses essential cookies. Turn it off only if no visitor is covered by consent rules such as the EU and UK GDPR and ePrivacy, Brazil’s LGPD or California’s CCPA.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -256,7 +252,7 @@
                             Connected to <code>@Model.SearchConsoleProperty</code> as <code>@Model.SearchConsoleConnectedAs</code>.
                             @if (Model.SearchConsoleLatestDate is DateTime latest)
                             {
-                                <span>Data through <strong>@latest.ToString("d MMM yyyy")</strong>.</span>
+                                <span>Data through <strong>@Dates.CalendarDate(latest, Blog.Core.Services.DateStyle.Medium)</strong>.</span>
                             }
                             else
                             {
@@ -346,6 +342,23 @@
                         <span asp-validation-for="RevisionsPerItem" class="@errCls"></span>
                     </div>
                 </div>
+                @if (User.IsInRole("Admin"))
+                {
+                    <fieldset class="space-y-3 pt-6 border-t border-border">
+                        <legend class="text-sm font-semibold text-foreground">Two-factor sign-in</legend>
+                        <p class="@helpCls">Anyone can turn on two-factor sign-in for their own account under <a href="/account/security" class="underline">Two-factor sign-in</a>. Tick a role to require it: people in that role must set it up before they reach the Desk, including anyone signed in now. Make sure your own account is set up before requiring it for Admins.</p>
+                        <div class="flex flex-wrap gap-x-6 gap-y-2">
+                            @foreach (var role in Blog.Core.Services.TwoFactor.Roles)
+                            {
+                                <label class="flex items-center gap-2 text-sm text-foreground">
+                                    <input type="checkbox" name="TwoFactorRequiredRoles" value="@role" checked="@(Model.TwoFactorRequiredRoles.Contains(role))" class="@checkCls" />
+                                    @role
+                                </label>
+                            }
+                        </div>
+                        <input type="hidden" name="TwoFactorRolesPosted" value="true" />
+                    </fieldset>
+                }
             </section>
 
             @* ────────────────────────────── Social ────────────────────────────── *@
@@ -442,6 +455,75 @@
                 </div>
             </section>
 
+            @* ────────────────────────────── Custom fields ────────────────────────────── *@
+            @{
+                var cfErrors = ViewData["CustomFieldErrors"] as IDictionary<int, string> ?? new Dictionary<int, string>();
+            }
+            <section id="s-fields" role="tabpanel" aria-labelledby="tab-fields" x-show="tab === 'fields'" x-cloak data-tab="fields"
+                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16"
+                     x-data='customFieldsEditor(@Json.Serialize(Model.CustomFieldsJson ?? "[]"), @Json.Serialize(cfErrors))'>
+                <header>
+                    <h2 class="text-base font-semibold text-foreground">Custom fields</h2>
+                    <p class="@helpCls mt-1">Extra facts you record on every post or page, such as a price, a version or an event date. Each field appears in the editor; fields marked <strong>Show to readers</strong> are listed under “Details” on the page and added to its structured data (<code>additionalProperty</code>). Fields are shown in this order.</p>
+                </header>
+                <input type="hidden" name="CustomFieldsPosted" value="true" />
+                <input type="hidden" name="CustomFieldsJson" :value="json()" />
+                @if (cfErrors.Count > 0 || ViewData.ModelState["CustomFieldsJson"]?.Errors.Count > 0)
+                {
+                    <p class="@errCls" role="alert">@(ViewData.ModelState["CustomFieldsJson"]?.Errors.FirstOrDefault()?.ErrorMessage ?? "Some custom fields need attention.") Correct the rows marked below, then save.</p>
+                }
+                <p x-show="rows.length === 0" class="@helpCls">No custom fields yet. Add one below; nothing appears in the editors or on the site until you do.</p>
+                <ol class="space-y-4 list-none p-0 m-0" x-show="rows.length > 0">
+                    <template x-for="(row, i) in rows" :key="row.uid">
+                        <li class="rounded-lg border border-border p-4 space-y-3">
+                            <div class="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                                <div class="space-y-1">
+                                    <label class="@labelCls" :for="'cf-label-' + i">Label</label>
+                                    <input class="@inputCls" :id="'cf-label-' + i" x-model="row.Label" maxlength="60" placeholder="Price from"
+                                           @@input="clearError(row)"
+                                           :aria-invalid="errors[row.uid] ? 'true' : null" :aria-describedby="errors[row.uid] ? 'cf-err-' + i : null" />
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="@labelCls" :for="'cf-type-' + i">Type</label>
+                                    <select class="@inputCls" :id="'cf-type-' + i" x-model="row.Type" :aria-describedby="row.Key && row.Type !== row.origType ? 'cf-typewarn-' + i : null">
+                                        <option value="text">Text</option>
+                                        <option value="number">Number</option>
+                                        <option value="date">Date</option>
+                                        <option value="url">Web address</option>
+                                        <option value="yesno">Yes / no</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="@labelCls" :for="'cf-applies-' + i">Used on</label>
+                                    <select class="@inputCls" :id="'cf-applies-' + i" x-model="row.AppliesTo">
+                                        <option value="posts">Posts</option>
+                                        <option value="pages">Pages</option>
+                                        <option value="both">Posts and pages</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p class="@errCls" x-show="errors[row.uid]" :id="'cf-err-' + i" x-text="errors[row.uid]"></p>
+                            <p class="text-xs tone-warn" x-show="row.Key && row.Type !== row.origType" :id="'cf-typewarn-' + i">Values already entered are kept. Any that do not fit the new type are flagged in the editor for you to correct.</p>
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <label class="flex items-center gap-2 text-sm text-foreground">
+                                    <input type="checkbox" class="@checkCls mt-0" x-model="row.ShowOnPage" /> Show to readers<span class="sr-only" x-text="': ' + (row.Label || 'new field')"></span>
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <span class="@helpCls" x-text="row.Key ? 'Export key: ' + row.Key : 'New field'"></span>
+                                    <button type="button" :id="'cf-up-' + i" class="h-10 min-w-10 px-2 rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :disabled="i === 0" @@click="move(i, -1)" :aria-label="'Move ' + (row.Label || 'this field') + ' up'">↑</button>
+                                    <button type="button" :id="'cf-down-' + i" class="h-10 min-w-10 px-2 rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :disabled="i === rows.length - 1" @@click="move(i, 1)" :aria-label="'Move ' + (row.Label || 'this field') + ' down'">↓</button>
+                                    <button type="button" class="h-10 px-3 rounded-md border border-input text-sm tone-bad hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @@click="remove(i)" :aria-label="'Remove ' + (row.Label || 'this field')">Remove</button>
+                                </div>
+                            </div>
+                        </li>
+                    </template>
+                </ol>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" id="cf-add" @@click="add()" class="h-10 px-4 inline-flex items-center rounded-md border border-input bg-background text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Add field</button>
+                    <p class="@helpCls">Up to @Blog.Core.Services.CustomFields.MaxFields fields. Renaming a field keeps its values. Removing one hides it everywhere but keeps the values already entered: add a field with the same label again and they return.</p>
+                </div>
+            </section>
+
             @* ── Sticky action bar: Save is visible on every tab, at every scroll position ── *@
             <div class="sticky bottom-0 z-10 mt-6 -mx-1 px-1 pb-[env(safe-area-inset-bottom,0px)]">
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 backdrop-blur px-4 py-3 shadow-lg">
@@ -463,12 +545,11 @@
 
 <partial name="_MediaSelectorModal" />
 
-@section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-}
+@* No client-side validation library here: the Desk layout does not load the one it needs, so it never ran
+   (it only logged a console error). Fields are checked by the browser's own constraints and, authoritatively, by SettingsController. *@
 
 <script>
-    // Settings tabs: one form, seven panels. The hash remembers the tab (#s-general …), a validation
+    // Settings tabs: one form, eight panels. The hash remembers the tab (#s-general …), a validation
     // error switches to the tab that holds it, and the browser's own "required" check reveals the
     // panel before it tries to focus the field (an invisible field cannot be focused, and the submit
     // would otherwise fail silently).
@@ -482,7 +563,8 @@
                     { key: 'analytics',    label: 'Search & analytics' },
                     { key: 'housekeeping', label: 'Notifications & housekeeping' },
                     { key: 'social',       label: 'Social' },
-                    { key: 'identity',     label: 'Identity' }
+                    { key: 'identity',     label: 'Identity' },
+                    { key: 'fields',       label: 'Custom fields' }
                 ],
                 tab: 'general',
                 errors: {},
@@ -502,6 +584,9 @@
                         this.$nextTick(function () {
                             var err = first.querySelector('.field-validation-error, .text-destructive');
                             if (err) err.scrollIntoView({ block: 'center' });
+                            // Errors are placed, then focused (UI rule 12): the field itself, not just the message.
+                            var field = first.querySelector('[aria-invalid="true"], .input-validation-error');
+                            if (field && field.focus) field.focus({ preventScroll: true });
                         });
                     }
 
@@ -525,6 +610,72 @@
                     var i = this.tabs.findIndex(function (t) { return t.key === this.tab; }.bind(this));
                     var n = (i + delta + this.tabs.length) % this.tabs.length;
                     this.go(this.tabs[n].key);
+                }
+            };
+        });
+    });
+</script>
+
+<script>
+    // Custom fields tab (ADR-0025): the rows are edited here and posted as one JSON value. The server
+    // keeps each existing field's key, so renaming a label never detaches the values already entered.
+    // Server errors arrive keyed by row position and are re-keyed to the row, so reordering keeps them.
+    document.addEventListener('alpine:init', function () {
+        Alpine.data('customFieldsEditor', function (json, serverErrors) {
+            var uid = 0;
+            var parsed = [];
+            try { parsed = JSON.parse(json || '[]') || []; } catch (e) { parsed = []; }
+            var rows = parsed.map(function (r) {
+                var type = r.Type || r.type || 'text';
+                return { uid: ++uid, Key: r.Key || r.key || '', Label: r.Label || r.label || '', Type: type, origType: type,
+                         AppliesTo: r.AppliesTo || r.appliesTo || 'posts', ShowOnPage: (r.ShowOnPage ?? r.showOnPage) !== false };
+            });
+            var errors = {};
+            Object.keys(serverErrors || {}).forEach(function (i) { if (rows[i]) errors[rows[i].uid] = serverErrors[i]; });
+            return {
+                rows: rows,
+                errors: errors,
+                json: function () {
+                    return JSON.stringify(this.rows.map(function (r) {
+                        return { Key: r.Key, Label: r.Label, Type: r.Type, AppliesTo: r.AppliesTo, ShowOnPage: !!r.ShowOnPage };
+                    }));
+                },
+                changed: function () {
+                    // The hidden input changes without an input event; tell the unsaved-changes guard.
+                    this.$nextTick(function () {
+                        var h = document.querySelector('input[name="CustomFieldsJson"]');
+                        if (h) h.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                },
+                clearError: function (row) { delete this.errors[row.uid]; },
+                add: function () {
+                    this.rows.push({ uid: ++uid, Key: '', Label: '', Type: 'text', origType: 'text', AppliesTo: 'posts', ShowOnPage: true });
+                    this.changed();
+                    var i = this.rows.length - 1;
+                    this.$nextTick(function () { var el = document.getElementById('cf-label-' + i); if (el) el.focus(); });
+                },
+                remove: function (i) {
+                    var gone = this.rows.splice(i, 1)[0];
+                    if (gone) delete this.errors[gone.uid];
+                    this.changed();
+                    var self = this;
+                    this.$nextTick(function () {
+                        var next = document.getElementById('cf-label-' + Math.min(i, self.rows.length - 1));
+                        (next || document.getElementById('cf-add')).focus();
+                    });
+                },
+                move: function (i, d) {
+                    var j = i + d;
+                    if (j < 0 || j >= this.rows.length) return;
+                    var r = this.rows.splice(i, 1)[0];
+                    this.rows.splice(j, 0, r);
+                    this.changed();
+                    // Keep focus on the moved row: the same arrow, or the other one at the top or bottom.
+                    this.$nextTick(function () {
+                        var same = document.getElementById((d < 0 ? 'cf-up-' : 'cf-down-') + j);
+                        var other = document.getElementById((d < 0 ? 'cf-down-' : 'cf-up-') + j);
+                        (same && !same.disabled ? same : other).focus();
+                    });
                 }
             };
         });

@@ -142,10 +142,10 @@
                     </div>
                     <div class="flex-shrink-0 text-right flex flex-col items-end gap-1">
                         <time class="text-xs font-mono font-semibold uppercase tracking-wider block" style="color: var(--muted-foreground);">
-                            @post.PublishedAt?.ToString("MMM dd")
+                            @Dates.MonthDay(post.PublishedAt)
                         </time>
                         <time class="text-2xl font-black leading-none" style="color: var(--border);">
-                            @post.PublishedAt?.ToString("yyyy")
+                            @Dates.YearOf(post.PublishedAt)
                         </time>
                         <a href="/@post.Slug" class="text-xs mt-2 font-bold uppercase tracking-widest underline underline-offset-2 hover:opacity-50 transition-opacity"
                            style="color: var(--primary);">Read →</a>

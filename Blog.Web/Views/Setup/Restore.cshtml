@@ -1,0 +1,84 @@
+@model IReadOnlyList<Blog.Web.Services.Backups.BackupFile>
+@{
+    Layout = "_SetupLayout";
+    ViewData["Title"] = "Restore From a Backup";
+
+    var ms = ViewData.ModelState;
+    var error = ms.TryGetValue("name", out var entry) && entry.Errors.Count > 0 ? entry.Errors[0].ErrorMessage : null;
+    var chosen = ms.TryGetValue("name", out var e2) ? e2.AttemptedValue : null;
+    var usable = Model.Where(f => f.Problem is null).ToList();
+    if (chosen is null && usable.Count > 0) chosen = usable[0].Name;
+}
+
+<div class="setup-container">
+    <div class="setup-card">
+        <h1 class="setup-title">Restore From a Backup</h1>
+        <p class="setup-subtitle">Bring back a whole site — posts, pages, users, settings, menus, subscribers and uploaded files — from a backup made in Admin → Backups.</p>
+
+        @if (error is not null)
+        {
+            <div class="alert alert-error setup-alert" role="alert" id="restore-error">
+                <p class="setup-alert-title">The backup was not restored.</p>
+                <p>@error</p>
+            </div>
+        }
+
+        @if (Model.Count == 0)
+        {
+            <div class="alert setup-alert setup-notice" role="status">
+                <p class="setup-alert-title">No backups found on this server.</p>
+                <p>Copy the backup ZIP into the backups folder (<code>App_Data/backups</code> unless <code>Backups:Path</code> is set in appsettings), then reload this page. Keep the file name as it was, for example <code>inkwell-backup-20260927-143000.zip</code>.</p>
+            </div>
+            <a href="/setup/restore" class="btn btn-primary btn-lg">Check again</a>
+            <a href="/account/register" class="btn btn-ghost">Start a new blog instead</a>
+        }
+        else
+        {
+            <form method="post" action="/setup/restore" id="restoreForm">
+                @Html.AntiForgeryToken()
+                <fieldset class="form-group @(error is null ? "" : "has-error")" aria-describedby="@(error is null ? "restore-hint" : "restore-error restore-hint")">
+                    <legend>Choose a backup</legend>
+                    @foreach (var f in Model)
+                    {
+                        var m = f.Manifest;
+                        var id = "b-" + f.Name.Replace(".", "-");
+                        <div class="restore-option">
+                            <input type="radio" name="name" id="@id" value="@f.Name" checked="@(f.Name == chosen)" disabled="@(f.Problem is not null)" />
+                            <label for="@id">
+                                <strong>@f.CreatedAtUtc.ToString("d MMM yyyy, HH:mm") UTC</strong>
+                                @if (m is not null)
+                                {
+                                    <span class="field-hint">@m.RowsIn("Posts") posts · @m.RowsIn("Pages") pages · @m.RowsIn("Users") users · @m.MediaFiles files · Inkwell @(string.IsNullOrEmpty(m.AppVersion) ? "(version unknown)" : m.AppVersion)</span>
+                                }
+                                @if (f.Problem is not null)
+                                {
+                                    <span class="field-error">@f.Problem</span>
+                                }
+                            </label>
+                        </div>
+                    }
+                    <p class="field-hint" id="restore-hint">Sign in afterwards with an account from the backup; passwords are kept. The Search Console connection and webhook signing secrets must be entered again, because the key that encrypted them stays on the old server.</p>
+                    <p class="field-hint">A restore is all or nothing. If the page times out on a very large site, wait a minute and open this page again: if it takes you to the Desk, the restore finished; if it lists the backups again, nothing was changed and you can retry.</p>
+                </fieldset>
+                <button type="submit" class="btn btn-primary btn-lg" id="restoreBtn" disabled="@(usable.Count == 0)">Restore this backup</button>
+                <a href="/account/register" class="btn btn-ghost">Start a new blog instead</a>
+            </form>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // A restore can take a while on a large site; a second click must not start a second one.
+    var form = document.getElementById('restoreForm');
+    var btn = document.getElementById('restoreBtn');
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+        btn.textContent = 'Restoring… this can take a few minutes';
+    });
+})();
+</script>
+}

@@ -35,7 +35,7 @@ else if (summary is null || !summary.HasData)
 {
     <p class="text-[11px] text-muted-foreground">
         @(isPublished ? "This post has not appeared in Google Search results in the last 56 days." : "Search data appears once the post is published and indexed.")
-        Data through @state.AsOf!.Value.ToString("d MMM yyyy").
+        Data through @Dates.CalendarDate(state.AsOf, Blog.Core.Services.DateStyle.Medium).
     </p>
 }
 else
@@ -86,7 +86,7 @@ else
 
     @if (queries.Count > 0)
     {
-        <table class="w-full mt-3 text-[11px]">
+        <div class="table-scroll"><table class="w-full mt-3 text-[11px]">
             <thead class="text-muted-foreground">
                 <tr><th class="text-left font-medium pb-1">Query</th><th class="text-right font-medium pb-1">Clicks</th><th class="text-right font-medium pb-1">Impr.</th><th class="text-right font-medium pb-1">Pos.</th></tr>
             </thead>
@@ -101,7 +101,7 @@ else
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
     }
-    <p class="text-[10px] text-muted-foreground mt-2">Google Search, web results, through @state.AsOf!.Value.ToString("d MMM yyyy"). Search Console publishes each day about two days late.</p>
+    <p class="text-[10px] text-muted-foreground mt-2">Google Search, web results, through @Dates.CalendarDate(state.AsOf, Blog.Core.Services.DateStyle.Medium). Search Console publishes each day about two days late.</p>
 }

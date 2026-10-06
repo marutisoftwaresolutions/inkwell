@@ -1,0 +1,91 @@
+@model Blog.Web.Controllers.BackupsViewModel
+@{
+    string Size(long bytes) => bytes switch
+    {
+        >= 1L << 30 => $"{bytes / (double)(1L << 30):0.0} GB",
+        >= 1L << 20 => $"{bytes / (double)(1L << 20):0.0} MB",
+        >= 1L << 10 => $"{bytes / (double)(1L << 10):0} KB",
+        _ => $"{bytes} B",
+    };
+}
+
+@if (Model.InProgress)
+{
+    @* Polls until the backup lands; the response without this element stops the polling. *@
+    <div data-backup-pending hx-get="/admin/backups/status?waiting=true" hx-trigger="every 5s" hx-target="#backup-list" hx-swap="innerHTML"
+         class="mb-3 rounded-md border pill-info px-4 py-3 text-sm" role="status">
+        @(Model.Running ? "A backup is being written now." : "A backup is queued and starts within a minute.")
+        This list updates by itself when it is done.
+    </div>
+}
+else if (ViewData["JustFinished"] is true)
+{
+    <div class="mb-3 rounded-md border pill-ok px-4 py-3 text-sm" role="status">Backup ready. It is at the top of the list.</div>
+}
+
+<div class="bg-card rounded-lg border border-border overflow-hidden">
+    <div class="table-scroll"><table class="w-full text-left text-sm">
+        <thead>
+            <tr class="bg-muted text-muted-foreground border-b border-border">
+                <th class="px-4 py-3 font-medium">Backup</th>
+                <th class="px-4 py-3 font-medium">Contents</th>
+                <th class="px-4 py-3 font-medium">Size</th>
+                <th class="px-4 py-3 font-medium w-[140px]">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+            @if (Model.Files.Count == 0)
+            {
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
+                        No backups yet. Make the first one with <strong>Make backup</strong>.
+                    </td>
+                </tr>
+            }
+            @foreach (var f in Model.Files)
+            {
+                var m = f.Manifest;
+                <tr class="hover:bg-muted transition-colors">
+                    <td class="px-4 py-3">
+                        <div class="font-medium text-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(f.CreatedAtUtc)">@Dates.DateTime(f.CreatedAtUtc)</div>
+                        <div class="font-mono text-[11px] text-muted-foreground break-all">@f.Name</div>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-muted-foreground">
+                        @if (m is null)
+                        {
+                            <span class="tone-bad">@f.Problem</span>
+                        }
+                        else
+                        {
+                            <text>@m.RowsIn("Posts") posts · @m.RowsIn("Pages") pages · @m.RowsIn("Users") users · @m.MediaFiles files</text>
+                            @if (m.IncludesAnalytics)
+                            {
+                                <text> · @m.RowsIn("PageViews") page views</text>
+                            }
+                            <div>Inkwell @(string.IsNullOrEmpty(m.AppVersion) ? "(version unknown)" : m.AppVersion)</div>
+                            @if (f.Problem is not null)
+                            {
+                                <div class="tone-warn">@f.Problem</div>
+                            }
+                        }
+                    </td>
+                    <td class="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">@Size(f.SizeBytes)</td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-1">
+                            <a href="/admin/backups/download/@f.Name" class="text-xs px-3 min-h-10 inline-flex items-center rounded hover:bg-muted text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Download backup from @Dates.DateTime(f.CreatedAtUtc)">Download</a>
+                            <form method="post" action="/admin/backups/delete/@f.Name"
+                                  data-confirm-title="Delete this backup?"
+                                  data-confirm-body="The file @f.Name is deleted from the server. Keep a downloaded copy if you may need it. The site itself is untouched."
+                                  data-confirm-action="Delete backup" data-confirm-tone="danger">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" aria-label="Delete backup from @Dates.DateTime(f.CreatedAtUtc)" class="text-destructive hover:opacity-80 transition-opacity min-h-10 min-w-10 inline-flex items-center justify-center rounded focus-visible:ring-2 focus-visible:ring-ring">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table></div>
+</div>

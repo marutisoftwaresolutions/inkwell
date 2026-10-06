@@ -21,14 +21,14 @@
                 <a href="/" class="text-foreground/80 hover:text-foreground transition-colors">Home</a>
                 
                 @{
-                    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
-                    var visiblePages = sortedPages.Take(4).ToList();
-                    var hiddenPages = sortedPages.Skip(4).ToList();
+                    var sortedPages = Model.Links;
+                    var visiblePages = sortedPages.Where(l => l.Depth == 0).Take(4).ToList();
+                    var hiddenPages = sortedPages.Except(visiblePages).ToList();
                 }
 
                 @foreach (var navPage in visiblePages)
                 {
-                    <a href="/@navPage.Slug" class="text-foreground/80 hover:text-foreground transition-colors">@navPage.Title</a>
+                    <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)" class="text-foreground/80 hover:text-foreground transition-colors">@if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title</a>
                 }
 
                 @if (hiddenPages.Any())
@@ -52,8 +52,8 @@
                             <div class="max-h-64 overflow-y-auto py-1">
                                 @foreach (var hiddenPage in hiddenPages)
                                 {
-                                    <a href="/@hiddenPage.Slug" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-muted hover:text-foreground transition-colors">
-                                        @hiddenPage.Title
+                                    <a href="@hiddenPage.Href" target="@(hiddenPage.OpenInNewTab ? "_blank" : null)" rel="@(hiddenPage.OpenInNewTab ? "noopener" : null)" class="block px-4 py-2 text-sm text-popover-foreground hover:bg-muted hover:text-foreground transition-colors">
+                                        @if (hiddenPage.Depth > 0) { <span aria-hidden="true">— </span> }@hiddenPage.Title
                                     </a>
                                 }
                             </div>

@@ -51,18 +51,18 @@ public class PageRepository : IPageRepository
             INSERT INTO Pages (Id, Title, Slug, Content, AuthorId, IsPublished, IsInNav, SortOrder, ParentId, FeaturedImageId, PublishedAt, CreatedAt, UpdatedAt,
                                MetaTitle, MetaDescription, CanonicalUrl,
                                OgImage, OgTitle, OgDescription,
-                               TwitterImage, TwitterTitle, TwitterDescription)
+                               TwitterImage, TwitterTitle, TwitterDescription, CustomFieldsJson)
             OUTPUT INSERTED.Id
             VALUES (@Id, @Title, @Slug, @Content, @AuthorId, @IsPublished, @IsInNav, @SortOrder, @ParentId, @FeaturedImageId, @PublishedAt, @CreatedAt, @UpdatedAt,
                     @MetaTitle, @MetaDescription, @CanonicalUrl,
                     @OgImage, @OgTitle, @OgDescription,
-                    @TwitterImage, @TwitterTitle, @TwitterDescription)",
+                    @TwitterImage, @TwitterTitle, @TwitterDescription, @CustomFieldsJson)",
             new { 
                 page.Id, page.Title, page.Slug, page.Content, page.AuthorId, page.IsPublished, page.IsInNav, page.SortOrder,
                 page.ParentId, page.FeaturedImageId, page.PublishedAt,
                 page.MetaTitle, page.MetaDescription, page.CanonicalUrl,
                 page.OgImage, page.OgTitle, page.OgDescription,
-                page.TwitterImage, page.TwitterTitle, page.TwitterDescription,
+                page.TwitterImage, page.TwitterTitle, page.TwitterDescription, page.CustomFieldsJson,
                 CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow 
             });
     }
@@ -75,14 +75,14 @@ public class PageRepository : IPageRepository
             SortOrder=@SortOrder, ParentId=@ParentId, FeaturedImageId=@FeaturedImageId, PublishedAt=@PublishedAt,
             MetaTitle=@MetaTitle, MetaDescription=@MetaDescription, CanonicalUrl=@CanonicalUrl,
             OgImage=@OgImage, OgTitle=@OgTitle, OgDescription=@OgDescription,
-            TwitterImage=@TwitterImage, TwitterTitle=@TwitterTitle, TwitterDescription=@TwitterDescription,
+            TwitterImage=@TwitterImage, TwitterTitle=@TwitterTitle, TwitterDescription=@TwitterDescription, CustomFieldsJson=@CustomFieldsJson,
             UpdatedAt=@UpdatedAt WHERE Id=@Id AND AuthorId=@AuthorId",
             new { 
                 page.Title, page.Slug, page.Content, page.IsPublished, page.IsInNav, page.SortOrder,
                 page.ParentId, page.FeaturedImageId, page.PublishedAt,
                 page.MetaTitle, page.MetaDescription, page.CanonicalUrl,
                 page.OgImage, page.OgTitle, page.OgDescription,
-                page.TwitterImage, page.TwitterTitle, page.TwitterDescription,
+                page.TwitterImage, page.TwitterTitle, page.TwitterDescription, page.CustomFieldsJson,
                 UpdatedAt = DateTime.UtcNow, page.Id, page.AuthorId 
             });
     }

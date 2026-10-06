@@ -1,0 +1,84 @@
+@* Markdown editor (ADR-0022): EasyMDE 2.21.0, self-hosted under wwwroot/lib/easymde. Two of its defaults
+   would fetch from a CDN, so both are off: autoDownloadFontAwesome (the toolbar uses inline SVG instead)
+   and spellChecker (the browser's own spell check is used). The preview is rendered by the server with
+   the same Markdig pipeline the save uses, so the preview is what readers get. *@
+<link rel="stylesheet" href="~/lib/easymde/easymde.min.css" asp-append-version="true" />
+<script src="~/lib/easymde/easymde.min.js" asp-append-version="true"></script>
+<script>
+(function () {
+    var textarea = document.getElementById('markdownSource');
+    if (!textarea || !window.EasyMDE) return;
+    var token = document.querySelector('#postForm input[name="__RequestVerificationToken"]');
+    var previewTimer = null, previewSeq = 0;
+
+    function svg(path) {
+        return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+    }
+    function btn(name, action, title, icon) { return { name: name, action: action, title: title, icon: svg(icon) }; }
+
+    var mde = new EasyMDE({
+        element: textarea,
+        autoDownloadFontAwesome: false,
+        spellChecker: false,
+        nativeSpellcheck: true,
+        forceSync: true,
+        status: ['lines', 'words'],
+        minHeight: '24rem',
+        previewClass: ['editor-preview', 'prose'],
+        toolbar: [
+            btn('bold', EasyMDE.toggleBold, 'Bold (Ctrl+B)', '<path d="M6 4h8a4 4 0 0 1 0 8H6z"/><path d="M6 12h9a4 4 0 0 1 0 8H6z"/>'),
+            btn('italic', EasyMDE.toggleItalic, 'Italic (Ctrl+I)', '<line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>'),
+            btn('heading', EasyMDE.toggleHeadingSmaller, 'Heading (Ctrl+H)', '<path d="M6 4v16"/><path d="M18 4v16"/><path d="M6 12h12"/>'),
+            '|',
+            btn('quote', EasyMDE.toggleBlockquote, "Quote (Ctrl+')", '<path d="M3 21c3 0 7-1 7-8V5H3v8h4"/><path d="M14 21c3 0 7-1 7-8V5h-7v8h4"/>'),
+            btn('unordered-list', EasyMDE.toggleUnorderedList, 'Bulleted list (Ctrl+L)', '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>'),
+            btn('ordered-list', EasyMDE.toggleOrderedList, 'Numbered list (Ctrl+Alt+L)', '<line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>'),
+            '|',
+            btn('link', EasyMDE.drawLink, 'Link (Ctrl+K)', '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'),
+            btn('image', EasyMDE.drawImage, 'Image (Ctrl+Alt+I)', '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>'),
+            // A gallery is HTML inside the Markdown: blank lines around it keep it one HTML block.
+            btn('gallery', function (editor) {
+                if (!window.InkwellGallery) return;
+                InkwellGallery.pick().then(function (html) {
+                    if (html) { editor.codemirror.replaceSelection('\n\n' + html + '\n\n'); editor.codemirror.focus(); }
+                });
+            }, 'Gallery', '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+            btn('table', EasyMDE.drawTable, 'Table', '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/>'),
+            '|',
+            btn('preview', EasyMDE.togglePreview, 'Preview (Ctrl+P)', '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>'),
+            btn('side-by-side', EasyMDE.toggleSideBySide, 'Side by side (F9)', '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>'),
+            '|',
+            { name: 'guide', action: 'https://commonmark.org/help/', title: 'Markdown reference (opens commonmark.org)', icon: svg('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>') },
+        ],
+        previewRender: function (plain, preview) {
+            // Side-by-side asks on every keystroke: wait for a pause, and show only the newest answer.
+            clearTimeout(previewTimer);
+            var ticket = ++previewSeq;
+            previewTimer = setTimeout(function () {
+                var body = new FormData();
+                body.append('markdown', plain);
+                if (token) body.append('__RequestVerificationToken', token.value);
+                fetch('/admin/posts/markdown-preview', { method: 'POST', body: body, credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+                    .then(function (html) { if (ticket === previewSeq) preview.innerHTML = html; })
+                    .catch(function () { if (ticket === previewSeq) preview.innerHTML = '<p>The preview could not be loaded. Your text is safe; try again in a moment.</p>'; });
+            }, 300);
+            return preview.innerHTML || '<p>Rendering preview…</p>';
+        },
+    });
+
+    // Tab and Shift+Tab leave the editor like any field (no keyboard trap); indent with Ctrl+] and Ctrl+[.
+    mde.codemirror.setOption('extraKeys', Object.assign({}, mde.codemirror.getOption('extraKeys') || {}, { Tab: false, 'Shift-Tab': false }));
+    // The textarea's label no longer reaches the editing area EasyMDE draws, so name that directly.
+    mde.codemirror.setOption('screenReaderLabel', 'Post body in Markdown');
+
+    // The Desk's unsaved-changes guard listens for input events on the form; the editor writes through
+    // forceSync without firing them, so announce each change.
+    mde.codemirror.on('change', function () { textarea.dispatchEvent(new Event('input', { bubbles: true })); });
+    // Toolbar buttons are icon-only: give each its title as an accessible name.
+    document.querySelectorAll('.EasyMDEContainer .editor-toolbar button').forEach(function (b) {
+        // Shortcut hints are dropped from the name, but the guide keeps "(opens commonmark.org)": it leaves the Desk.
+        if (!b.getAttribute('aria-label') && b.title) b.setAttribute('aria-label', b.classList.contains('guide') ? b.title : b.title.replace(/\s*\(.*\)$/, ''));
+    });
+})();
+</script>

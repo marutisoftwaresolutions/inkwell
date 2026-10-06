@@ -16,7 +16,7 @@
     <div>
         <h2 class="text-lg font-semibold text-foreground">Revision #@revision.Number <span class="text-muted-foreground font-normal">vs current</span></h2>
         <p class="text-xs text-muted-foreground mt-0.5">
-            @revision.Reason · @revision.CreatedAt.ToString("d MMM yyyy HH:mm") UTC@(string.IsNullOrEmpty(revision.AuthorName) ? "" : " · " + revision.AuthorName) · was @revision.Status
+            @revision.Reason · @Dates.DateTime(revision.CreatedAt)@(string.IsNullOrEmpty(revision.AuthorName) ? "" : " · " + revision.AuthorName) · was @revision.Status
             · <span class="text-emerald-700">+@added</span> <span class="text-red-700">−@removed</span> lines from this revision to now
         </p>
     </div>

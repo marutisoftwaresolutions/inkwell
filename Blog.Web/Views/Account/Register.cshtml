@@ -14,6 +14,9 @@
     }
     catch { }
     var hasError = ViewBag.Error != null;
+    // First run (no accounts yet): offer restoring a backup instead of starting empty. Fails closed to hidden.
+    var firstRun = false;
+    try { firstRun = !await UsersRepo.AnyUsersExistAsync(); } catch { }
 }
 <!DOCTYPE html>
 <html lang="en" data-theme="@colorScheme">
@@ -115,6 +118,12 @@
             <div class="text-center text-sm mt-5 text-muted-foreground">
                 Already have an account? <a href="/account/login" class="text-foreground hover:underline font-medium">Sign in</a>
             </div>
+            @if (firstRun)
+            {
+                <div class="text-center text-sm mt-2 text-muted-foreground">
+                    Moving an existing site? <a href="/setup/restore" class="text-foreground underline underline-offset-2 font-medium">Restore from a backup</a>
+                </div>
+            }
         </form>
 
         <script>

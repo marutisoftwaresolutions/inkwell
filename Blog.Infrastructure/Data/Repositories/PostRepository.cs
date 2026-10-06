@@ -135,6 +135,41 @@ public class PostRepository : IPostRepository
         };
     }
 
+    public async Task<IReadOnlyList<Post>> GetScheduledReachedAsync(DateTime fromUtc, DateTime toUtc)
+    {
+        using var conn = _ctx.CreateConnection();
+        var rows = await conn.QueryAsync<Post>(@"
+            SELECT Id, Title, Slug, AuthorId, Status, ScheduledAt, PublishedAt, UpdatedAt, MetaDescription
+              FROM Posts
+             WHERE Status = 'Scheduled' AND ScheduledAt > @From AND ScheduledAt <= @To;",
+            new { From = fromUtc, To = toUtc });
+        return rows.ToList();
+    }
+
+    public async Task SetWorkflowAsync(Guid id, PostStatus status, string? reviewNote, DateTime? reviewRequestedAt, DateTime? publishedAt)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync(@"
+            UPDATE Posts
+               SET Status = @Status, ReviewNote = @ReviewNote, ReviewRequestedAt = @ReviewRequestedAt,
+                   PublishedAt = COALESCE(PublishedAt, @PublishedAt), UpdatedAt = SYSUTCDATETIME()
+             WHERE Id = @Id;",
+            new { Id = id, Status = status.ToString(), ReviewNote = reviewNote, ReviewRequestedAt = reviewRequestedAt, PublishedAt = publishedAt });
+    }
+
+    public async Task<IReadOnlyList<Post>> GetReviewQueueAsync(int take, Guid? authorId = null)
+    {
+        using var conn = _ctx.CreateConnection();
+        var rows = await conn.QueryAsync<Post>(@"
+            SELECT TOP (@Take) p.Id, p.Title, p.Slug, p.AuthorId, p.Status, p.ReviewRequestedAt, p.UpdatedAt, u.DisplayName AS AuthorName
+              FROM Posts p
+              LEFT JOIN Users u ON u.Id = p.AuthorId
+             WHERE p.Status = 'InReview'" + (authorId.HasValue ? " AND p.AuthorId = @AuthorId" : "") + @"
+             ORDER BY COALESCE(p.ReviewRequestedAt, p.UpdatedAt), p.Id;",
+            new { Take = take, AuthorId = authorId });
+        return rows.ToList();
+    }
+
     public async Task<Post?> GetByIdAsync(Guid id, Guid? authorId = null)
     {
         using var conn = _ctx.CreateConnection();
@@ -200,13 +235,13 @@ public class PostRepository : IPostRepository
                                MetaTitle, MetaDescription, CanonicalUrl, OgImage, OgTitle, OgDescription,
                                TwitterImage, TwitterTitle, TwitterDescription,
                                AuthorId, Status, PublishedAt, LastVerifiedAt, NextReviewAt, ScheduledAt,
-                               AllowComments, FaqJson, RoundupJson, KeyFactsJson, HowToJson, AnswerCapsule, CreatedAt, UpdatedAt)
+                               AllowComments, FaqJson, RoundupJson, KeyFactsJson, HowToJson, AnswerCapsule, Markdown, EditorMode, CustomFieldsJson, CreatedAt, UpdatedAt)
             OUTPUT INSERTED.Id
             VALUES (@Id, @Uuid, @Title, @Slug, @Html, @Plaintext, @Type, @Visibility, @FeatureImage,
                     @MetaTitle, @MetaDescription, @CanonicalUrl, @OgImage, @OgTitle, @OgDescription,
                     @TwitterImage, @TwitterTitle, @TwitterDescription,
                     @AuthorId, @Status, @PublishedAt, @LastVerifiedAt, @NextReviewAt, @ScheduledAt,
-                    @AllowComments, @FaqJson, @RoundupJson, @KeyFactsJson, @HowToJson, @AnswerCapsule, @CreatedAt, @UpdatedAt)",
+                    @AllowComments, @FaqJson, @RoundupJson, @KeyFactsJson, @HowToJson, @AnswerCapsule, @Markdown, @EditorMode, @CustomFieldsJson, @CreatedAt, @UpdatedAt)",
             new
             {
                 post.Id, post.Uuid, post.Title, post.Slug, post.Html, post.Plaintext, post.Type, post.Visibility, post.FeatureImage,
@@ -215,6 +250,7 @@ public class PostRepository : IPostRepository
                 post.AuthorId, Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
                 post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson, post.AnswerCapsule,
+                post.Markdown, EditorMode = Blog.Core.Services.EditorModes.Normalize(post.EditorMode), post.CustomFieldsJson,
                 CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
             });
     }
@@ -232,6 +268,7 @@ public class PostRepository : IPostRepository
                 Status = @Status, PublishedAt = @PublishedAt, LastVerifiedAt = @LastVerifiedAt,
                 NextReviewAt = @NextReviewAt, ScheduledAt = @ScheduledAt,
                 AllowComments = @AllowComments, FaqJson = @FaqJson, RoundupJson = @RoundupJson, KeyFactsJson = @KeyFactsJson, HowToJson = @HowToJson, AnswerCapsule = @AnswerCapsule,
+                Markdown = @Markdown, EditorMode = @EditorMode, CustomFieldsJson = @CustomFieldsJson,
                 UpdatedAt = @UpdatedAt
             WHERE Id = @Id AND AuthorId = @AuthorId",
             new
@@ -242,6 +279,7 @@ public class PostRepository : IPostRepository
                 Status = post.Status.ToString(),
                 post.PublishedAt, post.LastVerifiedAt, post.NextReviewAt, post.ScheduledAt,
                 post.AllowComments, post.FaqJson, post.RoundupJson, post.KeyFactsJson, post.HowToJson, post.AnswerCapsule,
+                post.Markdown, EditorMode = Blog.Core.Services.EditorModes.Normalize(post.EditorMode), post.CustomFieldsJson,
                 UpdatedAt = DateTime.UtcNow, post.Id, post.AuthorId
             });
     }
@@ -261,10 +299,19 @@ public class PostRepository : IPostRepository
         await conn.ExecuteAsync("DELETE FROM Posts WHERE Id = @Id", new { Id = id });
     }
 
-    public async Task IncrementViewCountAsync(Guid id)
+    public async Task<int> AddViewCountsAsync(IReadOnlyList<Blog.Core.Services.PostViewCount> counts)
     {
+        if (counts.Count == 0) return 0;
         using var conn = _ctx.CreateConnection();
-        await conn.ExecuteAsync("UPDATE Posts SET ViewCount = ViewCount + 1 WHERE Id = @Id", new { Id = id });
+        // An empty owner (single-site mode) matches the slug alone; a tenant also matches on its posts.
+        // Only posts readers can see (the public listing's rule), so a beacon from an anonymous preview
+        // of a draft counts nothing.
+        return await conn.ExecuteAsync(@"
+            UPDATE Posts SET ViewCount = ViewCount + @Views
+            WHERE Slug = @Slug
+              AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= SYSUTCDATETIME()))
+              AND (@OwnerId = '00000000-0000-0000-0000-000000000000' OR AuthorId = @OwnerId)",
+            counts.Select(c => new { c.Views, c.Slug, c.OwnerId }));
     }
 
     public async Task<bool> SlugExistsAsync(string slug, Guid? excludeId = null)

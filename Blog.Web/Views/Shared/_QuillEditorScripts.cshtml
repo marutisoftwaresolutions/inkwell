@@ -87,6 +87,25 @@
     ButtonBlockBlot.className = 'ql-button-block';
     Quill.register(ButtonBlockBlot);
 
+    // ── Gallery Blot (shared markup from inkwell-gallery-editor.js) ──
+    // The same <div class="comp-gallery"> the builders save, so a post started here opens as a gallery
+    // block in the full editor, where alt text, captions and order can be changed.
+    class GalleryBlot extends BlockEmbed {
+        static create(value) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = window.InkwellGallery ? InkwellGallery.html(value || {}) : '';
+            const node = tmp.firstElementChild || document.createElement('div');
+            node.classList.add('comp-gallery');
+            node.setAttribute('contenteditable', 'false');
+            return node;
+        }
+        static value(node) { return window.InkwellGallery ? InkwellGallery.parse(node) : { columns: '3', items: [] }; }
+    }
+    GalleryBlot.blotName  = 'gallery';
+    GalleryBlot.tagName   = 'div';
+    GalleryBlot.className = 'comp-gallery';
+    Quill.register(GalleryBlot);
+
     function initQuill(editorId, contentInputId) {
         var quill = new Quill(editorId, {
             theme: 'snow',

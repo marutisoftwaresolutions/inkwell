@@ -1,11 +1,15 @@
-<div x-data="mediaSelector()" 
-     x-show="isOpen" 
+@* Media picker. Open it with window.dispatchEvent(new CustomEvent('open-media-selector', { detail: {...} })).
+   Single mode (default) fills targetInput / targetIdInput / previewImg and fires 'media-selected' { url, id, altText, caption, width, height }.
+   Multiple mode ({ multiple: true }, used by the gallery block) keeps the order images were picked in and fires
+   'media-selected-many' { items: [{ url, id, altText, caption, width, height }, ...] }. *@
+<div x-data="mediaSelector()"
+     x-show="isOpen"
      @@keydown.escape.window="closeModal()"
      class="fixed inset-0 z-[100] flex items-center justify-center hidden"
      :class="{ 'hidden': !isOpen }">
-    
+
     <!-- Backdrop -->
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
          @@click="closeModal()"
          x-show="isOpen"
          x-transition:enter="ease-out duration-300"
@@ -16,7 +20,7 @@
          x-transition:leave-end="opacity-0"></div>
 
     <!-- Modal Content -->
-    <div role="dialog" aria-modal="true" aria-labelledby="media-selector-title" class="bg-card w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl border border-border flex flex-col relative z-10 transform scale-100 overflow-hidden"
+    <div role="dialog" aria-modal="true" x-ref="panel" @@keydown.tab="trapTab($event)" aria-labelledby="media-selector-title" class="bg-card w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl border border-border flex flex-col relative z-10 transform scale-100 overflow-hidden"
          x-show="isOpen"
          x-transition:enter="ease-out duration-300"
          x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
@@ -24,18 +28,21 @@
          x-transition:leave="ease-in duration-200"
          x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
          x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
-        
+
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/30">
-            <h2 id="media-selector-title" class="text-xl font-semibold text-foreground">Select Media</h2>
-            <div class="flex items-center gap-3">
-                <label class="cursor-pointer px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium rounded-md shadow-sm transition-colors" :class="{'opacity-50 pointer-events-none': uploading}">
-                    <span x-show="!uploading">Upload New</span>
-                    <span x-show="uploading">Uploading...</span>
-                    <input type="file" class="hidden" accept="image/*" @@change="handleUpload" :disabled="uploading" />
+        <div class="px-6 py-4 border-b border-border flex justify-between items-center gap-4 bg-muted/30">
+            <div class="min-w-0">
+                <h2 id="media-selector-title" class="text-xl font-semibold text-foreground" x-text="multiple ? 'Choose images for the gallery' : 'Select media'">Select media</h2>
+                <p x-show="multiple" class="text-xs text-muted-foreground mt-0.5">Pick images in the order they should appear. Alt text and captions come from each image's details in the media library.</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <label class="cursor-pointer px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium rounded-md shadow-sm transition-colors focus-within:ring-2 focus-within:ring-ring" :class="{'opacity-50 pointer-events-none': uploading}">
+                    <span x-show="!uploading">Upload new</span>
+                    <span x-show="uploading">Uploading…</span>
+                    <input type="file" class="sr-only" accept="image/*" @@change="handleUpload" :disabled="uploading" aria-label="Upload a new image" />
                 </label>
                 <button type="button" @@click="closeModal()" aria-label="Close media picker" class="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
         </div>
@@ -47,47 +54,52 @@
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             </template>
-            
+
             <template x-if="!loading && items.length === 0">
                  <div class="text-center py-12 text-muted-foreground">
-                    <svg class="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    <p>No images found in your library.</p>
+                    <svg class="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <p>No images in the library yet. Upload one with <strong>Upload new</strong>.</p>
                 </div>
             </template>
 
             <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                 <template x-for="item in items" :key="item.id">
-                    <div @@click="selectItem(item)" 
-                         class="group relative aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all"
-                         :class="selectedItem?.id === item.id ? 'border-primary ring-2 ring-primary/20 scale-95' : 'border-transparent hover:border-border'">
-                        
-                        <img :src="item.url" :alt="item.originalFileName" class="w-full h-full object-cover">
-                        
-                        <div class="absolute inset-0 bg-primary/20 opacity-0 transition-opacity flex items-center justify-center text-primary-foreground"
-                             :class="{ 'opacity-100': selectedItem?.id === item.id }">
-                             <svg x-show="selectedItem?.id === item.id" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-md"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        </div>
-                    </div>
+                    <button type="button" @@click="selectItem(item)"
+                            :aria-pressed="isSelected(item) ? 'true' : 'false'"
+                            :aria-label="(item.altText || item.originalFileName || item.fileName) + (orderOf(item) ? ', image ' + orderOf(item) : '')"
+                            class="group relative aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            :class="isSelected(item) ? 'border-primary ring-2 ring-primary/20 scale-95' : 'border-transparent hover:border-border'">
+
+                        <img :src="item.url" alt="" class="w-full h-full object-cover">
+
+                        <span class="absolute inset-0 bg-primary/20 opacity-0 transition-opacity flex items-center justify-center text-primary-foreground"
+                              :class="{ 'opacity-100': isSelected(item) }">
+                             <svg x-show="isSelected(item) && !multiple" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-md" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                             <span x-show="isSelected(item) && multiple" x-text="orderOf(item)" class="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center shadow" aria-hidden="true"></span>
+                        </span>
+                    </button>
                 </template>
             </div>
-            
+
             <!-- Pagination Controls (Simple Next/Prev) -->
              <div class="mt-6 flex justify-center gap-2" x-show="total > 50">
-                <button type="button" @@click="loadPage(page - 1)" :disabled="page <= 1" class="px-3 py-1 text-sm border border-input rounded disabled:opacity-50">Prev</button>
+                <button type="button" @@click="loadPage(page - 1)" :disabled="page <= 1" class="min-h-10 px-3 text-sm border border-input rounded disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Previous page of images">Previous</button>
                 <span class="px-3 py-1 text-sm">Page <span x-text="page"></span></span>
-                <button type="button" @@click="loadPage(page + 1)" :disabled="items.length < 50" class="px-3 py-1 text-sm border border-input rounded disabled:opacity-50">Next</button>
+                <button type="button" @@click="loadPage(page + 1)" :disabled="items.length < 50" class="min-h-10 px-3 text-sm border border-input rounded disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Next page of images">Next</button>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="px-6 py-4 border-t border-border bg-muted/30 flex justify-between items-center">
-            <div class="text-sm text-muted-foreground truncate max-w-[50%]">
-                <span x-show="selectedItem" x-text="'Selected: ' + selectedItem?.originalFileName"></span>
+            <div class="text-sm text-muted-foreground truncate max-w-[50%]" role="status" aria-live="polite">
+                <span x-show="!multiple && selectedItem" x-text="'Selected: ' + selectedItem?.originalFileName"></span>
+                <span x-show="multiple" x-text="selected.length === 0 ? 'No images chosen yet' : selected.length + (selected.length === 1 ? ' image chosen' : ' images chosen')"></span>
             </div>
             <div class="flex gap-3">
                 <button type="button" @@click="closeModal()" class="px-4 py-2 border border-input hover:bg-accent text-sm font-medium rounded-md transition-colors">Cancel</button>
-                <button type="button" @@click="confirmSelection()" :disabled="!selectedItem" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    Insert Image
+                <button type="button" @@click="confirmSelection()" :disabled="multiple ? selected.length === 0 : !selectedItem" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        x-text="multiple ? (selected.length > 1 ? 'Insert ' + selected.length + ' images' : 'Insert image') : 'Insert image'">
+                    Insert image
                 </button>
             </div>
         </div>
@@ -105,10 +117,13 @@
             total: 0,
             page: 1,
             selectedItem: null,
+            selected: [],        // multiple mode: in the order picked
+            multiple: false,
             targetInputId: null, // the ID of the hidden input to update for URL
             targetIdInput: null, // the ID of the hidden input to update for ID
             previewImgId: null,  // the ID of the img tag to update
             folder: 'images',
+            returnFocus: null,
 
             init() {
                 // Listen for custom event to open the modal
@@ -117,6 +132,8 @@
                     this.targetIdInput = e.detail.targetIdInput;
                     this.previewImgId = e.detail.previewImg;
                     this.folder = e.detail.folder || 'images';
+                    this.multiple = !!e.detail.multiple;
+                    this.returnFocus = document.activeElement;
                     this.openModal();
                 });
             },
@@ -124,13 +141,17 @@
             async openModal() {
                 this.isOpen = true;
                 this.selectedItem = null;
-                if (this.items.length === 0) {
-                    await this.loadPage(1);
-                }
+                this.selected = [];
+                // Reload each time so alt text edited in the library since the last open is current.
+                await this.loadPage(this.items.length === 0 ? 1 : this.page);
+                // Move focus into the dialog: the first image, or Close when the library is empty.
+                this.$nextTick(() => { const first = this.$refs.panel.querySelector('button[aria-pressed]') || this.$refs.panel.querySelector('[aria-label="Close media picker"]'); first?.focus(); });
             },
 
             closeModal() {
+                if (!this.isOpen) return;
                 this.isOpen = false;
+                if (this.returnFocus && this.returnFocus.focus) this.returnFocus.focus();
             },
 
             async loadPage(p) {
@@ -163,7 +184,7 @@
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('folder', this.folder);
-                
+
                 const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
                 if (token) {
                     formData.append('__RequestVerificationToken', token);
@@ -183,7 +204,9 @@
                             url: data.url,
                             fileName: data.fileName,
                             originalFileName: file.name,
-                            contentType: file.type
+                            contentType: file.type,
+                            altText: null,
+                            caption: null
                         };
                         this.items.unshift(newItem);
                         this.selectItem(newItem);
@@ -193,17 +216,50 @@
                     }
                 } catch (e) {
                     console.error("Upload error", e);
+                    InkwellDialog.toast('error', 'The upload did not finish. Check your connection and try again.', 6000);
                 } finally {
                     this.uploading = false;
                     event.target.value = ''; // Reset file input
                 }
             },
 
+            // Keep Tab inside the dialog while it is open.
+            trapTab(e) {
+                const f = Array.from(this.$refs.panel.querySelectorAll('button:not([disabled]), input:not([disabled]), select, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
+                if (f.length === 0) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            },
+
+            isSelected(item) {
+                return this.multiple ? this.selected.some(s => s.id === item.id) : this.selectedItem?.id === item.id;
+            },
+
+            orderOf(item) {
+                const i = this.selected.findIndex(s => s.id === item.id);
+                return i < 0 ? '' : String(i + 1);
+            },
+
             selectItem(item) {
-                this.selectedItem = item;
+                if (!this.multiple) { this.selectedItem = item; return; }
+                const i = this.selected.findIndex(s => s.id === item.id);
+                if (i >= 0) this.selected.splice(i, 1); else this.selected.push(item);
+            },
+
+            detailOf(item) {
+                return { url: item.url, id: item.id, altText: item.altText || '', caption: item.caption || '', width: item.width || null, height: item.height || null };
             },
 
             confirmSelection() {
+                if (this.multiple) {
+                    if (this.selected.length === 0) return;
+                    window.dispatchEvent(new CustomEvent('media-selected-many', {
+                        detail: { items: this.selected.map(s => this.detailOf(s)) }
+                    }));
+                    this.closeModal();
+                    return;
+                }
                 if (this.selectedItem) {
                     // Update hidden input
                     const input = document.getElementById(this.targetInputId);
@@ -226,10 +282,10 @@
                         img.src = this.selectedItem.url;
                         img.classList.remove('hidden');
                     }
-                    
+
                     // Dispatch Custom Event for specific cases
                     window.dispatchEvent(new CustomEvent('media-selected', {
-                        detail: { url: this.selectedItem.url, id: this.selectedItem.id }
+                        detail: this.detailOf(this.selectedItem)
                     }));
 
                     this.closeModal();
@@ -238,3 +294,5 @@
         }));
     });
 </script>
+
+<script src="~/js/inkwell-gallery-editor.js" asp-append-version="true"></script>

@@ -9,6 +9,8 @@ public class CrawlerVisit
     public string   Operator   { get; set; } = "";
     public bool     IsAi       { get; set; }
     public string   Path       { get; set; } = "";
+    /// <summary>The query string without its leading "?", truncated to 512 characters; null when there was none.</summary>
+    public string?  Query      { get; set; }
     public int      StatusCode { get; set; }
     public string?  UserAgent  { get; set; }
     public DateTime VisitedAt  { get; set; }
@@ -51,4 +53,13 @@ public class CrawlerDay
 {
     public DateTime Day    { get; set; }
     public int      Visits { get; set; }
+}
+
+/// <summary>A path and query string crawlers requested, for the "what are they actually fetching" table.</summary>
+public class CrawledRequest
+{
+    public string Path     { get; set; } = "";
+    public string Query    { get; set; } = "";
+    public int    Visits   { get; set; }
+    public int    Crawlers { get; set; }
 }

@@ -1,0 +1,62 @@
+@model Blog.Web.Controllers.NewsletterSubscribeViewModel
+@inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
+@*
+    Reached only when the sign-up form is posted without its script (JavaScript off, or blocked). The form
+    on the home page and posts carries no anti-forgery token so those pages can be cached; this page does,
+    so the reader finishes here with one more press. Also shows the result or an error to fix.
+*@
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = Model.Success ? "Check your inbox" : "Subscribe";
+    ViewData["Robots"] = "noindex, follow";
+    var reCaptchaSiteKey = _rcfg["ReCaptcha:SiteKey"];
+    var hasError = !Model.Success && Model.Message != null;
+}
+
+<div class="min-h-[60vh] flex items-center justify-center px-4">
+    <div class="w-full max-w-md">
+        @if (Model.Success)
+        {
+            <div class="text-center">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style="background: var(--muted);">
+                    <i class="bi bi-check-lg text-2xl" style="color: var(--primary);" aria-hidden="true"></i>
+                </div>
+                <p class="text-lg mb-6" style="color: var(--foreground);" role="status">@Model.Message</p>
+                <a href="/" class="px-6 py-2.5 rounded-md text-sm font-medium hover:opacity-90 transition-opacity" style="background: var(--primary); color: var(--primary-foreground);">Back to Blog</a>
+            </div>
+        }
+        else
+        {
+            <h1 class="text-2xl font-bold mb-2" style="color: var(--foreground);">Subscribe</h1>
+            <p class="text-sm mb-6" style="color: var(--muted-foreground);">
+                @(hasError ? "Correct the address below and subscribe again." : "Press Subscribe to finish signing up. We'll send a confirmation email.")
+            </p>
+            <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-4" novalidate>
+                @Html.AntiForgeryToken()
+                <div class="flex flex-col gap-1">
+                    <label for="nl-email" class="text-sm font-medium" style="color: var(--foreground);">Email address</label>
+                    <input id="nl-email" type="email" name="email" value="@Model.Email" required autocomplete="email"
+                           aria-invalid="@(hasError ? "true" : null)" aria-describedby="@(hasError ? "nl-email-error" : null)"
+                           class="px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
+                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
+                    @if (hasError)
+                    {
+                        <p id="nl-email-error" class="text-sm" role="alert" style="color: var(--destructive, #dc2626);">@Model.Message</p>
+                    }
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label for="nl-name" class="text-sm font-medium" style="color: var(--foreground);">Your name (optional)</label>
+                    <input id="nl-name" type="text" name="name" value="@Model.Name" autocomplete="name"
+                           class="px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
+                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
+                </div>
+                @if (!string.IsNullOrEmpty(reCaptchaSiteKey))
+                {
+                    <div class="g-recaptcha" data-sitekey="@reCaptchaSiteKey"></div>
+                }
+                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                        style="background: var(--primary); color: var(--primary-foreground);">Subscribe</button>
+            </form>
+        }
+    </div>
+</div>

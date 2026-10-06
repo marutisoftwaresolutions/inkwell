@@ -1,6 +1,6 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
-    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
+    var sortedPages = Model.Links;
 }
 
 @* MODERN (Professional) — sharp single bar, solid primary left border accent, no rounded, no gradients *@
@@ -56,8 +56,8 @@
                         </a>
                         @foreach (var navPage in sortedPages)
                         {
-                            <a href="/@navPage.Slug" class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-60 border-b" style="border-color: var(--border); color: var(--foreground);">
-                                <i class="bi bi-chevron-right text-xs" style="color: var(--muted-foreground);"></i> @navPage.Title
+                            <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)" class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-60 border-b" style="border-color: var(--border); color: var(--foreground);">
+                                <i class="bi bi-chevron-right text-xs" style="color: var(--muted-foreground);"></i> @if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title
                             </a>
                         }
                     </div>
@@ -90,7 +90,7 @@
             <a href="/" class="py-3 text-sm font-semibold border-b hover:opacity-60" style="border-color: var(--border); color: var(--foreground);">Home</a>
             @foreach (var navPage in sortedPages)
             {
-                <a href="/@navPage.Slug" class="py-3 text-sm border-b hover:opacity-60" style="border-color: var(--border); color: var(--foreground);">@navPage.Title</a>
+                <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)" class="py-3 text-sm border-b hover:opacity-60" style="border-color: var(--border); color: var(--foreground);">@if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title</a>
             }
             @if (User.Identity != null && User.Identity.IsAuthenticated)
             {

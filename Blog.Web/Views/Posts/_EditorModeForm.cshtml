@@ -1,0 +1,12 @@
+@model Blog.Core.Domain.Post
+@* Switching between the visual editor and Markdown (ADR-0022). Its own form, outside the tracked editor:
+   it is a separate, confirmed save, not an edit. The toolbar button submits it with form="editorModeForm". *@
+<form method="post" action="/admin/posts/@Model.Id/editor-mode" id="editorModeForm"
+      data-confirm-title="@(Model.IsMarkdown ? "Switch to the visual editor?" : "Write this post in Markdown?")"
+      data-confirm-body="@(Model.IsMarkdown
+          ? "The post keeps its current HTML and the Markdown source is no longer used. Unsaved changes on this page are not included: save first."
+          : "The post's current HTML becomes its Markdown source, unchanged, and it is shown exactly as before. Unsaved changes on this page are not included: save first.")"
+      data-confirm-action="@(Model.IsMarkdown ? "Use the visual editor" : "Switch to Markdown")" data-confirm-tone="warning">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="mode" value="@(Model.IsMarkdown ? "rich" : "markdown")" />
+</form>

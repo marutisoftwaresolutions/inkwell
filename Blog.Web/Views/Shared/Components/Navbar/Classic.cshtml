@@ -1,6 +1,6 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
-    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
+    var sortedPages = Model.Links;
 }
 
 @* CLASSIC — Old newspaper left-aligned masthead: thick left accent · full-width top bar · stacked right icons *@
@@ -56,8 +56,8 @@
                         </a>
                         @foreach (var p in sortedPages)
                         {
-                            <a href="/@p.Slug" class="flex items-center gap-3 px-4 py-3 text-sm hover:opacity-60 border-b" style="border-color: var(--border); color: var(--foreground);">
-                                <i class="bi bi-chevron-right text-xs" style="color: var(--muted-foreground);"></i> @p.Title
+                            <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="flex items-center gap-3 px-4 py-3 text-sm hover:opacity-60 border-b" style="border-color: var(--border); color: var(--foreground);">
+                                <i class="bi bi-chevron-right text-xs" style="color: var(--muted-foreground);"></i> @if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title
                             </a>
                         }
                     </div>
@@ -86,7 +86,7 @@
             <a href="/" class="py-3 text-sm font-semibold uppercase border-b hover:opacity-60" style="border-color: var(--border);">Home</a>
             @foreach (var p in sortedPages)
             {
-                <a href="/@p.Slug" class="py-3 text-sm uppercase border-b hover:opacity-60" style="border-color: var(--border); color: var(--foreground);">@p.Title</a>
+                <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="py-3 text-sm uppercase border-b hover:opacity-60" style="border-color: var(--border); color: var(--foreground);">@if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title</a>
             }
             @if (User.Identity != null && User.Identity.IsAuthenticated)
             {

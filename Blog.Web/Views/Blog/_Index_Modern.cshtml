@@ -75,7 +75,7 @@
                         @(string.IsNullOrEmpty(heroPost.AuthorName) ? "Anonymous" : heroPost.AuthorName)
                     </span>
                     <span>•</span>
-                    <span><i class="bi bi-calendar3 me-1"></i>@heroPost.PublishedAt?.ToString("MMMM d, yyyy")</span>
+                    <span><i class="bi bi-calendar3 me-1"></i>@Dates.Long(heroPost.PublishedAt)</span>
                 </div>
             </div>
 

@@ -1,4 +1,6 @@
+using Blog.Core.Domain;
 using Blog.Core.Interfaces;
+using Blog.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,10 +11,12 @@ namespace Blog.Web.Controllers;
 public class SubscribersController : Controller
 {
     private readonly IMemberRepository _members;
+    private readonly AuditService _audit;
 
-    public SubscribersController(IMemberRepository members)
+    public SubscribersController(IMemberRepository members, AuditService audit)
     {
         _members = members;
+        _audit = audit;
     }
 
     [HttpGet("")]
@@ -39,6 +43,8 @@ public class SubscribersController : Controller
     public async Task<IActionResult> Delete(Guid id, string? status, int page = 1)
     {
         await _members.DeleteAsync(id);
+        // By id only: the address is personal data and the audit trail is permanent.
+        await _audit.LogAsync(AuditActions.SubscriberDeleted, "Subscriber", id.ToString(), "Subscriber");
         TempData["Success"] = "Subscriber removed.";
         return RedirectToAction(nameof(Index), new { status, page });
     }

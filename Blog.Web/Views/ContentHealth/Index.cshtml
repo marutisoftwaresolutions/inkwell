@@ -23,7 +23,7 @@
         var d = utc.Value - DateTime.UtcNow;
         if (d.TotalDays < 0) return $"overdue {(int)-d.TotalDays}d";
         if (d.TotalDays < 30) return $"in {(int)d.TotalDays}d";
-        return utc.Value.ToString("d MMM yyyy");
+        return Dates.CalendarDate(utc, Blog.Core.Services.DateStyle.Medium);
     }
     string TileClass(string key) => filter == key
         ? "rounded-xl border-2 border-emerald-500 bg-card p-4 block"
@@ -92,7 +92,7 @@
             <div class="text-xs text-muted-foreground mt-1">Low CTR for rank</div>
         </a>
     </div>
-    <p class="text-[11px] text-muted-foreground mb-6">Google Search, web results, 28 days through @(summary.SearchAsOf?.ToString("d MMM yyyy")) against the 28 before.</p>
+    <p class="text-[11px] text-muted-foreground mb-6">Google Search, web results, 28 days through @Dates.CalendarDate(summary.SearchAsOf, Blog.Core.Services.DateStyle.Medium) against the 28 before.</p>
 }
 else if (ViewBag.SearchConfigured == true)
 {
@@ -149,11 +149,11 @@ else
                         }
                     </td>
                     <td class="px-4 py-2 text-xs whitespace-nowrap @(i.NeverVerified ? "text-amber-600" : "text-muted-foreground")"
-                        title="@(i.LastVerifiedAt?.ToString("u") ?? "never verified")">
+                        title="@(i.LastVerifiedAt is null ? "never verified" : Dates.CalendarDate(i.LastVerifiedAt))">
                         @(i.NeverVerified ? "never" : Ago(i.LastVerifiedAt))
                     </td>
                     <td class="px-4 py-2 text-xs whitespace-nowrap @(i.ReviewOverdue ? "text-red-600 font-medium" : i.ReviewDueSoon ? "text-amber-600" : "text-muted-foreground")"
-                        title="@(i.NextReviewAt?.ToString("u") ?? "no review date")">
+                        title="@(i.NextReviewAt is null ? "no review date" : Dates.CalendarDate(i.NextReviewAt))">
                         @Due(i.NextReviewAt)
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">

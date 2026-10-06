@@ -3,6 +3,12 @@
     Layout = "_AdminLayout";
     ViewData["Title"] = "New Post";
     var formAction = "/admin/posts/create";
+    // Editorial workflow: without the publish permission the main button submits for review (the server enforces it too).
+    var canPublish = User.HasClaim("Permission", "posts.publish");
+    var publishLabel = canPublish ? "Publish" : "Submit for review";
+    var modalTitleText = canPublish ? "Ready to publish?" : "Submit for review?";
+    var modalDescText = canPublish ? "This will make your post publicly visible to all visitors." : "An editor will read it, then publish it or send it back with notes.";
+    var modalConfirmText = canPublish ? "Confirm Publish" : "Submit for review";
 }
 
 <div class="h-[calc(100vh-8rem)] flex flex-col">
@@ -10,6 +16,7 @@
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" />
         <input type="hidden" name="Plaintext" id="postPlaintext" />
+        <input type="hidden" name="EditorMode" value="@Model.EditorMode" />
 
         <!-- Toolbar -->
         <div class="flex items-center justify-between mb-4 gap-4">
@@ -20,11 +27,14 @@
                 </a>
             </div>
             <div class="flex items-center gap-2">
+                <a href="/admin/posts/create?mode=@(Model.IsMarkdown ? "rich" : "markdown")" data-editor-switch class="hidden md:inline-flex px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+                    @(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")
+                </a>
                 <button type="submit" name="submitAction" value="draft" class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">
                     Save Draft
                 </button>
                 <span data-dirty-indicator hidden>Unsaved changes</span> <button type="button" id="publishBtn" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">
-                    Publish
+                    @publishLabel
                 </button>
                 <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-2 border border-input rounded-md">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -38,7 +48,11 @@
                 <input type="text" name="Title" id="postTitle" value="@Model.Title" aria-label="Title" placeholder="Post Title" 
                        class="w-full px-6 py-4 text-3xl font-bold bg-transparent focus:outline-none placeholder:text-muted/50 border-b border-border" />
                 
-                <div id="editor-container" class="flex-1 overflow-hidden relative">
+                @if (Model.IsMarkdown)
+                {
+                    <partial name="_MarkdownPane" model="Model" />
+                }
+                <div id="editor-container" class="flex-1 overflow-hidden relative" hidden="@Model.IsMarkdown">
                     <div id="quill-editor" class="h-full"></div>
                 </div>
             </div>
@@ -50,6 +64,9 @@
                     <button type="button" data-settings-close onclick="toggleSettingsPanel(false)" aria-label="Close post settings" class="md:hidden h-8 w-8 inline-flex items-center justify-center rounded-md border border-input hover:bg-muted">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
+                </div>
+                <div class="md:hidden mb-4">
+                    <a href="/admin/posts/create?mode=@(Model.IsMarkdown ? "rich" : "markdown")" data-editor-switch class="flex items-center justify-center w-full min-h-10 px-3 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</a>
                 </div>
                 
                 <details class="group" data-desk-section="post-publishing" open>
@@ -241,6 +258,8 @@
                     </div>
                 </div>
                 </details>
+
+                <partial name="_CustomFieldsPanel" />
 
                 <!-- SEO & Social settings -->
                 <details class="group border-t border-border" data-desk-section="post-seo">
@@ -447,8 +466,8 @@
 <!-- Publish Modal -->
 <div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
     <div class="bg-card w-full max-w-sm rounded-lg shadow-lg border border-border p-6 transform transition-all scale-100">
-        <h3 id="modalTitle" class="text-lg font-semibold mb-2">Ready to publish?</h3>
-        <p id="modalDesc" class="text-muted-foreground mb-6">This will make your post publicly visible to all visitors.</p>
+        <h3 id="modalTitle" class="text-lg font-semibold mb-2">@modalTitleText</h3>
+        <p id="modalDesc" class="text-muted-foreground mb-6">@modalDescText</p>
         <div class="flex justify-end gap-3">
             <button type="button" onclick="document.getElementById('publishModal').classList.add('hidden')" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Cancel</button>
             <button type="button" id="modalConfirmBtn" onclick="confirmPublish()" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Confirm Publish</button>
@@ -457,6 +476,11 @@
 </div>
 
 @section Scripts {
+    <partial name="_EditorSwitchGuard" />
+    @if (Model.IsMarkdown)
+    {
+        <partial name="_MarkdownEditorScripts" />
+    }
     <partial name="_QuillEditorScripts" />
     <script>
         // Global Data
@@ -581,7 +605,7 @@
         var modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
         function updatePublishButton() {
-            if (scheduleInput && scheduleInput.value) {
+            if (@(canPublish ? "true" : "false") && scheduleInput && scheduleInput.value) {
                 var selectedDate = new Date(scheduleInput.value);
                 if (selectedDate > new Date()) {
                     if (publishBtn) publishBtn.innerText = 'Schedule';
@@ -591,10 +615,10 @@
                     return;
                 }
             }
-            if (publishBtn) publishBtn.innerText = 'Publish';
-            if (modalTitle) modalTitle.innerText = 'Ready to publish?';
-            if (modalDesc) modalDesc.innerText = 'This will make your post publicly visible to all visitors.';
-            if (modalConfirmBtn) modalConfirmBtn.innerText = 'Confirm Publish';
+            if (publishBtn) publishBtn.innerText = @Json.Serialize(publishLabel);
+            if (modalTitle) modalTitle.innerText = @Json.Serialize(modalTitleText);
+            if (modalDesc) modalDesc.innerText = @Json.Serialize(modalDescText);
+            if (modalConfirmBtn) modalConfirmBtn.innerText = @Json.Serialize(modalConfirmText);
         }
 
         if (scheduleInput) {

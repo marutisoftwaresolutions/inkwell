@@ -1953,3 +1953,57 @@ header:has(> .ink-nav-search), nav:has(> .ink-nav-search) { position: relative; 
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ── Cookie consent (v1.0.8) ─────────────────────────────────────
+   Shown by wwwroot/js/inkwell-consent.js only when the reader has not chosen yet. Fixed to the
+   bottom so it never shifts the page; Accept and Reject carry equal weight on purpose. Tokens only,
+   so every preset and both colour schemes render it. */
+.ink-consent {
+  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 60;
+  max-width: 720px; margin: 0 auto; padding: 16px 18px;
+  background: var(--surface); color: var(--fg-body);
+  border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+  font-family: var(--sans); font-size: 15px; line-height: 1.5;
+}
+.ink-consent[hidden] { display: none; }
+.ink-consent__title { margin: 0 0 4px; font-weight: 600; color: var(--fg); font-size: 15px; }
+.ink-consent__text { margin: 0 0 12px; }
+.ink-consent__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ink-consent__btn {
+  min-height: 40px; padding: 8px 18px; border-radius: 4px; cursor: pointer;
+  font: inherit; font-weight: 600;
+  background: var(--fg); color: var(--bg); border: 1px solid var(--fg);
+}
+.ink-consent__btn:hover { opacity: .9; }
+.ink-consent-settings {
+  display: block; margin: 0 auto; padding: 12px 16px 20px; text-align: center;
+  background: none; border: 0; cursor: pointer;
+  font: 13px var(--sans); color: var(--fg-meta); text-decoration: underline; text-underline-offset: 2px;
+}
+.ink-consent-settings:hover { color: var(--link-hover); }
+@media print { .ink-consent, .ink-consent-settings { display: none; } }
+
+/* ── Custom fields shown to readers ("Details", ADR-0025) — Inkwell tokens, so every preset and both schemes apply ── */
+.ink-details {
+  border: 1px solid var(--border);
+  border-radius: var(--r-2, 6px);
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  background: var(--surface, transparent);
+}
+.ink-details-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.6rem;
+  color: var(--fg-meta, inherit);
+}
+.ink-details dl { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; margin: 0; }
+.ink-details dt { font-weight: 600; color: var(--fg, inherit); }
+.ink-details dd { margin: 0; color: var(--fg-body, inherit); overflow-wrap: anywhere; }
+.ink-details a { color: var(--link, inherit); }
+@media (max-width: 480px) {
+  .ink-details dl { grid-template-columns: 1fr; gap: 0.1rem; }
+  .ink-details dd { margin-bottom: 0.5rem; }
+}

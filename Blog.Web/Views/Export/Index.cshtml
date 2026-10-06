@@ -1,0 +1,234 @@
+@model Blog.Web.Controllers.ExportViewModel
+@using Blog.Core.Services.Export
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Export";
+    var wp = Model.Target == ExportTarget.WordPress;
+    var o = Model.Options;
+    var c = Model.Counts;
+
+    string TabUrl(ExportTarget t) =>
+        $"/admin/export?target={t}&includeDrafts={o.IncludeDrafts.ToString().ToLowerInvariant()}&includePages={o.IncludePages.ToString().ToLowerInvariant()}" +
+        $"&includeComments={o.IncludeComments.ToString().ToLowerInvariant()}&includeEmails={o.IncludeEmails.ToString().ToLowerInvariant()}" +
+        $"&siteAddress={Uri.EscapeDataString(Model.SiteAddress)}";
+    string Pill(FidelityOutcome f) => f switch { FidelityOutcome.Kept => "pill-ok", FidelityOutcome.Changed => "pill-warn", _ => "pill-bad" };
+    string Word(FidelityOutcome f) => f switch { FidelityOutcome.Kept => "Kept", FidelityOutcome.Changed => "Changed", _ => "Not exported" };
+    var nothing = c.Posts == 0 && (!o.IncludePages || c.Pages == 0);
+}
+
+<div class="flex flex-col gap-6 max-w-4xl">
+    <div>
+        <p class="text-sm text-muted-foreground max-w-2xl">
+            Download this site's content in a format WordPress or Ghost imports directly. Check what carries over below before you
+            download. To move a whole Inkwell site, including users, settings and subscribers, use
+            <a href="/admin/backups" class="underline">Backups</a> instead.
+        </p>
+    </div>
+
+    <nav aria-label="Export format" class="flex gap-2">
+        @foreach (var t in new[] { ExportTarget.WordPress, ExportTarget.Ghost })
+        {
+            var active = t == Model.Target;
+            <a href="@TabUrl(t)" aria-current="@(active ? "page" : null)"
+               class="px-4 min-h-10 inline-flex items-center rounded-md border text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring @(active ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground hover:bg-muted")">
+                @(t == ExportTarget.WordPress ? "WordPress" : "Ghost")
+            </a>
+        }
+    </nav>
+
+    <form method="get" action="/admin/export" id="export-options" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3">
+        <input type="hidden" name="target" value="@Model.Target" />
+        <input type="hidden" name="submitted" value="true" />
+        <input type="hidden" name="siteAddress" value="@Model.SiteAddress" />
+        <h2 class="text-sm font-semibold text-foreground">What to include</h2>
+        <label class="flex items-start gap-2 text-sm text-foreground">
+            <input type="checkbox" name="includeDrafts" value="true" checked="@o.IncludeDrafts" class="mt-1 h-4 w-4 rounded border-input" />
+            <span>Unpublished posts <span class="block text-xs text-muted-foreground">Drafts, posts in review and posts sent back. Published and scheduled posts are always included.</span></span>
+        </label>
+        <label class="flex items-start gap-2 text-sm text-foreground">
+            <input type="checkbox" name="includePages" value="true" checked="@o.IncludePages" class="mt-1 h-4 w-4 rounded border-input" />
+            <span>Pages</span>
+        </label>
+        @if (wp)
+        {
+            <label class="flex items-start gap-2 text-sm text-foreground">
+                <input type="checkbox" name="includeComments" value="true" checked="@o.IncludeComments" class="mt-1 h-4 w-4 rounded border-input" />
+                <span>Comments</span>
+            </label>
+        }
+        else
+        {
+            <input type="hidden" name="includeComments" value="@o.IncludeComments.ToString().ToLowerInvariant()" />
+        }
+        <label class="flex items-start gap-2 text-sm text-foreground">
+            <input type="checkbox" name="includeEmails" value="true" checked="@o.IncludeEmails" class="mt-1 h-4 w-4 rounded border-input" />
+            <span>Email addresses
+                <span class="block text-xs text-muted-foreground">
+                    @(wp ? "Authors' and commenters' email addresses. Left out by default because they are personal data."
+                         : "Authors' email addresses. Ghost needs one for every author; without them, every post is credited to the account that imports the file.")
+                </span>
+            </span>
+        </label>
+        <div><button type="submit" class="px-4 min-h-10 border border-input rounded-md text-sm font-medium text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Update the summary</button>
+            <span class="text-xs text-muted-foreground" id="options-hint">With JavaScript on, the summary updates as soon as you change a box.</span></div>
+    </form>
+
+    <section aria-labelledby="fidelity-title" class="bg-card rounded-lg border border-border overflow-hidden">
+        <h2 id="fidelity-title" class="px-4 pt-4 text-sm font-semibold text-foreground">What carries over to @(wp ? "WordPress" : "Ghost")</h2>
+        <p class="px-4 pb-3 text-xs text-muted-foreground">For the selection above: @c.Posts posts@(o.IncludePages ? $", {c.Pages} pages" : "").</p>
+        <div class="table-scroll"><table class="w-full text-left text-sm">
+            <thead>
+                <tr class="bg-muted text-muted-foreground border-b border-border">
+                    <th class="px-4 py-3 font-medium">Content</th>
+                    <th class="px-4 py-3 font-medium">Result</th>
+                    <th class="px-4 py-3 font-medium">Details</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                @if (nothing)
+                {
+                    <tr><td colspan="3" class="px-4 py-8 text-center text-muted-foreground">Nothing to export yet. Publish a post, or tick “Unpublished posts” to include drafts.</td></tr>
+                }
+                @foreach (var row in nothing ? Array.Empty<FidelityRow>() : Model.Fidelity)
+                {
+                    <tr>
+                        <td class="px-4 py-3 font-medium text-foreground align-top">@row.Item</td>
+                        <td class="px-4 py-3 align-top"><span class="inline-block text-xs px-2 py-0.5 rounded border whitespace-nowrap @Pill(row.Outcome)">@Word(row.Outcome)</span></td>
+                        <td class="px-4 py-3 text-xs text-muted-foreground align-top min-w-[16rem]">@row.Detail</td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+    </section>
+
+    <form method="post" action="/admin/export/download" id="export-form" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="target" value="@Model.Target" />
+        <input type="hidden" name="includeDrafts" value="@o.IncludeDrafts.ToString().ToLowerInvariant()" />
+        <input type="hidden" name="includePages" value="@o.IncludePages.ToString().ToLowerInvariant()" />
+        <input type="hidden" name="includeComments" value="@o.IncludeComments.ToString().ToLowerInvariant()" />
+        <input type="hidden" name="includeEmails" value="@o.IncludeEmails.ToString().ToLowerInvariant()" />
+        <h2 class="text-sm font-semibold text-foreground">Download</h2>
+        @if (wp)
+        {
+            <div class="space-y-1">
+                <label for="siteAddress" class="text-sm font-medium text-foreground">Site address for images</label>
+                <input id="siteAddress" name="siteAddress" value="@Model.SiteAddress" class="w-full max-w-md px-3 py-2 bg-background border border-input rounded-md text-sm" aria-describedby="siteAddress-help siteAddress-error" />
+                <p id="siteAddress-error" class="text-xs text-destructive" hidden></p>
+                <p id="siteAddress-help" class="text-xs text-muted-foreground">WordPress downloads each image from this address during import, so it must be reachable from the WordPress server and use a standard web port: WordPress refuses image downloads from any port other than 80, 443 or 8080. Usually this site's public address.</p>
+            </div>
+        }
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="submit" id="export-btn" class="px-4 min-h-10 bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium shadow-sm transition-opacity disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring" disabled="@(nothing ? "disabled" : null)">
+                @(wp ? "Download WordPress file (.xml)" : "Download Ghost file (.zip)")
+            </button>
+            <span id="export-status" class="text-xs text-muted-foreground" role="status" aria-live="polite">@(nothing ? "There is nothing to export for this selection." : "")</span>
+        </div>
+    </form>
+
+    <div class="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground space-y-2">
+        <h2 class="text-sm font-semibold text-foreground">Importing the file</h2>
+        @if (wp)
+        {
+            <ol class="list-decimal ms-5 space-y-1">
+                <li>In WordPress, open <strong class="text-foreground">Tools → Import</strong>, install the <strong class="text-foreground">WordPress</strong> importer and run it.</li>
+                <li>Upload the .xml file. Map each author to an existing account or create one.</li>
+                <li>Tick <strong class="text-foreground">Download and import file attachments</strong>, so images are copied rather than linked back to this site.</li>
+                <li>To keep the same addresses, set <strong class="text-foreground">Settings → Permalinks</strong> to “Post name”.</li>
+            </ol>
+            <p>Running the import again is safe: posts that already exist in WordPress are skipped, not copied.</p>
+            <p>Very large files can exceed the upload limit of a WordPress host. WP-CLI imports the same file without that limit: <code>wp import file.xml --authors=create</code>.</p>
+        }
+        else
+        {
+            <ol class="list-decimal ms-5 space-y-1">
+                <li>In Ghost, open <strong class="text-foreground">Settings → Advanced → Import/Export</strong> and choose <strong class="text-foreground">Universal import</strong>.</li>
+                <li>Upload the .zip file. Posts, pages, tags, images and, with emails included, authors are imported together.</li>
+                <li>Import into a new, empty Ghost site, and only once. Ghost does not check for posts it already has: importing the same file again adds a second copy of every post, with -2 on its address.</li>
+            </ol>
+            <p>Ghost uses the same addresses (<code>/your-post/</code>), so links to your posts keep working once the domain points at Ghost.</p>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // Options apply as soon as a box changes, so the download always matches the summary on screen.
+    var options = document.getElementById('export-options');
+    if (options) {
+        options.addEventListener('change', function (e) {
+            if (e.target && e.target.type === 'checkbox') {
+                var btn = document.getElementById('export-btn');
+                if (btn) btn.disabled = true;
+                options.submit();
+            }
+        });
+        var hint = document.getElementById('options-hint');
+        if (hint) hint.hidden = true;
+    }
+
+    // A download does not leave the page, so the Desk's usual "busy until the next page" would never end.
+    // Fetch the file instead, show progress, then hand it to the browser. Without JavaScript the form posts normally.
+    var form = document.getElementById('export-form');
+    var btn = document.getElementById('export-btn');
+    var status = document.getElementById('export-status');
+    var site = document.getElementById('siteAddress');
+    var siteError = document.getElementById('siteAddress-error');
+    if (!form || !window.fetch || !window.URL) return;
+
+    function clearFieldError() {
+        if (!site || !siteError) return;
+        site.removeAttribute('aria-invalid');
+        siteError.hidden = true;
+        siteError.textContent = '';
+    }
+    function fail(message, field) {
+        if (field === 'siteAddress' && site && siteError) {
+            site.setAttribute('aria-invalid', 'true');
+            siteError.textContent = message;
+            siteError.hidden = false;
+            status.textContent = '';
+            site.focus();
+            return;
+        }
+        status.textContent = message;
+        if (window.InkwellDialog) InkwellDialog.toast('error', message);
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        clearFieldError();
+        btn.disabled = true;
+        status.textContent = 'Preparing the file. Large sites can take a minute.';
+        if (window.InkwellDesk) InkwellDesk.busy(true);
+        fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+            .then(function (res) {
+                if (!res.ok) {
+                    var field = res.headers.get('X-Field');
+                    return res.text().then(function (text) {
+                        var plain = (res.headers.get('content-type') || '').indexOf('text/plain') === 0;
+                        fail(plain && text ? text : res.status === 400
+                            ? 'This page has expired. Reload it and try again.'
+                            : 'The export could not be completed. Nothing was downloaded.', field);
+                    });
+                }
+                var cd = res.headers.get('content-disposition') || '';
+                var m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+                var name = m ? decodeURIComponent(m[1]) : 'inkwell-export';
+                return res.blob().then(function (blob) {
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url; a.download = name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+                    status.textContent = 'Downloaded ' + name + '.';
+                });
+            })
+            .catch(function () { fail('The download did not finish. Check your connection and try again.'); })
+            .finally(function () { btn.disabled = false; if (window.InkwellDesk) InkwellDesk.busy(false); });
+    }, true);
+})();
+</script>
+}

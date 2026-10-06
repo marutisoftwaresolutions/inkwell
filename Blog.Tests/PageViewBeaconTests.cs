@@ -148,6 +148,71 @@ public class PageViewBeaconTests : IClassFixture<WebApplicationFactory<Program>>
         }
     }
 
+    [Theory]
+    [InlineData("/", null)]
+    [InlineData("/My-Post", "my-post")]
+    [InlineData("/category/news", null)]
+    [InlineData("/a?b", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void Only_single_segment_paths_name_a_post(string? path, string? slug) =>
+        Assert.Equal(slug, PostViewTally.SlugOf(path));
+
+    [Fact]
+    public void Views_are_tallied_per_owner_and_post()
+    {
+        var tenant = Guid.NewGuid();
+        var counts = PostViewTally.Count(new[]
+        {
+            (Guid.Empty, "/one"), (Guid.Empty, "/ONE"), (Guid.Empty, "/"), (Guid.Empty, "/two"),
+            (tenant, "/one"), (Guid.Empty, "/tag/x"),
+        });
+        Assert.Equal(3, counts.Count);
+        Assert.Contains(new PostViewCount(Guid.Empty, "one", 2), counts);
+        Assert.Contains(new PostViewCount(Guid.Empty, "two", 1), counts);
+        Assert.Contains(new PostViewCount(tenant, "one", 1), counts);
+        Assert.Empty(PostViewTally.Count(Array.Empty<(Guid, string)>()));
+    }
+
+    [Fact]
+    public async Task Most_read_counts_the_beacon_not_the_page_load()
+    {
+        if (!ProbeDb(out var cs)) { _out.WriteLine("Dev database unavailable — skipping."); return; }
+
+        await using var conn = new SqlConnection(cs);
+        var slug = await conn.ExecuteScalarAsync<string?>("SELECT TOP 1 Slug FROM Posts WHERE Status = 'Published' ORDER BY NEWID()");
+        if (slug is null) { _out.WriteLine("No published post — skipping."); return; }
+        Task<int> ViewsAsync() => conn.ExecuteScalarAsync<int>("SELECT ViewCount FROM Posts WHERE Slug = @slug", new { slug });
+
+        var marker = "https://referrer.example/" + Guid.NewGuid().ToString("N")[..12];
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var recorder = _factory.Services.GetRequiredService<TrafficRecorder>();
+        var before = await ViewsAsync();
+        var added = 0;
+        try
+        {
+            // A reader's page load, a crawler and a revalidation all render the page; none of them counts.
+            using var get = new HttpRequestMessage(HttpMethod.Get, "/" + slug);
+            get.Headers.TryAddWithoutValidation("User-Agent", Browser);
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(get)).StatusCode);
+            await recorder.FlushAsync();
+            Assert.Equal(before, await ViewsAsync());
+
+            // The beacon from that page counts once, in the same flush that records the page view.
+            var token = _factory.Services.GetRequiredService<PageViewBeaconService>().Issue("/" + slug);
+            await Beacon(client, token, "/" + slug, marker);
+            await recorder.FlushAsync();
+            added = await ViewsAsync() - before;
+            Assert.Equal(1, added);
+            Assert.Equal(1, await CountAsync(conn, marker));
+        }
+        finally
+        {
+            await conn.ExecuteAsync("UPDATE Posts SET ViewCount = ViewCount - @added WHERE Slug = @slug", new { added, slug });
+            await conn.ExecuteAsync("DELETE FROM PageViews WHERE Referrer = @marker", new { marker });
+        }
+    }
+
     private static Task<HttpResponseMessage> Beacon(HttpClient client, string token, string path, string referrer, string ua = Browser)
     {
         var req = new HttpRequestMessage(HttpMethod.Post, "/pv")

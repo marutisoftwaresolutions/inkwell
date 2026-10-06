@@ -37,7 +37,7 @@
                 var excerpt = GetExcerpt(post);
                 <article style="padding:var(--sp-10) 0;border-bottom:1px solid var(--border);">
                     <time style="display:block;font-family:var(--sans);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);margin-bottom:var(--sp-4);">
-                        @post.PublishedAt?.ToString("MMMM d, yyyy")
+                        @Dates.Long(post.PublishedAt)
                     </time>
                     <h2 style="font-family:var(--serif);font-size:clamp(1.25rem,3vw,1.75rem);font-weight:700;line-height:1.2;margin:0 0 var(--sp-4);letter-spacing:-0.01em;">
                         <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>

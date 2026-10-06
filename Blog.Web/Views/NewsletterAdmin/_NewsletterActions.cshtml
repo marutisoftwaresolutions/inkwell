@@ -1,0 +1,68 @@
+@model Blog.Core.Domain.NewsletterIssue
+@*
+    Actions on a saved draft (ADR-0028), outside the tracked editor form: send a test to yourself, send to every
+    confirmed subscriber (confirmed through the shared dialog, typed at five or more recipients: it cannot be
+    recalled), delete the draft. All act on the saved draft, so unsaved edits are pointed out first.
+*@
+@{
+    var subscribers = (int)(ViewBag.Subscribers ?? 0);
+    var emailConfigured = (bool)(ViewBag.EmailConfigured ?? false);
+    var btn = "px-4 min-h-10 inline-flex items-center rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+}
+<section aria-labelledby="send-title" class="rounded-lg border border-border bg-card p-4 space-y-3">
+    <h2 id="send-title" class="text-sm font-semibold text-foreground">Send</h2>
+    @if (!emailConfigured)
+    {
+        <p class="text-sm text-muted-foreground">Outgoing email is not set up on this server (the <code>Smtp</code> settings), so nothing can be sent yet.</p>
+    }
+    <p class="text-xs text-muted-foreground">Both buttons use the draft as last saved. With unsaved changes on the page, you are asked to save first.</p>
+    <div class="flex flex-wrap items-center gap-3">
+        <form method="post" action="/admin/newsletter/@Model.Id/test" data-requires-saved>
+            @Html.AntiForgeryToken()
+            <button type="submit" class="@btn border border-input bg-background text-foreground hover:bg-muted" disabled="@(!emailConfigured ? "disabled" : null)">Send a test to me</button>
+        </form>
+        <form method="post" action="/admin/newsletter/@Model.Id/send" data-requires-saved
+              data-confirm-title="Send this newsletter?"
+              data-confirm-body="“@Model.Subject” goes to @subscribers confirmed subscriber@(subscribers == 1 ? "" : "s"), in batches over the next few minutes. Copies already sent cannot be recalled; you can stop the rest while it is sending."
+              data-confirm-action="Send to @subscribers subscriber@(subscribers == 1 ? "" : "s")"
+              data-confirm-tone="danger"
+              data-confirm-typed="@(subscribers >= 5 ? "SEND" : null)">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="@btn bg-primary text-primary-foreground hover:opacity-90" disabled="@(!emailConfigured || subscribers == 0 ? "disabled" : null)">
+                Send to @subscribers subscriber@(subscribers == 1 ? "" : "s")
+            </button>
+        </form>
+        <form method="post" action="/admin/newsletter/@Model.Id/delete" class="ms-auto"
+              data-confirm-title="Delete this draft?"
+              data-confirm-body="“@Model.Subject” is deleted. Nothing has been sent; subscribers are not affected."
+              data-confirm-action="Delete draft" data-confirm-tone="danger">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="@btn border border-input bg-background tone-bad hover:bg-muted">Delete draft</button>
+        </form>
+    </div>
+    @if (subscribers == 0)
+    {
+        <p class="text-xs text-muted-foreground">No confirmed subscribers yet: readers subscribe from the sign-up box on your site and confirm by email.</p>
+    }
+</section>
+
+<script>
+    // Sending and testing use the saved draft. With unsaved edits on the page, stop before the confirmation
+    // (a window-level capture listener runs before the shared dialog's) and offer to save instead, so nobody
+    // sends an older version or meets the browser's own "Leave site?" prompt halfway through.
+    window.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form || !form.hasAttribute || !form.hasAttribute('data-requires-saved')) return;
+        if (!window.InkwellDesk || !InkwellDesk.isDirty()) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        InkwellDialog.confirm({
+            title: 'Save your changes first?',
+            body: 'Sending uses the draft as last saved, and the changes on this page are not saved yet. Save the draft, check the preview, then send.',
+            action: 'Save draft', cancel: 'Keep editing', tone: 'warning'
+        }).then(function (ok) {
+            var editor = document.querySelector('form[data-track-changes]');
+            if (ok && editor) editor.requestSubmit();
+        });
+    }, true);
+</script>

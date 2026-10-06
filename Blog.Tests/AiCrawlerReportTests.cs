@@ -85,6 +85,42 @@ public class AiCrawlerReportTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task Requests_with_a_query_string_are_grouped_and_failed_checks_left_out()
+    {
+        if (!_dbAvailable) { _out.WriteLine("Dev database unavailable — skipping."); return; }
+
+        using var scope = _factory.Services.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<ICrawlerVisitRepository>();
+
+        var name = "TestBot-" + Guid.NewGuid().ToString("N")[..8];
+        var query = "page=" + Guid.NewGuid().ToString("N")[..8];
+        CrawlerVisit Visit(bool? verified) => new()
+        {
+            OwnerId = Guid.Empty, Crawler = name, Operator = "Test", IsAi = true, Path = "/",
+            Query = query, StatusCode = 200, UserAgent = "test", VisitedAt = DateTime.UtcNow, Verified = verified
+        };
+
+        try
+        {
+            await repo.RecordManyAsync([Visit(true), Visit(null), Visit(false)]);
+
+            var rows = await repo.GetTopQueriedRequestsAsync(null, 1, take: 500);
+            var mine = Assert.Single(rows, r => r.Query == query);
+            Assert.Equal("/", mine.Path);
+            Assert.Equal(2, mine.Visits);   // the failed identity check is someone else using the name
+        }
+        finally
+        {
+            var cs = _factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
+            await using var conn = new SqlConnection(cs);
+            await conn.OpenAsync();
+            await using var cmd = new SqlCommand("DELETE FROM CrawlerVisits WHERE Crawler = @n", conn);
+            cmd.Parameters.AddWithValue("@n", name);
+            await cmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task Empty_windows_return_zero_rather_than_failing_to_map()
     {
         if (!_dbAvailable) { _out.WriteLine("Dev database unavailable — skipping."); return; }

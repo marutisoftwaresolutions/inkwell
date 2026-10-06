@@ -1,98 +1,119 @@
-# Inkwell v1.0.7
+# Inkwell v1.0.8
 
-**Release date:** 2026-09-27
-**Type:** Feature and security release (backward-compatible: existing tenants keep their layout, theme, content and settings)
+**Release date:** 2026-10-06
+**Type:** Feature and security release (backward-compatible: existing tenants keep their layout, theme, content and settings; one default changes, see Upgrade notes)
 
-v1.0.7: **"Trust your numbers."** A self-hosted blog has to be able to tell a reader from a
-scraper, and a real crawler from someone using its name. This release makes Inkwell's own
-analytics count on the same basis as Google Analytics. It proves which crawlers really are who they
-say they are. It makes a traffic flood cost almost nothing, and it stops stored reader IP hashes from
-being reversible. It also adds a supported Docker deployment.
+v1.0.8: **"Open by design."** A blog you own should be as easy to write in, extend and leave as the
+platforms it competes with. This release lets you take your content to WordPress or Ghost and back
+up a whole site to one file. It adds Markdown, galleries, custom fields, menus, webhooks, editorial
+review and two-factor sign-in. You can now send the newsletter your readers subscribed to, and every
+date follows your time zone and your country's format.
 
 ## Highlights
 
-### 📈 Page views that match what your readers actually do
+### 📦 Leave whenever you like, keep everything when you stay
 
-A page view is now counted when the page's own small, self-hosted script reports back with a signed
-token for that page, not when the server merely sees a request. Clients that never run JavaScript,
-such as scrapers and request floods, are no longer counted. Admin → Analytics now counts on the same
-basis as Google Analytics.
+- **Export to WordPress and Ghost.** Admin → Export downloads a WordPress WXR 1.2 file or a Ghost
+  import ZIP. A summary built from your own content shows what carries over, what changes and what
+  is not exported before you download. Inkwell's own blocks (answer capsule, key facts, roundups,
+  how-to steps, FAQs, series) are written into the body as ordinary HTML, so nothing arrives empty.
+  Tested by real imports into WordPress 7.1.2 and Ghost 6.67.0.
+- **Backup and restore.** Admin → Backups makes one ZIP with every post, page, user, setting,
+  comment, subscriber, revision, the audit trail and every uploaded file. Restore it into a fresh
+  install from the first-run screen; links between content survive and users keep their passwords.
 
-- No cookies are set and nothing is stored in the browser.
-- Signed-in users and bots are ignored, a token only counts for its own page, and each address is
-  capped at 30 views a minute.
-- "Most read" no longer rises when a search engine or AI crawler fetches a post.
-- Trade-off, stated plainly: readers with JavaScript disabled are no longer counted. Your trend will
-  show a step down at the upgrade, because earlier figures were counted on the server.
+### ✍️ Write the way you prefer
 
-### 🔎 Crawler identity, checked rather than assumed
+- **Markdown authoring** with a self-hosted editor, toolbar, side-by-side view and a server-rendered
+  preview. Switch an existing post either way; the switch is refused if it would change how the post looks.
+- **Gallery block** in every editor, with a self-hosted lightbox that loads only on pages with a gallery,
+  and **alt text and captions** for images in the media library.
+- **Custom fields** for posts and pages (text, number, date, web address, yes/no), shown to readers
+  as a "Details" list when you choose and carried into structured data.
+- **Editorial review.** Authors without the publish permission submit posts; an Editor approves or
+  sends them back with a note. Before this, an author's Publish silently saved a draft.
 
-A User-Agent is self-declared. Admin → AI Crawlers now checks every visit that claims to be
-Googlebot, Bingbot, Applebot, GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot or Perplexity-User
-against the IP list or reverse-DNS name its operator publishes.
+### 🧭 Extend and connect
 
-- A new **Identity check** column shows verified, failed and unchecked visits.
-- Failed visits (someone else using the name) are left out of the totals, the trend and the
-  most-crawled pages.
-- Operators that publish no method are shown as unchecked, never guessed. So are private or proxy
-  addresses and checks that could not run.
-- The IP firewall keeps protecting search and AI crawlers from being blocked over missing pages. It
-  withdraws that protection only from an address proven, by two independent checks, not to be the
-  crawler it names.
+- **Navigation menus** for the header and footer, nested one level, in every navbar and footer layout.
+  Until you save a menu, nothing changes.
+- **Webhooks** send a signed JSON request on publish, update, unpublish and new comments, with retries,
+  a 30-day delivery log, redeliver and test. Private-network addresses are refused.
 
-### 🛡️ Floods cost almost nothing
+### 📬 Newsletters and dates that fit your readers
 
-Page views and crawler visits are held in memory and written in batches every 30 seconds, instead of
-one database write per request. Geo-IP lookups happen at write time within the free service's rate
-limit. Each buffer is capped, so a flood can neither grow memory nor turn into a flood of database
-writes. Up to 30 seconds of analytics can be lost if the process stops abruptly.
+- **Newsletter sending.** Admin → Newsletter writes an issue (subject, preview text, a Markdown
+  introduction, up to six posts as cards), previews it, sends a test, then sends to your confirmed
+  subscribers in background batches. Every copy has its own unsubscribe link and one-click unsubscribe
+  headers (RFC 8058), and a plain-text version. No tracking pixels, no rewritten links.
+- **Dates in your time zone and your country's format.** Settings → Display → **Date and time** sets
+  country, time zone (IANA), date format (Unicode CLDR or ISO 8601) and clock. Every date on the
+  public site and in the Desk follows it; before, most dates showed UTC or the server's clock.
 
-### 🐳 Docker deployment
+### 🔐 Safer sign-in, cookie consent, a cacheable home page
 
-A `Dockerfile` and `docker-compose.yml` (the app, SQL Server, and Caddy for automatic HTTPS) are now
-at the repo root. `docker compose up -d` starts a complete stack. A single container against an
-external SQL Server also works, configured entirely through environment variables.
+- **Two-factor sign-in** with an authenticator app and ten recovery codes, optional for everyone and
+  requirable per role. The API login accepts the code too.
+- **Cookie consent**, on by default: Google Analytics loads only after a reader accepts.
+- **The home page can be cached by a CDN.** It no longer sets a cookie or sends `no-store`.
 
 ## Security
 
-- **Reader IP hashes are no longer reversible.** They were SHA-256 with a salt that was the same in
-  every copy of the source. They are now HMAC-SHA256 under a random secret generated for each
-  installation, stored Data-Protection-encrypted beside the key ring.
-- **Crawler impersonators lose firewall protection.** This applies only to Google, Bing and Apple,
-  where the address and its reverse DNS can both be checked.
-- **Behind a trusted proxy, traffic recording uses the real client address.** This covers page views,
-  crawler visits and the identity check.
+- **An unused autosave endpoint let other websites overwrite posts.** It had no anti-forgery,
+  ownership or audit check. It has been removed.
+- **An author could publish by crafting the save request.** The server now decides every status from
+  the button pressed and the user's permission.
+- **The setup wizard stayed open after the first admin registered** through `/account/register`.
+  It now closes as soon as any user or settings exist.
+- **Failed API sign-ins were invisible to the IP firewall.** They now count toward the same limits as
+  the Desk sign-in page, as do failed two-factor codes.
+- **The subscription confirmation email inserted the subscriber's name unescaped.** It is now encoded.
 
 ## Fixed
 
-- Crawler requests that hit a missing page or a server error were recorded twice, or under the
-  internal error page. Each is now recorded once, under the URL that was requested.
-- GoogleOther, Google-InspectionTool, Google-Read-Aloud and similar Google agents were counted as
-  readers. They no longer are.
-- A fresh checkout could fail to build because the project listed specific uploaded files.
+- Opening an unsubscribe link unsubscribed immediately, so mail scanners could unsubscribe readers.
+  It now asks first; one-click unsubscribe from inbox providers still works.
+- Listing pages answered any page number and any query string. A page past the last now returns 404,
+  and unknown parameters redirect (301) to the clean URL; paging, search, filters and campaign tags are kept.
+- Editing a page did not save its search and social fields.
+- Comments and social-card images were available for unpublished posts.
+- Search results lost the query from page 2 onwards.
+- Structured data and Open Graph times had no time zone; they now end in `Z`.
+- Cancelling a Desk confirmation turned off the unsaved-changes warning.
+- Smaller fixes to labels, the Feed header layout, the welcome email and the Settings page are in
+  the CHANGELOG.
 
 ## Upgrade notes
 
-- **Schema is automatic.** The one change, `CrawlerVisits.Verified`, is applied on startup by
-  `MigrationService`. A fresh install gets the same schema from `DBScripts/init.sql` alone, verified
-  by diffing `sys.columns` against a live database in both directions before this release was cut.
-- **Back up `ip-hash.secret`** together with your Data Protection keys (`DataProtection:KeysPath`,
-  default `App_Data/keys`). If it is lost, reader hashes simply start a new series. Nothing in Inkwell
-  depends on them.
-- **Optional: clear the old reversible hashes.** Rows written before the upgrade keep them. Nothing in
-  Inkwell reads the column, so you can remove them; this cannot be undone, which is the point. Put the
-  UTC time you upgraded in place of the date below:
-  ```sql
-  UPDATE PageViews SET IpHash = NULL WHERE IpHash IS NOT NULL AND CreatedAt < '2026-09-27T00:00:00';
-  ```
-  On a large table, run it in batches (`UPDATE TOP (50000) …` until no rows are affected).
-- **Outbound requests.** To verify crawlers, the server now fetches the public IP lists that Google,
-  Bing, Apple, OpenAI and Perplexity publish (at most once a day each), and does some reverse-DNS
-  lookups. Nothing about readers is sent.
-- **Behind Cloudflare or another proxy,** restrict the server to the proxy's addresses first, then
-  turn on **Trust proxy headers** in Admin → Security. Until then the header can be forged.
-- **Content Security Policy.** If you run one, allow the self-hosted `/js/inkwell-views.js` and
-  `POST /pv`, or page views will not be recorded.
-- **Backward-compatible.** No setting changes meaning, and no layout, theme or content changes.
+- **Schema is automatic.** `MigrationService` adds, on startup, the tables `Webhooks`,
+  `WebhookDeliveries`, `MenuItems`, `Countries`, `TimeZones`, `DateLocales`, `NewsletterIssues` and
+  `NewsletterDeliveries` (the reference tables are seeded from IANA tzdata 2026e and CLDR 48), and
+  new columns on `Posts`, `Pages`, `Users` and `CrawlerVisits`. For a manual upgrade, run these
+  idempotent scripts from `DBScripts/` in order: `2026-09-27_add-query-to-crawlervisits`,
+  `2026-09-27_create-webhooks-tables`, `2026-09-27_create-menu-items-table`,
+  `2026-09-27_add-review-workflow-to-posts`, `2026-10-05_add-two-factor-to-users`,
+  `2026-10-05_add-markdown-to-posts`, `2026-10-05_add-custom-fields-to-posts-and-pages`,
+  `2026-10-05_create-and-seed-countries-timezones-date-locales`,
+  `2026-10-05_create-newsletter-issues-and-deliveries`. The four `*-to-settings` scripts of the same
+  dates change no schema (settings are stored as JSON). A fresh
+  install gets the full schema from `DBScripts/init.sql` alone, verified before this release by
+  diffing `sys.columns` against a live database in both directions.
+- **One default changes: cookie consent is on.** If you set a Google Analytics Measurement ID, the
+  tag now loads only after a reader accepts, so GA will count fewer visitors. To keep the earlier
+  behaviour, turn off **Ask readers for cookie consent** in Settings → Search & analytics.
+- **Choose your dates.** A site that changes nothing shows US-English dates in UTC. Set your country,
+  time zone and format in Settings → Display → Date and time. A Windows time zone saved earlier keeps
+  working.
+- **Before sending a newsletter,** configure SMTP and publish SPF, DKIM and DMARC records for the
+  sending domain. `Newsletter:BatchSize` (default 50 per minute) sets the pace. Newsletter sending,
+  Export and Backups are single-site features and are hidden in cloud mode.
+- **Backups** are stored in `Backups:Path` (default `App_Data/backups`), keeping the newest 10
+  (`Backups:Keep`). They do not include the encryption key ring: after a restore, reconnect Search
+  Console and re-enter webhook secrets.
+- **Behind a CDN,** you may now add an edge cache rule for `/`. Post pages are not cacheable yet.
+- **Removed:** `DBScripts/migration-all-changes.sql`, an early one-off script that no longer ran
+  cleanly. Use `init.sql` or the automatic migration.
+- **Backward-compatible otherwise.** Menus, custom fields, webhooks, two-factor requirements and the
+  date settings change nothing until you configure them.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete list.

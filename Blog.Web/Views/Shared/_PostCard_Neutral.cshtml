@@ -28,7 +28,7 @@
             <!-- Author -->
             <a href="#" rel="author"><i class="bi bi-person me-1"></i>@(string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName)</a>
             <!-- Date -->
-            <time datetime="@Model.PublishedAt?.ToString("yyyy-MM-dd")"><i class="bi bi-calendar me-1"></i>@Model.PublishedAt?.ToString("MMM dd, yyyy")</time>
+            <time datetime="@Dates.Iso(Model.PublishedAt)"><i class="bi bi-calendar me-1"></i>@Dates.Medium(Model.PublishedAt)</time>
         </div>
         <!-- Description -->
         @if (!string.IsNullOrEmpty(Model.MetaDescription))

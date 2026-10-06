@@ -37,8 +37,8 @@
         ["@id"] = postUrl,
         ["headline"] = Model.Title,
         ["description"] = description,
-        ["datePublished"] = Model.PublishedAt?.ToString("O") ?? Model.CreatedAt.ToString("O"),
-        ["dateModified"] = Model.UpdatedAt.ToString("O"),
+        ["datePublished"] = Blog.Core.Services.DateDisplay.IsoUtc(Model.PublishedAt ?? Model.CreatedAt),
+        ["dateModified"] = Blog.Core.Services.DateDisplay.IsoUtc(Model.UpdatedAt),
         ["wordCount"] = wordCount,
         ["mainEntityOfPage"] = new Dictionary<string, string> { ["@type"] = "WebPage", ["@id"] = postUrl },
         ["author"] = author,
@@ -51,6 +51,12 @@
     if (imageUrl is not null) article["image"] = imageUrl;
     if (Model.Categories.Any()) article["articleSection"] = Model.Categories.First().Name;
     if (Model.Tags.Any()) article["keywords"] = string.Join(", ", Model.Tags.Select(t => t.Name));
+    // Custom fields shown to readers (ADR-0025): the same values as the visible "Details" list.
+    if (ViewData["CustomFields"] is IReadOnlyList<Blog.Core.Services.CustomFields.Display> { Count: > 0 } customFields)
+        article["additionalProperty"] = customFields.Select(c => new Dictionary<string, object>
+        {
+            ["@type"] = "PropertyValue", ["name"] = c.Label, ["value"] = Blog.Core.Services.CustomFields.SchemaValue(c)
+        }).ToList();
 
     // ── BreadcrumbList schema ────────────────────────────────────────────────
     var items = new List<Dictionary<string, object>>

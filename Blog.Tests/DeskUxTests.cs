@@ -96,6 +96,19 @@ public class DeskUxSourceTests
     /// No Razor view has a legitimate reason to contain one.
     /// </summary>
     [Fact]
+    public void No_desk_page_loads_jquery_plugins_without_jquery()
+    {
+        // The Desk layout ships no jQuery; Settings once loaded jQuery validation anyway, which only threw
+        // "jQuery is not defined" on every visit.
+        var views = Path.Combine(Root(), "Blog.Web", "Views");
+        Assert.DoesNotContain("jquery", File.ReadAllText(Path.Combine(views, "Shared", "_AdminLayout.cshtml")), StringComparison.OrdinalIgnoreCase);
+        var offenders = Directory.GetFiles(views, "*.cshtml", SearchOption.AllDirectories)
+            .Where(f => File.ReadAllText(f) is var t && t.Contains("Layout = \"_AdminLayout\"") && (t.Contains("_ValidationScriptsPartial") || t.Contains("jquery", StringComparison.OrdinalIgnoreCase)))
+            .Select(f => Path.GetRelativePath(views, f)).ToList();
+        Assert.True(offenders.Count == 0, "Desk pages loading jQuery plugins: " + string.Join(", ", offenders));
+    }
+
+    [Fact]
     public void No_view_contains_an_unexpanded_regex_backreference()
     {
         var root = Path.Combine(Root(), "Blog.Web", "Views");
@@ -112,8 +125,14 @@ public class DeskUxSourceTests
     {
         var root = Path.Combine(Root(), "Blog.Web", "Views");
         var offenders = new List<string>();
-        foreach (var path in Directory.EnumerateFiles(root, "Index.cshtml", SearchOption.AllDirectories))
+        // Every Desk view, not only Index.cshtml: editor partials and logs (Webhooks/Deliveries) have
+        // tables too. Reader views (Blog/, the public layout, view components) and e-mail templates are
+        // not Desk screens.
+        foreach (var path in Directory.EnumerateFiles(root, "*.cshtml", SearchOption.AllDirectories))
         {
+            var rel = Path.GetRelativePath(root, path).Replace('\\', '/');
+            if (rel.StartsWith("Blog/") || rel.StartsWith("Shared/_Public") || rel.StartsWith("Shared/Components/")
+                || rel.Contains("Email", StringComparison.OrdinalIgnoreCase)) continue;
             var html = File.ReadAllText(path);
             var tables = Regex.Matches(html, "<table\\b").Count;
             var wrapped = Regex.Matches(html, "<div class=\"table-scroll\"><table\\b").Count;
@@ -131,6 +150,8 @@ public class DeskUxSourceTests
     [InlineData("Import/Index.cshtml")]
     [InlineData("Redirects/Index.cshtml")]
     [InlineData("Media/Index.cshtml")]
+    [InlineData("Webhooks/Index.cshtml")]
+    [InlineData("Webhooks/Deliveries.cshtml")]
     public void Every_unbounded_list_has_search_and_a_pager(string view)
     {
         var html = View(view);

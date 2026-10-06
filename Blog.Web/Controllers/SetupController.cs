@@ -1,6 +1,8 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Core.Services;
+using Blog.Web.Services;
+using Blog.Web.Services.Backups;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Web.Controllers;
@@ -10,17 +12,24 @@ public class SetupController : Controller
     private readonly ISettingRepository _settings;
     private readonly IUserRepository _users;
     private readonly AuthService _auth;
+    private readonly BackupService _backups;
+    private readonly AuditService _audit;
 
-    public SetupController(ISettingRepository settings, IUserRepository users, AuthService auth)
+    public SetupController(ISettingRepository settings, IUserRepository users, AuthService auth,
+        BackupService backups, AuditService audit)
     {
         _settings = settings;
         _users = users;
         _auth = auth;
+        _backups = backups;
+        _audit = audit;
     }
 
     private async Task<IActionResult> GuardAsync()
     {
-        if (await _settings.IsInstalledAsync())
+        // Installed once either exists: the first admin can also be created at /account/register,
+        // which writes no settings row, and the wizard must not stay open to create a second admin.
+        if (await _settings.IsInstalledAsync() || await _users.AnyUsersExistAsync())
             return RedirectToAction("Index", "Dashboard", new { area = "" });
         return null!;
     }
@@ -145,4 +154,57 @@ public class SetupController : Controller
     }
 
     public IActionResult Complete() => View();
+
+    // ── Restore from a backup (ADR-0019) ────────────────────────────────────────
+    // Only while the install is fresh, and only from a file already in the server's backups folder:
+    // copying a file there needs server access, so an anonymous visitor can never supply the data.
+
+    [HttpGet]
+    public async Task<IActionResult> Restore()
+    {
+        var guard = await GuardAsync();
+        if (guard != null) return guard;
+        return View(_backups.List());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [ActionName("Restore")]
+    public async Task<IActionResult> RestorePost(string? name)
+    {
+        var guard = await GuardAsync();
+        if (guard != null) return guard;
+
+        if (string.IsNullOrEmpty(name) || _backups.Find(name) is null)
+        {
+            ModelState.AddModelError("name", "Choose one of the backups listed below.");
+            return View("Restore", _backups.List());
+        }
+
+        RestoreOutcome outcome;
+        try
+        {
+            // Not the request's token: a closed browser tab must not abandon a restore half-way
+            // (it is one transaction, so it would roll back, but the work would be wasted).
+            outcome = await _backups.RestoreAsync(name, CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("name", ex.Message);
+            return View("Restore", _backups.List());
+        }
+        catch (Exception ex)
+        {
+            // The database load is one transaction, so a failure leaves the install as empty as it was.
+            HttpContext.RequestServices.GetRequiredService<ILogger<SetupController>>().LogError(ex, "Restore of {Name} failed.", name);
+            ModelState.AddModelError("name", $"The restore failed and nothing was changed. {ex.Message}");
+            return View("Restore", _backups.List());
+        }
+
+        var rows = outcome.Rows.Values.Sum();
+        await _audit.LogAsync(AuditActions.BackupRestored, "Backup", name, name,
+            newValues: $"{rows} rows, {outcome.MediaFiles} media files, from Inkwell {outcome.Manifest.AppVersion}",
+            userNameOverride: "setup");
+        return View("Restored", outcome);
+    }
 }

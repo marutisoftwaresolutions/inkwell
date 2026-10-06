@@ -1,49 +1,48 @@
 @inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
+@*
+    No anti-forgery token and no TempData here: either would set a cookie and mark every page that shows
+    this form no-store, so a CDN could not cache the home page. The script fetches a token from
+    /newsletter/token when the reader presses Subscribe; posted without one (no JavaScript), the form
+    lands on /newsletter/subscribe, which asks for one more press with a token of its own.
+*@
 @{
     var siteName = (string)(ViewData["SiteName"] ?? ViewBag.SiteName ?? "the blog");
     var reCaptchaSiteKey = _rcfg["ReCaptcha:SiteKey"];
 }
 <section class="my-10 rounded-2xl px-6 py-10 text-center border border-dashed" style="background: var(--muted); border-color: var(--border);">
-    @if (TempData["NewsletterMessage"] != null)
-    {
-        <p class="text-sm font-medium mb-0" style="color: var(--foreground);">@TempData["NewsletterMessage"]</p>
-    }
-    else
-    {
-        <div id="nl-body">
-            <div class="mb-1">
-                <i class="bi bi-envelope-paper text-3xl" style="color: var(--primary);"></i>
-            </div>
-            <h3 class="text-xl font-bold mb-2" style="color: var(--foreground);">Stay in the loop</h3>
-            <p class="text-sm mb-6" style="color: var(--muted-foreground);">Get new articles on optometry and eye care delivered to your inbox. No spam, unsubscribe any time.</p>
-
-            <p id="nl-msg" class="text-sm mb-4" style="display:none;"></p>
-
-            <form id="newsletter-form" method="post" action="/newsletter/subscribe" class="flex flex-col gap-3 max-w-md mx-auto" novalidate>
-                @Html.AntiForgeryToken()
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" name="name" placeholder="Your name (optional)"
-                           class="flex-none sm:w-32 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
-                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
-                    <input type="email" name="email" placeholder="your@email.com" required
-                           class="flex-1 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
-                           style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
-                    <button id="nl-btn" type="submit"
-                            class="px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
-                            style="background: var(--primary); color: var(--primary-foreground);">
-                        Subscribe
-                    </button>
-                </div>
-                @if (!string.IsNullOrEmpty(reCaptchaSiteKey))
-                {
-                    <div class="flex justify-center">
-                        <div class="g-recaptcha" data-sitekey="@reCaptchaSiteKey"></div>
-                    </div>
-                }
-            </form>
-            <p class="text-xs mt-4" style="color: var(--muted-foreground);">We'll send a confirmation email. No spam ever.</p>
+    <div id="nl-body">
+        <div class="mb-1">
+            <i class="bi bi-envelope-paper text-3xl" style="color: var(--primary);"></i>
         </div>
-    }
+        <h3 class="text-xl font-bold mb-2" style="color: var(--foreground);">Stay in the loop</h3>
+        <p class="text-sm mb-6" style="color: var(--muted-foreground);">Get new articles from @siteName in your inbox. No spam, unsubscribe any time.</p>
+
+        <p id="nl-msg" class="text-sm mb-4" style="display:none;"></p>
+
+        <form id="newsletter-form" method="post" action="/newsletter/subscribe" class="flex flex-col gap-3 max-w-md mx-auto" novalidate>
+            <input type="hidden" name="__RequestVerificationToken" value="" />
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input type="text" name="name" placeholder="Your name (optional)"
+                       class="flex-none sm:w-32 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
+                       style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
+                <input type="email" name="email" placeholder="your@email.com" required
+                       class="flex-1 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-1"
+                       style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
+                <button id="nl-btn" type="submit"
+                        class="px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                        style="background: var(--primary); color: var(--primary-foreground);">
+                    Subscribe
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(reCaptchaSiteKey))
+            {
+                <div class="flex justify-center">
+                    <div class="g-recaptcha" data-sitekey="@reCaptchaSiteKey"></div>
+                </div>
+            }
+        </form>
+        <p class="text-xs mt-4" style="color: var(--muted-foreground);">We'll send a confirmation email. No spam ever.</p>
+    </div>
 </section>
 
 <script>
@@ -80,6 +79,11 @@
         msg.style.display = 'none';
 
         try {
+            // The page may come from a cache, so its token is fetched now rather than rendered.
+            var t = await fetch('/newsletter/token', { credentials: 'same-origin', cache: 'no-store' });
+            if (!t.ok) throw new Error('token');
+            form.querySelector('[name=__RequestVerificationToken]').value = (await t.json()).token;
+
             var res = await fetch('/newsletter/subscribe', {
                 method: 'POST',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },

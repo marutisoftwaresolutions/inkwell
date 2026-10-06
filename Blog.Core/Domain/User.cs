@@ -31,6 +31,9 @@ public class User
 
     public bool IsActive { get; set; } = true;
     public DateTime? LastLogin { get; set; }
+    /// <summary>When the user turned on two-factor sign-in; null when it is off (ADR-0021). The secret is never on this type.</summary>
+    public DateTime? TwoFactorEnabledAt { get; set; }
+    public bool TwoFactorEnabled => TwoFactorEnabledAt.HasValue;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

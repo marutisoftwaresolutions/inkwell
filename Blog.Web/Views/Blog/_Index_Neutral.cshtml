@@ -64,7 +64,7 @@
                 <!-- Card overlay -->
                 <div class="relative max-w-[80%] lg:max-w-[60%] md:min-w-[60%] aspect-[1/1] sm:aspect-[3/2] md:aspect-[2/1] p-4 sm:p-6 text-center" style="background: var(--background);">
                     <div class="h-full flex flex-col items-center gap-2 sm:gap-3 overflow-hidden">
-                        <span class="uppercase text-sm" style="color: var(--muted-foreground);">@heroPost.PublishedAt?.ToString("MMM dd, yyyy")</span>
+                        <span class="uppercase text-sm" style="color: var(--muted-foreground);">@Dates.Medium(heroPost.PublishedAt)</span>
                         <h1 class="text-2xl sm:text-3xl md:text-4xl font-medium">@heroPost.Title</h1>
                         <p class="mb-2" style="color: var(--muted-foreground);">@(heroPost.MetaDescription ?? heroPost.Plaintext?.Substring(0, Math.Min(heroPost.Plaintext?.Length ?? 0, 200)))</p>
                         <a href="/@heroPost.Slug" class="inline-flex py-2 px-4 border border-dashed hover:opacity-80" style="background: var(--muted); border-color: var(--border);">Read More</a>
@@ -125,7 +125,7 @@
                                     }
                                     <div class="flex flex-col gap-1">
                                         <h4 class="text-sm capitalize hover:opacity-80">@(pop.Title.Length > 45 ? pop.Title.Substring(0, 45) + " ..." : pop.Title)</h4>
-                                        <span class="text-sm" style="color: var(--muted-foreground);">@pop.PublishedAt?.ToString("dd MMM, yyyy")</span>
+                                        <span class="text-sm" style="color: var(--muted-foreground);">@Dates.Medium(pop.PublishedAt)</span>
                                     </div>
                                 </a>
                             }

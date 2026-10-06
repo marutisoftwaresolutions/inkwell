@@ -10,7 +10,7 @@
         if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m ago";
         if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
         if (d.TotalDays < 30) return $"{(int)d.TotalDays}d ago";
-        return utc.ToString("d MMM yyyy");
+        return Dates.Medium(utc);
     }
 }
 @if (revisions.Count == 0)
@@ -25,7 +25,7 @@ else
             <li class="flex items-baseline justify-between gap-2">
                 <div class="min-w-0">
                     <a href="/admin/revisions/@type/@entityId/@r.Id" class="text-foreground hover:underline">#@r.Number · @r.Reason</a>
-                    <div class="text-muted-foreground truncate" title="@r.CreatedAt.ToString("u")">@Ago(r.CreatedAt)@(string.IsNullOrEmpty(r.AuthorName) ? "" : " · " + r.AuthorName) · @r.Status · @(r.HtmlLength / 1000)k</div>
+                    <div class="text-muted-foreground truncate" title="@Dates.DateTimeSeconds(r.CreatedAt)">@Ago(r.CreatedAt)@(string.IsNullOrEmpty(r.AuthorName) ? "" : " · " + r.AuthorName) · @r.Status · @(r.HtmlLength / 1000)k</div>
                 </div>
                 <a href="/admin/revisions/@type/@entityId/@r.Id" class="shrink-0 h-6 px-2 rounded border border-input text-[10px] inline-flex items-center hover:bg-muted">Compare</a>
             </li>

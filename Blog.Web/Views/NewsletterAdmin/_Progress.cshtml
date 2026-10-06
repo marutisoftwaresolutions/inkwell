@@ -1,0 +1,40 @@
+@model Blog.Core.Domain.NewsletterIssue
+@using Blog.Core.Domain
+@*
+    Progress of a queued or sending newsletter (ADR-0028), counted in full. While it is active this fragment
+    replaces itself every 15 seconds through htmx (paused while a dialog is open, so a half-finished "Stop
+    sending" is never lost); once the send ends it stops asking. Only the short summary is a live region.
+*@
+@{
+    var p = ViewBag.Progress as NewsletterProgress ?? new NewsletterProgress(0, 0, 0, 0, 0);
+    var queued = Model.Status == NewsletterStatus.Queued;
+    var total = queued ? 0 : Math.Max(p.Total, Model.RecipientCount);
+    var summary = Model.Status switch
+    {
+        NewsletterStatus.Queued => "Queued: sending starts within a minute.",
+        NewsletterStatus.Sending => $"{p.Sent:N0} of {total:N0} sent{(p.Failed > 0 ? $", {p.Failed:N0} failed" : "")}. Still sending.",
+        NewsletterStatus.Sent => $"Sent {Dates.DateTime(Model.FinishedAt)}: {p.Sent:N0} of {total:N0} delivered{(p.Failed > 0 ? $", {p.Failed:N0} failed" : "")}.",
+        NewsletterStatus.Cancelled => $"Stopped {Dates.DateTime(Model.FinishedAt)} after {p.Sent:N0} of {total:N0}. Copies already sent were not recalled.",
+        _ => Model.Status,
+    };
+    var pct = total == 0 ? 0 : (int)Math.Round(100.0 * (p.Sent + p.Failed + p.Skipped) / total);
+}
+<div id="newsletter-progress" class="space-y-3"
+     hx-get="@(Model.IsActive ? $"/admin/newsletter/{Model.Id}/progress" : null)"
+     hx-trigger="@(Model.IsActive ? "every 15s [!document.querySelector('#inkwell-dialog[open]')]" : null)"
+     hx-swap="@(Model.IsActive ? "outerHTML" : null)">
+    <p class="text-sm text-foreground" role="status" aria-live="polite">@summary</p>
+    @if (!queued)
+    {
+        <div class="h-2 w-full rounded-full bg-muted overflow-hidden" role="progressbar" aria-label="Copies processed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@pct">
+            <div class="h-full bg-primary" style="width:@(pct)%"></div>
+        </div>
+    }
+    <dl class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Recipients</dt><dd class="text-lg font-semibold text-foreground">@(queued ? "—" : total.ToString("N0"))</dd></div>
+        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Sent</dt><dd class="text-lg font-semibold text-foreground">@p.Sent.ToString("N0")</dd></div>
+        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Waiting</dt><dd class="text-lg font-semibold text-foreground">@p.Pending.ToString("N0")</dd></div>
+        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Failed</dt><dd class="text-lg font-semibold @(p.Failed > 0 ? "tone-bad" : "text-foreground")">@p.Failed.ToString("N0")</dd></div>
+        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Skipped or stopped</dt><dd class="text-lg font-semibold text-foreground">@((p.Skipped + p.Cancelled).ToString("N0"))</dd></div>
+    </dl>
+</div>

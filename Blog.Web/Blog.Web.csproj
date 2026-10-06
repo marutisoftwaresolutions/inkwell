@@ -38,6 +38,7 @@
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
     <PackageReference Include="SixLabors.ImageSharp.Web" Version="3.2.0" />
   </ItemGroup>

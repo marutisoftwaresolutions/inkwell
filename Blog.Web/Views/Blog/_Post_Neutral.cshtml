@@ -50,8 +50,8 @@
                         </span>
                     </div>
                     <span>•</span>
-                    <time datetime="@Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt, (string?)ViewBag.DisplayTimeZone)?.ToString("yyyy-MM-dd")">
-                        <i class="bi bi-calendar me-1"></i>@Blog.Core.Services.TimeZoneHelper.ToDisplay(Model.PublishedAt, (string?)ViewBag.DisplayTimeZone)?.ToString("MMMM d, yyyy")
+                    <time datetime="@Dates.Iso(Model.PublishedAt)">
+                        <i class="bi bi-calendar me-1"></i>@Dates.Long(Model.PublishedAt)
                     </time>
                     <span>•</span>
                     <span><i class="bi bi-clock me-1"></i>@readingMinutes min read</span>
@@ -66,14 +66,14 @@
                         {
                             <span class="flex items-center gap-1">
                                 <i class="bi bi-patch-check"></i>
-                                Last verified: <strong style="color: var(--foreground);">@Model.LastVerifiedAt.Value.ToString("MMMM d, yyyy")</strong>
+                                Last verified: <strong style="color: var(--foreground);">@Dates.CalendarDate(Model.LastVerifiedAt)</strong>
                             </span>
                         }
                         @if (Model.NextReviewAt.HasValue)
                         {
                             <span class="flex items-center gap-1">
                                 <i class="bi bi-arrow-clockwise"></i>
-                                Next review: <strong style="color: var(--foreground);">@Model.NextReviewAt.Value.ToString("MMMM d, yyyy")</strong>
+                                Next review: <strong style="color: var(--foreground);">@Dates.CalendarDate(Model.NextReviewAt)</strong>
                             </span>
                         }
                     </div>
@@ -91,6 +91,8 @@
             <partial name="_AnswerCapsule" model="Model" />
 
             <partial name="_KeyFacts" model="Model" />
+            <partial name="_CustomFieldDetails" />
+
             <partial name="_HowTo" model="Model" />
 
             <!-- On this page + Post Content -->

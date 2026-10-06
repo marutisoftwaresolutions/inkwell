@@ -34,9 +34,10 @@ public class AiCrawlersController : Controller
 
         var activityTask  = _visits.GetActivityAsync(ownerId, days);
         var topPagesTask  = _visits.GetTopPagesAsync(ownerId, days);
+        var queriedTask   = _visits.GetTopQueriedRequestsAsync(ownerId, days);
         var dailyTask     = _visits.GetDailyAiVisitsAsync(ownerId, days);
         var settingsTask  = _settings.GetSettingsAsync(ownerId ?? Guid.Empty);
-        await Task.WhenAll(activityTask, topPagesTask, dailyTask, settingsTask);
+        await Task.WhenAll(activityTask, topPagesTask, queriedTask, dailyTask, settingsTask);
 
         // Every crawler we can name is listed, including those with no visits — an engine that has
         // never fetched the site is a finding, not an omission.
@@ -53,6 +54,7 @@ public class AiCrawlersController : Controller
         ViewBag.Ai        = full.Where(a => a.IsAi).ToList();
         ViewBag.Search    = full.Where(a => !a.IsAi).ToList();
         ViewBag.TopPages  = topPagesTask.Result;
+        ViewBag.Queried   = queriedTask.Result;
         ViewBag.Daily     = FillGaps(dailyTask.Result, days);
         // Headline figures leave out visits that failed the operator's network check: those are someone
         // else using the name, not the engine reading the site. The table still shows them.

@@ -6,6 +6,8 @@
     // site description instead of emitting a blank <meta name="description">.
     ViewData["Description"] = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription : null;
     ViewData["SiteName"] = ViewBag.SiteName ?? "Blog";
+    // The gallery lightbox script is sent only to pages that have a gallery.
+    ViewData["HasGallery"] = Model.Content?.Contains("comp-gallery", StringComparison.Ordinal) == true;
 
     // Canonical is emitted once by _PublicLayout from this value — do not emit a second <link> here.
     ViewData["Canonical"] = !string.IsNullOrEmpty(Model.CanonicalUrl)

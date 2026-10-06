@@ -74,9 +74,9 @@
                                 @m.Status
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground hidden md:table-cell text-xs">@m.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                        <td class="px-4 py-3 text-muted-foreground hidden md:table-cell text-xs">@Dates.Medium(m.CreatedAt)</td>
                         <td class="px-4 py-3 text-muted-foreground hidden md:table-cell text-xs">
-                            @(m.ConfirmedAt.HasValue ? m.ConfirmedAt.Value.ToLocalTime().ToString("dd MMM yyyy") : "—")
+                            @(m.ConfirmedAt.HasValue ? Dates.Medium(m.ConfirmedAt) : "—")
                         </td>
                         <td class="px-4 py-3 text-right">
                             <form method="post" action="/admin/subscribers/delete/@m.Id?status=@currentStatus&page=@(page)"

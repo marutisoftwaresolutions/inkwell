@@ -47,7 +47,7 @@
                         @* Date header *@
                         <div style="display:flex;align-items:center;gap:var(--sp-6);margin-bottom:var(--sp-6);">
                             <time style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);">
-                                @post.PublishedAt?.ToString("EEEE, MMMM d, yyyy") ?? post.PublishedAt?.ToString("dddd, MMMM d, yyyy")
+                                @Dates.LongWithWeekday(post.PublishedAt)
                             </time>
                             @if (cat != null)
                             {
@@ -109,7 +109,7 @@
                     {
                         <a href="/@sp.Slug" style="display:block;padding:var(--sp-6);border-bottom:1px solid var(--border);text-decoration:none;">
                             <div style="font-family:var(--serif);font-size:0.875rem;font-weight:600;line-height:1.3;color:var(--fg);margin-bottom:4px;">@sp.Title</div>
-                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@sp.PublishedAt?.ToString("MMM d, yyyy")</time>
+                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Dates.Medium(sp.PublishedAt)</time>
                         </a>
                     }
                 </div>

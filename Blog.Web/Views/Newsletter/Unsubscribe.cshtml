@@ -1,0 +1,24 @@
+@model Blog.Web.Controllers.NewsletterUnsubscribeViewModel
+@*
+    The unsubscribe link only asks (ADR-0028): mail systems open links to scan them, so the change happens on the
+    button's POST. No anti-forgery token: the token in the address is the proof, as for one-click unsubscribe.
+*@
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = "Unsubscribe";
+    ViewData["Robots"] = "noindex, follow";
+}
+
+<div class="min-h-[60vh] flex items-center justify-center px-4">
+    <div class="w-full max-w-md text-center">
+        <h1 class="text-2xl font-bold mb-3" style="color: var(--foreground);">Unsubscribe?</h1>
+        <p class="text-sm mb-6" style="color: var(--muted-foreground);">
+            <strong style="color: var(--foreground);">@Model.Email</strong> will stop getting our newsletter. You can subscribe again at any time.
+        </p>
+        <form method="post" action="/newsletter/unsubscribe/@Uri.EscapeDataString(Model.Token)" class="flex flex-col sm:flex-row gap-3 justify-center">
+            <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style="background: var(--primary); color: var(--primary-foreground);">Unsubscribe</button>
+            <a href="/" class="px-5 py-2.5 rounded-lg text-sm font-medium border hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style="border-color: var(--border); color: var(--foreground);">Keep my subscription</a>
+        </form>
+    </div>
+</div>

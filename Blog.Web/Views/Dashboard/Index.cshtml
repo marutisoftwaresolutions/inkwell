@@ -105,7 +105,7 @@
                 <p class="text-xs font-medium text-muted-foreground">Striking distance</p>
                 <p class="text-2xl font-bold">@ViewBag.SearchStriking <a href="/admin/content-health?filter=striking" class="text-xs font-normal text-primary hover:underline">see posts</a></p>
             </div>
-            <p class="text-[11px] text-muted-foreground ml-auto">Google Search through @searchState.AsOf?.ToString("d MMM yyyy")</p>
+            <p class="text-[11px] text-muted-foreground ml-auto">Google Search through @Dates.CalendarDate(searchState.AsOf, Blog.Core.Services.DateStyle.Medium)</p>
         </div>
     }
 
@@ -127,6 +127,36 @@
             </a>
         </div>
     </div>
+
+    @* Editorial workflow: a review queue for those who may publish; "sent back to you" for authors. Hidden when empty. *@
+    @{
+        var reviewItems = (ViewBag.ReviewItems as IEnumerable<Blog.Core.Domain.Post>)?.ToList() ?? new List<Blog.Core.Domain.Post>();
+        var reviewing = (ViewBag.ReviewMode as string) == "review";
+    }
+    @if (reviewItems.Count > 0)
+    {
+        <div class="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+            <div class="p-6 border-b border-border flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-lg font-semibold">@(reviewing ? "Waiting for review" : "Sent back to you") (@(ViewBag.ReviewCount ?? reviewItems.Count))</h2>
+                <a href="/admin/posts?status=@(reviewing ? "review" : "changes")" class="text-sm font-medium text-primary hover:text-primary/80">
+                    @(reviewing ? "Open the review queue" : "See all")
+                </a>
+            </div>
+            <ul class="divide-y divide-border">
+                @foreach (var item in reviewItems)
+                {
+                    <li class="px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+                        <a href="/admin/posts/edit/@item.Id" class="font-medium text-foreground hover:underline">@item.Title</a>
+                        <span class="text-xs text-muted-foreground">
+                            @(reviewing
+                                ? (string.IsNullOrWhiteSpace(item.AuthorName) ? "Submitted for review" : $"By {item.AuthorName}")
+                                : (string.IsNullOrWhiteSpace(item.ReviewNote) ? "Needs changes" : "Editor's note: " + (item.ReviewNote.Length > 90 ? item.ReviewNote[..90] + "…" : item.ReviewNote)))
+                        </span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
 
     <!-- Recent Posts -->
     <div class="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
@@ -158,7 +188,7 @@
                                       displayStatus == Blog.Core.Domain.PostStatus.Draft ? "pill-warn" : "pill-info")">
                                     @displayStatus
                                 </span>
-                                <span>@post.CreatedAt.ToString("MMM d, yyyy")</span>
+                                <span>@Dates.Medium(post.CreatedAt)</span>
                                 <span>@post.ViewCount views</span>
                             </div>
                         </div>
@@ -217,7 +247,7 @@
                             <td class="px-4 py-2 text-muted-foreground">
                                 @if (j.IsRunning) { <span class="tone-warn">running now</span> }
                                 else if (j.LastStartedAt is null) { <span>never — first run within a minute of startup</span> }
-                                else { @j.LastStartedAt.Value.ToString("yyyy-MM-dd HH:mm") }
+                                else { @Dates.DateTime(j.LastStartedAt) }
                             </td>
                             <td class="px-4 py-2">
                                 @if (j.LastStartedAt is null) { <span class="text-muted-foreground">—</span> }

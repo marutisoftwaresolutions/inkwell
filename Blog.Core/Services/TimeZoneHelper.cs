@@ -8,21 +8,55 @@ public static class TimeZoneHelper
 {
     public const string Utc = "UTC";
 
-    public static TimeZoneInfo Resolve(string? timeZoneId)
+    /// <summary>
+    /// IANA zones renamed in recent tzdata releases, with the name they had before (tzdata "backward" links).
+    /// A host whose time-zone data predates a rename knows only the old name; the rules are the same.
+    /// </summary>
+    private static readonly Dictionary<string, string> RenamedFrom = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Europe/Kyiv"] = "Europe/Kiev",
+        ["Pacific/Kanton"] = "Pacific/Enderbury",
+        ["Asia/Kolkata"] = "Asia/Calcutta",
+        ["Asia/Yangon"] = "Asia/Rangoon",
+        ["Asia/Ho_Chi_Minh"] = "Asia/Saigon",
+        ["Asia/Kathmandu"] = "Asia/Katmandu",
+        ["America/Nuuk"] = "America/Godthab",
+        ["Atlantic/Faroe"] = "Atlantic/Faeroe",
+        ["Pacific/Chuuk"] = "Pacific/Truk",
+        ["Pacific/Pohnpei"] = "Pacific/Ponape",
+        ["Asia/Urumqi"] = "Asia/Kashgar",
+    };
+
+    public static TimeZoneInfo Resolve(string? timeZoneId) => TryFind(timeZoneId) ?? TimeZoneInfo.Utc;
+
+    /// <summary>True when the id names a zone this host knows, so Settings can refuse a typo.</summary>
+    public static bool IsKnown(string? timeZoneId) => TryFind(timeZoneId) is not null;
+
+    private static TimeZoneInfo? TryFind(string? timeZoneId)
     {
         if (string.IsNullOrWhiteSpace(timeZoneId) || timeZoneId.Equals(Utc, StringComparison.OrdinalIgnoreCase))
             return TimeZoneInfo.Utc;
-        try { return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId.Trim()); }
-        catch (TimeZoneNotFoundException) { return TimeZoneInfo.Utc; }
-        catch (InvalidTimeZoneException) { return TimeZoneInfo.Utc; }
+        var id = timeZoneId.Trim();
+        foreach (var candidate in RenamedFrom.TryGetValue(id, out var old) ? new[] { id, old } : new[] { id })
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById(candidate); }
+            catch (TimeZoneNotFoundException) { }
+            catch (InvalidTimeZoneException) { }
+        }
+        return null;
     }
 
-    /// <summary>True when the id names a zone this host knows, so Settings can refuse a typo.</summary>
-    public static bool IsKnown(string? timeZoneId)
+    /// <summary>
+    /// The IANA id for a stored zone id: settings saved before ADR-0027 may hold a Windows id
+    /// ("India Standard Time"), which becomes "Asia/Kolkata". Unknown or IANA ids come back unchanged.
+    /// </summary>
+    public static string ToIana(string? timeZoneId)
     {
-        if (string.IsNullOrWhiteSpace(timeZoneId) || timeZoneId.Equals(Utc, StringComparison.OrdinalIgnoreCase)) return true;
-        try { TimeZoneInfo.FindSystemTimeZoneById(timeZoneId.Trim()); return true; }
-        catch { return false; }
+        if (string.IsNullOrWhiteSpace(timeZoneId) || timeZoneId.Equals(Utc, StringComparison.OrdinalIgnoreCase)) return Utc;
+        var id = timeZoneId.Trim();
+        if (id.Contains('/') || !TimeZoneInfo.TryConvertWindowsIdToIanaId(id, out var iana)) return id;
+        // ICU can answer with a pre-rename name ("Asia/Calcutta"); store the current one.
+        return RenamedFrom.FirstOrDefault(kv => string.Equals(kv.Value, iana, StringComparison.OrdinalIgnoreCase)).Key ?? iana;
     }
 
     /// <summary>A UTC instant in the tenant's zone. Unspecified kinds are treated as UTC, which is what storage holds.</summary>

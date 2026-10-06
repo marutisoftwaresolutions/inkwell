@@ -1,6 +1,6 @@
 @model Blog.Web.Models.NavbarViewModel
 @{
-    var sortedPages = Model.Pages.OrderBy(p => p.SortOrder).ToList();
+    var sortedPages = Model.Links;
 }
 
 @* GRID — Symmetric 3-column layout: [icons|name] · [logo] · [name|icons] *@
@@ -60,10 +60,10 @@
                         </a>
                         @foreach (var p in sortedPages)
                         {
-                            <a href="/@p.Slug"
+                            <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)"
                                class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-70 border-l-[3px] border-l-transparent hover:border-l-primary"
                                style="color: var(--foreground); border-bottom: 1px solid var(--border);">
-                                <i class="bi bi-file-text text-xs" style="color: var(--muted-foreground);"></i> @p.Title
+                                <i class="bi bi-file-text text-xs" style="color: var(--muted-foreground);"></i> @if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title
                             </a>
                         }
                     </div>
@@ -96,7 +96,7 @@
             <a href="/" class="px-3 py-2.5 rounded-lg text-sm font-medium hover:opacity-70" style="background: var(--muted); color: var(--foreground);">Home</a>
             @foreach (var p in sortedPages)
             {
-                <a href="/@p.Slug" class="px-3 py-2.5 rounded-lg text-sm hover:opacity-70" style="background: var(--muted); color: var(--foreground);">@p.Title</a>
+                <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)" class="px-3 py-2.5 rounded-lg text-sm hover:opacity-70" style="background: var(--muted); color: var(--foreground);">@if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title</a>
             }
             @if (User.Identity != null && User.Identity.IsAuthenticated)
             {

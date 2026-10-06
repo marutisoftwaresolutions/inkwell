@@ -59,7 +59,14 @@
         // Quill fires its own event; the editor root is inside the form on every Inkwell editor page.
         document.addEventListener('inkwell:content-changed', schedule);
 
-        form.addEventListener('submit', () => { setDirty(form, false); tracked.get(form).submitted = true; }, true);
+        // Deferred: a confirmation dialog (declarative data-confirm-* or a page's own handler) may cancel
+        // this submit after this capture listener runs. Disarming the guard on a cancelled submit would
+        // let the page be left without a prompt, so only a submit that actually proceeds counts.
+        form.addEventListener('submit', e => setTimeout(() => {
+            if (e.defaultPrevented) return;
+            setDirty(form, false);
+            tracked.get(form).submitted = true;
+        }, 0), true);
     }
 
     window.addEventListener('beforeunload', function (e) {
@@ -115,12 +122,26 @@
     document.addEventListener('htmx:sendError', () => busy(false));
 
     // ── boot ──────────────────────────────────────────────────────────────────────────
-    function boot() { document.querySelectorAll('form[data-track-changes]').forEach(track); }
+    // Errors are placed at the field (UI rule 12): after a failed save, bring the first one into view and
+    // focus it, opening any collapsed section it sits in, so the author never has to hunt for it.
+    function revealFirstError() {
+        const el = document.querySelector('form[data-track-changes] [aria-invalid="true"]');
+        if (!el) return;
+        for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true;
+        if (el.offsetParent === null) return;   // inside a hidden tab: the page's own tab logic reveals it
+        el.scrollIntoView({ block: 'center' });
+        el.focus({ preventScroll: true });
+    }
+
+    function boot() { document.querySelectorAll('form[data-track-changes]').forEach(track); revealFirstError(); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
     // Editors may build their form contents after load (Quill, page builder); re-baseline once they are ready.
     window.addEventListener('load', () => setTimeout(() => tracked.forEach((s, f) => { s.baseline = serialize(f); setDirty(f, false); }), 300));
 
-    window.InkwellDesk = { busy, track, isDirty: () => Array.from(tracked.values()).some(s => s.dirty) };
+    // markClean: the page has already asked about the unsaved work (e.g. "Discard and switch") and is about to
+    // leave on purpose, so the browser's own leave prompt would be a second, redundant question.
+    const markClean = () => tracked.forEach((s, form) => setDirty(form, false));
+    window.InkwellDesk = { busy, track, isDirty: () => Array.from(tracked.values()).some(s => s.dirty), markClean };
 })();
 
 /*

@@ -14,11 +14,11 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
     {
         using var conn = _ctx.CreateConnection();
         await conn.ExecuteAsync(@"
-            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, StatusCode, UserAgent, VisitedAt, Verified)
-            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @StatusCode, @UserAgent, @VisitedAt, @Verified);",
+            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, Query, StatusCode, UserAgent, VisitedAt, Verified)
+            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @Query, @StatusCode, @UserAgent, @VisitedAt, @Verified);",
             new
             {
-                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.StatusCode, v.UserAgent, v.Verified,
+                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.Query, v.StatusCode, v.UserAgent, v.Verified,
                 VisitedAt = v.VisitedAt == default ? DateTime.UtcNow : v.VisitedAt
             });
     }
@@ -29,11 +29,11 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
         using var conn = _ctx.CreateConnection();
         using var tx = conn.BeginTransaction();
         var written = await conn.ExecuteAsync(@"
-            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, StatusCode, UserAgent, VisitedAt, Verified)
-            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @StatusCode, @UserAgent, @VisitedAt, @Verified);",
+            INSERT INTO CrawlerVisits (OwnerId, Crawler, Operator, IsAi, Path, Query, StatusCode, UserAgent, VisitedAt, Verified)
+            VALUES (@OwnerId, @Crawler, @Operator, @IsAi, @Path, @Query, @StatusCode, @UserAgent, @VisitedAt, @Verified);",
             visits.Select(v => new
             {
-                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.StatusCode, v.UserAgent, v.Verified,
+                v.OwnerId, v.Crawler, v.Operator, v.IsAi, v.Path, v.Query, v.StatusCode, v.UserAgent, v.Verified,
                 VisitedAt = v.VisitedAt == default ? DateTime.UtcNow : v.VisitedAt
             }), tx);
         tx.Commit();
@@ -84,6 +84,27 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
              GROUP BY Path
              ORDER BY Visits DESC;",
             new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId, AiOnly = aiOnly ? 1 : 0, Take = take });
+
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<CrawledRequest>> GetTopQueriedRequestsAsync(Guid? ownerId, int days, int take = 20)
+    {
+        using var conn = _ctx.CreateConnection();
+        var rows = await conn.QueryAsync<CrawledRequest>($@"
+            SELECT TOP (@Take)
+                   Path,
+                   Query,
+                   COUNT(1)                AS Visits,
+                   COUNT(DISTINCT Crawler) AS Crawlers
+              FROM CrawlerVisits
+             WHERE VisitedAt >= @Since
+               {OwnerFilter(ownerId)}
+               AND Query IS NOT NULL
+               AND (Verified IS NULL OR Verified = 1)
+             GROUP BY Path, Query
+             ORDER BY Visits DESC;",
+            new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId, Take = take });
 
         return rows.ToList();
     }

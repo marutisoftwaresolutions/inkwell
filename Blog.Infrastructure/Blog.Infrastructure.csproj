@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Migrations\*.sql" />
+    <!-- One source for the reference catalogs (ADR-0027): MigrationService seeds from the dated script itself. -->
+    <EmbeddedResource Include="..\DBScripts\2026-10-05_create-and-seed-countries-timezones-date-locales.sql" LogicalName="Blog.Infrastructure.ReferenceData.sql" />
   </ItemGroup>
 
 </Project>

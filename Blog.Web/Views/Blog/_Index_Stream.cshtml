@@ -52,7 +52,7 @@
                             {
                                 <span style="font-family:var(--sans);font-size:13px;font-weight:700;color:var(--fg);">@post.AuthorName</span>
                             }
-                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@post.PublishedAt?.ToString("MMM d, yyyy · h:mm tt")</time>
+                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Dates.DateTime(post.PublishedAt)</time>
                         </div>
                         <p style="font-family:var(--sans);font-size:0.9375rem;line-height:1.55;color:var(--fg);margin:0 0 6px;">
                             <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;font-weight:600;">@post.Title</a>

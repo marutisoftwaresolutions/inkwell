@@ -149,17 +149,28 @@
                         <td class="px-6 py-4">
                             @if (user.IsActive)
                             {
-                                <span class="px-2 py-1 text-xs rounded-full font-medium bg-emerald-100 text-emerald-800">Active</span>
+                                <span class="px-2 py-1 text-xs rounded-full font-medium border pill-ok">Active</span>
                             }
                             else
                             {
-                                <span class="px-2 py-1 text-xs rounded-full font-medium bg-red-100 text-red-800">Disabled</span>
+                                <span class="px-2 py-1 text-xs rounded-full font-medium border pill-bad">Disabled</span>
+                            }
+                            @if (user.TwoFactorEnabled)
+                            {
+                                <span class="ml-1 px-2 py-0.5 text-xs rounded-full border pill-ok" title="Signs in with an authenticator app code">2FA<span class="sr-only">: two-factor sign-in on</span></span>
                             }
                         </td>
                         <td class="px-6 py-4 text-right">
                             @* Never offered on your own row: disabling yourself locks you out. The controller refuses it too. *@
                             @if (isAdmin && !isSelf)
                             {
+                                if (user.TwoFactorEnabled)
+                                {
+                                <form method="post" action="/account/two-factor/reset/@user.Id" class="inline mr-2" data-confirm-title="Turn off two-factor sign-in for this user?" data-confirm-body="Use this when @displayName has lost their phone and their recovery codes. They sign in with a password only until they set it up again; if their role requires it, they are asked to at their next visit to the Desk." data-confirm-action="Turn off two-factor" data-confirm-tone="warning">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="px-3 min-h-10 text-xs rounded-md border hover:opacity-80 transition-opacity focus-visible:ring" style="border-color: var(--border); color: var(--muted-foreground);">Reset 2FA<span class="sr-only"> for @displayName</span></button>
+                                </form>
+                                }
                                 if (user.IsActive)
                                 {
                                 <form method="post" action="/admin/users/toggle-active" class="inline" data-confirm-title="Disable this user?" data-confirm-body="@displayName is signed out and cannot sign in until re-enabled. Their posts, pages and comments stay." data-confirm-action="Disable user" data-confirm-tone="warning">

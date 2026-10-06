@@ -97,7 +97,7 @@
                                     @(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)
                                 </td>
                                 <td style="color:var(--fg-meta);font-size:var(--fs-sm);white-space:nowrap;">
-                                    @post.PublishedAt?.ToString("d MMM yyyy")
+                                    @Dates.Medium(post.PublishedAt)
                                 </td>
                                 <td style="color:var(--fg-meta);font-size:var(--fs-sm);white-space:nowrap;">
                                     @readingMinutes min

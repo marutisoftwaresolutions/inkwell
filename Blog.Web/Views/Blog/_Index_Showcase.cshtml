@@ -60,7 +60,7 @@
                         <span style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,.8);margin-bottom:var(--sp-4);">@heroCategory.Name</span>
                     }
                     <h1 style="font-family:var(--serif);font-size:clamp(1.5rem,4vw,2.75rem);font-weight:700;line-height:1.15;color:#fff;margin:0 0 var(--sp-4);max-width:36ch;">@heroPost.Title</h1>
-                    <span style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.7);">@heroPost.PublishedAt?.ToString("MMM d, yyyy")</span>
+                    <span style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.7);">@Dates.Medium(heroPost.PublishedAt)</span>
                 </div>
             </a>
         }
@@ -88,7 +88,7 @@
                             {
                                 <p style="font-family:var(--sans);font-size:0.875rem;line-height:1.6;color:var(--fg-body);margin:0 0 var(--sp-4);">@excerpt</p>
                             }
-                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@post.PublishedAt?.ToString("MMM d, yyyy")</time>
+                            <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">@Dates.Medium(post.PublishedAt)</time>
                         </div>
                     </article>
                 }
@@ -105,7 +105,7 @@
                         <h4 style="font-family:var(--serif);font-size:1rem;font-weight:600;margin:0;">
                             <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>
                         </h4>
-                        <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);flex-shrink:0;margin-left:var(--sp-6);">@post.PublishedAt?.ToString("MMM d, yyyy")</time>
+                        <time style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);flex-shrink:0;margin-left:var(--sp-6);">@Dates.Medium(post.PublishedAt)</time>
                     </article>
                 }
             </div>

@@ -7,6 +7,150 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.0.8] — 2026-10-06
+
+### Added
+
+- **Newsletter sending.** Admin → Newsletter writes, previews and sends newsletters to your confirmed subscribers.
+  - **Writing:** each issue has a subject, preview text, an introduction in Markdown and up to six posts shown as cards (image, summary, date, link).
+  - **Before sending:** preview the email, then send a test to yourself. Sending asks for confirmation with the number of recipients, and the typed word SEND at five or more.
+  - **How it goes out:** in the background, in batches (`Newsletter:BatchSize` per minute, default 50), through your SMTP server. A failed copy is retried after 5 and 30 minutes and the reason is shown in the send log. Someone who unsubscribes meanwhile is skipped, and **Stop sending** cancels whatever has not gone out.
+  - **Unsubscribe:** every copy carries the subscriber's own unsubscribe link and one-click unsubscribe headers (RFC 8058), so inbox providers can offer an Unsubscribe button. There is a plain-text version for mail apps that need one.
+  - **Privacy and access:** no tracking pixels or rewritten links. Admin-only, audited (drafted, updated, queued, test sent, cancelled, sent), and single-site installs only.
+  - **Upgrade:** adds the `NewsletterIssues` and `NewsletterDeliveries` tables automatically.
+- **Dates in your time zone and country's format.** Settings → Display → **Date and time** sets four things:
+  - **Country** narrows the next two lists, and suggests the country's main zone and its usual format.
+  - **Time zone,** from the IANA Time Zone Database.
+  - **Date format,** from each country's Unicode CLDR conventions, or ISO 8601.
+  - **Clock:** the format's own, 24-hour or 12-hour. A live preview shows today in the chosen settings.
+  - **Where it applies:** every date on the public site (all home layouts, post cards, post pages, comments, footers, the masthead date) and in the Desk now follows these settings.
+  - **Calendar dates** such as “last verified” and “next review” are never shifted by the time zone.
+  - **Gregorian year everywhere:** sites using Arabic, Thai or Persian formats still show it.
+  - **Reference data:** 249 countries, 419 time zones and 548 country date formats are stored in three new tables (`Countries`, `TimeZones`, `DateLocales`), seeded by a dated, idempotent script generated from IANA tzdata 2026e and CLDR 48. `tools/RefDataGenerator` rebuilds it when either is updated.
+  - **Upgrade:** the tables are created and seeded automatically. A site that changes nothing shows US-English dates in UTC; a Windows time zone saved earlier keeps working and is stored under its IANA name on the next save.
+- **Custom fields.** Settings → Custom fields defines your own fields for posts, pages or both.
+  - **Types:** text, number, date, web address or yes/no.
+  - **Editing:** a “Custom fields” panel in the post and page editors. A wrong value, such as a number with words in it, is shown again at the field with what to fix, and nothing is saved.
+  - **Readers:** fields marked “Show to readers” appear as a “Details” list on the page. Posts also carry them as `additionalProperty` in their structured data. Other fields stay internal.
+  - **Safe to change:** renaming a field keeps its values. Removing one hides it everywhere but keeps what was entered. Changing a field's type never clears a value: one that no longer fits is shown in the editor as it was, flagged for you to correct. Revisions record the values.
+  - **Yes / no** fields have three states: not set, Yes or No. Readers see the answer only when one is chosen.
+  - **Export:** WordPress exports carry each value as a native custom field. Ghost has no custom fields, and the export summary says so before you download.
+  - **Upgrade:** adds `CustomFieldsJson` to Posts and Pages automatically. Nothing changes on a site until a field is defined.
+- **Gallery block.** Several images in a grid of two, three or four columns:
+  - **In every editor:** the post and page builders have a Gallery block whose settings edit columns, order, alt text and captions. The rich-text editor has `/gal`, and the Markdown editor has a toolbar button.
+  - **Choosing images:** the media picker can now select several images, in the order you pick them.
+  - **Readers:** each image links to its full-size file, so a gallery works without JavaScript. With it, a self-hosted lightbox opens the image, with arrow keys between images and Escape to close, and focus returns where it was. The lightbox script loads only on pages with a gallery. Phones show two images per row.
+- **Alt text and captions for images in the media library.** Each image has a **Details** page, shown as **Add alt** when it has none. Its alt text and caption are copied into galleries when you place them. Changes are audited.
+- **Markdown authoring.** Posts can be written in Markdown as well as in the visual editor.
+  - **Starting:** choose **Write in Markdown** on a new post, or switch an existing post from its editor. Its current HTML becomes the Markdown source, and the switch is refused if that would change how the post looks. Switching back keeps the post as it renders.
+  - **The editor:** self-hosted, with a formatting toolbar, keyboard shortcuts, side-by-side view and a preview rendered by the server. It supports CommonMark plus tables, strikethrough, task lists and footnotes. HTML is allowed.
+  - **Saving:** the post's HTML is rendered from the Markdown on every save, so pages, feeds, search, `llms.txt`, webhooks and exports are unchanged.
+  - **Revisions** keep the Markdown source.
+  - **API:** the posts API accepts `markdown`. Sending `content` (HTML) makes HTML the post's source again.
+  - **Ghost import:** a new option keeps Ghost posts written in Markdown as Markdown posts. Ghost exports without rendered HTML now render their Markdown properly instead of flattening it.
+  - **Upgrade:** adds `Markdown` and `EditorMode` to `Posts` automatically. Existing posts are unchanged.
+- **Two-factor sign-in.** Users can add a code from an authenticator app to their sign-in, under Profile → Two-factor sign-in.
+  - **Setting up:** scan a QR code (or type the setup key), confirm one code, then save ten single-use recovery codes. They are shown once.
+  - **Signing in:** after the password, the Desk asks for the 6-digit code. A recovery code works in its place. Five wrong codes end the attempt, and each one counts toward the IP firewall's sign-in limits.
+  - **API:** `POST /api/v1/auth/login` accepts the code as `code` and refuses a token without it.
+  - **Requiring it:** optional for everyone by default. An Admin can require it for chosen roles in Settings → Notifications & housekeeping. People in those roles, including anyone already signed in, are asked to set it up before they reach the Desk.
+  - **Recovery:** users can create new recovery codes or turn two-factor off (with their password). An Admin can turn it off for someone who lost their phone (Users → Reset 2FA).
+  - **Audit:** every change is audited.
+  - **Upgrade:** adds four columns to `Users` automatically.
+- **Export to WordPress and Ghost.** Admin → Export downloads the site's content in each platform's own import format:
+  - **WordPress:** a WXR 1.2 file for **Tools → Import → WordPress**.
+  - **Ghost:** a ZIP of import JSON plus `content/images` for **Settings → Import**.
+  - **Before you download,** a summary built from your own content shows what carries over, what changes and what is not exported:
+    - **WordPress keeps** posts, pages and their hierarchy, categories, tags, authors, comments with replies, and feature and in-body images, which WordPress downloads during import.
+    - **Search and social fields** are written for both Yoast SEO and Rank Math.
+    - **Ghost:** categories become tags, and series become internal tags. Images are packed in the ZIP. Comments are not exported, because Ghost cannot import them.
+    - **Inkwell's own blocks** (answer capsule, key facts, roundups, how-to steps, FAQs and series) are written into the post body as ordinary HTML, so no section is left empty. WordPress also keeps the original data in post meta.
+  - **Options:** unpublished posts, pages, comments and email addresses can each be left out. Email addresses are off by default; Ghost needs them to keep authors.
+  - **Files and access:** files are built outside the web root, streamed to you and deleted when the download finishes. Admin-only, every export is audited, and the screen is not available in cloud mode.
+  - **Tested by real imports** into WordPress 7.1.2 (with the WordPress Importer 0.9.6) and Ghost 6.67.0. The import instructions on the screen now say that WordPress downloads images only from ports 80, 443 and 8080, that re-importing into WordPress skips posts it already has, and that Ghost should be imported into once, because a second import copies every post.
+- **Cookie consent.** The public site now asks readers before any optional cookie is set. It is on by default, including on existing sites after the upgrade, and can be turned off in Admin → Settings → Search & analytics (**Ask readers for cookie consent**).
+  - **With a Google Analytics Measurement ID:** the Google tag is no longer in the page. A banner offers **Accept analytics cookies** and **Reject analytics cookies** as equal buttons, and Analytics loads only after Accept.
+  - **Without one:** the banner is a short notice that only essential cookies are used.
+  - **Changing a choice:** the choice is remembered for 180 days in a first-party cookie and can be changed from **Cookie settings** at the foot of every page. Withdrawing consent stops the tag and removes its cookies.
+  - **Rendering:** the banner is self-hosted, works in every layout, preset and colour scheme, and leaves page caching unchanged.
+  - **Turning it off** restores the earlier behaviour (Analytics on every page).
+  - **Measurement ID:** the Measurement ID field now accepts only a Google tag id, such as `G-ABC123XYZ9`.
+  - **Built-in Analytics:** it uses no cookies and is unaffected.
+- **Backup and restore.** Admin → Backups makes a whole-site backup: one ZIP file with posts, pages, taxonomy, series, users, roles, settings, theme, menus, redirects, snippets, webhooks, firewall rules, comments, subscribers, newsletters, revisions, the audit trail and every uploaded file.
+  - **Making one:** backups run in the background through the scheduler, and the list updates by itself when one is done. Page-view analytics are included only when asked for. Backups are stored outside the web root (`Backups:Path`, default `App_Data/backups`), and the newest 10 are kept (`Backups:Keep`).
+  - **Restoring:** only into a fresh install. Copy the ZIP into the new server's backups folder and choose **Restore from a backup** on the first-run screen. The restore runs as one transaction, so a failure leaves the install empty. Primary keys are kept, so every link between posts, categories, users and media survives.
+  - **Signing in afterwards:** users sign in with their old passwords.
+  - **Not included:**
+    - the encryption key ring, so the Search Console connection and webhook signing secrets must be entered again after a restore;
+    - crawler, error and job logs;
+    - search-performance data;
+    - the webhook delivery log;
+    - import staging;
+    - password-reset links.
+  - **Access:** Admin-only; making, downloading, deleting and restoring a backup are all audited. The screen is not available in cloud (multi-tenant) mode.
+- **Editorial review.** Authors without the publish permission now submit posts for review; before, pressing Publish silently saved a draft.
+  - **Two new states:** *In review* and *Needs changes*.
+  - **Reviewing:** an Editor or Admin approves the post, which publishes it (or schedules it, if its time is ahead), or sends it back with a note the author sees above the editor. Saving a returned post as a draft keeps the note, and an editor saving edits to a post in review keeps it in review.
+  - **An author's changes to a live post** go through review too, which takes the post off the site until approved; the confirmation says so first.
+  - **Finding work:** the Posts list filters by both states, and the dashboard shows a "Waiting for review" queue to editors and "Sent back to you" to authors.
+  - **Readers never see** a post in review or one that needs changes: not on any page, feed, sitemap, search or `llms.txt`.
+  - **Audit:** submissions, approvals and returns are audited.
+  - **Upgrade:** adds `ReviewNote` and `ReviewRequestedAt` to `Posts` automatically.
+- **Navigation menus.** Admin → Menus builds the header and footer menus from pages, categories, tags, series, custom links and, in the footer, the home feed:
+  - **Items:** ordered and nested one level, with an optional new-tab setting. They point at content by id, so renaming a slug never breaks a menu, and deleted or unpublished content drops out on its own.
+  - **Layouts:** all eight navbar and six footer layouts render them. Top-level items appear in the header bar; nested items appear in the theme's menu and on phones.
+  - **Existing sites are unchanged:** until a header menu is saved, the header shows the pages marked "Show in navigation" exactly as before, and a site with no footer menu shows no extra footer row. Saving a menu empty returns to that default, after a confirmation.
+  - **Custom links:** only a site path or an http(s) address is accepted.
+  - **Access:** uses the Theme permission; changes are audited.
+  - **Upgrade:** adds the `MenuItems` table automatically.
+- **Webhooks.** Admin → Webhooks sends a signed JSON request to another service when something changes, to rebuild a static site, post to social media or purge a cache:
+  - **Events:** `post.published` (including a scheduled post reaching its time), `post.updated`, `post.unpublished`, `page.published` and `comment.created` (a reader's comment, sent while it awaits moderation).
+  - **Delivery:** queued and sent by the scheduler within a minute, so a slow or dead endpoint never holds up publishing. A failed delivery is retried after 1 minute, 5 minutes, 30 minutes and 2 hours, then marked failed.
+  - **Delivery log:** kept for 30 days per endpoint, with the response code and the start of the response, **Redeliver**, and **Send test**.
+  - **Headers:** every request carries `X-Inkwell-Event`, an `X-Inkwell-Delivery` id that a redelivery keeps (so receivers can ignore duplicates), and `X-Inkwell-Signature: t=<unix>,v1=<HMAC-SHA256 of "t.body">`.
+  - **Secret:** the signing secret is generated for you, stored Data-Protection-encrypted and never shown again.
+  - **Private networks refused:** addresses on the server itself or a private network are refused, including host names that resolve to one, and redirects are not followed.
+  - **Privacy:** payloads never include a commenter's email address or IP.
+  - **Access:** Admin-only; creating, changing, deleting, testing and redelivering are audited.
+  - **Upgrade:** adds the `Webhooks` and `WebhookDeliveries` tables automatically.
+- **What crawlers actually request, in AI Crawlers.** Crawler visits now record the query string as well as the path, and the report gains a **Requests with a query string** table: the path, the query string, visits and how many crawlers asked for it, leaving out visits that failed the identity check. Before this, `/?page=500`, `/?p=123` and `/?anything` were all recorded as `/`. Query strings are shown as text, never as links. Visits recorded before the upgrade have none. Upgrading adds a `Query` column to `CrawlerVisits` automatically.
+
+### Changed
+
+- **LICENSE names Maruti Software Solutions as the copyright holder,** in place of the product's former name.
+- **The home page can be cached by a CDN.** It no longer sets a cookie or sends `Cache-Control: no-store`. The newsletter form fetches its anti-forgery token when the reader presses Subscribe, instead of carrying one in the page, so an edge cache rule on `/` no longer breaks the form. The check itself is unchanged: nothing is written without a valid token. Without JavaScript, the form leads to a short page that confirms the sign-up with one more press. Post pages still carry the comment form's token and are not cacheable yet.
+- **"Most read" counts the same readers as Analytics.** A post's view count, which orders the popular-posts lists on the home page and the 404 page, now goes up from the page-view beacon, like Analytics, instead of on every page load. Request floods, scrapers, cache revalidations and API reads no longer raise it, and opening a post no longer writes to the database. Existing counts are kept; new views add to them.
+- **The Desk takes you to the first error after a failed save.** On any editor, the first field with an error is opened, scrolled into view and focused, even inside a collapsed section.
+
+### Removed
+
+- **`DBScripts/migration-all-changes.sql`.** An early one-off migration that predated `init.sql`, stopped with errors when run against a current database, still carried the product's old codename, and seeded one site's category and tag list. Every table and column it created is in `DBScripts/init.sql`, which, together with the automatic startup migration, is the supported way to create or upgrade a database. The `init.sql` header and start-up banner now name only Inkwell.
+
+### Fixed
+
+- **Opening an unsubscribe link unsubscribed immediately.** Mail systems open links to scan them, which could unsubscribe readers who never clicked. The link now shows a page with an Unsubscribe button; one-click unsubscribe from inbox providers still works.
+- **The welcome email promised automatic emails for every new article,** which the site never sent. It now says readers will get the newsletter when one is sent.
+- **Deleting a subscriber left no audit entry.** It is now audited, by id only, so the address stays out of the permanent record.
+- **The Settings page logged a script error on every visit.** It loaded a form-validation library that needs jQuery, which the Desk does not load, so it never ran. It is removed; fields are still checked by the browser and the server.
+- **Most dates ignored the site's time zone.** Only the post page converted. Home layouts, post cards, comments and most Desk screens showed UTC, and footers and mastheads used the server's own clock, so a post published late in the evening in India could show the next day's date, or the previous one. All of them now use the site's zone.
+- **Published and modified times in structured data and Open Graph had no time zone.** They now end in `Z` (UTC), so search engines no longer have to guess the zone.
+- **Editing a page did not save its search and social fields.** Meta title, description, canonical address, Open Graph and Twitter fields were shown on the page editor but only saved when the page was first created. They are now saved on every edit.
+- **Newsletter sign-up without JavaScript.** Errors such as a mistyped address were lost after the redirect; they now appear next to the address field. The sign-up box no longer names a topic in its copy; it uses the site's name.
+- **Listing pages answered any page number and any query string.** The home feed, search, category, tag, author and series pages returned 200 for a page past the last one (an empty listing) and for any unknown parameter (`/?p=123`, `/?anything`), so every variant was a separate URL crawlers could keep fetching. A page past the last one now returns 404, and unknown or invalid parameters are dropped with a 301 to the clean URL. Paging, search, filters, `utm_*` campaign tags and ad click ids are always kept, and no link the site itself produces is ever redirected.
+- **Cancelling a confirmation turned off the unsaved-changes warning.** On any Desk form that asks for confirmation before saving, choosing Cancel quietly stopped the "you have unsaved changes" prompt for the rest of the visit, so leaving the page afterwards could lose work. The warning now stays on until a save actually goes through.
+- **Page links in the Feed header layout led to "not found".** The Feed navbar linked navigation pages to `/pages/{slug}`, an address that never existed; it now links `/{slug}` like every other layout.
+- **Three Settings fields had labels that pointed at nothing.** The site logo, favicon and cover image address fields carry their own ids for the media picker, which disconnected their labels: screen readers announced them as unnamed fields and clicking a label did not focus its field. The labels now point at the right fields.
+- **Comments and social-card images were available for unpublished posts.** A comment could be posted to a draft, and `/og-image/{slug}.png` generated an image showing a draft's title, for anyone who knew the address. Both now answer "not found" unless the post is live.
+- **Search results lost the query from page 2 onwards.** The pager on `/search?q=…` pages linked with the home feed's `search=` parameter, which the search page ignored, so page 2 and later listed every post. Search now reads either, so paging through results keeps the query.
+
+### Security
+
+- **The subscription confirmation email inserted the subscriber's name into its HTML unescaped.** A name containing HTML could alter the email sent to that address. It is now encoded.
+- **An unused autosave endpoint let other websites overwrite posts.** `POST /admin/posts/autosave/{id}` was called by nothing in the Desk, yet it replaced any post's title and body for whoever was signed in, with no anti-forgery check, no ownership check and no audit entry. A page on another site could have used a signed-in editor's browser to rewrite a post. It has been removed, and the README no longer claims draft auto-save, which never worked.
+- **Failed API sign-ins were invisible to the IP firewall.** A wrong password at `POST /api/v1/auth/login` returned 401 without being reported, so password-guessing against the API never led to a block. Failed API sign-ins (and failed two-factor codes) now count toward the same limits as the Desk sign-in page.
+- **The setup wizard stayed open after the first admin registered.** The wizard at `/setup` treated a site as set up only once its settings had been saved. The first admin can also be created at `/account/register`, which saves no settings, so until someone saved Settings, anyone could complete the wizard and create another Admin account. The wizard now closes as soon as any user or settings exist.
+- **A user without the publish permission could publish a post by crafting the save request.** The post editor took the status from the button only for Publish and Save Draft; any other request kept a submitted Status field, so `Status=Published` went live. The server now decides every status from the button pressed and the user's permission, and never from a submitted value.
+
 ## [1.0.7] — 2026-09-27
 
 ### Added

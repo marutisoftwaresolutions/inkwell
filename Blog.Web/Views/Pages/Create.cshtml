@@ -44,6 +44,9 @@
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image" aria-label="Image">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 </button>
+                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="gallery" draggable="true" title="Gallery" aria-label="Gallery">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                </button>
                 <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button" aria-label="Button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 </button>
@@ -116,6 +119,8 @@
                         
                     </div>
                     </details>
+
+                    <partial name="_CustomFieldsPanel" />
 
                     <details class="group border-t border-border" data-desk-section="page-seo">
                     <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
@@ -293,6 +298,7 @@
     const components = {
         heading: () => `<h2 contenteditable="true" style="font-size:1.8rem;font-weight:700;color:var(--foreground);">Your Heading Here</h2>`,
         text: () => `<p contenteditable="true" style="font-size:1rem;line-height:1.8;color:var(--foreground);">Click to edit this text block. Write your content here.</p>`,
+        gallery: () => InkwellGallery.pick(),
         image: () => `<div class="comp-image"><div class="img-placeholder" onclick="selectBlockImage(this)"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto .5rem;display:block;color:var(--muted-foreground)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="color:var(--muted-foreground);font-size:.85rem;">Click to select image</span></div></div>`,
         button: () => `<div class="comp-button"><a href="#" contenteditable="true">Click Me</a></div>`,
         hero: () => `<div class="comp-hero"><h2 contenteditable="true">Welcome to Our Site</h2><p contenteditable="true">A brief description of what makes this page special.</p><a href="#" contenteditable="true">Get Started</a></div>`,
@@ -324,6 +330,7 @@
 
     // ── COMPONENT SETTINGS DEFINITIONS ──
     const settingsDefs = {
+        gallery: (b) => InkwellGallery.settings(b),
         heading: (block) => {
             const h = block.querySelector('h2,h3,h1,h4,h5,h6');
             return `
@@ -449,7 +456,7 @@
     function showComponentSettings(block) {
         const type = block.dataset.type;
         const content = block.querySelector('.block-content');
-        const titleMap = { heading:'Heading', text:'Text', image:'Image', button:'Button', hero:'Hero', imagetext:'Image + Text', quote:'Quote', divider:'Divider', spacer:'Spacer', video:'Video' };
+        const titleMap = { heading:'Heading', text:'Text', image:'Image', button:'Button', hero:'Hero', imagetext:'Image + Text', quote:'Quote', divider:'Divider', spacer:'Spacer', video:'Video', gallery:'Gallery' };
         compSettingsTitle.textContent = titleMap[type] || 'Component';
         const gen = settingsDefs[type];
         compSettingsBody.innerHTML = gen ? gen(content) : '<p class="text-xs text-muted-foreground">No settings available.</p>';

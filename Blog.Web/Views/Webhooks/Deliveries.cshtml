@@ -1,0 +1,101 @@
+@model IReadOnlyList<Blog.Core.Domain.WebhookDelivery>
+@using Blog.Core.Domain
+@using Blog.Web.Models
+@{
+    Layout = "_AdminLayout";
+    var webhook = (Webhook)ViewBag.Webhook;
+    var q = ViewData[ListPaging.QueryKey] as string;
+    ViewData["Title"] = $"Deliveries — {webhook.Name}";
+
+    string StatusClass(string s) => s switch
+    {
+        WebhookDeliveryStatus.Succeeded => "text-foreground",
+        WebhookDeliveryStatus.Failed    => "text-destructive",
+        _                               => "text-muted-foreground",
+    };
+}
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <a href="/admin/webhooks" class="text-xs text-muted-foreground hover:underline"><span aria-hidden="true">←</span> Webhooks</a>
+            <h2 class="text-lg font-semibold text-foreground mt-1">Deliveries — @webhook.Name</h2>
+            <p class="font-mono text-[11px] text-muted-foreground break-all">@webhook.Url</p>
+            <p class="text-xs text-muted-foreground mt-1">Kept for 30 days. Failed deliveries are retried automatically; <strong>Redeliver</strong> sends the same event again now, with the same delivery id. <strong>Send test</strong> works even while the webhook is paused.</p>
+        </div>
+        <form method="post" action="/admin/webhooks/@webhook.Id/test">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Send test</button>
+        </form>
+    </div>
+
+    <div class="bg-card rounded-lg border border-border overflow-hidden">
+        <partial name="_ListSearch" />
+        <div class="table-scroll"><table class="w-full text-left text-sm">
+            <thead>
+                <tr class="bg-muted text-muted-foreground border-b border-border">
+                    <th class="px-4 py-3 font-medium">When (UTC)</th>
+                    <th class="px-4 py-3 font-medium">Event</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium text-right">Attempts</th>
+                    <th class="px-4 py-3 font-medium">Response</th>
+                    <th class="px-4 py-3 font-medium w-[110px]">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                @if (Model.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
+                            @if (string.IsNullOrEmpty(q))
+                            {
+                                <text>Nothing delivered yet. Use <strong>Send test</strong> to check the endpoint, or publish something this webhook listens for.</text>
+                            }
+                            else
+                            {
+                                <text>No matches for “@q”. <a href="?" class="text-primary hover:underline">Clear the search</a> to see all @ViewBag.TotalAll.</text>
+                            }
+                        </td>
+                    </tr>
+                }
+                @foreach (var d in Model)
+                {
+                    <tr class="hover:bg-muted/50 transition-colors align-top">
+                        <td class="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">@Dates.DateTimeSeconds(d.CreatedAt)</td>
+                        <td class="px-4 py-3 font-mono text-xs text-foreground">@d.EventType</td>
+                        <td class="px-4 py-3 text-xs @StatusClass(d.Status)">
+                            @d.Status
+                            @if (d.Status == WebhookDeliveryStatus.Pending && d.Attempts > 0)
+                            {
+                                <span class="block text-muted-foreground">next try @Dates.DateTime(d.NextAttemptAt)</span>
+                            }
+                        </td>
+                        <td class="px-4 py-3 text-xs text-right text-muted-foreground">@d.Attempts</td>
+                        <td class="px-4 py-3 text-xs text-muted-foreground max-w-[26rem]">
+                            @if (d.ResponseCode is int code) { <span class="text-foreground">HTTP @code</span> }
+                            @if (!string.IsNullOrEmpty(d.Error)) { <span class="block text-destructive break-words">@d.Error</span> }
+                            @if (!string.IsNullOrEmpty(d.ResponseSnippet)) { <span class="block font-mono text-[11px] break-all">@d.ResponseSnippet</span> }
+                        </td>
+                        <td class="px-4 py-3">
+                            @if (d.EventType != WebhookEvents.Test)
+                            {
+                                var alreadyAccepted = d.Status == WebhookDeliveryStatus.Succeeded;
+                                <form method="post" action="/admin/webhooks/@webhook.Id/deliveries/@d.Id/redeliver"
+                                      data-confirm-title="@(alreadyAccepted ? "Send this event again?" : null)"
+                                      data-confirm-body="@(alreadyAccepted ? "The endpoint already accepted it. It will receive the same event a second time, with the same delivery id — a receiver that does not check that id may act on it twice." : null)"
+                                      data-confirm-action="@(alreadyAccepted ? "Redeliver" : null)"
+                                      data-confirm-tone="@(alreadyAccepted ? "warning" : null)">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="q" value="@ViewData[ListPaging.QueryKey]" />
+                                    <input type="hidden" name="page" value="@ViewData[ListPaging.PageKey]" />
+                                    <button type="submit" class="text-xs px-2 py-1 rounded border border-input hover:bg-muted" aria-label="Redeliver @d.EventType from @Dates.DateTime(d.CreatedAt)">Redeliver</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+        <partial name="_ListPager" />
+    </div>
+</div>

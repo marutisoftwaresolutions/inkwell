@@ -248,6 +248,16 @@ var COMMANDS = [
           var tb = q.getModule('toolbar');
           if (tb && tb.handlers && tb.handlers.image) tb.handlers.image.call({quill:q});
       }},
+    { category:'Media', label:'Gallery',    desc:'Several images in a grid', icon:'▦',  badge:'/gal', keywords:['gallery','images','grid','photos'],
+      action:function(q,r){
+          if (!window.InkwellGallery) return;
+          InkwellGallery.pickItems().then(function(items){
+              var at = r ? r.index : q.getLength();
+              q.insertEmbed(at,'gallery',{ columns:'3', items:items },'user');
+              q.insertText(at+1,'\n','user');
+              q.setSelection(at+2,0,'user');
+          });
+      }},
     { category:'Media', label:'Video Embed', desc:'Embed YouTube / Vimeo',   icon:'▶',  badge:'/vid', keywords:['video','youtube','vimeo','embed'],
       inputDialog:{
           title: 'Embed Video',
