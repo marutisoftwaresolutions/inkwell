@@ -58,8 +58,11 @@ forms and responsive images, and the Desk gets a new shell. The Docker deploymen
 
 ## Fixed
 
-- **The Docker deployment did not work.** The image did not build (a user-ID clash with the .NET 10
-  base image, and a missing `DBScripts/` input), and nothing created the database on first boot.
+- **A fresh clone could not build, and the Docker deployment did not work.** A SQL file the build
+  embeds was missing from the repository, so v1.0.8 compiled only on machines that already had it.
+  The repository now includes it, along with the dated schema scripts named in the upgrade notes.
+  The image also clashed with the .NET 10 base image's built-in user, and nothing created the
+  database on first boot.
   `docker compose up` now builds and seeds the database through a one-off `db-init` service, and a
   GitHub Actions workflow boots the full stack on an empty database on every push. Thanks to the
   community member who reported it and shared a working fork.

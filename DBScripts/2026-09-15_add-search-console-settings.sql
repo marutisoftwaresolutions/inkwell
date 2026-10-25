@@ -1,0 +1,13 @@
+-- DBScripts/2026-09-15_add-search-console-settings.sql
+-- Change: Added four Search Console fields to UserSettings:
+--           SearchConsoleProperty            — "sc-domain:example.com" or "https://www.example.com/"
+--           SearchConsoleCredentialProtected — service-account JSON, Data-Protection-encrypted
+--           SearchConsoleClientEmail         — the service account's email, for display only
+--           SearchPerformanceRetentionMonths — months of rows kept (default 16, range 1–16)
+--         Edited in Admin → Settings → Search Console; read by the search-console-sync job.
+-- Schema impact: NONE — stored in Settings.JsonPayload, no column change. Older payloads without
+--         the fields fall back to the defaults in code ("not connected").
+-- Security: the credential is never stored in clear. Rotating the Data Protection key ring
+--         invalidates it; the operator pastes the key file again.
+-- Action required: None.
+PRINT 'No schema migration required for this change (Search Console settings live in the Settings JSON blob).';

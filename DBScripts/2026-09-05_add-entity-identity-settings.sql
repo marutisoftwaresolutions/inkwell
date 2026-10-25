@@ -1,0 +1,22 @@
+-- DBScripts/2026-09-05_add-entity-identity-settings.sql
+-- Change: Added publisher-identity fields to UserSettings — EntityType, EntityLegalName,
+--         EntitySameAs, EntityFounder, EntityFoundingDate, EntityIdentityStatement.
+--
+-- Why:    Search and answer engines resolve a brand by cross-referencing authoritative profiles.
+--         Until now the only entity signals were four hardcoded social links, so a domain that
+--         previously published something else kept answering to its former identity. Measured on
+--         this deployment: the brand query for the domain's *former* product still ranks on it.
+--         These fields feed Organization/Person JSON-LD (legalName, founder, foundingDate, an
+--         expanded sameAs) and the Identity section of llms.txt.
+--
+-- Schema impact: NONE — stored in Settings.JsonPayload, no column change.
+--
+-- Defaults on existing rows: absent keys deserialize to the C# defaults, so every existing tenant
+--         keeps EntityType = 'Organization' and empty strings elsewhere. Empty fields are OMITTED
+--         from structured data rather than emitted blank, so no tenant's schema changes until they
+--         fill something in. Nothing here is inferred: an unsupplied founder or founding date is
+--         left out rather than guessed.
+--
+-- Action required: None. Fields are populated on the next save from Admin -> Settings.
+
+PRINT 'No schema migration required for this change.';

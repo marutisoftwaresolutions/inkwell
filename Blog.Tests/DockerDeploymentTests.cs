@@ -54,6 +54,29 @@ public class DockerDeploymentTests
     }
 
     [Fact]
+    public void Out_of_project_build_inputs_are_never_gitignored()
+    {
+        // 2026-10-25: the first CI run of the Docker image failed because the embedded reference-data
+        // script was listed in the local .gitignore, so no clean clone (Docker or not) could compile.
+        // Every machine that already had the file built fine, which is why only CI could see it.
+        var root = Root();
+        if (!Directory.Exists(Path.Combine(root, ".git"))) return; // a source zip has no git to ask
+        var csproj = Read("Blog.Infrastructure/Blog.Infrastructure.csproj") + Read("Blog.Web/Blog.Web.csproj");
+        var inputs = System.Text.RegularExpressions.Regex.Matches(csproj, @"<(?:EmbeddedResource|Content|None) Include=""\.\.\\([^""*]+)""")
+            .Select(m => m.Groups[1].Value.Replace('\\', '/')).ToList();
+        foreach (var rel in inputs)
+        {
+            Assert.True(Exists(rel), $"{rel} is a build input but does not exist.");
+            var psi = new System.Diagnostics.ProcessStartInfo("git", $"check-ignore -q \"{rel}\"")
+                { WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            using var git = System.Diagnostics.Process.Start(psi);
+            if (git is null) return; // no git on this machine
+            git.WaitForExit();
+            Assert.True(git.ExitCode != 0, $"{rel} is a build input but is ignored by git, so a clean clone cannot build.");
+        }
+    }
+
+    [Fact]
     public void Compose_creates_and_seeds_the_database_before_the_app_starts()
     {
         // Same report: a new SQL Server container has no `blog` database, so the app could not
