@@ -168,7 +168,7 @@ public class TwoFactorTests
 
         var api = RepoFile("Blog.Web", "Controllers", "Api", "AuthApiController.cs");
         Assert.Contains("allowRecoveryCode: false", api);
-        Assert.True(api.IndexOf("GetTwoFactorAsync", StringComparison.Ordinal) < api.IndexOf("GenerateAccessToken(user)", StringComparison.Ordinal));
+        Assert.True(api.IndexOf("GetTwoFactorAsync", StringComparison.Ordinal) < api.IndexOf("_tokens.Issue(user)", StringComparison.Ordinal));
         Assert.Contains("MustEnrolAsync", api);
 
         var ctrl = RepoFile("Blog.Web", "Controllers", "TwoFactorController.cs");

@@ -1,7 +1,8 @@
 @model Blog.Core.Domain.NewsletterIssue
 @using Blog.Core.Domain
 @{
-    ViewData["Title"] = "Newsletter";
+    ViewData["Title"] = Model.Subject;
+    ViewData["Description"] = $"Queued by {Model.QueuedByName ?? "an Admin"} · {Dates.DateTime(Model.QueuedAt)}";
     Layout = "_AdminLayout";
     var deliveries = ViewBag.Deliveries as IReadOnlyList<NewsletterDelivery> ?? Array.Empty<NewsletterDelivery>();
     string Pill(string s) => s switch
@@ -13,52 +14,49 @@
     };
 }
 
-<div class="max-w-5xl mx-auto space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="min-w-0">
-            <a href="/admin/newsletter" class="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">← Newsletters</a>
-            <h1 class="text-xl font-semibold text-foreground mt-1">@Model.Subject</h1>
-            <p class="text-xs text-muted-foreground">Queued by @(Model.QueuedByName ?? "an Admin") · @Dates.DateTime(Model.QueuedAt)</p>
-        </div>
-        @if (Model.IsActive)
-        {
+@section PageActions {
+    <a href="/admin/newsletter" class="desk-btn desk-btn-outline">Back to newsletters</a>
+    @if (Model.IsActive)
+    {
             <form method="post" action="/admin/newsletter/@Model.Id/cancel"
                   data-confirm-title="Stop sending?"
                   data-confirm-body="Subscribers who have not been sent a copy yet will not get one. Copies already sent cannot be recalled. The newsletter cannot be resumed."
                   data-confirm-action="Stop sending" data-confirm-tone="warning">
                 @Html.AntiForgeryToken()
-                <button type="submit" class="px-4 min-h-10 inline-flex items-center rounded-md border border-input bg-background text-sm font-medium tone-bad hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Stop sending</button>
+                <button type="submit" class="desk-btn desk-btn-danger-outline">Stop sending</button>
             </form>
-        }
-    </div>
+    }
+}
+
+<div class="max-w-5xl space-y-6">
 
     <partial name="_Progress" model="Model" />
 
     <section aria-labelledby="log-title" class="space-y-2">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="log-title" class="text-sm font-semibold text-foreground">Send log <span class="text-xs font-normal text-muted-foreground">(failures first, up to 100)</span></h2>
+            <h2 id="log-title" class="desk-section-title">Send log <span class="text-xs font-normal text-muted-foreground">(failures first, up to 100)</span></h2>
             @if (Model.IsActive)
             {
-                <a href="/admin/newsletter/@Model.Id" class="text-xs underline text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">Refresh the log</a>
+                <a href="/admin/newsletter/@Model.Id" class="desk-btn desk-btn-link text-xs">Refresh the log</a>
             }
         </div>
-        <div class="rounded-lg border border-border bg-card"><div class="table-scroll"><table class="w-full text-left text-sm">
-                <thead class="bg-muted/50 text-xs text-muted-foreground">
-                    <tr><th class="px-4 py-3 font-medium">Subscriber</th><th class="px-4 py-3 font-medium">Status</th><th class="px-4 py-3 font-medium">Tries</th><th class="px-4 py-3 font-medium">Sent</th><th class="px-4 py-3 font-medium">Problem</th></tr>
+        <div class="desk-card overflow-hidden"><div class="table-scroll"><table class="desk-table desk-table-compact">
+                <thead>
+                    <tr><th>Subscriber</th><th>Status</th><th>Tries</th><th>Sent</th><th>Problem</th></tr>
                 </thead>
-                <tbody class="divide-y divide-border">
+                <tbody>
                     @if (deliveries.Count == 0)
                     {
-                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-muted-foreground">No copies yet: the list of recipients is drawn up when sending starts.</td></tr>
+                        <tr><td colspan="5" class="py-6 text-center text-muted-foreground">No copies yet: the list of recipients is drawn up when sending starts.</td></tr>
                     }
                     @foreach (var d in deliveries)
                     {
                         <tr>
-                            <td class="px-4 py-2 text-foreground">@d.Email</td>
-                            <td class="px-4 py-2"><span class="@Pill(d.Status) text-xs px-2 py-0.5 rounded-full border">@d.Status</span></td>
-                            <td class="px-4 py-2 text-muted-foreground">@d.Attempts</td>
-                            <td class="px-4 py-2 text-muted-foreground whitespace-nowrap">@Dates.DateTime(d.SentAt)</td>
-                            <td class="px-4 py-2 text-xs text-muted-foreground">@d.Error</td>
+                            <td class="text-foreground">@d.Email</td>
+                            <td><span class="desk-pill @Pill(d.Status)">@d.Status</span></td>
+                            <td class="text-muted-foreground">@d.Attempts</td>
+                            <td class="text-muted-foreground whitespace-nowrap">@Dates.DateTime(d.SentAt)</td>
+                            <td class="text-xs text-muted-foreground">@d.Error</td>
                         </tr>
                     }
                 </tbody>
@@ -67,7 +65,7 @@
     </section>
 
     <section aria-labelledby="preview-title" class="space-y-2">
-        <h2 id="preview-title" class="text-sm font-semibold text-foreground">The email as sent</h2>
+        <h2 id="preview-title" class="desk-section-title">The email as sent</h2>
         <iframe src="/admin/newsletter/@Model.Id/preview" title="The email as sent" sandbox class="w-full h-[42rem] rounded-lg border border-border bg-white"></iframe>
     </section>
 </div>

@@ -4,6 +4,7 @@ using Blog.Core.Services;
 using Blog.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Blog.Web.Controllers;
 
@@ -20,10 +21,12 @@ public class ContentHealthController : Controller
     private readonly IContentHealthRepository _health;
     private readonly ITenantContext _tenant;
     private readonly Blog.Web.Services.SearchConsole.SearchPerformanceService _search;
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
 
     public ContentHealthController(IContentHealthRepository health, ITenantContext tenant,
-        Blog.Web.Services.SearchConsole.SearchPerformanceService search)
+        Blog.Web.Services.SearchConsole.SearchPerformanceService search, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
     {
+        _cache = cache;
         _health = health;
         _tenant = tenant;
         _search = search;
@@ -31,7 +34,7 @@ public class ContentHealthController : Controller
 
     /// <param name="filter">
     /// attention (default) · overdue · duesoon · unverified · nokeyfacts · nofaq · meta · staleyear · weakaeo ·
-    /// striking · losing · lowctr · all
+    /// a11y · striking · losing · lowctr · all
     /// </param>
     /// <param name="q">Search across post title and slug.</param>
     /// <param name="page">1-based page within the filtered, searched list.</param>
@@ -49,8 +52,25 @@ public class ContentHealthController : Controller
             foreach (var item in all)
                 item.Search = SearchPerformanceAnalyzer.ForSlug(pages, item.Slug);
 
+        // Accessibility reads every published body, so it runs only when this view is asked for.
+        // Cached per owner while no published post changes (the key moves with the count and the latest edit), so
+        // paging and searching inside the view do not reload every body.
+        if (filter == "a11y")
+        {
+            var key = $"content-health:a11y:{ownerId}:{all.Count}:{(all.Count == 0 ? 0 : all.Max(i => i.UpdatedAt).Ticks)}";
+            var findings = await _cache.GetOrCreateAsync(key, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+                var bodies = await _health.GetPublishedHtmlAsync(ownerId);
+                return bodies.ToDictionary(kv => kv.Key, kv => AccessibilityCheck.Check(kv.Value));
+            });
+            foreach (var item in all)
+                item.Accessibility = findings!.GetValueOrDefault(item.Id) ?? [];
+        }
+
         var filtered = filter switch
         {
+            "a11y"       => all.Where(i => i.Accessibility is { Count: > 0 }).OrderByDescending(i => AccessibilityCheck.IssueCount(i.Accessibility!)),
             "striking"   => all.Where(i => i.StrikingDistance).OrderBy(i => i.Search!.Position),
             "losing"     => all.Where(i => i.LosingImpressions).OrderByDescending(i => i.Search!.PrevImpressions - i.Search!.Impressions),
             "lowctr"     => all.Where(i => i.LowCtrForPosition).OrderByDescending(i => i.Search!.Impressions),

@@ -3,6 +3,7 @@ using Blog.Core.Interfaces;
 using Blog.Core.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Blog.Web.Controllers;
 
@@ -18,12 +19,21 @@ public class AiCrawlersController : Controller
     private readonly ICrawlerVisitRepository _visits;
     private readonly ITenantContext _tenant;
     private readonly ISettingRepository _settings;
+    private readonly IMemoryCache _cache;
+    private readonly ILogger<AiCrawlersController> _logger;
 
-    public AiCrawlersController(ICrawlerVisitRepository visits, ITenantContext tenant, ISettingRepository settings)
+    /// <summary>How long one report stays cached: crawler visits are written in batches, and re-reading
+    /// millions of rows because someone switched from 30 to 7 days and back buys nothing.</summary>
+    private static readonly TimeSpan ReportCacheFor = TimeSpan.FromMinutes(5);
+
+    public AiCrawlersController(ICrawlerVisitRepository visits, ITenantContext tenant, ISettingRepository settings,
+        IMemoryCache cache, ILogger<AiCrawlersController> logger)
     {
         _visits = visits;
         _tenant = tenant;
         _settings = settings;
+        _cache = cache;
+        _logger = logger;
     }
 
     [HttpGet("")]
@@ -32,16 +42,15 @@ public class AiCrawlersController : Controller
         days = Math.Clamp(days, 1, 365);
         var ownerId = _tenant.IsCloudMode && _tenant.IsResolved ? _tenant.UserId : (Guid?)null;
 
-        var activityTask  = _visits.GetActivityAsync(ownerId, days);
-        var topPagesTask  = _visits.GetTopPagesAsync(ownerId, days);
-        var queriedTask   = _visits.GetTopQueriedRequestsAsync(ownerId, days);
-        var dailyTask     = _visits.GetDailyAiVisitsAsync(ownerId, days);
-        var settingsTask  = _settings.GetSettingsAsync(ownerId ?? Guid.Empty);
-        await Task.WhenAll(activityTask, topPagesTask, queriedTask, dailyTask, settingsTask);
+        var report   = await TryLoadReportAsync(ownerId, days);
+        var settings = await _settings.GetSettingsAsync(ownerId ?? Guid.Empty);
+        if (report is null)
+            TempData["Error"] = "Crawler activity could not be loaded in time. The figures below are empty; try again in a minute or pick a shorter window.";
+        report ??= new CrawlerReport();
 
         // Every crawler we can name is listed, including those with no visits — an engine that has
         // never fetched the site is a finding, not an omission.
-        var seen = activityTask.Result.ToDictionary(a => a.Crawler, StringComparer.OrdinalIgnoreCase);
+        var seen = report.Activity.ToDictionary(a => a.Crawler, StringComparer.OrdinalIgnoreCase);
         var full = CrawlerIdentifier.Known
             .Select(k => seen.TryGetValue(k.Name, out var a)
                 ? Fill(a, k)
@@ -53,18 +62,37 @@ public class AiCrawlersController : Controller
         ViewBag.Days      = days;
         ViewBag.Ai        = full.Where(a => a.IsAi).ToList();
         ViewBag.Search    = full.Where(a => !a.IsAi).ToList();
-        ViewBag.TopPages  = topPagesTask.Result;
-        ViewBag.Queried   = queriedTask.Result;
-        ViewBag.Daily     = FillGaps(dailyTask.Result, days);
+        ViewBag.TopPages  = report.TopPages;
+        ViewBag.Queried   = report.Queried;
+        ViewBag.Daily     = FillGaps(report.Daily, days);
         // Headline figures leave out visits that failed the operator's network check: those are someone
         // else using the name, not the engine reading the site. The table still shows them.
         ViewBag.AiVisits  = full.Where(a => a.IsAi).Sum(a => a.Visits - a.FailedVisits);
         ViewBag.AiEngines = full.Count(a => a.IsAi && a.Visits - a.FailedVisits > 0);
         ViewBag.RetentionDays = Blog.Web.Services.Jobs.CrawlerVisitRetentionJob.ClampDays(
-            settingsTask.Result.CrawlerVisitRetentionDays);
+            settings.CrawlerVisitRetentionDays);
 
         ViewData["Title"] = "AI Crawlers";
         return View();
+    }
+
+    /// <summary>One stored-procedure call per owner and window, cached briefly. A failure is never cached.</summary>
+    private async Task<CrawlerReport?> TryLoadReportAsync(Guid? ownerId, int days)
+    {
+        try
+        {
+            return await _cache.GetOrCreateAsync($"ai-crawlers:{ownerId?.ToString("N") ?? "all"}:{days}", entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = ReportCacheFor;
+                return _visits.GetReportAsync(ownerId, days);
+            });
+        }
+        catch (Exception ex)
+        {
+            // Optional page (architecture rule: fail open) — a slow database shows a message, not a 500.
+            _logger.LogWarning(ex, "AI Crawlers report failed for a {Days}-day window.", days);
+            return null;
+        }
     }
 
     /// <summary>

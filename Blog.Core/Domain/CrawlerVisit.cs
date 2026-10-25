@@ -63,3 +63,15 @@ public class CrawledRequest
     public int    Visits   { get; set; }
     public int    Crawlers { get; set; }
 }
+
+/// <summary>
+/// Everything Admin → AI Crawlers shows for one window, read in one stored-procedure call
+/// (<c>usp_CrawlerVisits_Report</c>, ADR-0037) so the visits table is collapsed once per load.
+/// </summary>
+public class CrawlerReport
+{
+    public IReadOnlyList<CrawlerActivity> Activity { get; init; } = [];
+    public IReadOnlyList<CrawledPage>     TopPages { get; init; } = [];
+    public IReadOnlyList<CrawledRequest>  Queried  { get; init; } = [];
+    public IReadOnlyList<CrawlerDay>      Daily    { get; init; } = [];
+}

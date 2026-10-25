@@ -131,6 +131,9 @@ public class EditorAndListUxTests
     public void Every_icon_only_editor_control_has_an_accessible_name(string view)
     {
         var html = Web(view);
+        // The block builder's palette and toolbar live in shared files every builder view loads (inkwell-builder.js).
+        if (html.Contains("<partial name=\"_BuilderPalette\" />"))
+            html += Web("Views/Shared/_BuilderPalette.cshtml") + Web("wwwroot/js/inkwell-builder.js");
         // Palette items and the block toolbar (a JS template literal) mirror their tooltip into aria-label.
         var titled = Regex.Matches(html, "<button\\b[^>]*\\btitle=\"[^\"]+\"[^>]*>").Select(m => m.Value).ToList();
         if (view != "Views/Posts/Create.cshtml") Assert.NotEmpty(titled); // the Quill editor has no block palette
@@ -169,7 +172,8 @@ public class EditorAndListUxTests
         Assert.Contains("<partial name=\"_ListPager\" />", html);
         Assert.Equal(Regex.Matches(html, "<table\\b").Count, Regex.Matches(html, "<div class=\"table-scroll\"><table\\b").Count);
         Assert.Contains("aria-current=\"@Current(", html);               // active filter tile is announced
-        Assert.Contains("No matches for “@q”", html);                     // honest zero-result state
+        // Honest zero-result state: the literal copy, or the shared _EmptyState partial fed the query.
+        Assert.True(html.Contains("No matches for “@q”") || html.Contains("ViewData[\"EmptyQuery\"]"), view + " has no zero-result state");
 
         var code = Web(controller);
         Assert.Contains("ListPaging.Apply(this,", code);

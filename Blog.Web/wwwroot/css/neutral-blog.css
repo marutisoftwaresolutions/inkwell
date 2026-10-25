@@ -93,8 +93,8 @@ article.grid img {
 }
 
 .post-prose blockquote {
-    border-left: 3px solid var(--primary, #404040);
-    padding-left: 1.25rem;
+    border-inline-start: 3px solid var(--primary, #404040);
+    padding-inline-start: 1.25rem;
     font-style: italic;
     color: var(--muted-foreground, #737373);
     margin: 1.5rem 0;
@@ -120,7 +120,7 @@ article.grid img {
 
 .post-prose ul,
 .post-prose ol {
-    padding-left: 1.5rem;
+    padding-inline-start: 1.5rem;
     margin-bottom: 1.25rem;
 }
 
@@ -158,13 +158,13 @@ article.grid img {
     font-size: 0.73rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    text-align: left;
-    border-right: 1px solid rgba(255, 255, 255, 0.14);
+    text-align: start;
+    border-inline-end: 1px solid rgba(255, 255, 255, 0.14);
     white-space: nowrap;
     color: inherit;
 }
 .blog-table th:last-child {
-    border-right: none;
+    border-inline-end: none;
 }
 .blog-table td {
     padding: 0.6rem 1rem;
@@ -207,8 +207,8 @@ article.grid img {
     font-size: 0.73rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    text-align: left;
-    border-right: 1px solid rgba(255, 255, 255, 0.14);
+    text-align: start;
+    border-inline-end: 1px solid rgba(255, 255, 255, 0.14);
     white-space: nowrap;
     color: inherit;
 }
@@ -282,7 +282,7 @@ article.grid img {
 }
 
 .comp-quote {
-    border-left: 3px solid var(--primary, #333);
+    border-inline-start: 3px solid var(--primary, #333);
     padding: 1rem 1.5rem;
     background: var(--muted, #f5f5f5);
     margin: 1.5rem 0;
@@ -347,7 +347,7 @@ article.grid img {
 .comp-video iframe {
     position: absolute;
     top: 0;
-    left: 0;
+    inset-inline-start: 0;
     width: 100%;
     height: 100%;
     border: 0;
@@ -453,3 +453,33 @@ article.grid img {
     color: var(--background, #fff);
     border-style: solid;
 }
+/* ── Contact forms (ADR-0030) ─────────────────────────────────────────────────
+   Theme tokens only, so every preset and both colour schemes style them. Errors are bold text with a marker,
+   never colour alone. */
+.ink-form { margin: 2rem 0; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface, transparent); font-family: var(--font-body, inherit); }
+.ink-form-title { margin: 0 0 1rem; font-size: 1.25rem; }
+.ink-form-field { margin: 0 0 1rem; }
+.ink-form-field > label { display: block; margin-bottom: 0.375rem; font-weight: 600; color: var(--fg); }
+.ink-form input[type="text"], .ink-form input[type="email"], .ink-form textarea, .ink-form select {
+    display: block; width: 100%; max-width: 36rem; padding: 0.625rem 0.75rem; font: inherit; font-size: 1rem;
+    color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+}
+.ink-form textarea { max-width: 100%; min-height: 8rem; }
+.ink-form input:focus-visible, .ink-form textarea:focus-visible, .ink-form select:focus-visible, .ink-form-submit:focus-visible {
+    outline: 2px solid var(--link, currentColor); outline-offset: 2px;
+}
+.ink-form [aria-invalid="true"] { border-width: 2px; border-color: var(--fg); }
+.ink-form-check { display: flex; gap: 0.5rem; align-items: flex-start; color: var(--fg); }
+.ink-form-check input { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; }
+.ink-form-req { color: var(--fg-meta, inherit); }
+.ink-form-help { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--fg-meta, inherit); }
+.ink-form-field-error, .ink-form-error { margin: 0.375rem 0 0; font-weight: 700; color: var(--fg); }
+.ink-form-field-error::before, .ink-form-error::before { content: "⚠ "; }
+.ink-form-sent { margin: 0 0 1rem; padding: 0.75rem 1rem; border-inline-start: 4px solid var(--link, currentColor); color: var(--fg); }
+.ink-form-sent::before { content: "✓ "; }
+.ink-form-submit {
+    display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0.625rem 1.5rem; font: inherit; font-weight: 600;
+    color: var(--bg); background: var(--fg); border: 0; border-radius: 6px; cursor: pointer;
+}
+.ink-form-submit:disabled { opacity: 0.6; cursor: progress; }
+.ink-form-hp { position: absolute; inset-inline-start: -10000px; width: 1px; height: 1px; overflow: hidden; }

@@ -1,0 +1,37 @@
+@*
+    Honest empty state for a Desk list or panel (UI/UX rule 4). ViewData keys:
+      EmptyTitle   — what is (not) here, e.g. "No redirects yet"
+      EmptyHint    — what to do next, e.g. "Add the first one below." (optional)
+      EmptyHref    — primary call to action link (optional) with EmptyAction as its label
+      EmptyIcon    — inner SVG markup (24x24 stroke) (optional)
+      EmptyQuery   — when set, the state reads as "No matches for “…”" and EmptyClearHref clears the search
+*@
+@{
+    var title = ViewData["EmptyTitle"] as string ?? "Nothing here yet";
+    var hint = ViewData["EmptyHint"] as string;
+    var href = ViewData["EmptyHref"] as string;
+    var action = ViewData["EmptyAction"] as string ?? "Add one";
+    var icon = ViewData["EmptyIcon"] as string;
+    var query = ViewData["EmptyQuery"] as string;
+    var clear = ViewData["EmptyClearHref"] as string ?? "?";
+    if (!string.IsNullOrEmpty(query)) { title = $"No matches for “{query}”"; }
+}
+<div class="desk-empty" role="status">
+    <div class="desk-empty-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            @if (!string.IsNullOrEmpty(icon)) { @Html.Raw(icon) }
+            else if (!string.IsNullOrEmpty(query)) { <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/> }
+            else { <path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/> }
+        </svg>
+    </div>
+    <p class="desk-empty-title">@title</p>
+    @if (!string.IsNullOrEmpty(query))
+    {
+        <p class="desk-empty-hint"><a href="@clear" class="desk-btn desk-btn-link">Clear the search</a>@(string.IsNullOrEmpty(hint) ? "" : " " + hint)</p>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(hint)) { <p class="desk-empty-hint">@hint</p> }
+        @if (!string.IsNullOrEmpty(href)) { <a href="@href" class="desk-btn desk-btn-primary mt-4">@action</a> }
+    }
+</div>

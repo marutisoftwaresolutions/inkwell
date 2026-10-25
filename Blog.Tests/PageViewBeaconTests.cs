@@ -180,8 +180,16 @@ public class PageViewBeaconTests : IClassFixture<WebApplicationFactory<Program>>
         if (!ProbeDb(out var cs)) { _out.WriteLine("Dev database unavailable — skipping."); return; }
 
         await using var conn = new SqlConnection(cs);
-        var slug = await conn.ExecuteScalarAsync<string?>("SELECT TOP 1 Slug FROM Posts WHERE Status = 'Published' ORDER BY NEWID()");
-        if (slug is null) { _out.WriteLine("No published post — skipping."); return; }
+        // Its own post, so no other test can touch its view count: live (scheduled and already due) but never picked by
+        // the tests that choose a random 'Published' post. Its count starts NULL, as posts created before
+        // DF_Posts_ViewCount did: those never counted a view until the update learned ISNULL (2026-10-15).
+        var author = (await _factory.Services.CreateScope().ServiceProvider.GetRequiredService<Blog.Core.Interfaces.IUserRepository>().GetFirstAdminAsync())?.Id;   // the site owner, as views are credited
+        if (author is null) { _out.WriteLine("No user to own a post — skipping."); return; }
+        var postId = Guid.NewGuid();
+        var slug = "zz-beacon-" + postId.ToString("N")[..10];
+        await conn.ExecuteAsync(@"INSERT INTO Posts (Id, Title, Slug, Html, Plaintext, AuthorId, Status, ViewCount, ScheduledAt, PublishedAt, CreatedAt, UpdatedAt)
+            VALUES (@postId, N'Beacon check', @slug, N'<p>Beacon check.</p>', N'Beacon check.', @author, 'Scheduled', NULL,
+                    DATEADD(MINUTE, -1, SYSUTCDATETIME()), SYSUTCDATETIME(), SYSUTCDATETIME(), SYSUTCDATETIME())", new { postId, slug, author });
         Task<int> ViewsAsync() => conn.ExecuteScalarAsync<int>("SELECT ViewCount FROM Posts WHERE Slug = @slug", new { slug });
 
         var marker = "https://referrer.example/" + Guid.NewGuid().ToString("N")[..12];
@@ -203,12 +211,13 @@ public class PageViewBeaconTests : IClassFixture<WebApplicationFactory<Program>>
             await Beacon(client, token, "/" + slug, marker);
             await recorder.FlushAsync();
             added = await ViewsAsync() - before;
-            Assert.Equal(1, added);
+            var rows = await CountAsync(conn, marker);
+            Assert.True(added == 1, $"view count +{added}, page-view rows {rows}, post status {await conn.ExecuteScalarAsync<string>("SELECT Status FROM Posts WHERE Id = @postId", new { postId })}");
             Assert.Equal(1, await CountAsync(conn, marker));
         }
         finally
         {
-            await conn.ExecuteAsync("UPDATE Posts SET ViewCount = ViewCount - @added WHERE Slug = @slug", new { added, slug });
+            await conn.ExecuteAsync("DELETE FROM Revisions WHERE EntityId = @postId; DELETE FROM Posts WHERE Id = @postId", new { postId });
             await conn.ExecuteAsync("DELETE FROM PageViews WHERE Referrer = @marker", new { marker });
         }
     }

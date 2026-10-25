@@ -86,6 +86,7 @@ public class DeskAccessibilityTests
                 var named = tag.Contains("aria-label=") || tag.Contains("aria-labelledby=") || inner.Contains("sr-only");
                 if (!named) offenders.Add(rel + ": " + Regex.Replace(tag, @"\s+", " ")[..Math.Min(100, tag.Length)]);
             }
+
         }
         Assert.True(offenders.Count == 0, "Icon-only control without aria-label / sr-only text:\n" + string.Join('\n', offenders));
 
@@ -170,7 +171,13 @@ public class DeskAccessibilityTests
         {
             var html = Web(view);
             foreach (var name in names)
+            {
+                // The shared _ListSearch partial renders the labelled q input itself.
+                if (name == "q" && html.Contains("<partial name=\"_ListSearch\" />")) continue;
+                // A filter rendered as tab links carries its name on the <nav aria-label> instead of a select.
+                if (Regex.IsMatch(html, $"<nav[^>]*class=\"desk-tabs[^>]*aria-label=\"") && Regex.IsMatch(html, $"href=\"\\?{name}=")) continue;
                 Assert.True(Regex.IsMatch(html, $"<(select|input)[^>]*name=\"{name}\"[^>]*aria-label=\""), $"{view}: {name} has no aria-label");
+            }
         }
     }
 
@@ -221,8 +228,8 @@ public class DeskAccessibilityTests
     public void Dashboard_stat_numbers_are_not_headings_and_the_view_link_names_the_post()
     {
         var dash = Web("Views/Dashboard/Index.cshtml");
-        Assert.DoesNotMatch(new Regex("<h3 class=\"text-2xl font-bold\">@ViewBag"), dash);
-        Assert.Contains("<p class=\"text-2xl font-bold\">@ViewBag.TotalPosts</p>", dash);
+        Assert.DoesNotMatch(new Regex("<h[1-6][^>]*>@ViewBag\\.(TotalPosts|PublishedPosts|DraftPosts|PendingComments)"), dash);
+        Assert.Contains("<partial name=\"_KpiTile\" model=\"tile\" />", dash); // numbers are tiles (paragraph + label), never headings
         Assert.Contains("aria-label=\"View @post.Title\"", dash);
     }
 

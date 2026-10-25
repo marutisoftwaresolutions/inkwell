@@ -1,0 +1,91 @@
+@model IEnumerable<Blog.Core.Domain.ContactForm>
+@using Blog.Web.Models
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Forms";
+    ViewData["Description"] = "Contact forms for your pages. Build a form here, then add it to any page with the Form block in the page editor. What visitors send is kept here, checked for spam the same way comments are, and can be emailed to you.";
+    var q = ViewData[ListPaging.QueryKey] as string;
+    int all = ViewData["AllForms"] as int? ?? 0;
+    ViewData["ListSearchPlaceholder"] = "Search forms";
+}
+
+@section PageActions {
+    <a href="/admin/forms/create" class="desk-btn desk-btn-primary">New form</a>
+}
+
+<div class="flex flex-col gap-6">
+    <div class="desk-card overflow-hidden">
+        <partial name="_ListSearch" />
+        @if (!Model.Any())
+        {
+            if (all == 0)
+            {
+                ViewData["EmptyTitle"] = "No forms yet.";
+                ViewData["EmptyHint"] = "Create one with New form; it starts as a ready-made contact form.";
+                ViewData["EmptyHref"] = "/admin/forms/create";
+                ViewData["EmptyAction"] = "New form";
+            }
+            else
+            {
+                ViewData["EmptyQuery"] = q;
+                ViewData["EmptyClearHref"] = "?";
+                ViewData["EmptyTitle"] = $"No matches for “{q}”.";
+                ViewData["EmptyHint"] = $"Clear the search to see all {all}.";
+            }
+            <partial name="_EmptyState" />
+        }
+        else
+        {
+        <div class="table-scroll"><table class="desk-table">
+            <thead>
+                <tr>
+                    <th>Form</th>
+                    <th>Submissions</th>
+                    <th>Last received</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in Model)
+                {
+                    <tr>
+                        <td>
+                            <a href="/admin/forms/edit/@f.Id" class="font-medium text-foreground hover:underline">@f.Name</a>
+                            @if (!f.IsActive)
+                            {
+                                <span class="ml-1 desk-pill desk-pill-muted">Off</span>
+                            }
+                            <span class="block text-xs text-muted-foreground font-mono">@f.FormKey</span>
+                        </td>
+                        <td>
+                            <a href="/admin/forms/@f.Id/submissions" class="hover:underline">@f.SubmissionCount</a>
+                            @if (f.UnreadCount > 0)
+                            {
+                                <span class="ml-1 desk-pill pill-info">@f.UnreadCount new</span>
+                            }
+                        </td>
+                        <td class="text-xs text-muted-foreground whitespace-nowrap">@(f.LastSubmissionAt is null ? "Never" : Dates.DateTime(f.LastSubmissionAt))</td>
+                        <td>
+                            <div class="desk-row-actions">
+                                <a href="/admin/forms/@f.Id/submissions" class="desk-btn desk-btn-outline desk-btn-sm">Submissions</a>
+                                <a href="/admin/forms/edit/@f.Id" class="desk-btn desk-btn-outline desk-btn-sm">Edit</a>
+                                <form method="post" action="/admin/forms/delete/@f.Id"
+                                      data-confirm-title="Delete this form?"
+                                      data-confirm-body="@($"“{f.Name}” and its {f.SubmissionCount} submission{(f.SubmissionCount == 1 ? "" : "s")} are deleted for good. Pages that show it keep working but show nothing in its place. Export the submissions first if you need them.")"
+                                      data-confirm-action="Delete form" data-confirm-tone="danger"
+                                      data-confirm-typed="@(f.SubmissionCount >= 5 ? "DELETE" : null)">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="q" value="@q" />
+                                    <input type="hidden" name="page" value="@Context.Request.Query["page"]" />
+                                    <button type="submit" class="desk-btn desk-btn-danger-outline desk-btn-sm" aria-label="Delete “@f.Name”">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+        }
+    </div>
+    <partial name="_ListPager" />
+</div>

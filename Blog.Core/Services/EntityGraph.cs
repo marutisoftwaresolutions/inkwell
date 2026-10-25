@@ -101,7 +101,46 @@ public static class EntityGraph
         var founded = FoundingDate(s.EntityFoundingDate);
         if (founded is not null) facts.Add(("Founded", founded));
 
+        var email = ContactEmail(s.EntityContactEmail);
+        if (email is not null) facts.Add(("Contact", email));
+
         return facts;
+    }
+
+    /// <summary>
+    /// The Organization's <c>contactPoint</c>, or null when neither a usable email nor a contact page is set, so a
+    /// site that leaves the fields empty emits exactly what it did before. A path (/contact) becomes an absolute URL
+    /// on <paramref name="baseUrl"/>; anything that is not an email or an http(s) address is left out, never guessed.
+    /// </summary>
+    public static Dictionary<string, object>? ContactPoint(UserSettings s, string baseUrl)
+    {
+        var email = ContactEmail(s.EntityContactEmail);
+        var url = ContactUrl(s.EntityContactUrl, baseUrl);
+        if (email is null && url is null) return null;
+
+        var point = new Dictionary<string, object>
+        {
+            ["@type"] = "ContactPoint",
+            // Google requires contactType; "customer support" is the value its documentation uses.
+            ["contactType"] = string.IsNullOrWhiteSpace(s.EntityContactType) ? "customer support" : s.EntityContactType.Trim(),
+        };
+        if (email is not null) point["email"] = email;
+        if (url is not null) point["url"] = url;
+        return point;
+    }
+
+    private static string? ContactEmail(string? configured)
+    {
+        var v = (configured ?? "").Trim();
+        return System.Text.RegularExpressions.Regex.IsMatch(v, @"^[^@\s]+@[^@\s]+\.[^@\s]+$") ? v : null;
+    }
+
+    private static string? ContactUrl(string? configured, string baseUrl)
+    {
+        var v = (configured ?? "").Trim();
+        if (v.Length == 0) return null;
+        if (v.StartsWith('/') && !v.StartsWith("//")) return baseUrl.TrimEnd('/') + v;
+        return Uri.TryCreate(v, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) ? u.ToString() : null;
     }
 
     private static IEnumerable<string> SplitLines(string? value) =>

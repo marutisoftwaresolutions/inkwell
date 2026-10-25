@@ -96,6 +96,7 @@ public class SettingsController : Controller
             CommentsEnabled = globalSettings.CommentsEnabled,
             CommentsModeration = globalSettings.CommentsModeration,
             CrawlerVisitRetentionDays = Blog.Web.Services.Jobs.CrawlerVisitRetentionJob.ClampDays(globalSettings.CrawlerVisitRetentionDays),
+            PageViewRetentionDays = Blog.Web.Services.Jobs.PageViewRetentionJob.ClampDays(globalSettings.PageViewRetentionDays),
             DisplayTimeZoneId = Blog.Core.Services.TimeZoneHelper.ToIana(globalSettings.DisplayTimeZoneId),
             Country = globalSettings.Country,
             DateLocale = globalSettings.DateLocale,
@@ -126,6 +127,9 @@ public class SettingsController : Controller
             EntityFounder           = globalSettings.EntityFounder,
             EntityFoundingDate      = globalSettings.EntityFoundingDate,
             EntityIdentityStatement = globalSettings.EntityIdentityStatement,
+            EntityContactEmail      = globalSettings.EntityContactEmail,
+            EntityContactUrl        = globalSettings.EntityContactUrl,
+            EntityContactType       = globalSettings.EntityContactType,
 
             SearchConsoleProperty          = globalSettings.SearchConsoleProperty,
             SearchConsoleConnectedAs       = _searchCredentials.IsConfigured(globalSettings) ? globalSettings.SearchConsoleClientEmail : null,
@@ -163,6 +167,7 @@ public class SettingsController : Controller
         globalSettings.CommentsEnabled = model.CommentsEnabled;
         globalSettings.CommentsModeration = model.CommentsModeration;
         globalSettings.CrawlerVisitRetentionDays = Blog.Web.Services.Jobs.CrawlerVisitRetentionJob.ClampDays(model.CrawlerVisitRetentionDays);
+        globalSettings.PageViewRetentionDays = Blog.Web.Services.Jobs.PageViewRetentionJob.ClampDays(model.PageViewRetentionDays);
 
         // Date and time (ADR-0027). The zone must be one this host knows (a typo would silently show UTC) and is
         // stored as its IANA id, so a Windows id saved before keeps working and moves to the standard name.
@@ -245,6 +250,9 @@ public class SettingsController : Controller
         globalSettings.EntityFounder           = (model.EntityFounder ?? string.Empty).Trim();
         globalSettings.EntityFoundingDate      = (model.EntityFoundingDate ?? string.Empty).Trim();
         globalSettings.EntityIdentityStatement = (model.EntityIdentityStatement ?? string.Empty).Trim();
+        globalSettings.EntityContactEmail      = (model.EntityContactEmail ?? string.Empty).Trim();
+        globalSettings.EntityContactUrl        = (model.EntityContactUrl ?? string.Empty).Trim();
+        globalSettings.EntityContactType       = (model.EntityContactType ?? string.Empty).Trim();
 
         // ── Search Console ──────────────────────────────────────────────────
         // The key file is write-only: it is protected on the way in, never echoed back, and only

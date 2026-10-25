@@ -138,11 +138,20 @@ public class AccountController : Controller
 
     // ── Register (First Run) ──────────────────────────────────────────────────
 
+    /// <summary>
+    /// Registration creates the site's first account (the admin). Once a site has users it is closed: it used to stay
+    /// open and give every newcomer the Author role, which can publish, so anyone could sign up and post on a live
+    /// site. New people join by invitation (Users → Invite). Cloud mode, where each registration is its own site, is
+    /// unchanged.
+    /// </summary>
+    private async Task<bool> RegistrationOpenAsync() => _tenant.IsCloudMode || !await _users.AnyUsersExistAsync();
+
     [HttpGet("register")]
     public async Task<IActionResult> Register()
     {
         if (User.Identity?.IsAuthenticated == true)
             return RedirectToAction("Index", "Dashboard");
+        if (!await RegistrationOpenAsync()) return NotFound();
 
         return View();
     }
@@ -155,6 +164,7 @@ public class AccountController : Controller
         ViewBag.Name = name;
         if (User.Identity?.IsAuthenticated == true)
             return RedirectToAction("Index", "Dashboard");
+        if (!await RegistrationOpenAsync()) return NotFound();
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(name))
         {

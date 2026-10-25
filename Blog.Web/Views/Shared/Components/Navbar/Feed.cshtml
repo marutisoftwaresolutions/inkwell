@@ -1,14 +1,15 @@
 @model Blog.Web.Models.NavbarViewModel
 
 <!-- Navbar Feed Variant -->
-<nav class="navbar-feed w-full border-b" style="border-color: var(--border); background: var(--surface);">
+@* relative z-40 so the categories menu stacks above a full-bleed hero below the bar *@
+<nav x-data="{ mobileOpen: false }" class="navbar-feed relative z-40 w-full border-b" style="border-color: var(--border); background: var(--surface); color: var(--fg);">
 	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 		<div class="flex items-center justify-between h-16">
 			<!-- Logo/Brand -->
 			<div class="flex-shrink-0">
 				@if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
 				{
-					<img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-8 w-auto" />
+					<a href="/"><img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-8 w-auto" /></a>
 				}
 				else
 				{
@@ -17,17 +18,23 @@
 			</div>
 
 			<!-- Navigation Links -->
-			<div class="hidden md:flex items-center space-x-4">
+			<div class="hidden md:flex items-center space-x-4 rtl:space-x-reverse">
 				<a href="/" class="text-sm hover:opacity-75 transition">Home</a>
 
 				@if (Model.Categories?.Count > 0)
 				{
-					<div class="group relative">
-						<button class="text-sm hover:opacity-75 transition">Categories</button>
-						<div class="absolute hidden group-hover:block left-0 mt-2 w-48 bg-white border rounded shadow-lg" style="background: var(--surface); border-color: var(--border);">
+					@* Click-to-open (not hover-only): reachable by keyboard and touch, and no gap to lose the hover across *@
+					<div class="relative" x-data="{ catOpen: false }" @@keydown.escape="catOpen = false">
+						<button type="button" @@click="catOpen = !catOpen" @@click.outside="catOpen = false" :aria-expanded="catOpen" aria-haspopup="true"
+								class="text-sm hover:opacity-75 transition inline-flex items-center gap-1">
+							Categories <i class="bi bi-chevron-down text-xs" aria-hidden="true"></i>
+						</button>
+						<div x-show="catOpen" x-transition
+							 style="display:none; background: var(--surface); border-color: var(--border);"
+							 class="absolute start-0 top-full mt-2 w-48 max-h-64 overflow-y-auto border rounded shadow-lg z-50">
 							@foreach (var category in Model.Categories)
 							{
-								<a href="/category/@category.Slug" class="block px-4 py-2 text-sm hover:bg-gray-100 first:rounded-t last:rounded-b" style="background: var(--surface); border-color: var(--border);">
+								<a href="/category/@category.Slug" class="block px-4 py-2 text-sm hover:opacity-75" style="color: var(--fg);">
 									@category.Name
 								</a>
 							}
@@ -35,23 +42,35 @@
 					</div>
 				}
 
-				@if (Model.Links.Any(l => l.Depth == 0))
+				@foreach (var pageView in Model.Links.Where(l => l.Depth == 0))
 				{
-					@foreach (var pageView in Model.Links.Where(l => l.Depth == 0))
-					{
-						<a href="@pageView.Href" target="@(pageView.OpenInNewTab ? "_blank" : null)" rel="@(pageView.OpenInNewTab ? "noopener" : null)" class="text-sm hover:opacity-75 transition">@if (pageView.Depth > 0) { <span aria-hidden="true">— </span> }@pageView.Title</a>
-					}
+					<a href="@pageView.Href" target="@(pageView.OpenInNewTab ? "_blank" : null)" rel="@(pageView.OpenInNewTab ? "noopener" : null)" class="text-sm hover:opacity-75 transition">@pageView.Title</a>
 				}
 			</div>
 
 			<!-- Mobile Menu Button -->
 			<div class="md:hidden">
-				<button type="button" aria-label="Open menu" class="inline-flex items-center justify-center p-2 rounded-md hover:opacity-75 transition">
+				<button type="button" @@click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen" aria-label="Open menu" class="inline-flex items-center justify-center p-2 rounded-md hover:opacity-75 transition">
 					<svg aria-hidden="true" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
 					</svg>
 				</button>
 			</div>
+		</div>
+	</div>
+
+	@* Mobile drawer — the button above had no handler, so phones showed no menu at all *@
+	<div x-show="mobileOpen" x-transition class="md:hidden border-t" style="display:none; background: var(--surface); border-color: var(--border);">
+		<div class="px-4 py-3 flex flex-col">
+			<a href="/" class="py-3 text-sm border-b hover:opacity-75" style="border-color: var(--border); color: var(--fg);">Home</a>
+			@foreach (var pageView in Model.Links)
+			{
+				<a href="@pageView.Href" target="@(pageView.OpenInNewTab ? "_blank" : null)" rel="@(pageView.OpenInNewTab ? "noopener" : null)" class="py-3 text-sm border-b hover:opacity-75" style="border-color: var(--border); color: var(--fg);">@if (pageView.Depth > 0) { <span aria-hidden="true">— </span> }@pageView.Title</a>
+			}
+			@foreach (var category in Model.Categories ?? [])
+			{
+				<a href="/category/@category.Slug" class="py-3 text-sm border-b hover:opacity-75" style="border-color: var(--border); color: var(--fg-meta);">@category.Name</a>
+			}
 		</div>
 	</div>
     <partial name="_NavSearch" />

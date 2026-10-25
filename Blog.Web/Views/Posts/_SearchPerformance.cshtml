@@ -14,7 +14,7 @@
         var d = (now - prev) * 100.0 / prev;
         return (d >= 0 ? "+" : "") + d.ToString("0") + "%";
     }
-    string DeltaClass(int now, int prev) => prev == 0 ? "text-muted-foreground" : now >= prev ? "text-emerald-700" : "text-red-700";
+    string DeltaClass(int now, int prev) => prev == 0 ? "text-muted-foreground" : now >= prev ? "tone-ok" : "tone-bad";
 }
 
 @* Empty states say WHY they are empty — a blank tile teaches nothing. *@
@@ -59,7 +59,7 @@ else
                 @if (summary.PrevPosition > 0)
                 {
                     var moved = summary.PrevPosition - summary.Position;
-                    <span class="text-[11px] font-normal @(moved >= 0 ? "text-emerald-700" : "text-red-700")">@(moved >= 0 ? "↑" : "↓") @Math.Abs(moved).ToString("0.0")</span>
+                    <span class="text-[11px] font-normal @(moved >= 0 ? "tone-ok" : "tone-bad")">@(moved >= 0 ? "↑" : "↓") @Math.Abs(moved).ToString("0.0")</span>
                 }
             </div>
         </div>
@@ -67,19 +67,19 @@ else
 
     @if (summary.StrikingDistance)
     {
-        <p class="text-[11px] mt-2 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 px-2 py-1.5">
+        <p class="text-[11px] mt-2 rounded border pill-ok px-2 py-1.5">
             <strong>Striking distance.</strong> Position @summary.Position.ToString("0.0") with @summary.Impressions impressions — one push from page one. Strengthen the answer capsule and Key Facts for the queries below, and add inbound links from related posts.
         </p>
     }
     @if (summary.LowCtrForPosition)
     {
-        <p class="text-[11px] mt-2 rounded border border-amber-200 bg-amber-50 text-amber-900 px-2 py-1.5">
+        <p class="text-[11px] mt-2 rounded border pill-warn px-2 py-1.5">
             <strong>Low click-through for its rank.</strong> On page one but @Pct(summary.Ctr) of @summary.Impressions impressions click. The title and meta description are the lever here, not the ranking.
         </p>
     }
     @if (summary.LosingImpressions)
     {
-        <p class="text-[11px] mt-2 rounded border border-red-200 bg-red-50 text-red-800 px-2 py-1.5">
+        <p class="text-[11px] mt-2 rounded border pill-bad px-2 py-1.5">
             <strong>Losing impressions.</strong> @summary.Impressions this window against @summary.PrevImpressions the one before. Check freshness, the year stamp, and whether a competing page has taken the queries.
         </p>
     }

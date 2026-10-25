@@ -43,4 +43,15 @@ public class ContentHealthRepository : IContentHealthRepository
 
         return rows.ToList();
     }
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetPublishedHtmlAsync(Guid? ownerId = null)
+    {
+        using var conn = _ctx.CreateConnection();
+        var rows = await conn.QueryAsync<(Guid Id, string Html)>(@"
+            SELECT Id, ISNULL(Html, '') AS Html
+              FROM Posts
+             WHERE Status = 'Published'
+               AND (@OwnerId IS NULL OR AuthorId = @OwnerId);", new { OwnerId = ownerId });
+        return rows.ToDictionary(r => r.Id, r => r.Html);
+    }
 }

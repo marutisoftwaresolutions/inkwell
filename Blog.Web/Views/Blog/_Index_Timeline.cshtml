@@ -44,7 +44,7 @@
         {
             @* Month/year heading *@
             <div style="display:flex;align-items:center;gap:var(--sp-6);margin-bottom:var(--sp-6);">
-                <div style="width:100px;flex-shrink:0;text-align:right;">
+                <div style="width:100px;flex-shrink:0;text-align:end;">
                     <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-meta);">@group.Key</span>
                 </div>
                 <div style="width:12px;height:12px;border-radius:50%;background:var(--fg);flex-shrink:0;position:relative;z-index:1;"></div>
@@ -57,7 +57,7 @@
                 var excerpt = GetExcerpt(post);
                 <div style="display:flex;gap:var(--sp-6);margin-bottom:var(--sp-8);">
                     @* Left column: date label, aligned under the month dot *@
-                    <div style="width:100px;flex-shrink:0;text-align:right;padding-top:3px;">
+                    <div style="width:100px;flex-shrink:0;text-align:end;padding-top:3px;">
                         <time style="font-family:var(--sans);font-size:12px;color:var(--fg-meta);">@Dates.MonthDay(post.PublishedAt)</time>
                     </div>
                     @* Vertical connector line + dot *@

@@ -47,7 +47,8 @@ public sealed class ExportRepository : IExportSource
               (SELECT COUNT(*) FROM P WHERE Status IN ('Draft', 'NeedsChanges')) AS Drafts,
               (SELECT COUNT(*) FROM P WHERE Status = 'InReview') AS InReview,
               (SELECT COUNT(*) FROM P WHERE NULLIF(LTRIM(CustomFieldsJson), '') IS NOT NULL)
-                + (SELECT COUNT(*) FROM Pages WHERE {PageFilter} AND NULLIF(LTRIM(CustomFieldsJson), '') IS NOT NULL) AS WithCustomFields", Args(o));
+                + (SELECT COUNT(*) FROM Pages WHERE {PageFilter} AND NULLIF(LTRIM(CustomFieldsJson), '') IS NOT NULL) AS WithCustomFields,
+              (SELECT COUNT(*) FROM Pages WHERE {PageFilter} AND Content LIKE '%comp-form%') AS WithForms", Args(o));
     }
 
     public async Task<ExportCatalog> LoadCatalogAsync(ExportOptions o)
@@ -156,6 +157,78 @@ public sealed class ExportRepository : IExportSource
                     r.TwitterTitle, r.TwitterDescription, r.TwitterImage),
                 CustomFieldsJson = r.CustomFieldsJson,
             };
+    }
+
+    // ── Single items, for a push (ADR-0029) ──────────────────────────────────
+
+    public async Task<IReadOnlyList<Blog.Core.Services.Export.Push.ExportItemRef>> ListItemsAsync(ExportOptions o)
+    {
+        using var conn = _ctx.CreateConnection();
+        var pages = o.IncludePages
+            ? await conn.QueryAsync<(Guid Id, Guid? ParentId, string? Title, string? Slug)>($@"
+                SELECT Id, ParentId, Title, Slug FROM Pages WHERE {PageFilter}
+                ORDER BY CASE WHEN ParentId IS NULL THEN 0 ELSE 1 END, SortOrder, Title", Args(o))
+            : Enumerable.Empty<(Guid Id, Guid? ParentId, string? Title, string? Slug)>();
+        var posts = await conn.QueryAsync<(Guid Id, string? Title, string? Slug)>(@"
+            SELECT Id, Title, Slug FROM Posts WHERE Status IN @Statuses
+            ORDER BY COALESCE(PublishedAt, CreatedAt), Id", Args(o));
+        return pages.Select(p => new Blog.Core.Services.Export.Push.ExportItemRef(
+                    Blog.Core.Services.Export.Push.PushItemKind.Page, p.Id, p.ParentId, p.Title ?? "", p.Slug ?? ""))
+            .Concat(posts.Select(p => new Blog.Core.Services.Export.Push.ExportItemRef(
+                    Blog.Core.Services.Export.Push.PushItemKind.Post, p.Id, null, p.Title ?? "", p.Slug ?? "")))
+            .ToList();
+    }
+
+    public async Task<ExportPost?> GetPostAsync(Guid id)
+    {
+        using var conn = _ctx.CreateConnection();
+        var r = await conn.QuerySingleOrDefaultAsync<PostRow>(@"
+            SELECT Id, Title, Slug, Html, Status, CreatedAt, UpdatedAt, PublishedAt, ScheduledAt, AuthorId, FeatureImage,
+                   AllowComments, MetaTitle, MetaDescription, CanonicalUrl, OgTitle, OgDescription, OgImage,
+                   TwitterTitle, TwitterDescription, TwitterImage, AnswerCapsule, KeyFactsJson, FaqJson, HowToJson, RoundupJson, CustomFieldsJson
+            FROM Posts WHERE Id = @id", new { id });
+        if (r is null) return null;
+        var cats = (await conn.QueryAsync<Guid>("SELECT CategoryId FROM PostCategories WHERE PostId = @id", new { id })).ToList();
+        var tags = (await conn.QueryAsync<Guid>("SELECT TagId FROM PostTags WHERE PostId = @id ORDER BY SortOrder", new { id })).ToList();
+        var series = (await conn.QueryAsync<(string Title, string Slug, long Part)>(@"
+            SELECT x.Title, x.Slug, x.Part FROM (
+                SELECT sp.PostId, s.Title, s.Slug, ROW_NUMBER() OVER (PARTITION BY sp.SeriesId ORDER BY sp.SortOrder) AS Part
+                FROM SeriesPosts sp JOIN Series s ON s.Id = sp.SeriesId
+                WHERE sp.SeriesId IN (SELECT SeriesId FROM SeriesPosts WHERE PostId = @id)) x
+            WHERE x.PostId = @id", new { id }))
+            .Select(x => new ExportSeriesRef(x.Title, x.Slug, (int)x.Part)).ToList();
+        return new ExportPost
+        {
+            Id = r.Id, Title = r.Title ?? "", Slug = r.Slug ?? "", Html = r.Html ?? "",
+            Status = Enum.TryParse<PostStatus>(r.Status, true, out var s) ? s : PostStatus.Draft,
+            CreatedAtUtc = r.CreatedAt, UpdatedAtUtc = r.UpdatedAt, PublishedAtUtc = r.PublishedAt, ScheduledAtUtc = r.ScheduledAt,
+            AuthorId = r.AuthorId, FeatureImage = r.FeatureImage, AllowComments = r.AllowComments ?? true,
+            Seo = new ExportSeo(r.MetaTitle, r.MetaDescription, r.CanonicalUrl, r.OgTitle, r.OgDescription, r.OgImage,
+                r.TwitterTitle, r.TwitterDescription, r.TwitterImage),
+            AnswerCapsule = r.AnswerCapsule, KeyFactsJson = r.KeyFactsJson, FaqJson = r.FaqJson,
+            HowToJson = r.HowToJson, RoundupJson = r.RoundupJson, CustomFieldsJson = r.CustomFieldsJson,
+            CategoryIds = cats, TagIds = tags, Series = series,
+        };
+    }
+
+    public async Task<ExportPage?> GetPageAsync(Guid id)
+    {
+        using var conn = _ctx.CreateConnection();
+        var r = await conn.QuerySingleOrDefaultAsync<PageRow>(@"
+            SELECT p.Id, p.ParentId, p.Title, p.Slug, p.Content, p.IsPublished, p.SortOrder, p.CreatedAt, p.UpdatedAt, p.PublishedAt,
+                   p.AuthorId, m.Url AS FeatureImage, p.MetaTitle, p.MetaDescription, p.CanonicalUrl, p.OgTitle, p.OgDescription,
+                   p.OgImage, p.TwitterTitle, p.TwitterDescription, p.TwitterImage, p.CustomFieldsJson
+            FROM Pages p LEFT JOIN Media m ON m.Id = p.FeaturedImageId
+            WHERE p.Id = @id", new { id });
+        return r is null ? null : new ExportPage
+        {
+            Id = r.Id, ParentId = r.ParentId, Title = r.Title ?? "", Slug = r.Slug ?? "", Html = r.Content ?? "",
+            IsPublished = r.IsPublished, SortOrder = r.SortOrder, CreatedAtUtc = r.CreatedAt, UpdatedAtUtc = r.UpdatedAt,
+            PublishedAtUtc = r.PublishedAt, AuthorId = r.AuthorId, FeatureImage = r.FeatureImage,
+            Seo = new ExportSeo(r.MetaTitle, r.MetaDescription, r.CanonicalUrl, r.OgTitle, r.OgDescription, r.OgImage,
+                r.TwitterTitle, r.TwitterDescription, r.TwitterImage),
+            CustomFieldsJson = r.CustomFieldsJson,
+        };
     }
 
     private sealed class AuthorRow

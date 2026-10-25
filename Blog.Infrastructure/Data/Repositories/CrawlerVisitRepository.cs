@@ -1,6 +1,7 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Dapper;
+using System.Data;
 
 namespace Blog.Infrastructure.Data.Repositories;
 
@@ -40,88 +41,38 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
         return written;
     }
 
-    // "(@OwnerId IS NULL OR OwnerId = @OwnerId)" is a classic SQL Server anti-pattern: with a
-    // parameter on both sides of the OR, the optimizer cannot compile a plan that seeks the
-    // (OwnerId, VisitedAt) index for the non-null case, so a self-hosted deployment — which always
-    // calls these with ownerId = null — took a full scan of CrawlerVisits on every admin page load.
-    // Branching the predicate text in C# gives each shape its own sargable, index-friendly query.
-    private static string OwnerFilter(Guid? ownerId) => ownerId.HasValue ? "AND OwnerId = @OwnerId" : "";
-
-    public async Task<IReadOnlyList<CrawlerActivity>> GetActivityAsync(Guid? ownerId, int days)
+    // AI Crawlers reads the whole report in one call (ADR-0037). The procedure collapses the window once,
+    // through the covering IX_CrawlerVisits_VisitedAt, to one row per crawler x path x day x check result,
+    // and answers the four sections from that; only the query-string section goes back to the table.
+    // Self-hosted calls pass a null owner: the date is the leading index key, so no owner predicate is
+    // needed to seek (the reason the old per-section queries scanned the whole table).
+    public async Task<CrawlerReport> GetReportAsync(Guid? ownerId, int days, int take = 20)
     {
         using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<CrawlerActivity>($@"
-            SELECT Crawler,
-                   MAX(Operator)          AS [Operator],
-                   MAX(CAST(IsAi AS INT)) AS IsAi,
-                   COUNT(1)               AS Visits,
-                   COUNT(DISTINCT Path)   AS Pages,
-                   SUM(CASE WHEN Verified = 1 THEN 1 ELSE 0 END) AS VerifiedVisits,
-                   SUM(CASE WHEN Verified = 0 THEN 1 ELSE 0 END) AS FailedVisits,
-                   MAX(VisitedAt)         AS LastSeen
-              FROM CrawlerVisits
-             WHERE VisitedAt >= @Since {OwnerFilter(ownerId)}
-             GROUP BY Crawler
-             ORDER BY Visits DESC;",
-            new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId });
+        using var grid = await conn.QueryMultipleAsync("dbo.usp_CrawlerVisits_Report",
+            new { OwnerId = ownerId, SinceDay = DateTime.UtcNow.Date.AddDays(-(days - 1)), Take = take },
+            commandType: CommandType.StoredProcedure, commandTimeout: ReportTimeoutSeconds);
 
-        return rows.ToList();
+        return new CrawlerReport
+        {
+            Activity = (await grid.ReadAsync<CrawlerActivity>()).ToList(),
+            TopPages = (await grid.ReadAsync<CrawledPage>()).ToList(),
+            Queried  = (await grid.ReadAsync<CrawledRequest>()).ToList(),
+            Daily    = (await grid.ReadAsync<CrawlerDay>()).ToList(),
+        };
     }
 
-    public async Task<IReadOnlyList<CrawledPage>> GetTopPagesAsync(Guid? ownerId, int days, bool aiOnly = true, int take = 20)
+    /// <summary>A report read is an admin page load, not the hot path; give it longer than the 30-second default.</summary>
+    private const int ReportTimeoutSeconds = 90;
+
+    // Summarises finished days into CrawlerVisitDaily (ADR-0037). The procedure serialises itself with an app
+    // lock, so a second caller gets (0, 0) instead of inserting the same day twice.
+    public async Task<(int Days, int Rows)> RollUpAsync(DateTime throughDay, int maxDays)
     {
         using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<CrawledPage>($@"
-            SELECT TOP (@Take)
-                   Path,
-                   COUNT(1)                AS Visits,
-                   COUNT(DISTINCT Crawler) AS Crawlers
-              FROM CrawlerVisits
-             WHERE VisitedAt >= @Since
-               {OwnerFilter(ownerId)}
-               AND (@AiOnly = 0 OR IsAi = 1)
-               AND (Verified IS NULL OR Verified = 1)   -- a failed check is someone else using the name
-             GROUP BY Path
-             ORDER BY Visits DESC;",
-            new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId, AiOnly = aiOnly ? 1 : 0, Take = take });
-
-        return rows.ToList();
-    }
-
-    public async Task<IReadOnlyList<CrawledRequest>> GetTopQueriedRequestsAsync(Guid? ownerId, int days, int take = 20)
-    {
-        using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<CrawledRequest>($@"
-            SELECT TOP (@Take)
-                   Path,
-                   Query,
-                   COUNT(1)                AS Visits,
-                   COUNT(DISTINCT Crawler) AS Crawlers
-              FROM CrawlerVisits
-             WHERE VisitedAt >= @Since
-               {OwnerFilter(ownerId)}
-               AND Query IS NOT NULL
-               AND (Verified IS NULL OR Verified = 1)
-             GROUP BY Path, Query
-             ORDER BY Visits DESC;",
-            new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId, Take = take });
-
-        return rows.ToList();
-    }
-
-    public async Task<IReadOnlyList<CrawlerDay>> GetDailyAiVisitsAsync(Guid? ownerId, int days)
-    {
-        using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<CrawlerDay>($@"
-            SELECT CAST(VisitedAt AS DATE) AS Day, COUNT(1) AS Visits
-              FROM CrawlerVisits
-             WHERE VisitedAt >= @Since AND IsAi = 1 {OwnerFilter(ownerId)}
-               AND (Verified IS NULL OR Verified = 1)
-             GROUP BY CAST(VisitedAt AS DATE)
-             ORDER BY Day;",
-            new { Since = DateTime.UtcNow.AddDays(-days), OwnerId = ownerId });
-
-        return rows.ToList();
+        return await conn.QuerySingleAsync<(int Days, int Rows)>("dbo.usp_CrawlerVisits_RollUp",
+            new { Through = throughDay.Date, MaxDays = maxDays },
+            commandType: CommandType.StoredProcedure, commandTimeout: ReportTimeoutSeconds * 4);
     }
 
     public async Task<IReadOnlyList<Guid>> GetOwnerIdsAsync()
@@ -133,6 +84,10 @@ public class CrawlerVisitRepository : ICrawlerVisitRepository
     public async Task<int> PruneAsync(Guid ownerId, DateTime olderThanUtc)
     {
         using var conn = _ctx.CreateConnection();
+        // The daily summary follows the same window; it is keyed by day, so a partly expired day is kept.
+        await conn.ExecuteAsync(
+            "DELETE FROM CrawlerVisitDaily WHERE OwnerId = @OwnerId AND [Day] < @CutoffDay",
+            new { OwnerId = ownerId, CutoffDay = olderThanUtc.Date });
         return await conn.ExecuteAsync(
             "DELETE FROM CrawlerVisits WHERE OwnerId = @OwnerId AND VisitedAt < @Cutoff",
             new { OwnerId = ownerId, Cutoff = olderThanUtc });

@@ -45,6 +45,7 @@ public static class AuditActions
     public const string UserDeleted      = "User.Deleted";
     public const string UserRoleChanged  = "User.RoleChanged";
     public const string UserToggled      = "User.ActiveToggled";
+    public const string UserProfileUpdated = "User.ProfileUpdated";
 
     // Auth
     public const string AuthLoggedIn    = "Auth.LoggedIn";
@@ -135,4 +136,18 @@ public static class AuditActions
     public const string ExportStarted   = "Export.Started";
     public const string ExportCompleted = "Export.Completed";
     public const string ExportFailed    = "Export.Failed";
+
+    // Direct push to WordPress / Ghost (ADR-0029): target, site, options, policy and counts; never the credential
+    public const string ExportPushStarted   = "Export.PushStarted";
+    public const string ExportPushed        = "Export.Pushed";
+    public const string ExportPushPaused    = "Export.PushPaused";
+    public const string ExportPushResumed   = "Export.PushResumed";
+    public const string ExportPushCancelled = "Export.PushCancelled";
+
+    // Contact forms (ADR-0030). A visitor's submission is not an admin write and is not audited.
+    public const string FormCreated            = "Form.Created";
+    public const string FormUpdated            = "Form.Updated";
+    public const string FormDeleted            = "Form.Deleted";
+    public const string FormSubmissionDeleted  = "FormSubmission.Deleted";
+    public const string FormSubmissionExported = "FormSubmission.Exported";
 }

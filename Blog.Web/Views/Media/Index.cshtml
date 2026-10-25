@@ -4,6 +4,7 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Media Library";
+    ViewData["Description"] = "Images, video and documents for your posts and pages. Upload here, then place them from the editor.";
 
     var folder = ViewData["MediaFolder"] as string ?? "";
     var references = ViewData["MediaReferences"] as Dictionary<Guid, List<MediaReference>> ?? new Dictionary<Guid, List<MediaReference>>();
@@ -74,14 +75,14 @@
     </section>
 
     <section aria-labelledby="library-heading">
-        <div class="flex flex-wrap items-center gap-x-4 mb-6 border-b border-border">
-            <h2 id="library-heading" class="text-lg font-semibold mr-4 py-2">Library Items</h2>
-            <nav aria-label="Folders" class="flex items-center overflow-x-auto">
+        <h2 id="library-heading" class="sr-only">Library items</h2>
+        <div class="mb-6 overflow-x-auto">
+            <nav aria-label="Folders" class="desk-tabs">
                 @foreach (var f in MediaController.Folders)
                 {
                     var active = f.Key == folder;
                     <a href="@FolderHref(f.Key)" aria-current="@(active ? "page" : null)"
-                       class="px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @(active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")">@f.Label</a>
+                       class="desk-tab whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">@f.Label</a>
                 }
             </nav>
         </div>
@@ -89,21 +90,24 @@
         <partial name="_ListSearch" />
         @if (!Model.Any())
         {
-            <div class="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-border/50">
-                <svg class="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                @if (q.Length > 0)
-                {
-                    <p>No files match “@q”@(folder.Length > 0 ? $" in the {folderLabel} folder" : "").</p>
-                }
-                else if (folder.Length > 0)
-                {
-                    <p>No files in the @folderLabel folder yet. Upload one above and it lands here.</p>
-                }
-                else
-                {
-                    <p>No media files yet. Upload the first one above.</p>
-                }
-            </div>
+            ViewData["EmptyIcon"] = "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" ry=\"2\"/><circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"/><polyline points=\"21 15 16 10 5 21\"/>";
+            if (q.Length > 0)
+            {
+                ViewData["EmptyQuery"] = q;
+                ViewData["EmptyClearHref"] = Url.Action("Index", "Media") + (folder.Length > 0 ? "?folder=" + folder : "");
+                ViewData["EmptyHint"] = folder.Length > 0 ? $"to see every file in the {folderLabel} folder." : "to see every file.";
+            }
+            else if (folder.Length > 0)
+            {
+                ViewData["EmptyTitle"] = $"No files in the {folderLabel} folder yet.";
+                ViewData["EmptyHint"] = "Upload one above and it lands here.";
+            }
+            else
+            {
+                ViewData["EmptyTitle"] = "No media files yet.";
+                ViewData["EmptyHint"] = "Upload the first one above.";
+            }
+            <div class="desk-card"><partial name="_EmptyState" /></div>
         }
         else
         {
@@ -147,7 +151,7 @@
                                        aria-label="@(string.IsNullOrEmpty(item.AltText) ? "Add alt text for" : "Details for") @display" title="Alt text and caption"
                                        class="inline-flex items-center min-h-10 px-2 bg-white/20 hover:bg-white/30 text-white text-xs rounded backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">@(string.IsNullOrEmpty(item.AltText) ? "Add alt" : "Details")</a>
                                 }
-                                <button type="button" data-copy-url="@item.Url" aria-label="Copy URL of @display"
+                                <button type="button" data-copy-url="@item.Url" aria-label="Copy URL of “@display”"
                                         class="flex-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded backdrop-blur-sm transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
                                     Copy URL
                                 </button>
@@ -161,8 +165,8 @@
                                     <input type="hidden" name="folder" value="@folder" />
                                     <input type="hidden" name="q" value="@q" />
                                     <input type="hidden" name="page" value="@(page)" />
-                                    <button type="submit" aria-label="Delete @display"
-                                            class="p-1 bg-red-500/80 hover:bg-red-500 text-white rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                                    <button type="submit" aria-label="Delete “@display”"
+                                            class="desk-btn desk-btn-danger desk-btn-icon desk-btn-sm focus-visible:ring-offset-0 focus-visible:ring-white">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                     </button>
                                 </form>
@@ -236,7 +240,7 @@
         setUploading(true);
         progress.classList.remove('hidden');
         refreshButton.classList.add('hidden');
-        progressFill.classList.remove('bg-red-500');
+        progressFill.classList.remove('bg-destructive');
         progressFill.classList.add('bg-primary');
         progressFill.style.width = '0%';
         progressPercent.textContent = '0%';
@@ -290,7 +294,7 @@
         } else {
             progressLabel.textContent = failed === 1 ? 'The file was not uploaded.' : 'No files were uploaded.';
             progressFill.classList.remove('bg-primary');
-            progressFill.classList.add('bg-red-500');
+            progressFill.classList.add('bg-destructive');
         }
     }
 

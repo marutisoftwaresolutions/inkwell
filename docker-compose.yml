@@ -3,9 +3,10 @@
 #   cp .env.example .env      # fill in a real SA password and your domain
 #   docker compose up -d
 #
-# First boot: MigrationService creates the schema against the empty `db` container automatically
-# (same startup path as any other install — see the Fresh-Install Schema Rule); once the app
-# reports healthy, visit your domain and the setup wizard runs.
+# First boot: `db-init` creates the `blog` database and applies DBScripts/init.sql (the complete
+# schema), then exits; the app starts only after it succeeds and MigrationService applies anything
+# newer on startup. db-init re-runs on every `up` and changes nothing on an existing database. Once
+# the app reports healthy, visit your domain and the setup wizard runs.
 #
 # The app's own port is deliberately NOT published to the host — only Caddy's 80/443 are reachable
 # from outside the compose network. That is what makes ReverseProxy__TrustForwardedHeaders safe to
@@ -28,11 +29,30 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  app:
-    build: .
+  # One-shot: a new SQL Server container has no `blog` database, and the app cannot connect to one
+  # that does not exist. Creates it if missing, then applies init.sql (idempotent, UTF-8).
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      SQLCMDPASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in .env}
+    volumes:
+      - ./DBScripts:/scripts:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        /opt/mssql-tools18/bin/sqlcmd -S db -U sa -C -b -Q "IF DB_ID(N'blog') IS NULL CREATE DATABASE [blog];"
+        /opt/mssql-tools18/bin/sqlcmd -S db -U sa -C -b -I -f 65001 -d blog -i /scripts/init.sql
+    restart: "no"
+
+  app:
+    build: .
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
     environment:
       ConnectionStrings__DefaultConnection: "Server=db;Database=blog;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
       DeploymentMode: SelfHosted

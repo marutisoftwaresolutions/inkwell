@@ -19,6 +19,7 @@ public class MediaController : Controller
     private readonly ILogger<MediaController> _logger;
     private readonly AuditService _audit;
     private readonly IImageProcessingService _imageProcessing;
+    private readonly ResponsiveImageStore _responsive;
 
     /// <summary>Files per library page. Also bounds the reference query behind the delete dialog.</summary>
     public const int PageSize = 48;
@@ -57,8 +58,9 @@ public class MediaController : Controller
         };
 
     public MediaController(IMediaRepository media, IWebHostEnvironment env, ILogger<MediaController> logger,
-        AuditService audit, IImageProcessingService imageProcessing)
+        AuditService audit, IImageProcessingService imageProcessing, ResponsiveImageStore responsive)
     {
+        _responsive = responsive;
         _media = media;
         _env = env;
         _logger = logger;
@@ -118,6 +120,8 @@ public class MediaController : Controller
             var subdir = $"{safeFolder}/{relativeMonthDir}";
 
             var saved = await _imageProcessing.SaveImageAsync(file.OpenReadStream(), file.FileName, mime, subdir, convertToWebp: true);
+            // Narrower copies for srcset (ADR-0032). Never fails the upload; the image-variants job retries anything missed.
+            await _responsive.EnsureVariantsAsync(saved.RelativeUrl, CancellationToken.None);   // a dropped connection must not abort a stored upload
             var fileName = saved.FileName;
             mime = saved.ContentType;
             var storedSize = saved.FileSize;
@@ -180,6 +184,12 @@ public class MediaController : Controller
                 if (System.IO.File.Exists(fullPath))
                 {
                     System.IO.File.Delete(fullPath);
+                    // Its responsive copies go with it (ADR-0032).
+                    foreach (var w in Blog.Core.Services.ResponsiveImages.VariantWidths)
+                        if (_responsive.FileOf(Blog.Core.Services.ResponsiveImages.VariantPath("/" + filePath, w)) is { } copy && System.IO.File.Exists(copy))
+                            try { System.IO.File.Delete(copy); }
+                            catch (Exception ex) { _logger.LogWarning(ex, "Responsive copy {Copy} could not be deleted.", copy); }   // never blocks the delete
+                    _responsive.Forget("/" + filePath);
                     _logger.LogInformation("Successfully deleted from disk: {FullPath}", fullPath);
                 }
                 else

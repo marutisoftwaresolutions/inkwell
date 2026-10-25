@@ -12,7 +12,7 @@
         <div class="flex items-center justify-between" style="height: 4rem;">
 
             @* Left: Wordmark *@
-            <a href="/" class="flex flex-col leading-none shrink-0">
+            <a href="/" class="flex flex-col leading-none min-w-0">
                 <span class="text-2xl font-black uppercase hover:opacity-70 transition-opacity"
                       style="font-family: var(--font-sans); color: var(--foreground); letter-spacing: -0.04em;">
                     @Model.SiteName
@@ -51,7 +51,7 @@
                          x-transition:leave-start="opacity-100"
                          x-transition:leave-end="opacity-0"
                          style="display:none; background: var(--background); border-top: 2px solid var(--foreground);"
-                         class="absolute right-0 top-full min-w-52 z-50 shadow-xl">
+                         class="absolute end-0 top-full min-w-52 z-50 shadow-xl">
                         <a href="/" class="flex items-center gap-3 px-5 py-3.5 text-sm font-bold uppercase hover:opacity-50 transition-opacity border-b"
                            style="border-color: var(--border); letter-spacing: 0.12em;">
                             <i class="bi bi-house text-xs"></i>
@@ -73,7 +73,7 @@
                 @if (User.Identity != null && User.Identity.IsAuthenticated)
                 {
                     <a href="/admin/dashboard"
-                       class="hidden md:flex items-center ml-3 px-4 h-8 text-xs font-bold uppercase hover:opacity-70 transition-opacity"
+                       class="hidden md:flex items-center ms-3 px-4 h-8 text-xs font-bold uppercase hover:opacity-70 transition-opacity"
                        style="background: var(--foreground); color: var(--background); letter-spacing: 0.1em;">
                         Dashboard
                     </a>

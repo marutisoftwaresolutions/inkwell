@@ -71,6 +71,11 @@ public class SecurityController : Controller
         ViewBag.InvalidAllowlistEntries = await _firewall.GetInvalidAllowlistEntriesAsync();
         ViewBag.YourIp      = _firewall.ResolveClientIp(HttpContext);
 
+        // Shared _ListSearch/_ListPager partials (UI/UX rule); ?kind= survives search and paging through ListSearchKeep.
+        Blog.Web.Models.ListPaging.Stash(this, Blog.Web.Models.PagingMeta.FromCounts(q, page, total, PageSize, items.Count));
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["kind"] = kind };
+        ViewData["ListSearchPlaceholder"] = "Search IP, reason or path…";
+
         ViewData["Title"] = "Security";
         return View();
     }

@@ -2,11 +2,11 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Error Monitor";
+    ViewData["Description"] = "Missing resources (4xx) and server errors (5xx), grouped by signature. Admin-only, read-only.";
 
     var items = (IReadOnlyList<ErrorLog>)ViewBag.Items;
     var stats = (ErrorStats)ViewBag.Stats;
     var page = (int)ViewBag.Page;
-    var totalPages = (int)ViewBag.TotalPages;
     int? filterStatus = ViewBag.FilterStatus;
     string? filterQuery = ViewBag.FilterQuery;
 
@@ -20,79 +20,85 @@
     }
     string Badge(int code) => code >= 500 ? "pill-bad"
         : code == 404 ? "pill-warn"
-        : "bg-muted text-muted-foreground";
+        : "desk-pill-muted";
 }
-
-<div class="mb-5">
-    <h2 class="text-lg font-semibold text-foreground">Error Monitor</h2>
-    <p class="text-xs text-muted-foreground mt-0.5">Missing resources (4xx) and server errors (5xx), grouped by signature. Admin-only, read-only.</p>
-</div>
 
 @* ── Summary tiles ─────────────────────────────────────────────── *@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@stats.TotalGroups.ToString("N0")</div>
-        <div class="text-xs text-muted-foreground mt-1">Distinct errors</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value">@stats.TotalGroups.ToString("N0")</div>
+        <div class="desk-kpi-label">Distinct errors</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@stats.TotalOccurrences.ToString("N0")</div>
-        <div class="text-xs text-muted-foreground mt-1">Total occurrences</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value">@stats.TotalOccurrences.ToString("N0")</div>
+        <div class="desk-kpi-label">Total occurrences</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold tone-warn">@stats.NotFoundGroups.ToString("N0")</div>
-        <div class="text-xs text-muted-foreground mt-1">404 signatures</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value tone-warn">@stats.NotFoundGroups.ToString("N0")</div>
+        <div class="desk-kpi-label">404 signatures</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold tone-bad">@stats.ServerErrorGroups.ToString("N0")</div>
-        <div class="text-xs text-muted-foreground mt-1">5xx signatures</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value tone-bad">@stats.ServerErrorGroups.ToString("N0")</div>
+        <div class="desk-kpi-label">5xx signatures</div>
     </div>
 </div>
 
-@* ── Filters ───────────────────────────────────────────────────── *@
-<form method="get" class="flex flex-wrap gap-2 mb-4">
-    <select name="status" aria-label="Filter by status code" class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-        <option value="">All status codes</option>
-        <option value="404" selected="@(filterStatus == 404)">404 Not Found</option>
-        <option value="500" selected="@(filterStatus == 500)">500 Server Error</option>
-        <option value="403" selected="@(filterStatus == 403)">403 Forbidden</option>
-    </select>
-    <input type="text" name="q" value="@filterQuery" placeholder="Search path / message / type" aria-label="Search errors"
-           class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-64" />
-    <button type="submit" class="h-8 px-3 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90">Filter</button>
-    @if (filterStatus != null || !string.IsNullOrEmpty(filterQuery))
-    {
-        <a href="/admin/errors" class="h-8 px-3 rounded border border-input text-xs text-foreground flex items-center hover:bg-muted">Clear</a>
-    }
-</form>
+@* ── Filters: status code is its own small form that carries the search along; the search box is the shared partial. ── *@
+<div class="flex flex-wrap items-start gap-2">
+    <form method="get" class="flex items-center gap-2 mb-4">
+        <input type="hidden" name="q" value="@filterQuery" />
+        <select name="status" aria-label="Filter by status code" class="desk-select w-auto">
+            <option value="">All status codes</option>
+            <option value="404" selected="@(filterStatus == 404)">404 Not Found</option>
+            <option value="500" selected="@(filterStatus == 500)">500 Server Error</option>
+            <option value="403" selected="@(filterStatus == 403)">403 Forbidden</option>
+        </select>
+        <button type="submit" class="desk-btn desk-btn-outline">Apply</button>
+    </form>
+    <partial name="_ListSearch" />
+</div>
 
 @* ── Grouped listing ───────────────────────────────────────────── *@
-<div class="rounded-xl border border-border bg-card overflow-hidden">
-    <div class="table-scroll"><table class="w-full text-sm">
+<div class="desk-card overflow-hidden">
+    @if (items.Count == 0)
+    {
+        if (!string.IsNullOrEmpty(filterQuery))
+        {
+            ViewData["EmptyQuery"] = filterQuery;
+            ViewData["EmptyClearHref"] = filterStatus is null ? "/admin/errors" : $"/admin/errors?status={filterStatus}";
+            ViewData["EmptyHint"] = "to see every recorded error.";
+        }
+        else
+        {
+            ViewData["EmptyTitle"] = filterStatus is null ? "No errors recorded" : $"No {filterStatus} errors recorded";
+            ViewData["EmptyHint"] = filterStatus is null ? "Missing pages and server errors appear here as visitors hit them." : "Choose “All status codes” to see every signature.";
+        }
+        <partial name="_EmptyState" />
+    }
+    else
+    {
+    <div class="table-scroll"><table class="desk-table">
         <thead>
-            <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                <th class="px-4 py-2 font-medium">Status</th>
-                <th class="px-4 py-2 font-medium">Path</th>
-                <th class="px-4 py-2 font-medium">Type / Message</th>
-                <th class="px-4 py-2 font-medium text-right">Count</th>
-                <th class="px-4 py-2 font-medium">First</th>
-                <th class="px-4 py-2 font-medium">Last</th>
-                <th class="px-4 py-2 font-medium">Last IP</th>
+            <tr>
+                <th>Status</th>
+                <th>Path</th>
+                <th>Type / Message</th>
+                <th class="text-right">Count</th>
+                <th>First</th>
+                <th>Last</th>
+                <th>Last IP</th>
             </tr>
         </thead>
         <tbody>
-            @if (items.Count == 0)
-            {
-                <tr><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">No errors recorded in this window.</td></tr>
-            }
             @foreach (var e in items)
             {
-                <tr class="border-b border-border/50 align-top hover:bg-muted/40">
-                    <td class="px-4 py-2">
-                        <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold @Badge(e.StatusCode)">@e.StatusCode</span>
+                <tr class="align-top">
+                    <td class="align-top">
+                        <span class="desk-pill @Badge(e.StatusCode)">@e.StatusCode</span>
                         <div class="text-[10px] text-muted-foreground mt-1">@e.Method</div>
                     </td>
-                    <td class="px-4 py-2 font-mono text-xs text-foreground break-all max-w-[22rem]">@e.Path</td>
-                    <td class="px-4 py-2 max-w-[26rem]">
+                    <td class="align-top font-mono text-xs text-foreground break-all max-w-[22rem]">@e.Path</td>
+                    <td class="align-top max-w-[26rem]">
                         @if (!string.IsNullOrEmpty(e.ExceptionType))
                         {
                             <div class="text-xs font-medium tone-bad break-all">@e.ExceptionType</div>
@@ -102,10 +108,10 @@
                             <div class="text-xs text-muted-foreground break-words">@(e.Message!.Length > 200 ? e.Message[..200] + "…" : e.Message)</div>
                         }
                     </td>
-                    <td class="px-4 py-2 text-right font-semibold text-foreground">@e.OccurrenceCount.ToString("N0")</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(e.FirstSeenAt)">@Ago(e.FirstSeenAt)</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(e.LastSeenAt)">@Ago(e.LastSeenAt)</td>
-                    <td class="px-4 py-2 whitespace-nowrap">
+                    <td class="align-top text-right font-semibold text-foreground">@e.OccurrenceCount.ToString("N0")</td>
+                    <td class="align-top text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(e.FirstSeenAt)">@Ago(e.FirstSeenAt)</td>
+                    <td class="align-top text-xs text-muted-foreground whitespace-nowrap" title="@Dates.DateTimeSeconds(e.LastSeenAt)">@Ago(e.LastSeenAt)</td>
+                    <td class="align-top whitespace-nowrap">
                         @if (string.IsNullOrEmpty(e.LastIpAddress))
                         {
                             <span class="text-xs text-muted-foreground">—</span>
@@ -120,7 +126,7 @@
                                 <input type="hidden" name="hours" value="24" />
                                 <input type="hidden" name="reason" value="Blocked from the Error Monitor (@e.StatusCode on @e.Path)" />
                                 <input type="hidden" name="returnUrl" value="@($"/admin/errors?status={filterStatus}&q={filterQuery}&page={page}")" />
-                                <button type="submit" aria-label="Block @e.LastIpAddress for 24 hours" class="mt-1 h-6 px-2 rounded border border-input text-[11px] text-destructive hover:bg-destructive/10">Block</button>
+                                <button type="submit" aria-label="Block @e.LastIpAddress for 24 hours" class="desk-btn desk-btn-danger-outline desk-btn-sm h-6 px-2 text-[11px] mt-1">Block</button>
                             </form>
                         }
                     </td>
@@ -128,21 +134,7 @@
             }
         </tbody>
     </table></div>
+    }
 </div>
 
-@if (totalPages > 1)
-{
-    <div class="flex items-center justify-between mt-4 text-xs text-muted-foreground">
-        <span>Page @(page) of @totalPages</span>
-        <div class="flex gap-2">
-            @if (page > 1)
-            {
-                <a href="?status=@filterStatus&q=@filterQuery&page=@(page-1)" class="h-8 px-3 rounded border border-input flex items-center hover:bg-muted">Prev</a>
-            }
-            @if (page < totalPages)
-            {
-                <a href="?status=@filterStatus&q=@filterQuery&page=@(page+1)" class="h-8 px-3 rounded border border-input flex items-center hover:bg-muted">Next</a>
-            }
-        </div>
-    </div>
-}
+<partial name="_ListPager" />

@@ -4,14 +4,15 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Preview import";
+    ViewData["Description"] = $"What would happen if this import ran ({Model.Source}, {Model.FileName}). Nothing has been written: this is a prediction from the staged file and your current options, not a trial run. Images are counted, not downloaded.";
     var p = (ImportPreview)ViewBag.Preview;
 
     string Badge(ImportOutcome o) => o switch
     {
-        ImportOutcome.Overwrite        => "bg-red-100 text-red-700",
-        ImportOutcome.CreateWithNewSlug=> "bg-amber-100 text-amber-700",
-        ImportOutcome.Skip             => "bg-slate-100 text-slate-700",
-        _                              => "bg-emerald-100 text-emerald-700"
+        ImportOutcome.Overwrite        => "pill-bad",
+        ImportOutcome.CreateWithNewSlug=> "pill-warn",
+        ImportOutcome.Skip             => "desk-pill-muted",
+        _                              => "pill-ok"
     };
     string Label(ImportOutcome o) => o switch
     {
@@ -22,41 +23,36 @@
     };
 }
 
-<div class="mb-5">
-    <h2 class="text-lg font-semibold text-foreground">Preview import</h2>
-    <p class="text-xs text-muted-foreground mt-0.5">
-        What would happen if this import ran — @Model.Source, @Model.FileName. <strong>Nothing has been
-        written.</strong> This is a prediction from the staged file and your current options, not a trial run:
-        images are counted, not downloaded.
-    </p>
-</div>
+@section PageActions {
+    <a href="/admin/import/configure/@Model.Id" class="desk-btn desk-btn-outline">Change options</a>
+}
 
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-emerald-600">@p.Creates</div>
+    <div class="desk-card p-4">
+        <div class="text-2xl font-bold tabular-nums tone-ok">@p.Creates</div>
         <div class="text-xs text-muted-foreground mt-1">Will be created</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold @(p.Renames > 0 ? "text-amber-600" : "text-foreground")">@p.Renames</div>
+    <div class="desk-card p-4">
+        <div class="text-2xl font-bold tabular-nums @(p.Renames > 0 ? "tone-warn" : "text-foreground")">@p.Renames</div>
         <div class="text-xs text-muted-foreground mt-1">Given a new slug</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold @(p.Overwrites > 0 ? "text-red-600" : "text-foreground")">@p.Overwrites</div>
+    <div class="desk-card p-4">
+        <div class="text-2xl font-bold tabular-nums @(p.Overwrites > 0 ? "tone-bad" : "text-foreground")">@p.Overwrites</div>
         <div class="text-xs text-muted-foreground mt-1">Will overwrite</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@p.Skips</div>
+    <div class="desk-card p-4">
+        <div class="text-2xl font-bold tabular-nums text-foreground">@p.Skips</div>
         <div class="text-xs text-muted-foreground mt-1">Skipped</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@p.ImagesToFetch</div>
+    <div class="desk-card p-4">
+        <div class="text-2xl font-bold tabular-nums text-foreground">@p.ImagesToFetch</div>
         <div class="text-xs text-muted-foreground mt-1">Images to fetch</div>
     </div>
 </div>
 
 @if (p.Overwrites > 0)
 {
-    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div class="mb-6 rounded-lg border p-4 pill-bad text-sm" role="alert">
         <strong>@p.Overwrites existing @(p.Overwrites == 1 ? "post or page" : "posts or pages") would be replaced.</strong>
         The current content is overwritten and is not recoverable from the import. Change the slug-conflict
         policy to <em>Suffix</em> or <em>Skip</em> on the previous step if that is not what you intend.
@@ -65,26 +61,24 @@
 
 @if (p.BrokenLinks.Count > 0)
 {
-    <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
-        <div class="px-4 py-2 border-b border-border">
-            <span class="text-sm font-medium text-foreground">Links that would not resolve (@p.BrokenLinks.Count)</span>
-            <span class="text-xs text-muted-foreground ml-2">
-                These point at content this import does not bring and that does not already exist here.
-            </span>
+    <div class="desk-card overflow-hidden mb-6">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Links that would not resolve (@p.BrokenLinks.Count)</h2>
+            <p class="desk-card-description">These point at content this import does not bring and that does not already exist here.</p>
         </div>
-        <div class="table-scroll"><table class="w-full text-sm">
+        <div class="table-scroll"><table class="desk-table desk-table-compact">
             <thead>
-                <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                    <th class="px-4 py-2 font-medium">In</th>
-                    <th class="px-4 py-2 font-medium">Link</th>
+                <tr>
+                    <th>In</th>
+                    <th>Link</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var l in p.BrokenLinks.Take(100))
                 {
-                    <tr class="border-b border-border/50 hover:bg-muted/40">
-                        <td class="px-4 py-2 text-xs text-foreground max-w-[24rem]">@l.InPostTitle</td>
-                        <td class="px-4 py-2 font-mono text-[11px] text-muted-foreground break-all">@l.Href</td>
+                    <tr>
+                        <td class="text-xs text-foreground max-w-[24rem]">@l.InPostTitle</td>
+                        <td class="font-mono text-[11px] text-muted-foreground break-all">@l.Href</td>
                     </tr>
                 }
             </tbody>
@@ -94,26 +88,26 @@
 
 @foreach (var group in p.ByType)
 {
-    <div class="rounded-xl border border-border bg-card overflow-hidden mb-4">
-        <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">
-            @group.Key (@group.Count())
+    <div class="desk-card overflow-hidden mb-4">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">@group.Key (@group.Count())</h2>
         </div>
-        <div class="table-scroll"><table class="w-full text-sm">
+        <div class="table-scroll"><table class="desk-table desk-table-compact">
             <tbody>
                 @foreach (var item in group.Take(200))
                 {
-                    <tr class="border-b border-border/50 align-top hover:bg-muted/40">
-                        <td class="px-4 py-2 w-24">
-                            <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold @Badge(item.Outcome)">@Label(item.Outcome)</span>
+                    <tr class="align-top">
+                        <td class="w-24">
+                            <span class="desk-pill @Badge(item.Outcome)">@Label(item.Outcome)</span>
                         </td>
-                        <td class="px-4 py-2 max-w-[24rem]">
+                        <td class="max-w-[24rem]">
                             <div class="text-xs text-foreground">@item.Title</div>
                             @if (!string.IsNullOrEmpty(item.Slug))
                             {
                                 <div class="text-[11px] font-mono text-muted-foreground">/@item.Slug</div>
                             }
                         </td>
-                        <td class="px-4 py-2 text-xs text-muted-foreground">@item.Reason</td>
+                        <td class="text-xs text-muted-foreground">@item.Reason</td>
                     </tr>
                 }
             </tbody>
@@ -129,17 +123,14 @@
         runBody += $" The {p.Overwrites} overwritten {(p.Overwrites == 1 ? "post or page" : "posts or pages")} cannot be recovered from the import.";
 }
 <div class="flex flex-wrap gap-3 mt-6">
-    <a href="/admin/import/configure/@Model.Id"
-       class="h-9 px-4 rounded border border-input text-sm text-foreground hover:bg-muted inline-flex items-center">
-        ← Change options
-    </a>
+    <a href="/admin/import/configure/@Model.Id" class="desk-btn desk-btn-outline">Change options</a>
     @if (p.Overwrites > 0)
     {
         <form method="post" action="/admin/import/run/@Model.Id"
               data-confirm-title="Run the import?" data-confirm-body="@runBody"
               data-confirm-action="Run import" data-confirm-tone="danger" data-confirm-typed="OVERWRITE">
             @Html.AntiForgeryToken()
-            <button type="submit" class="h-9 px-4 rounded bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 inline-flex items-center">Run the import</button>
+            <button type="submit" class="desk-btn desk-btn-primary">Run the import</button>
         </form>
     }
     else
@@ -148,7 +139,7 @@
               data-confirm-title="Run the import?" data-confirm-body="@runBody"
               data-confirm-action="Run import" data-confirm-tone="neutral">
             @Html.AntiForgeryToken()
-            <button type="submit" class="h-9 px-4 rounded bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 inline-flex items-center">Run the import</button>
+            <button type="submit" class="desk-btn desk-btn-primary">Run the import</button>
         </form>
     }
 </div>

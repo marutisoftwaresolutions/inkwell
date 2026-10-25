@@ -1,0 +1,117 @@
+@using Blog.Core.Services
+@model ContentCalendar.Month
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Calendar";
+    ViewData["Description"] = "What was published, what is scheduled, and drafts that carry a date. Times are in the site's time zone (Settings → Display). Read-only: open a post to change its date.";
+    var culture = System.Globalization.CultureInfo.GetCultureInfo(Dates.Options.Locale);
+    // Monday first (ISO 8601), named in the site's date language.
+    var order = new[] { 1, 2, 3, 4, 5, 6, 0 };
+    var shortDays = order.Select(i => culture.DateTimeFormat.AbbreviatedDayNames[i]).ToArray();
+    var longDays = order.Select(i => culture.DateTimeFormat.DayNames[i]).ToArray();
+    var monthTitle = Dates.CalendarDate(Model.First.ToDateTime(TimeOnly.MinValue), DateStyle.MonthYear);
+    var published = Model.Count(ContentCalendar.Kind.Published);
+    var scheduled = Model.Count(ContentCalendar.Kind.Scheduled);
+    var planned = Model.Count(ContentCalendar.Kind.Planned);
+
+    string Label(ContentCalendar.Kind k) => k switch
+    {
+        ContentCalendar.Kind.Published => "Published",
+        ContentCalendar.Kind.Scheduled => "Scheduled",
+        _ => "Planned",
+    };
+    // Colour is never the only signal: every entry also carries its label (checklist 7 and 5).
+    string Tone(ContentCalendar.Kind k) => k switch
+    {
+        ContentCalendar.Kind.Published => "cal-published",
+        ContentCalendar.Kind.Scheduled => "cal-scheduled",
+        _ => "cal-planned",
+    };
+}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <nav class="flex items-center gap-2" aria-label="Month">
+        <a href="?month=@Model.PreviousKey" class="desk-btn desk-btn-outline desk-btn-icon" aria-label="Previous month"><span aria-hidden="true">←</span></a>
+        <h2 class="text-base font-semibold min-w-[10rem] text-center">@monthTitle</h2>
+        <a href="?month=@Model.NextKey" class="desk-btn desk-btn-outline desk-btn-icon" aria-label="Next month"><span aria-hidden="true">→</span></a>
+        <a href="/admin/calendar" class="desk-btn desk-btn-outline">This month</a>
+    </nav>
+</div>
+
+<p class="text-xs text-muted-foreground mb-4" data-calendar-counts>
+    <span class="inline-block pl-2 @Tone(ContentCalendar.Kind.Published)">@published published</span>
+    <span class="inline-block pl-2 ml-3 @Tone(ContentCalendar.Kind.Scheduled)">@scheduled scheduled</span>
+    <span class="inline-block pl-2 ml-3 @Tone(ContentCalendar.Kind.Planned)">@planned planned</span>
+</p>
+
+@if (published + scheduled + planned == 0)
+{
+    <div class="desk-card mb-6">
+        @{
+            ViewData["EmptyTitle"] = $"Nothing published, scheduled or planned in {monthTitle}";
+            ViewData["EmptyHint"] = "To plan a post, give the draft a publish date in its editor and save it as a draft.";
+        }
+        <partial name="_EmptyState" />
+    </div>
+}
+
+@* ── Wide screens: the month grid ─────────────────────────────────────── *@
+<div class="hidden md:block desk-card overflow-hidden">
+    <div class="table-scroll"><table class="w-full table-fixed text-sm">
+        <caption class="sr-only">Posts by day, @monthTitle</caption>
+        <thead>
+            <tr class="border-b border-border text-xs text-muted-foreground">
+                @for (var i = 0; i < 7; i++)
+                {
+                    <th scope="col" class="px-2 py-2 font-medium text-left"><abbr title="@longDays[i]" class="no-underline">@shortDays[i]</abbr></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var week in Model.Weeks)
+            {
+                <tr class="border-b border-border/50 align-top">
+                    @foreach (var day in week)
+                    {
+                        <td class="h-28 px-2 py-1.5 border-r border-border/50 last:border-r-0 @(day.InMonth ? "" : "bg-muted/40 text-muted-foreground")">
+                            <div class="text-xs font-medium mb-1 @(day.IsToday ? "inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground" : "")"
+                                 @(day.IsToday ? Html.Raw("aria-current=\"date\"") : null)>@day.Date.Day</div>
+                            <ul class="space-y-1">
+                                @foreach (var e in day.Entries)
+                                {
+                                    <li>
+                                        <a href="/admin/posts/edit/@e.Id" class="block pl-1.5 py-0.5 rounded-sm text-xs leading-snug hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @Tone(e.Kind)">
+                                            <span class="block truncate text-foreground" title="@e.Title">@e.Title</span>
+                                            <span class="block text-[11px] text-muted-foreground">@Label(e.Kind) · @Dates.Wall(e.Local, DateStyle.Time)</span>
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table></div>
+</div>
+
+@* ── Phones: the same month as a list of days ─────────────────────────── *@
+<div class="md:hidden space-y-3">
+    @foreach (var day in Model.DaysWithEntries)
+    {
+        <section class="desk-card p-3" aria-label="@Dates.CalendarDate(day.Date.ToDateTime(TimeOnly.MinValue), DateStyle.LongWithWeekday)">
+            <h3 class="desk-section-title mb-2">@Dates.CalendarDate(day.Date.ToDateTime(TimeOnly.MinValue), DateStyle.LongWithWeekday)@(day.IsToday ? " · today" : "")</h3>
+            <ul class="space-y-1.5">
+                @foreach (var e in day.Entries)
+                {
+                    <li>
+                        <a href="/admin/posts/edit/@e.Id" class="block pl-2 py-1 rounded-sm text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @Tone(e.Kind)">
+                            <span class="block text-foreground">@e.Title</span>
+                            <span class="block text-[11px] text-muted-foreground">@Label(e.Kind) · @Dates.Wall(e.Local, DateStyle.Time)</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</div>

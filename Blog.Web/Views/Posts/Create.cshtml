@@ -1,6 +1,7 @@
 @model Blog.Core.Domain.Post
 @{
     Layout = "_AdminLayout";
+    ViewData["HideHeader"] = true; // the editor carries its own toolbar; the layout breadcrumb still names the page
     ViewData["Title"] = "New Post";
     var formAction = "/admin/posts/create";
     // Editorial workflow: without the publish permission the main button submits for review (the server enforces it too).
@@ -11,7 +12,7 @@
     var modalConfirmText = canPublish ? "Confirm Publish" : "Submit for review";
 }
 
-<div class="h-[calc(100vh-8rem)] flex flex-col">
+<div class="md:h-[calc(100vh-7.5rem)] flex flex-col">
     <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" />
@@ -19,7 +20,7 @@
         <input type="hidden" name="EditorMode" value="@Model.EditorMode" />
 
         <!-- Toolbar -->
-        <div class="flex items-center justify-between mb-4 gap-4">
+        <div class="flex items-center justify-between mb-3 gap-3 flex-wrap sm:flex-nowrap sticky top-14 md:static z-20 bg-background/95 backdrop-blur md:bg-transparent md:backdrop-blur-none -mx-4 px-4 py-2 md:mx-0 md:px-0 md:py-0 border-b border-border md:border-0">
             <div class="flex items-center gap-4">
                 <a href="/admin/posts" class="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 text-sm font-medium">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
@@ -30,13 +31,13 @@
                 <a href="/admin/posts/create?mode=@(Model.IsMarkdown ? "rich" : "markdown")" data-editor-switch class="hidden md:inline-flex px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
                     @(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")
                 </a>
-                <button type="submit" name="submitAction" value="draft" class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">
+                <button type="submit" name="submitAction" value="draft" class="desk-btn desk-btn-outline">
                     Save Draft
                 </button>
-                <span data-dirty-indicator hidden>Unsaved changes</span> <button type="button" id="publishBtn" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">
+                <span data-dirty-indicator hidden>Unsaved changes</span> <button type="button" id="publishBtn" class="desk-btn desk-btn-primary">
                     @publishLabel
                 </button>
-                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-2 border border-input rounded-md">
+                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden desk-btn desk-btn-outline desk-btn-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </button>
             </div>
@@ -463,18 +464,6 @@
 </script>
 
 
-<!-- Publish Modal -->
-<div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
-    <div class="bg-card w-full max-w-sm rounded-lg shadow-lg border border-border p-6 transform transition-all scale-100">
-        <h3 id="modalTitle" class="text-lg font-semibold mb-2">@modalTitleText</h3>
-        <p id="modalDesc" class="text-muted-foreground mb-6">@modalDescText</p>
-        <div class="flex justify-end gap-3">
-            <button type="button" onclick="document.getElementById('publishModal').classList.add('hidden')" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Cancel</button>
-            <button type="button" id="modalConfirmBtn" onclick="confirmPublish()" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Confirm Publish</button>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <partial name="_EditorSwitchGuard" />
     @if (Model.IsMarkdown)
@@ -600,25 +589,20 @@
         // Publish logic
         var publishBtn = document.getElementById('publishBtn');
         var scheduleInput = document.querySelector('input[name="ScheduledAt"]');
-        var modalTitle = document.getElementById('modalTitle');
-        var modalDesc = document.getElementById('modalDesc');
-        var modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        // Publish / schedule / submit confirmation goes through the shared Desk dialog (focus trap, Escape, both schemes).
+        var confirmCopy = { title: @Json.Serialize(modalTitleText), body: @Json.Serialize(modalDescText), action: @Json.Serialize(modalConfirmText) };
 
         function updatePublishButton() {
             if (@(canPublish ? "true" : "false") && scheduleInput && scheduleInput.value) {
                 var selectedDate = new Date(scheduleInput.value);
                 if (selectedDate > new Date()) {
                     if (publishBtn) publishBtn.innerText = 'Schedule';
-                    if (modalTitle) modalTitle.innerText = 'Ready to schedule?';
-                    if (modalDesc) modalDesc.innerText = 'This will schedule your post to be published automatically at the selected time.';
-                    if (modalConfirmBtn) modalConfirmBtn.innerText = 'Confirm Schedule';
+                    confirmCopy = { title: 'Ready to schedule?', body: 'The post goes live at the scheduled time and stays hidden until then.', action: 'Schedule post' };
                     return;
                 }
             }
             if (publishBtn) publishBtn.innerText = @Json.Serialize(publishLabel);
-            if (modalTitle) modalTitle.innerText = @Json.Serialize(modalTitleText);
-            if (modalDesc) modalDesc.innerText = @Json.Serialize(modalDescText);
-            if (modalConfirmBtn) modalConfirmBtn.innerText = @Json.Serialize(modalConfirmText);
+            confirmCopy = { title: @Json.Serialize(modalTitleText), body: @Json.Serialize(modalDescText), action: @Json.Serialize(modalConfirmText) };
         }
 
         if (scheduleInput) {
@@ -627,8 +611,8 @@
         }
 
         if (publishBtn) {
-            publishBtn.addEventListener('click', function() {
-                document.getElementById('publishModal').classList.remove('hidden');
+            publishBtn.addEventListener('click', function () {
+                InkwellDialog.confirm({ title: confirmCopy.title, body: confirmCopy.body, action: confirmCopy.action, tone: 'neutral' }).then(function (ok) { if (ok) window.confirmPublish(); });
             });
         }
 
@@ -636,10 +620,7 @@
              document.getElementById('postContent').value = quill.root.innerHTML;
              document.getElementById('postPlaintext').value = quill.getText();
              
-             if (modalConfirmBtn) {
-                 modalConfirmBtn.disabled = true;
-                 modalConfirmBtn.innerText = 'Publishing...';
-             }
+             if (publishBtn) { publishBtn.disabled = true; publishBtn.innerText = 'Publishing…'; }
              await uploadPendingImages();
 
              var form = document.getElementById('postForm');

@@ -119,6 +119,16 @@ public class ThreatScorerTests
     [InlineData("")]
     public void Everything_else_is_treated_as_an_ordinary_client(string userAgent) =>
         Assert.False(ThreatScorer.IsProtectedCrawler(userAgent));
+    [Fact]
+    public void An_api_401_is_not_scored_but_an_api_probe_and_a_desk_401_are()
+    {
+        // An expired API token answers 401 on every call; a retrying integration must not block itself (ADR-0033).
+        Assert.False(ThreatScorer.Score("/api/v1/posts/123", null, 401, isProtectedCrawler: false).IsThreat);
+        Assert.False(ThreatScorer.Score("/api/v1/auth/login", null, 401, isProtectedCrawler: false).IsThreat);
+        Assert.True(ThreatScorer.Score("/api/v1/posts", null, 403, isProtectedCrawler: false).IsThreat);
+        Assert.True(ThreatScorer.Score("/admin/settings", null, 401, isProtectedCrawler: false).IsThreat);
+        Assert.Equal(ThreatScorer.ProbeScore, ThreatScorer.Score("/api/v1/../../wp-login.php", null, 401, isProtectedCrawler: false).Score);
+    }
 }
 
 public class IpAllowlistTests

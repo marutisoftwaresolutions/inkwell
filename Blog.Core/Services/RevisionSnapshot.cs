@@ -23,8 +23,14 @@ public static class RevisionSnapshot
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? EditorMode = null,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? CustomFieldsJson = null);
 
-    /// <summary>A page's bag holds only its custom field values (ADR-0025); a page without any has no bag, as before.</summary>
-    private sealed record PageBag(string? CustomFieldsJson);
+    /// <summary>
+    /// A page's bag holds its custom field values (ADR-0025) and, for a Markdown page, its source and mode (ADR-0022).
+    /// A rich page without custom fields has no bag, as before.
+    /// </summary>
+    private sealed record PageBag(
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? CustomFieldsJson,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Markdown = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? EditorMode = null);
 
     public static Revision FromPost(Post post, string reason, Guid authorId, string? authorName) => new()
     {
@@ -52,7 +58,8 @@ public static class RevisionSnapshot
         Html = page.Content ?? string.Empty,
         MetaTitle = page.MetaTitle,
         MetaDescription = page.MetaDescription,
-        StructuredJson = page.CustomFieldsJson is null ? null : JsonSerializer.Serialize(new PageBag(page.CustomFieldsJson)),
+        StructuredJson = page.CustomFieldsJson is null && !page.IsMarkdown ? null
+            : JsonSerializer.Serialize(new PageBag(page.CustomFieldsJson, page.IsMarkdown ? page.Markdown : null, page.IsMarkdown ? EditorModes.Markdown : null)),
         Status = page.IsPublished ? "Published" : "Draft",
         Reason = reason,
         AuthorId = authorId,
@@ -98,13 +105,16 @@ public static class RevisionSnapshot
         page.Content = revision.Html;
         page.MetaTitle = revision.MetaTitle;
         page.MetaDescription = revision.MetaDescription;
-        if (string.IsNullOrWhiteSpace(revision.StructuredJson)) return;
-        try
+        PageBag? bag = null;
+        if (!string.IsNullOrWhiteSpace(revision.StructuredJson))
         {
-            var bag = JsonSerializer.Deserialize<PageBag>(revision.StructuredJson);
-            if (bag?.CustomFieldsJson is not null) page.CustomFieldsJson = bag.CustomFieldsJson;
+            try { bag = JsonSerializer.Deserialize<PageBag>(revision.StructuredJson); }
+            catch (JsonException) { }
         }
-        catch (JsonException) { }
+        // A revision without a mode was written by the rich editor, so restoring it returns the page to rich.
+        page.EditorMode = EditorModes.Normalize(bag?.EditorMode);
+        page.Markdown = page.IsMarkdown ? bag?.Markdown : null;
+        if (bag?.CustomFieldsJson is not null) page.CustomFieldsJson = bag.CustomFieldsJson;
     }
 
     private static StructuredBag ParseBag(string? json)

@@ -4,30 +4,28 @@
 @{
     var isNew = Model.Id == Guid.Empty;
     ViewData["Title"] = isNew ? "New Newsletter" : "Edit Newsletter";
+    ViewData["Description"] = "A draft until you send it. Save, check the preview and send yourself a test first.";
     Layout = "_AdminLayout";
     var posts = ViewBag.Posts as IReadOnlyList<Blog.Core.Domain.Post> ?? Array.Empty<Blog.Core.Domain.Post>();
     var chosen = Model.PostIdList;
     // Count only the chosen posts still shown: one unpublished meanwhile drops out and frees its place.
     var chosenShown = posts.Count(p => chosen.Contains(p.Id));
-    var inputCls = "w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    var inputCls = "desk-input";
     string? Err(string key) => ViewData.ModelState[key]?.Errors.FirstOrDefault()?.ErrorMessage;
 }
 
-<div class="max-w-5xl mx-auto space-y-6">
-    <form method="post" action="/admin/newsletter/save" data-track-changes class="space-y-6" x-data="{ picked: @chosenShown, max: @NewsletterService.MaxPosts, filter: '' }">
+@section PageActions {
+    <a href="/admin/newsletter" class="desk-btn desk-btn-outline">Back to newsletters</a>
+    <button type="submit" form="newsletterEditor" class="desk-btn desk-btn-primary">Save draft</button>
+}
+
+<div class="max-w-5xl space-y-6">
+    <form id="newsletterEditor" method="post" action="/admin/newsletter/save" data-track-changes class="space-y-6" x-data="{ picked: @chosenShown, max: @NewsletterService.MaxPosts, filter: '' }">
         @Html.AntiForgeryToken()
         @if (!isNew) { <input type="hidden" name="id" value="@Model.Id" /> }
 
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="min-w-0">
-                <a href="/admin/newsletter" class="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">← Newsletters</a>
-                <h1 class="text-xl font-semibold text-foreground mt-1">@(isNew ? "New newsletter" : "Edit newsletter")</h1>
-                <p class="text-sm text-muted-foreground">A draft until you send it. Save, check the preview and send yourself a test first.</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <span data-dirty-indicator hidden class="pill-warn text-xs px-2 py-0.5 rounded-full border">Unsaved changes</span>
-                <button type="submit" class="px-4 min-h-10 bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Save draft</button>
-            </div>
+        <div class="flex items-center gap-3 min-h-6">
+            <span data-dirty-indicator hidden class="desk-pill pill-warn">Unsaved changes</span>
         </div>
 
         <div asp-validation-summary="ModelOnly" class="text-sm text-destructive"></div>
@@ -35,33 +33,33 @@
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div class="space-y-5">
                 <div class="space-y-1">
-                    <label for="subject" class="text-sm font-medium text-foreground">Subject</label>
+                    <label for="subject" class="desk-label">Subject</label>
                     <input id="subject" name="subject" value="@Model.Subject" maxlength="@NewsletterAdminController.MaxSubjectLength" required class="@inputCls"
                            aria-invalid="@(Err("Subject") != null ? "true" : null)" aria-describedby="subject-help@(Err("Subject") != null ? " subject-error" : "")" />
-                    @if (Err("Subject") is { } se) { <p id="subject-error" class="text-xs text-destructive">@se</p> }
-                    <p id="subject-help" class="text-xs text-muted-foreground">Also the heading at the top of the email.</p>
+                    @if (Err("Subject") is { } se) { <p id="subject-error" class="desk-error">@se</p> }
+                    <p id="subject-help" class="desk-hint">Also the heading at the top of the email.</p>
                 </div>
                 <div class="space-y-1">
-                    <label for="preheader" class="text-sm font-medium text-foreground">Preview text <span class="text-muted-foreground font-normal">(optional)</span></label>
+                    <label for="preheader" class="desk-label">Preview text <span class="text-muted-foreground font-normal">(optional)</span></label>
                     <input id="preheader" name="preheader" value="@Model.Preheader" maxlength="@NewsletterAdminController.MaxPreheaderLength" class="@inputCls"
                            aria-invalid="@(Err("Preheader") != null ? "true" : null)" aria-describedby="preheader-help@(Err("Preheader") != null ? " preheader-error" : "")" />
-                    @if (Err("Preheader") is { } pe) { <p id="preheader-error" class="text-xs text-destructive">@pe</p> }
-                    <p id="preheader-help" class="text-xs text-muted-foreground">The line most inboxes show after the subject.</p>
+                    @if (Err("Preheader") is { } pe) { <p id="preheader-error" class="desk-error">@pe</p> }
+                    <p id="preheader-help" class="desk-hint">The line most inboxes show after the subject.</p>
                 </div>
                 <div class="space-y-1">
-                    <label for="introMarkdown" class="text-sm font-medium text-foreground">Introduction</label>
-                    <textarea id="introMarkdown" name="introMarkdown" rows="9" maxlength="@NewsletterAdminController.MaxIntroLength" class="@inputCls font-mono"
+                    <label for="introMarkdown" class="desk-label">Introduction</label>
+                    <textarea id="introMarkdown" name="introMarkdown" rows="9" maxlength="@NewsletterAdminController.MaxIntroLength" class="desk-textarea font-mono"
                               aria-invalid="@(Err("IntroMarkdown") != null ? "true" : null)" aria-describedby="intro-help@(Err("IntroMarkdown") != null ? " intro-error" : "")">@Model.IntroMarkdown</textarea>
-                    @if (Err("IntroMarkdown") is { } ie) { <p id="intro-error" class="text-xs text-destructive">@ie</p> }
-                    <p id="intro-help" class="text-xs text-muted-foreground">Markdown: **bold**, *italic*, [a link](/a-post), lists. Links to your own pages may start with /.</p>
+                    @if (Err("IntroMarkdown") is { } ie) { <p id="intro-error" class="desk-error">@ie</p> }
+                    <p id="intro-help" class="desk-hint">Markdown: **bold**, *italic*, [a link](/a-post), lists. Links to your own pages may start with /.</p>
                 </div>
             </div>
 
             <fieldset class="space-y-2" aria-describedby="posts-help@(Err("PostIds") != null ? " posts-error" : "")">
-                <legend class="text-sm font-medium text-foreground">Posts to feature</legend>
-                <p id="posts-help" class="text-xs text-muted-foreground">Up to @NewsletterService.MaxPosts, each as a card with its image, summary and a link; chosen posts are listed first, then the 60 latest. <span id="posts-count" x-text="picked + ' of ' + max + ' chosen' + (picked >= max ? ': untick one to choose another.' : '')" aria-live="polite"></span></p>
+                <legend class="desk-label">Posts to feature</legend>
+                <p id="posts-help" class="desk-hint">Up to @NewsletterService.MaxPosts, each as a card with its image, summary and a link; chosen posts are listed first, then the 60 latest. <span id="posts-count" x-text="picked + ' of ' + max + ' chosen' + (picked >= max ? ': untick one to choose another.' : '')" aria-live="polite"></span></p>
                 <input type="search" x-model="filter" placeholder="Filter by title" aria-label="Filter posts by title" class="@inputCls" />
-                @if (Err("PostIds") is { } poe) { <p id="posts-error" class="text-xs text-destructive">@poe</p> }
+                @if (Err("PostIds") is { } poe) { <p id="posts-error" class="desk-error">@poe</p> }
                 @if (posts.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No published posts yet. The newsletter can still be sent with just an introduction.</p>
@@ -72,7 +70,7 @@
                         var isChosen = chosen.Contains(p.Id);
                         <li x-show="!filter || $el.dataset.title.includes(filter.toLowerCase())" data-title="@p.Title.ToLowerInvariant()">
                             <label class="flex items-start gap-3 px-3 py-2 min-h-10 hover:bg-muted/40 cursor-pointer">
-                                <input type="checkbox" name="postIds" value="@p.Id" checked="@isChosen" class="mt-1 h-4 w-4 rounded border-border"
+                                <input type="checkbox" name="postIds" value="@p.Id" checked="@isChosen" class="desk-checkbox mt-1"
                                        @@click="if ($el.checked && picked >= max) $event.preventDefault()" @@change="picked += $event.target.checked ? 1 : -1"
                                        :aria-disabled="(!$el.checked && picked >= max) ? 'true' : null" aria-describedby="posts-count" />
                                 <span class="min-w-0">
@@ -91,7 +89,7 @@
     {
         <partial name="_NewsletterActions" model="Model" />
         <section aria-labelledby="preview-title" class="space-y-2">
-            <h2 id="preview-title" class="text-sm font-semibold text-foreground">Preview <span class="text-xs font-normal text-muted-foreground">(as last saved)</span></h2>
+            <h2 id="preview-title" class="desk-section-title">Preview <span class="text-xs font-normal text-muted-foreground">(as last saved)</span></h2>
             <iframe src="/admin/newsletter/@Model.Id/preview" title="Email preview" sandbox class="w-full h-[42rem] rounded-lg border border-border bg-white"></iframe>
         </section>
     }

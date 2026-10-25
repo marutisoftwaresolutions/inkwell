@@ -5,8 +5,8 @@
 
 @* MODERN (Professional) — sharp single bar, solid primary left border accent, no rounded, no gradients *@
 <header x-data="{ mobileOpen: false }"
-        class="sticky top-0 z-50 w-full border-b border-l-4"
-        style="background: var(--background); border-bottom-color: var(--border); border-left-color: var(--primary);">
+        class="sticky top-0 z-50 w-full border-b border-s-4"
+        style="background: var(--background); border-bottom-color: var(--border); border-inline-start-color: var(--primary);">
 
     <div class="container xl:max-w-6xl mx-auto px-4">
         <div class="flex items-center justify-between" style="height: 4rem;">
@@ -37,7 +37,7 @@
                 @* Pages dropdown *@
                 <div class="relative" x-data="{ pagesOpen: false }">
                     <button @@click="pagesOpen = !pagesOpen" @@click.outside="pagesOpen = false"
-                            class="w-10 h-10 flex items-center justify-center border-l hover:opacity-60 transition-opacity"
+                            class="w-10 h-10 flex items-center justify-center border-s hover:opacity-60 transition-opacity"
                             style="border-color: var(--border); color: var(--foreground);"
                             title="Pages">
                         <i class="bi bi-layout-text-sidebar text-base"></i>
@@ -50,7 +50,7 @@
                          x-transition:leave-start="opacity-100"
                          x-transition:leave-end="opacity-0"
                          style="display:none; background: var(--card); border-color: var(--border); border-top: 3px solid var(--primary);"
-                         class="absolute right-0 top-full min-w-52 border shadow-lg z-50">
+                         class="absolute end-0 top-full min-w-52 border shadow-lg z-50">
                         <a href="/" class="flex items-center gap-3 px-4 py-3.5 text-sm font-semibold hover:opacity-60 border-b" style="border-color: var(--border); color: var(--foreground);">
                             <i class="bi bi-house text-xs" style="color: var(--primary);"></i> Home
                         </a>
@@ -68,7 +68,7 @@
                 @if (User.Identity != null && User.Identity.IsAuthenticated)
                 {
                     <a href="/admin/dashboard"
-                       class="hidden md:flex items-center px-5 h-10 text-xs font-bold uppercase tracking-widest border-l hover:opacity-80 transition-opacity"
+                       class="hidden md:flex items-center px-5 h-10 text-xs font-bold uppercase tracking-widest border-s hover:opacity-80 transition-opacity"
                        style="border-color: var(--primary); background: var(--primary); color: var(--primary-foreground);">
                         Dashboard
                     </a>
@@ -76,7 +76,7 @@
 
                 @* Mobile *@
                 <button @@click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen" aria-label="Open menu"
-                        class="md:hidden w-10 h-10 flex items-center justify-center border-l"
+                        class="md:hidden w-10 h-10 flex items-center justify-center border-s"
                         style="border-color: var(--border); color: var(--foreground);">
                     <i class="bi bi-list text-xl" aria-hidden="true"></i>
                 </button>

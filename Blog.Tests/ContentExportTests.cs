@@ -332,7 +332,9 @@ public class ContentExportTests
         Assert.Contains("[Authorize(Policy = \"AdminOnly\")]", src);
         Assert.Matches(new Regex(@"\[HttpPost\(""download""\)\]\s*\[ValidateAntiForgeryToken\]"), src);
         foreach (var a in new[] { "ExportStarted", "ExportCompleted", "ExportFailed" }) Assert.Contains("AuditActions." + a, src);
-        Assert.Equal(2, Regex.Matches(src, @"if \(_tenant\.IsCloudMode\) return NotFound\(\);").Count);
+        // Every action (download, and the push actions of ADR-0029) answers 404 in cloud mode.
+        Assert.Equal(Regex.Matches(src, @"public async Task<IActionResult> \w+\(").Count,
+            Regex.Matches(src, @"if \(_tenant\.IsCloudMode\) return NotFound\(\);").Count);
         var svc = RepoFile("Blog.Web", "Services", "Export", "ExportService.cs");
         Assert.Contains("FileOptions.DeleteOnClose", svc);
         Assert.Contains("App_Data", svc);

@@ -1,0 +1,154 @@
+@model Blog.Web.Controllers.PushStatusViewModel
+@using Blog.Core.Services.Export
+@using Blog.Core.Services.Export.Push
+@{
+    Layout = "_AdminLayout";
+    var p = Model.Push;
+    var wp = p.Target == ExportTarget.WordPress;
+    ViewData["Title"] = wp ? "Push to WordPress" : "Push to Ghost";
+    var pushError = TempData["PushError"] as string;
+    var pushField = TempData["PushField"] as string;
+    string Outcome(PushItemStatus s) => s switch
+    {
+        PushItemStatus.Created => "Created",
+        PushItemStatus.Updated => "Updated",
+        PushItemStatus.Skipped => "Skipped",
+        PushItemStatus.Failed => "Failed",
+        PushItemStatus.Cancelled => "Not sent",
+        _ => "Waiting",
+    };
+    string Pill(PushItemStatus s) => s switch
+    {
+        PushItemStatus.Created or PushItemStatus.Updated => "pill-ok",
+        PushItemStatus.Failed => "pill-bad",
+        PushItemStatus.Skipped or PushItemStatus.Cancelled => "pill-warn",
+        _ => "pill-info",
+    };
+    var policy = p.ConflictPolicy switch
+    {
+        PushConflictPolicy.Update => "replaced",
+        PushConflictPolicy.Duplicate => "added as a second copy",
+        _ => "left as they are",
+    };
+    ViewData["ListSearchPlaceholder"] = "Search titles and messages";
+    ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["show"] = Model.Show };
+}
+
+<div class="flex flex-col gap-6 max-w-4xl">
+    <div>
+        <p class="text-sm"><a href="/admin/export?target=@p.Target" class="underline text-muted-foreground">← Export</a></p>
+        <h2 class="text-lg font-semibold text-foreground mt-2">Push to <a href="@p.SiteUrl" class="underline" target="_blank" rel="noopener">@p.SiteUrl<span class="sr-only"> (opens in a new tab)</span></a></h2>
+        <p class="text-sm text-muted-foreground">
+            @(wp ? "WordPress" : "Ghost") · started @Dates.DateTime(p.StartedAt)@(p.StartedByName is null ? "" : $" by {p.StartedByName}")
+            · posts and pages already there are @policy
+            · drafts @(p.IncludeDrafts ? "included" : "not included") · pages @(p.IncludePages ? "included" : "not included")
+        </p>
+    </div>
+
+    <partial name="_PushProgress" model="Model" />
+
+    @if (p.Status == PushStatus.Paused)
+    {
+        <form method="post" action="/admin/export/push/@p.Id/resume" class="desk-card p-4 flex flex-col gap-3" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <h3 class="desk-card-title">Resume the push</h3>
+            <p class="desk-hint">The @(wp ? "application password" : "Admin API key") is never stored, so it is needed again. The push continues from the first item not yet sent.</p>
+            @if (pushError is not null && pushField is null or "pushSite")
+            {
+                <p class="rounded-lg border pill-bad px-4 py-3 text-sm" role="alert">@pushError</p>
+            }
+            @if (wp)
+            {
+                <div class="space-y-1">
+                    <label for="pushUser" class="desk-label">WordPress user name</label>
+                    <input id="pushUser" name="pushUser" value="@(TempData["PushUser"] as string)" required spellcheck="false" autofocus="@(pushField == "pushUser" ? "autofocus" : null)"
+                           aria-invalid="@(pushField == "pushUser" ? "true" : "false")" aria-describedby="@(pushField == "pushUser" ? "pushUser-error" : null)"
+                           class="desk-input max-w-md" />
+                    @if (pushField == "pushUser") { <p id="pushUser-error" class="desk-error">@pushError</p> }
+                </div>
+            }
+            <div class="space-y-1">
+                <label for="pushSecret" class="desk-label">@(wp ? "Application password" : "Admin API key")</label>
+                <input id="pushSecret" name="pushSecret" type="password" required autocomplete="new-password" spellcheck="false" autofocus="@(pushField == "pushSecret" ? "autofocus" : null)"
+                       aria-invalid="@(pushField == "pushSecret" ? "true" : "false")" aria-describedby="@(pushField == "pushSecret" ? "pushSecret-error" : null)"
+                       class="desk-input max-w-md" />
+                @if (pushField == "pushSecret") { <p id="pushSecret-error" class="desk-error">@pushError</p> }
+            </div>
+            <div><button type="submit" class="desk-btn desk-btn-primary">Check and resume</button></div>
+        </form>
+    }
+
+    @if (p.IsActive)
+    {
+        <form method="post" action="/admin/export/push/@p.Id/cancel"
+              data-confirm-title="Cancel this push?"
+              data-confirm-body="Nothing more is sent to @p.SiteUrl. Items already there stay; delete them on that site if you do not want them. Nothing on this site changes."
+              data-confirm-action="Cancel the push" data-confirm-cancel="Keep pushing" data-confirm-tone="warning">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="desk-btn desk-btn-outline">Cancel the push</button>
+        </form>
+    }
+
+    <section aria-labelledby="items-title" class="flex flex-col gap-3">
+        <h3 id="items-title" class="desk-card-title">Posts and pages</h3>
+        <nav aria-label="Filter by outcome" class="flex flex-wrap gap-2 text-sm">
+            @foreach (var (key, name) in new[] { ("", "All"), ("failed", "Failed"), ("skipped", "Skipped"), ("created", "Created"), ("updated", "Updated"), ("pending", "Waiting") })
+            {
+                var current = (Model.Show ?? "") == key;
+                <a href="/admin/export/push/@p.Id@(key == "" ? "" : "?show=" + key)" aria-current="@(current ? "page" : null)"
+                   class="px-3 min-h-10 inline-flex items-center rounded-md border @(current ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground hover:bg-muted")">@name</a>
+            }
+        </nav>
+        <partial name="_ListSearch" />
+        <div class="desk-card overflow-hidden">
+            <div class="table-scroll"><table class="desk-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Outcome</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Items.Count == 0)
+                    {
+                        <tr><td colspan="3" class="px-4 py-8 text-center text-muted-foreground">
+                            @(string.IsNullOrEmpty(ViewData[Blog.Web.Models.ListPaging.QueryKey] as string)
+                                ? Model.Show is null ? "This push has no posts or pages." : "No items with this outcome."
+                                : "No items match the search.")
+                            @if (!string.IsNullOrEmpty(ViewData[Blog.Web.Models.ListPaging.QueryKey] as string))
+                            {
+                                <a href="?@(Model.Show is null ? "" : "show=" + Model.Show)" class="underline">Clear the search</a>
+                            }
+                        </td></tr>
+                    }
+                    @foreach (var i in Model.Items)
+                    {
+                        <tr>
+                            <td class="align-top">
+                                <span class="text-foreground">@(string.IsNullOrWhiteSpace(i.Title) ? "(untitled)" : i.Title)</span>
+                                <span class="block text-xs text-muted-foreground">@(i.Kind == PushItemKind.Page ? "Page" : "Post")</span>
+                            </td>
+                            <td class="align-top"><span class="desk-pill @Pill(i.Status)">@Outcome(i.Status)</span></td>
+                            <td class="align-top text-xs text-muted-foreground min-w-[14rem]">
+                                @if (!string.IsNullOrWhiteSpace(i.RemoteUrl))
+                                {
+                                    <a href="@i.RemoteUrl" class="underline" target="_blank" rel="noopener">View on the site<span class="sr-only"> (opens in a new tab)</span></a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(i.Error))
+                                {
+                                    <span class="block">@i.Error</span>
+                                }
+                                @if (i.Status == PushItemStatus.Pending && i.Attempts > 0)
+                                {
+                                    <span class="block">Attempt @(i.Attempts + 1) of @PushRules.MaxAttempts is due @Dates.Time(i.NextAttemptAt).</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        </div>
+        <partial name="_ListPager" />
+    </section>
+</div>

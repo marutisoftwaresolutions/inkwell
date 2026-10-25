@@ -1,9 +1,11 @@
+using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Web.Models;
 using Blog.Web.Services;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text;
 
 namespace Blog.Web.Controllers;
@@ -15,12 +17,21 @@ public class AnalyticsController : Controller
     private readonly IPageViewRepository _pageViews;
     private readonly IUserRepository _users;
     private readonly ITenantContext _tenant;
+    private readonly IMemoryCache _cache;
+    private readonly ILogger<AnalyticsController> _logger;
 
-    public AnalyticsController(IPageViewRepository pageViews, IUserRepository users, ITenantContext tenant)
+    /// <summary>How long one report stays cached. Views arrive in batches anyway, so a few minutes of
+    /// staleness costs nothing, and switching tabs or exporting does not re-read the table.</summary>
+    private static readonly TimeSpan ReportCacheFor = TimeSpan.FromMinutes(5);
+
+    public AnalyticsController(IPageViewRepository pageViews, IUserRepository users, ITenantContext tenant,
+        IMemoryCache cache, ILogger<AnalyticsController> logger)
     {
         _pageViews = pageViews;
         _users = users;
         _tenant = tenant;
+        _cache = cache;
+        _logger = logger;
     }
 
     private Task<Guid> GetOwnerIdAsync()
@@ -51,7 +62,10 @@ public class AnalyticsController : Controller
         var ownerId = await GetOwnerIdAsync();
         var (dateFrom, dateTo, p) = ParseRange(period, from, to);
 
-        var (total, daily, sources, topPages, referrers, campaigns, countries, regions) = await LoadDataAsync(ownerId, dateFrom, dateTo);
+        var report = await TryLoadReportAsync(ownerId, dateFrom, dateTo, 20);
+        if (report is null)
+            TempData["Error"] = "Analytics could not be loaded in time. The figures below are empty; try again in a minute or pick a shorter period.";
+        var (total, daily, sources, topPages, referrers, campaigns, countries, regions) = Shape(report ?? new AnalyticsReport());
 
         var model = BuildViewModel(dateFrom, dateTo, p, total, daily, sources, topPages, referrers, campaigns, countries, regions);
         ViewData["Title"] = "Analytics";
@@ -63,7 +77,7 @@ public class AnalyticsController : Controller
     {
         var ownerId = await GetOwnerIdAsync();
         var (dateFrom, dateTo, p) = ParseRange(period, from, to);
-        var (total, daily, sources, topPages, referrers, campaigns, countries, regions) = await LoadDataAsync(ownerId, dateFrom, dateTo);
+        var (total, daily, sources, topPages, referrers, campaigns, countries, regions) = Shape(await LoadReportAsync(ownerId, dateFrom, dateTo, 20));
 
         using var wb = new XLWorkbook();
 
@@ -160,37 +174,33 @@ public class AnalyticsController : Controller
     {
         var ownerId = await GetOwnerIdAsync();
         var (dateFrom, dateTo, _) = ParseRange(period, from, to);
+        var report = await LoadReportAsync(ownerId, dateFrom, dateTo, 100);
         var sb = new StringBuilder();
 
         if (sheet == "sources")
         {
             sb.AppendLine("Source,Medium,Views");
-            var sources = await _pageViews.GetSourceBreakdownAsync(ownerId, dateFrom, dateTo);
-            foreach (var s in sources) sb.AppendLine($"\"{s.Source}\",\"{s.Medium}\",{s.Count}");
+            foreach (var s in report.Sources) sb.AppendLine($"\"{s.Source}\",\"{s.Medium}\",{s.Count}");
         }
         else if (sheet == "daily")
         {
             sb.AppendLine("Date,Views");
-            var daily = await _pageViews.GetDailyAsync(ownerId, dateFrom, dateTo);
-            foreach (var d in daily) sb.AppendLine($"{d.Date:yyyy-MM-dd},{d.Count}");
+            foreach (var d in report.Daily) sb.AppendLine($"{d.Date:yyyy-MM-dd},{d.Count}");
         }
         else if (sheet == "referrers")
         {
             sb.AppendLine("Referrer,Visits");
-            var refs = await _pageViews.GetTopReferrersAsync(ownerId, dateFrom, dateTo, 100);
-            foreach (var r in refs) sb.AppendLine($"\"{r.Referrer}\",{r.Count}");
+            foreach (var r in report.Referrers) sb.AppendLine($"\"{r.Referrer}\",{r.Count}");
         }
         else if (sheet == "countries")
         {
             sb.AppendLine("Country,Visits");
-            var ctry = await _pageViews.GetCountryBreakdownAsync(ownerId, dateFrom, dateTo, 100);
-            foreach (var c in ctry) sb.AppendLine($"\"{c.Country}\",{c.Count}");
+            foreach (var c in report.Countries) sb.AppendLine($"\"{c.Country}\",{c.Count}");
         }
         else // pages (default)
         {
             sb.AppendLine("Page,Views");
-            var pages = await _pageViews.GetTopPagesAsync(ownerId, dateFrom, dateTo, 100);
-            foreach (var pg in pages) sb.AppendLine($"\"{pg.Path}\",{pg.Views}");
+            foreach (var pg in report.TopPages) sb.AppendLine($"\"{pg.Path}\",{pg.Views}");
         }
 
         var fileName = $"analytics-{sheet}-{dateFrom:yyyy-MM-dd}.csv";
@@ -199,36 +209,47 @@ public class AnalyticsController : Controller
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<(int total,
+    /// <summary>One stored-procedure call per owner and window, cached briefly. A failure is never cached.</summary>
+    private Task<AnalyticsReport> LoadReportAsync(Guid ownerId, DateTime from, DateTime to, int top) =>
+        _cache.GetOrCreateAsync($"analytics:{ownerId:N}:{from:yyyyMMdd}:{to:yyyyMMdd}:{top}", entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = ReportCacheFor;
+            return _pageViews.GetReportAsync(ownerId, from, to, top);
+        })!;
+
+    /// <summary>
+    /// The page is optional (architecture rule: fail open): a slow or unreachable database shows an empty
+    /// report with a message instead of a server error. Exports keep throwing — an empty file would mislead.
+    /// </summary>
+    private async Task<AnalyticsReport?> TryLoadReportAsync(Guid ownerId, DateTime from, DateTime to, int top)
+    {
+        try { return await LoadReportAsync(ownerId, from, to, top); }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Analytics report failed for {From:yyyy-MM-dd}..{To:yyyy-MM-dd}.", from, to);
+            return null;
+        }
+    }
+
+    private static (int total,
         List<DailyViewCount> daily,
         List<SourceCount> sources,
         List<PageViewCount> topPages,
         List<ReferrerCount> referrers,
         List<CampaignCount> campaigns,
         List<CountryCount> countries,
-        List<RegionCount> regions)> LoadDataAsync(Guid ownerId, DateTime from, DateTime to)
+        List<RegionCount> regions) Shape(AnalyticsReport r)
     {
-        var totalTask     = _pageViews.GetTotalAsync(ownerId, from, to);
-        var dailyTask     = _pageViews.GetDailyAsync(ownerId, from, to);
-        var sourcesTask   = _pageViews.GetSourceBreakdownAsync(ownerId, from, to);
-        var pagesTask     = _pageViews.GetTopPagesAsync(ownerId, from, to, 20);
-        var referrersTask = _pageViews.GetTopReferrersAsync(ownerId, from, to, 20);
-        var campTask      = _pageViews.GetCampaignsAsync(ownerId, from, to);
-        var countryTask   = _pageViews.GetCountryBreakdownAsync(ownerId, from, to, 20);
-        var regionTask    = _pageViews.GetRegionBreakdownAsync(ownerId, from, to, 20);
-
-        await Task.WhenAll(totalTask, dailyTask, sourcesTask, pagesTask, referrersTask, campTask, countryTask, regionTask);
-
-        var daily     = dailyTask.Result.Select(d => new DailyViewCount(d.Date.ToString("yyyy-MM-dd"), d.Count)).ToList();
-        var sources   = sourcesTask.Result.Select(s => new SourceCount(
+        var daily     = r.Daily.Select(d => new DailyViewCount(d.Date.ToString("yyyy-MM-dd"), d.Count)).ToList();
+        var sources   = r.Sources.Select(s => new SourceCount(
             VisitSourceClassifier.GetDisplayLabel(s.Source, s.Medium), s.Source, s.Medium, s.Count)).ToList();
-        var pages     = pagesTask.Result.Select(p => new PageViewCount(p.Path, p.Views)).ToList();
-        var referrers = referrersTask.Result.Select(r => new ReferrerCount(r.Referrer, r.Count)).ToList();
-        var campaigns = campTask.Result.Select(c => new CampaignCount(c.Campaign, c.Count)).ToList();
-        var countries = countryTask.Result.Select(c => new CountryCount(c.Country, c.Count)).ToList();
-        var regions   = regionTask.Result.Select(r => new RegionCount(r.Region, r.Count)).ToList();
+        var pages     = r.TopPages.Select(p => new PageViewCount(p.Path, p.Views)).ToList();
+        var referrers = r.Referrers.Select(x => new ReferrerCount(x.Referrer, x.Count)).ToList();
+        var campaigns = r.Campaigns.Select(c => new CampaignCount(c.Campaign, c.Count)).ToList();
+        var countries = r.Countries.Select(c => new CountryCount(c.Country, c.Count)).ToList();
+        var regions   = r.Regions.Select(x => new RegionCount(x.Region, x.Count)).ToList();
 
-        return (totalTask.Result, daily, sources, pages, referrers, campaigns, countries, regions);
+        return (r.Total, daily, sources, pages, referrers, campaigns, countries, regions);
     }
 
     private static AnalyticsDashboardViewModel BuildViewModel(

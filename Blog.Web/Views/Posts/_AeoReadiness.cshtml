@@ -6,10 +6,10 @@
 
     var ring = result.Score switch
     {
-        >= 85 => "text-emerald-600",
-        >= 70 => "text-emerald-600",
-        >= 50 => "text-amber-600",
-        _     => "text-red-600"
+        >= 85 => "tone-ok",
+        >= 70 => "tone-ok",
+        >= 50 => "tone-warn",
+        _     => "tone-bad"
     };
 }
 
@@ -30,7 +30,7 @@
     }
     else
     {
-        <p class="text-[11px] text-emerald-700 mt-1">Every signal is complete.</p>
+        <p class="text-[11px] tone-ok mt-1">Every signal is complete.</p>
     }
 
     <div x-show="aeoOpen" x-transition class="pt-3 space-y-1.5">
@@ -42,7 +42,7 @@
         @foreach (var s in result.Signals)
         {
             <div class="flex items-start gap-2 text-xs">
-                <span class="mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 @(s.IsComplete ? "bg-emerald-500" : s.IsMissing ? "bg-red-400" : "bg-amber-400")"></span>
+                <span class="mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 @(s.IsComplete ? "bg-success" : s.IsMissing ? "bg-destructive" : "bg-warning")"></span>
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between gap-2">
                         <span class="text-foreground">@s.Name</span>

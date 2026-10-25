@@ -175,6 +175,7 @@ public class UsersController : Controller
 
         user.IsActive = !user.IsActive;
         await _users.UpdateAsync(user);
+        Blog.Web.Services.DeskSessionValidator.Forget(HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), userId);   // a disabled account is signed out on its next request
         await _audit.LogAsync(AuditActions.UserToggled, "User", userId.ToString(),
             user.DisplayName ?? user.Email,
             newValues: $"{{\"isActive\":{user.IsActive.ToString().ToLower()}}}");
@@ -218,6 +219,8 @@ public class UsersController : Controller
         }
 
         await _users.DeleteAsync(userId);
+
+        Blog.Web.Services.DeskSessionValidator.Forget(HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), userId);
         await _audit.LogAsync(AuditActions.UserDeleted, "User", userId.ToString(),
             targetUser.DisplayName ?? targetUser.Email);
         TempData["Success"] = $"{targetUser.DisplayName ?? targetUser.Email} has been deleted.";

@@ -5,9 +5,9 @@ namespace Blog.Tests;
 /// <summary>
 /// Docker deployment (2026-09-24), added after a GitHub issue reported that useinkwell.app/docs
 /// documented a Dockerfile and docker-compose.yml that had never existed in this repo. These are
-/// source/file-existence checks only — this sandbox has no `docker` CLI, so a real `docker build`
-/// and `docker compose up` smoke test still needs to run once, outside this environment, before the
-/// image is trusted. See the reverse-proxy rationale in Program.cs and docker-compose.yml.
+/// source/file-existence checks only — the dev machine has no `docker` CLI. The real `docker build`
+/// and `docker compose up` smoke test is `.github/workflows/docker.yml`; these checks never replace
+/// it. See the reverse-proxy rationale in Program.cs and docker-compose.yml.
 /// </summary>
 public class DockerDeploymentTests
 {
@@ -31,7 +31,40 @@ public class DockerDeploymentTests
         Assert.Contains("EXPOSE 8080", df);
         Assert.Contains("HEALTHCHECK", df);
         Assert.Contains("ENTRYPOINT [\"dotnet\", \"Blog.Web.dll\"]", df);
-        Assert.Contains("USER inkwell", df); // never runs as root
+        Assert.Contains("USER app", df); // never runs as root
+    }
+
+    [Fact]
+    public void Dockerfile_reuses_the_base_image_user_and_copies_every_build_input()
+    {
+        // 2026-10-25 GitHub report: the image never built. aspnet:10.0 already has `app` at UID 1654,
+        // so adding our own user at that UID failed; and Blog.Infrastructure embeds a file from
+        // ../DBScripts/, which the build stage never copied.
+        var df = Read("Dockerfile");
+        Assert.DoesNotContain("adduser", df);
+        Assert.DoesNotContain("useradd", df);
+        Assert.Contains("COPY DBScripts/ DBScripts/", df);
+        Assert.True(df.IndexOf("COPY DBScripts/", StringComparison.Ordinal) < df.IndexOf("RUN dotnet publish", StringComparison.Ordinal),
+            "DBScripts must be in the build stage before dotnet publish.");
+
+        // Any other out-of-project build input added later must be copied too.
+        var csproj = Read("Blog.Infrastructure/Blog.Infrastructure.csproj") + Read("Blog.Web/Blog.Web.csproj");
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(csproj, @"<(?:EmbeddedResource|Content|None) Include=""\.\.\\([^\\""]+)\\"))
+            Assert.Contains($"COPY {m.Groups[1].Value}/ {m.Groups[1].Value}/", df);
+    }
+
+    [Fact]
+    public void Compose_creates_and_seeds_the_database_before_the_app_starts()
+    {
+        // Same report: a new SQL Server container has no `blog` database, so the app could not
+        // connect and no schema was ever applied. db-init creates it and runs init.sql first.
+        var compose = Read("docker-compose.yml");
+        Assert.Contains("db-init:", compose);
+        Assert.Contains("CREATE DATABASE [blog]", compose);
+        Assert.Contains("-i /scripts/init.sql", compose);
+        Assert.Contains("-f 65001", compose); // sqlcmd encoding rule
+        Assert.Contains("condition: service_completed_successfully", compose);
+        Assert.Contains("Database=blog;", compose);
     }
 
     [Fact]

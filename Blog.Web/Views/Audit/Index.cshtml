@@ -5,15 +5,15 @@
 
 	var items = (IReadOnlyList<AuditLog>)ViewBag.Items;
 	var total = (int)ViewBag.Total;
-	var page = (int)ViewBag.Page;
-	var pageSize = (int)ViewBag.PageSize;
-	var totalPages = (int)ViewBag.TotalPages;
+
+	ViewData["Description"] = $"{total:N0} total entries. Admin-only and read-only: nothing here can be edited or removed.";
 
 	string? filterEntityType = ViewBag.FilterEntityType;
 	string? filterAction = ViewBag.FilterAction;
 	string? filterUserId = ViewBag.FilterUserId;
 	string? filterFrom = ViewBag.FilterFrom;
 	string? filterTo = ViewBag.FilterTo;
+	var filtered = filterEntityType != null || filterAction != null || filterUserId != null || filterFrom != null || filterTo != null;
 
 	var entityTypes = (string[])ViewBag.EntityTypes;
 	var allUsers = (List<(Guid Id, string Name)>)ViewBag.AllUsers;
@@ -33,29 +33,22 @@
 		var a when a.Contains("Published") => "pill-info",
 		var a when a.Contains("LoggedIn") => "pill-info",
 		var a when a.Contains("Failed") => "pill-warn",
-		var a when a.Contains("LoggedOut") => "bg-muted text-muted-foreground",
-		_ => "bg-muted text-muted-foreground"
+		_ => "desk-pill-muted"
 	};
 }
 
-<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-	<div>
-		<h2 class="text-lg font-semibold text-foreground">Audit Trail</h2>
-		<p class="text-xs text-muted-foreground mt-0.5">@total.ToString("N0") total entries — Admin-only, read-only</p>
-	</div>
-	<a href="/admin/audit/export/csv@Qs(1)"
-	   class="h-8 px-3 rounded bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:bg-primary/90">
-		<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+@section PageActions {
+	<a href="/admin/audit/export/csv@Qs(1)" class="desk-btn desk-btn-outline">
+		<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
 		Export CSV
 	</a>
-</div>
+}
 
 @* Filter bar *@
-<form method="get" class="flex flex-wrap gap-2 mb-5">
+<form method="get" class="flex flex-wrap items-center gap-2 mb-5">
 	<input type="hidden" name="page" value="1" />
 
-	<select name="entityType" aria-label="Filter by entity type"
-			class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+	<select name="entityType" aria-label="Filter by entity type" class="desk-select desk-select-sm w-auto">
 		<option value="">All types</option>
 		@foreach (var et in entityTypes)
 		{
@@ -63,11 +56,9 @@
 		}
 	</select>
 
-	<input type="text" name="action" value="@filterAction" placeholder="Action (e.g. Post.Published)" aria-label="Filter by action"
-		   class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-48" />
+	<input type="text" name="action" value="@filterAction" placeholder="Action (e.g. Post.Published)" aria-label="Filter by action" class="desk-input desk-input-sm w-48" />
 
-	<select name="userId" aria-label="Filter by user"
-			class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+	<select name="userId" aria-label="Filter by user" class="desk-select desk-select-sm w-auto">
 		<option value="">All users</option>
 		@foreach (var u in allUsers)
 		{
@@ -75,68 +66,65 @@
 		}
 	</select>
 
-	<input type="date" name="from" value="@filterFrom" aria-label="From date"
-		   class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-	<span class="flex items-center text-xs text-muted-foreground">to</span>
-	<input type="date" name="to" value="@filterTo" aria-label="To date"
-		   class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+	<input type="date" name="from" value="@filterFrom" aria-label="From date" class="desk-input desk-input-sm w-auto" />
+	<span class="text-xs text-muted-foreground">to</span>
+	<input type="date" name="to" value="@filterTo" aria-label="To date" class="desk-input desk-input-sm w-auto" />
 
-	<button type="submit"
-			class="h-8 px-3 rounded bg-primary text-primary-foreground text-xs font-medium">
-		Filter
-	</button>
-	<a href="/admin/audit"
-	   class="h-8 px-3 rounded border border-border bg-background text-xs text-muted-foreground flex items-center">Clear</a>
+	<button type="submit" class="desk-btn desk-btn-primary desk-btn-sm">Filter</button>
+	@if (filtered)
+	{
+		<a href="/admin/audit" class="desk-btn desk-btn-ghost desk-btn-sm">Clear</a>
+	}
 </form>
 
 @* Table *@
-<div class="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+<div class="desk-card overflow-hidden">
 	@if (items.Count == 0)
 	{
-		<div class="flex flex-col items-center justify-center py-16 text-center">
-			<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-muted-foreground mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-			<p class="text-sm text-muted-foreground">No audit entries match the current filters.</p>
-		</div>
+		ViewData["EmptyTitle"] = filtered ? "No audit entries match these filters" : "No audit entries yet";
+		ViewData["EmptyHint"] = filtered ? "Widen the date range or clear the filters to see every entry." : "Every create, update, delete and sign-in is recorded here as it happens.";
+		ViewData["EmptyIcon"] = "<path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\" /><polyline points=\"14 2 14 8 20 8\" />";
+		<partial name="_EmptyState" />
 	}
 	else
 	{
-		<div class="table-scroll"><table class="w-full text-xs">
-			<thead class="border-b border-border bg-muted/40">
+		<div class="table-scroll"><table class="desk-table desk-table-compact text-xs">
+			<thead>
 				<tr>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground whitespace-nowrap">Time (UTC)</th>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">User</th>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Action</th>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Entity</th>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">Name / ID</th>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground">IP</th>
-					<th class="px-4 py-2.5 text-left font-semibold text-muted-foreground"><span class="sr-only">Details</span></th>
+					<th>Time (UTC)</th>
+					<th>User</th>
+					<th>Action</th>
+					<th>Entity</th>
+					<th>Name / ID</th>
+					<th>IP</th>
+					<th><span class="sr-only">Details</span></th>
 				</tr>
 			</thead>
-			<tbody class="divide-y divide-border">
+			<tbody>
 				@foreach (var row in items)
 				{
 					var rowId = $"row-{row.Id}";
 					var hasDetail = row.OldValues != null || row.NewValues != null;
-					<tr class="hover:bg-muted/30 transition-colors">
-							<td class="px-4 py-2.5 text-muted-foreground whitespace-nowrap font-mono">
+					<tr>
+							<td class="text-muted-foreground whitespace-nowrap font-mono">
 								@Dates.DateTimeSeconds(row.CreatedAt)
 							</td>
-							<td class="px-4 py-2.5 font-medium text-foreground">@row.UserName</td>
-							<td class="px-4 py-2.5">
-								<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold @BadgeColor(row.Action)">
+							<td class="font-medium text-foreground">@row.UserName</td>
+							<td>
+								<span class="desk-pill @BadgeColor(row.Action)">
 									@row.Action
 								</span>
 							</td>
-							<td class="px-4 py-2.5 text-muted-foreground">@row.EntityType</td>
-							<td class="px-4 py-2.5 text-foreground truncate max-w-[200px]" title="@row.EntityName">
+							<td class="text-muted-foreground">@row.EntityType</td>
+							<td class="text-foreground truncate max-w-[200px]" title="@row.EntityName">
 								@(row.EntityName ?? row.EntityId ?? "—")
 							</td>
-							<td class="px-4 py-2.5 text-muted-foreground font-mono">@(row.IpAddress ?? "—")</td>
-							<td class="px-4 py-2.5 whitespace-nowrap">
+							<td class="text-muted-foreground font-mono">@(row.IpAddress ?? "—")</td>
+							<td class="whitespace-nowrap">
 								@if (hasDetail)
 								{
 									<button type="button" aria-expanded="false" aria-controls="@rowId" aria-label="Details for @row.Action @(row.EntityName ?? row.EntityId)"
-											class="h-6 px-2 rounded border border-input text-[10px] font-medium text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											class="desk-btn desk-btn-outline desk-btn-sm h-6 px-2 text-[10px]"
 											onclick="var r=document.getElementById('@rowId'); r.hidden=!r.hidden; this.setAttribute('aria-expanded', String(!r.hidden));">Details</button>
 								}
 							</td>
@@ -144,19 +132,19 @@
 						@if (hasDetail)
 						{
 							<tr id="@rowId" hidden class="bg-muted/20">
-								<td colspan="7" class="px-4 py-3">
+								<td colspan="7">
 									<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 										@if (row.OldValues != null)
 										{
 											<div>
-												<p class="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Before</p>
+												<p class="desk-section-title mb-1">Before</p>
 												<pre class="text-[10px] bg-background border border-border rounded p-2 overflow-auto max-h-32 text-foreground">@row.OldValues</pre>
 											</div>
 										}
 										@if (row.NewValues != null)
 										{
 											<div>
-												<p class="text-[10px] font-semibold text-muted-foreground uppercase mb-1">After</p>
+												<p class="desk-section-title mb-1">After</p>
 												<pre class="text-[10px] bg-background border border-border rounded p-2 overflow-auto max-h-32 text-foreground">@row.NewValues</pre>
 											</div>
 										}
@@ -170,30 +158,4 @@
 		}
 	</div>
 
-	@* Pagination *@
-	@if (totalPages > 1)
-	{
-		<div class="flex items-center justify-between mt-4">
-			<p class="text-xs text-muted-foreground">
-				Showing @((page - 1) * pageSize + 1)–@(Math.Min(page * pageSize, total)) of @total.ToString("N0")
-			</p>
-			<div class="flex gap-1">
-				@if (page > 1)
-				{
-					<a href="@Qs(page - 1)"
-					   class="h-8 px-3 rounded border border-border text-xs flex items-center hover:bg-muted">← Prev</a>
-				}
-				@for (int p2 = Math.Max(1, page - 2); p2 <= Math.Min(totalPages, page + 2); p2++)
-				{
-					var active = p2 == page;
-					<a href="@Qs(p2)"
-					   class="h-8 w-8 rounded border text-xs flex items-center justify-center @(active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")">@p2</a>
-				}
-				@if (page < totalPages)
-				{
-					<a href="@Qs(page + 1)"
-					   class="h-8 px-3 rounded border border-border text-xs flex items-center hover:bg-muted">Next →</a>
-				}
-			</div>
-		</div>
-	}
+	<partial name="_ListPager" />

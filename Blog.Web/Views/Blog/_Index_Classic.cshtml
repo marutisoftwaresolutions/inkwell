@@ -56,17 +56,17 @@
     {
         <!-- Hero -->
         <div class="relative pt-4 lg:pt-6 flex flex-col gap-4 lg:gap-6">
-            <div class="relative overflow-hidden w-full aspect-[1/1] sm:aspect-[3/2] md:aspect-[2/1] flex justify-center items-center" style="background: var(--muted);">
+            <div class="relative w-full aspect-[1/1] sm:aspect-[3/2] md:aspect-[2/1] flex justify-center items-center" style="background: var(--muted);">
                 @if (!string.IsNullOrEmpty(heroPost.FeatureImage))
                 {
                     <img src="@heroPost.FeatureImage" alt="@heroPost.Title" class="absolute w-full inset-x-0 bottom-0 object-cover h-full" fetchpriority="high" decoding="async" />
                 }
-                <!-- Card overlay -->
-                <div class="relative max-w-[80%] lg:max-w-[60%] md:min-w-[60%] aspect-[1/1] sm:aspect-[3/2] md:aspect-[2/1] p-4 sm:p-6 text-center" style="background: var(--background);">
-                    <div class="h-full flex flex-col items-center gap-2 sm:gap-3 overflow-hidden">
+                @* Card overlay — sized by its content, never clipped: a fixed aspect ratio cut long titles and hid the excerpt and Read More. The frame above keeps its ratio as a minimum and grows when the card needs more room. *@
+                <div class="relative my-8 max-w-[80%] lg:max-w-[60%] md:min-w-[60%] p-4 sm:p-6 text-center" style="background: var(--background);">
+                    <div class="flex flex-col items-center justify-center gap-2 sm:gap-3">
                         <span class="uppercase text-sm" style="color: var(--muted-foreground);">@Dates.Medium(heroPost.PublishedAt)</span>
                         <h1 class="text-2xl sm:text-3xl md:text-4xl font-medium">@heroPost.Title</h1>
-                        <p class="mb-2" style="color: var(--muted-foreground);">@(heroPost.MetaDescription ?? heroPost.Plaintext?.Substring(0, Math.Min(heroPost.Plaintext?.Length ?? 0, 200)))</p>
+                        <p class="mb-2 line-clamp-3" style="color: var(--muted-foreground);">@(heroPost.MetaDescription ?? heroPost.Plaintext?.Substring(0, Math.Min(heroPost.Plaintext?.Length ?? 0, 200)))</p>
                         <a href="/@heroPost.Slug" class="inline-flex py-2 px-4 border border-solid shadow-sm rounded hover:opacity-80" style="background: var(--muted); border-color: var(--border);">Read More</a>
                     </div>
                 </div>
@@ -169,7 +169,7 @@
                 <div class="mb-4 flex items-center gap-2">
                     <span class="text-sm" style="color: var(--muted-foreground);">Search results for:</span>
                     <span class="font-medium">"@searchTerm"</span>
-                    <a href="/" class="text-xs px-2 py-0.5 ml-2 border border-solid shadow-sm rounded hover:opacity-80" style="border-color: var(--border);">Clear</a>
+                    <a href="/" class="text-xs px-2 py-0.5 ms-2 border border-solid shadow-sm rounded hover:opacity-80" style="border-color: var(--border);">Clear</a>
                 </div>
             }
 

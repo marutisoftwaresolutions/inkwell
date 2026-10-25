@@ -166,6 +166,8 @@ public class DeskUxSourceTests
         Assert.Contains("id=\"desk-busy\"", layout);
         Assert.Contains("js/inkwell-desk.js", layout);
         Assert.True(File.Exists(Path.Combine(Root(), "Blog.Web", "wwwroot", "js", "inkwell-desk.js")));
+        // Validation toasts sit over the Save button; they clear once the person starts correcting the form.
+        Assert.Contains("querySelectorAll('.toast-model-error').forEach(t => t.remove())", File.ReadAllText(Path.Combine(Root(), "Blog.Web", "wwwroot", "js", "inkwell-desk.js")));
         var css = File.ReadAllText(Path.Combine(Root(), "Blog.Web", "wwwroot", "css", "admin.css"));
         Assert.Contains(".table-scroll", css);
         Assert.Contains("#desk-busy", css);

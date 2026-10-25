@@ -1,51 +1,52 @@
 @using System.Security.Claims
+@using Blog.Web.Models
 @model List<Blog.Core.Domain.User>
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "User Management";
+    ViewData["Title"] = "Users";
+    ViewData["Description"] = "Manage user accounts and assign roles.";
     var allRoles = (List<Blog.Core.Domain.Role>)ViewBag.AllRoles;
     var userRoles = (Dictionary<Guid, string>)ViewBag.UserRoles;
     var currentUserIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
     Guid.TryParse(currentUserIdStr, out var currentUserId);
     var isAdmin = User.IsInRole("Admin");
+    var listQuery = ViewData[ListPaging.QueryKey] as string;
 
     // Reading TempData consumes it, so the password panel renders exactly once and never on refresh.
     var invitePassword = TempData["InvitePassword"] as string;
     var inviteEmail = TempData["InviteEmail"] as string;
 }
 
-<div class="max-w-5xl mx-auto">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <p class="text-sm" style="color: var(--muted-foreground);">Manage user accounts and assign roles</p>
-        </div>
-        <a href="/admin/dashboard/seed" class="px-4 py-2 text-sm font-medium rounded-md hover:opacity-90 transition-opacity" style="background: var(--secondary); color: var(--secondary-foreground); border: 1px solid var(--border);">
-            Seed data
-        </a>
-    </div>
+@section PageActions {
+    @if (isAdmin)
+    {
+        <a href="#invite-user" class="desk-btn desk-btn-primary">Invite user</a>
+    }
+}
 
+<div class="max-w-5xl mx-auto">
     @if (!allRoles.Any())
     {
-        <div class="p-4 mb-6 rounded-lg border border-dashed" style="background: var(--muted); border-color: var(--border);">
-            <p class="text-sm font-medium" style="color: var(--destructive);">Roles and permissions are not seeded yet. <a href="/admin/dashboard/seed" class="underline font-bold">Seed roles and permissions</a> before assigning roles.</p>
+        <div class="rounded-lg border p-4 mb-6 pill-bad">
+            <p class="text-sm font-medium">Roles and permissions are not seeded yet. <a href="/admin/dashboard/seed" class="underline font-semibold">Seed roles and permissions</a> before assigning roles.</p>
         </div>
     }
 
     @if (!string.IsNullOrEmpty(invitePassword))
     {
     <!-- One-time password panel: rendered only on the redirect after a successful invite -->
-    <section id="invite-once" class="p-5 mb-6 border rounded-xl" role="status" aria-labelledby="invite-once-title" aria-describedby="invite-once-body" style="background: var(--card); border-color: var(--border);">
+    <section id="invite-once" class="desk-card p-5 mb-6" role="status" aria-labelledby="invite-once-title" aria-describedby="invite-once-body">
         <div class="flex items-start gap-3">
-            <div class="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0 text-amber-700 bg-amber-50" aria-hidden="true">!</div>
+            <div class="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0 pill-warn border" aria-hidden="true">!</div>
             <div class="flex-1 min-w-0">
-                <h3 id="invite-once-title" class="text-base font-semibold">Password for @inviteEmail</h3>
-                <p id="invite-once-body" class="text-sm mt-1" style="color: var(--muted-foreground);">Copy it now and pass it on securely. It is shown only this once and cannot be read back later; if it is lost, a new one has to be set. Nothing has been emailed.</p>
+                <h2 id="invite-once-title" class="desk-card-title">Password for @inviteEmail</h2>
+                <p id="invite-once-body" class="text-sm mt-1 text-muted-foreground">Copy it now and pass it on securely. It is shown only this once and cannot be read back later; if it is lost, a new one has to be set. Nothing has been emailed.</p>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                    <code id="invite-once-password" class="px-3 py-2 rounded-md border font-mono text-sm select-all" style="background: var(--muted); border-color: var(--border); color: var(--foreground);">@invitePassword</code>
-                    <button type="button" id="invite-once-copy" class="h-9 px-4 rounded-md text-sm font-medium transition-colors focus-visible:ring" style="background: var(--primary); color: var(--primary-foreground);">Copy password</button>
+                    <code id="invite-once-password" class="px-3 py-2 rounded-md border border-border bg-muted text-foreground font-mono text-sm select-all">@invitePassword</code>
+                    <button type="button" id="invite-once-copy" class="desk-btn desk-btn-primary">Copy password</button>
                 </div>
             </div>
-            <button type="button" id="invite-once-dismiss" aria-label="Dismiss password panel" class="p-1 rounded-md hover:opacity-80 focus-visible:ring" style="color: var(--muted-foreground);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button type="button" id="invite-once-dismiss" aria-label="Dismiss password panel" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
     </section>
     }
@@ -53,54 +54,73 @@
     @if (isAdmin)
     {
     <!-- Invite Author Form -->
-    <div class="p-5 mb-6 border rounded-xl" style="background: var(--card); border-color: var(--border);">
-        <h3 class="text-base font-semibold mb-3">Invite Author</h3>
-        <p class="text-xs mb-4" style="color: var(--muted-foreground);">Create an account for a new author. The password is shown to you once after the account is created; nothing is emailed.</p>
-        <form method="post" action="/admin/users/invite" class="flex flex-wrap items-end gap-3">
+    <div id="invite-user" class="desk-card mb-6 scroll-mt-16">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Invite author</h2>
+            <p class="desk-card-description">Create an account for a new author. The password is shown to you once after the account is created; nothing is emailed.</p>
+        </div>
+        <form method="post" action="/admin/users/invite" class="desk-card-body flex flex-wrap items-end gap-3">
             @Html.AntiForgeryToken()
             <div class="flex-1 min-w-[150px]">
-                <label for="invite-name" class="block text-xs font-medium mb-1">Display name *</label>
-                <input type="text" id="invite-name" name="displayName" autocomplete="off" placeholder="Jane Doe" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required />
+                <label for="invite-name" class="desk-label">Display name *</label>
+                <input type="text" id="invite-name" name="displayName" autocomplete="off" placeholder="Jane Doe" class="desk-input" required />
             </div>
             <div class="flex-1 min-w-[150px]">
-                <label for="invite-email" class="block text-xs font-medium mb-1">Email *</label>
-                <input type="email" id="invite-email" name="email" autocomplete="off" placeholder="jane@example.com" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1" style="background: var(--background); border-color: var(--border); color: var(--foreground);" required />
+                <label for="invite-email" class="desk-label">Email *</label>
+                <input type="email" id="invite-email" name="email" autocomplete="off" placeholder="jane@example.com" class="desk-input" required />
             </div>
             <div class="flex-1 min-w-[240px]">
-                <label for="invite-password" class="block text-xs font-medium mb-1">Password</label>
+                <label for="invite-password" class="desk-label">Password</label>
                 <div class="flex items-stretch gap-1">
-                    <input type="password" id="invite-password" name="password" autocomplete="new-password" minlength="8" placeholder="Leave blank to generate one" aria-describedby="invite-password-hint" class="w-full min-w-0 px-3 py-2 text-sm border rounded-md font-mono focus:outline-none focus:ring-1" style="background: var(--background); border-color: var(--border); color: var(--foreground);" />
-                    <button type="button" id="invite-password-toggle" aria-pressed="false" aria-label="Show password" aria-controls="invite-password" class="px-2 rounded-md border hover:opacity-80 transition-opacity focus-visible:ring shrink-0" style="border-color: var(--border); color: var(--muted-foreground);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                    <button type="button" id="invite-password-generate" class="px-3 text-xs font-medium rounded-md border hover:opacity-80 transition-opacity focus-visible:ring shrink-0" style="border-color: var(--border); color: var(--foreground);">Generate</button>
+                    <input type="password" id="invite-password" name="password" autocomplete="new-password" minlength="8" placeholder="Leave blank to generate one" aria-describedby="invite-password-hint" class="desk-input min-w-0 font-mono" />
+                    <button type="button" id="invite-password-toggle" aria-pressed="false" aria-label="Show password" aria-controls="invite-password" class="desk-btn desk-btn-outline desk-btn-icon shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                    <button type="button" id="invite-password-generate" class="desk-btn desk-btn-outline shrink-0">Generate</button>
                 </div>
-                <p id="invite-password-hint" class="text-xs mt-1" style="color: var(--muted-foreground);">At least 8 characters. Leave it blank and one is generated for you.</p>
+                <p id="invite-password-hint" class="desk-hint">At least 8 characters. Leave it blank and one is generated for you.</p>
             </div>
             <div class="min-w-[100px]">
-                <label for="invite-role" class="block text-xs font-medium mb-1">Role</label>
-                <select id="invite-role" name="roleName" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1" style="background: var(--background); border-color: var(--border); color: var(--foreground);">
+                <label for="invite-role" class="desk-label">Role</label>
+                <select id="invite-role" name="roleName" class="desk-select">
                     <option value="Author">Author</option>
                     <option value="Editor">Editor</option>
                     <option value="Contributor">Contributor</option>
                     <option value="Admin">Admin</option>
                 </select>
             </div>
-            <button type="submit" class="px-5 py-2 text-sm font-medium rounded-md hover:opacity-90 transition-opacity focus-visible:ring" style="background: var(--primary); color: var(--primary-foreground);">
+            <button type="submit" class="desk-btn desk-btn-primary">
                 Add user
             </button>
         </form>
     </div>
     }
 
-    <div class="border rounded-xl overflow-hidden" style="border-color: var(--border); background: var(--card);">
+    <div class="desk-card overflow-hidden">
         <partial name="_ListSearch" />
-<div class="table-scroll"><table class="w-full text-sm">
+        @if (Model.Count == 0)
+        {
+            if (!string.IsNullOrEmpty(listQuery))
+            {
+                ViewData["EmptyQuery"] = listQuery;
+                ViewData["EmptyClearHref"] = "/admin/users";
+            }
+            else
+            {
+                ViewData["EmptyTitle"] = "No other users yet.";
+                ViewData["EmptyHint"] = isAdmin ? "Invite an author above to give someone else access to the Desk." : "Accounts you create appear here.";
+                if (isAdmin) { ViewData["EmptyHref"] = "#invite-user"; ViewData["EmptyAction"] = "Invite user"; }
+            }
+            <partial name="_EmptyState" />
+        }
+        else
+        {
+<div class="table-scroll"><table class="desk-table">
             <thead>
-                <tr style="background: var(--muted);">
-                    <th class="text-left px-6 py-3 font-semibold" style="color: var(--muted-foreground);">User</th>
-                    <th class="text-left px-6 py-3 font-semibold" style="color: var(--muted-foreground);">Email</th>
-                    <th class="text-left px-6 py-3 font-semibold" style="color: var(--muted-foreground);">Role</th>
-                    <th class="text-left px-6 py-3 font-semibold" style="color: var(--muted-foreground);">Status</th>
-                    <th class="text-right px-6 py-3 font-semibold" style="color: var(--muted-foreground);">Actions</th>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -109,20 +129,20 @@
                     var currentRole = userRoles.ContainsKey(user.Id) ? userRoles[user.Id] : "None";
                     var displayName = user.DisplayName ?? user.Username ?? "This user";
                     var isSelf = user.Id == currentUserId;
-                    <tr class="border-t" style="border-color: var(--border);">
-                        <td class="px-6 py-4">
+                    <tr>
+                        <td>
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
                                     <img src="@(!string.IsNullOrEmpty(user.AvatarUrl) ? user.AvatarUrl : $"/avatar/{System.Net.WebUtility.UrlEncode(user.DisplayName ?? "U")}")" alt="" class="w-full h-full object-cover" loading="lazy" />
                                 </div>
                                 <div>
-                                    <p class="font-medium">@(user.DisplayName ?? user.Username ?? "Unknown") @if (isSelf) { <span class="text-xs font-normal" style="color: var(--muted-foreground);">(you)</span> }</p>
-                                    <p class="text-xs" style="color: var(--muted-foreground);">@("@")@(user.Username)</p>
+                                    <p class="font-medium">@(user.DisplayName ?? user.Username ?? "Unknown") @if (isSelf) { <span class="text-xs font-normal text-muted-foreground">(you)</span> }</p>
+                                    <p class="text-xs text-muted-foreground">@("@")@(user.Username)</p>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4" style="color: var(--muted-foreground);">@user.Email</td>
-                        <td class="px-6 py-4">
+                        <td class="text-muted-foreground">@user.Email</td>
+                        <td>
                             @if (isAdmin && allRoles.Any())
                             {
                                 @* No auto-submit: the role only changes after an explicit Change click and a confirmation
@@ -132,35 +152,35 @@
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="userId" value="@user.Id" />
                                     <label for="role-@user.Id" class="sr-only">Role for @displayName</label>
-                                    <select id="role-@user.Id" name="roleName" data-current="@currentRole" class="px-2 py-1 text-xs rounded-md border focus:outline-none focus:ring-1 focus:ring-primary" style="background: var(--background); border-color: var(--border); color: var(--foreground);">
+                                    <select id="role-@user.Id" name="roleName" data-current="@currentRole" class="desk-select desk-select-sm w-auto">
                                         @foreach (var role in allRoles)
                                         {
                                             <option value="@role.Name" data-description="@role.Description" selected="@(currentRole == role.Name)">@role.Name</option>
                                         }
                                     </select>
-                                    <button type="submit" disabled aria-label="Change role for @displayName" class="px-3 py-1 text-xs font-medium rounded-md border hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring" style="border-color: var(--border); color: var(--foreground);">Change</button>
+                                    <button type="submit" disabled aria-label="Change role for @displayName" class="desk-btn desk-btn-outline desk-btn-sm">Change</button>
                                 </form>
                             }
                             else
                             {
-                                <span class="px-2 py-1 text-xs rounded-full font-medium" style="background: var(--muted); color: var(--muted-foreground);">@currentRole</span>
+                                <span class="desk-pill desk-pill-muted">@currentRole</span>
                             }
                         </td>
-                        <td class="px-6 py-4">
+                        <td>
                             @if (user.IsActive)
                             {
-                                <span class="px-2 py-1 text-xs rounded-full font-medium border pill-ok">Active</span>
+                                <span class="desk-pill pill-ok">Active</span>
                             }
                             else
                             {
-                                <span class="px-2 py-1 text-xs rounded-full font-medium border pill-bad">Disabled</span>
+                                <span class="desk-pill pill-bad">Disabled</span>
                             }
                             @if (user.TwoFactorEnabled)
                             {
-                                <span class="ml-1 px-2 py-0.5 text-xs rounded-full border pill-ok" title="Signs in with an authenticator app code">2FA<span class="sr-only">: two-factor sign-in on</span></span>
+                                <span class="desk-pill pill-ok ml-1" title="Signs in with an authenticator app code">2FA<span class="sr-only">: two-factor sign-in on</span></span>
                             }
                         </td>
-                        <td class="px-6 py-4 text-right">
+                        <td class="text-right whitespace-nowrap">
                             @* Never offered on your own row: disabling yourself locks you out. The controller refuses it too. *@
                             @if (isAdmin && !isSelf)
                             {
@@ -168,7 +188,7 @@
                                 {
                                 <form method="post" action="/account/two-factor/reset/@user.Id" class="inline mr-2" data-confirm-title="Turn off two-factor sign-in for this user?" data-confirm-body="Use this when @displayName has lost their phone and their recovery codes. They sign in with a password only until they set it up again; if their role requires it, they are asked to at their next visit to the Desk." data-confirm-action="Turn off two-factor" data-confirm-tone="warning">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="px-3 min-h-10 text-xs rounded-md border hover:opacity-80 transition-opacity focus-visible:ring" style="border-color: var(--border); color: var(--muted-foreground);">Reset 2FA<span class="sr-only"> for @displayName</span></button>
+                                    <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm">Reset 2FA<span class="sr-only"> for @displayName</span></button>
                                 </form>
                                 }
                                 if (user.IsActive)
@@ -176,7 +196,7 @@
                                 <form method="post" action="/admin/users/toggle-active" class="inline" data-confirm-title="Disable this user?" data-confirm-body="@displayName is signed out and cannot sign in until re-enabled. Their posts, pages and comments stay." data-confirm-action="Disable user" data-confirm-tone="warning">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="userId" value="@user.Id" />
-                                    <button type="submit" aria-label="Disable @displayName" class="px-3 py-1 text-xs rounded-md border hover:opacity-80 transition-opacity focus-visible:ring" style="border-color: var(--border); color: var(--muted-foreground);">Disable</button>
+                                    <button type="submit" aria-label="Disable @displayName" class="desk-btn desk-btn-outline desk-btn-sm">Disable</button>
                                 </form>
                                 }
                                 else
@@ -184,7 +204,7 @@
                                 <form method="post" action="/admin/users/toggle-active" class="inline">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="userId" value="@user.Id" />
-                                    <button type="submit" aria-label="Enable @displayName" class="px-3 py-1 text-xs rounded-md border hover:opacity-80 transition-opacity focus-visible:ring" style="border-color: var(--border); color: var(--muted-foreground);">Enable</button>
+                                    <button type="submit" aria-label="Enable @displayName" class="desk-btn desk-btn-outline desk-btn-sm">Enable</button>
                                 </form>
                                 }
                             }
@@ -202,7 +222,7 @@
                                 <form method="post" action="/admin/users/delete" class="inline ml-2" data-confirm-title="Delete this user?" data-confirm-body="@displayName (@user.Email) loses access immediately and their profile is removed. This cannot be undone." data-confirm-action="Delete user" data-confirm-tone="danger">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="userId" value="@user.Id" />
-                                    <button type="submit" aria-label="Delete @displayName" class="px-3 py-1 text-xs rounded-md border hover:bg-red-50 transition-colors focus-visible:ring" style="border-color: var(--destructive); color: var(--destructive);">
+                                    <button type="submit" aria-label="Delete @displayName" class="desk-btn desk-btn-danger-outline desk-btn-sm">
                                         Delete
                                     </button>
                                 </form>
@@ -212,13 +232,22 @@
                 }
             </tbody>
         </table></div>
+        }
 <partial name="_ListPager" />
     </div>
 
-    <div class="mt-6 p-4 rounded-lg border border-dashed text-sm" style="background: var(--muted); border-color: var(--border); color: var(--muted-foreground);">
+    <div class="mt-6 rounded-lg border p-4 pill-info text-sm">
         <strong>Note:</strong> Blog visitors (consumers) can read posts and leave comments without any account. Roles only control access to the admin panel.
         After changing a user's role, they must <strong>log out and back in</strong> for the new permissions to take effect.
     </div>
+
+    <details class="mt-6 text-sm text-muted-foreground">
+        <summary class="cursor-pointer">Development helpers</summary>
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+            <span>Seeds the default roles, permissions and sample content on a fresh install. Not needed on a configured site.</span>
+            <a href="/admin/dashboard/seed" class="desk-btn desk-btn-outline desk-btn-sm">Seed data</a>
+        </div>
+    </details>
 </div>
 
 @section Scripts {

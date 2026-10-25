@@ -1,4 +1,6 @@
 @model Blog.Core.Domain.Page
+@inject Blog.Web.Services.Forms.FormEmbedRenderer FormEmbeds
+@inject Blog.Web.Services.ResponsiveImageStore Images
 @{
     Layout = "_PublicLayout";
     ViewData["Title"] = !string.IsNullOrEmpty(Model.MetaTitle) ? Model.MetaTitle : Model.Title;
@@ -8,6 +10,11 @@
     ViewData["SiteName"] = ViewBag.SiteName ?? "Blog";
     // The gallery lightbox script is sent only to pages that have a gallery.
     ViewData["HasGallery"] = Model.Content?.Contains("comp-gallery", StringComparison.Ordinal) == true;
+    // Form blocks become real forms here, with fresh tokens (ADR-0030); the stored page is not changed.
+    ViewData["HasForm"] = Blog.Web.Services.Forms.FormEmbedRenderer.HasForm(Model.Content);
+    if (ViewData["HasForm"] is true) Model.Content = await FormEmbeds.ExpandAsync(Model.Content, Context);
+    // Upload images in the body get srcset, sizes, width and height as the page is rendered (ADR-0032).
+    Model.Content = Blog.Core.Services.ResponsiveImages.EnhanceHtml(Model.Content, Images.Describe);
 
     // Canonical is emitted once by _PublicLayout from this value — do not emit a second <link> here.
     ViewData["Canonical"] = !string.IsNullOrEmpty(Model.CanonicalUrl)

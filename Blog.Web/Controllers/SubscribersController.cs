@@ -34,6 +34,10 @@ public class SubscribersController : Controller
         var confirmed = await _members.GetConfirmedCountAsync();
         ViewBag.ConfirmedCount = confirmed;
 
+        // Shared _ListPager partial; ?status= survives paging through ListSearchKeep (no search: the repository pages by status only).
+        Blog.Web.Models.ListPaging.Stash(this, Blog.Web.Models.PagingMeta.FromCounts(null, page, total, pageSize, items.Count));
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["status"] = status };
+
         ViewData["Title"] = "Subscribers";
         return View(items);
     }

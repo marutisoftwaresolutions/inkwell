@@ -8,7 +8,7 @@
 <div class="max-w-2xl flex flex-col gap-6">
     @if (required)
     {
-        <div class="rounded-md border pill-info px-4 py-3 text-sm" role="status">
+        <div class="rounded-lg border p-4 pill-info text-sm" role="status">
             This site requires two-factor sign-in for your role. Set it up to continue to the Desk.
         </div>
     }
@@ -18,8 +18,8 @@
     </p>
 
     <ol class="flex flex-col gap-6">
-        <li class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3">
-            <h2 class="text-sm font-semibold text-foreground">1. Scan this code with your app</h2>
+        <li class="desk-card p-5 flex flex-col gap-3">
+            <h2 class="desk-card-title">1. Scan this code with your app</h2>
             <div class="flex flex-wrap gap-6 items-start">
                 <div class="qr-box w-48 h-48 p-2 rounded border border-border" role="img" aria-label="QR code that adds this site to an authenticator app">@Html.Raw(Model.QrSvg)</div>
                 <div class="text-sm text-muted-foreground max-w-xs space-y-2">
@@ -29,27 +29,27 @@
                 </div>
             </div>
         </li>
-        <li class="bg-card rounded-lg border border-border p-4">
+        <li class="desk-card p-5">
             <form method="post" action="/account/two-factor/setup" class="flex flex-col gap-3">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="token" value="@Model.Token" />
                 <input type="hidden" name="required" value="@(required ? "true" : "false")" />
-                <h2 class="text-sm font-semibold text-foreground">2. Enter the code the app shows</h2>
+                <h2 class="desk-card-title">2. Enter the code the app shows</h2>
                 <div class="space-y-1">
-                    <label for="code" class="text-sm font-medium text-foreground">6-digit code</label>
+                    <label for="code" class="desk-label">6-digit code</label>
                     <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required autofocus="@(codeError is not null)"
                            aria-invalid="@(codeError is null ? "false" : "true")" aria-describedby="@(codeError is null ? null : "code-error")"
-                           class="block w-40 px-3 py-2 bg-background border border-input rounded-md text-lg tracking-widest font-mono" />
+                           class="desk-input w-40 text-lg tracking-widest font-mono" />
                     @if (codeError is not null)
                     {
-                        <p id="code-error" class="text-xs text-destructive">@codeError</p>
+                        <p id="code-error" class="desk-error">@codeError</p>
                     }
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button type="submit" class="px-4 min-h-10 bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Turn on two-factor sign-in</button>
+                    <button type="submit" class="desk-btn desk-btn-primary">Turn on two-factor sign-in</button>
                     @if (!required)
                     {
-                        <a href="/account/security" class="text-sm underline underline-offset-2">Cancel</a>
+                        <a href="/account/security" class="desk-btn desk-btn-ghost">Cancel</a>
                     }
                 </div>
             </form>

@@ -1,0 +1,35 @@
+@model Blog.Web.Models.KpiTile
+@*
+    One dashboard number with its context: label, value, an optional delta against the previous
+    period (tone follows the sign), an optional note, and a link to the screen that explains it.
+    Renders as a link when Href is set so the whole tile is the target (UI/UX rule 11).
+*@
+@{
+    var tag = string.IsNullOrEmpty(Model.Href) ? "div" : "a";
+    var deltaTone = Model.Delta is null ? "" : Model.Delta > 0 ? "tone-ok" : Model.Delta < 0 ? "tone-bad" : "text-muted-foreground";
+    var deltaText = Model.Delta is null ? null : Model.Delta > 0 ? $"+{Model.Delta:N0}" : Model.Delta.Value.ToString("N0");
+}
+<@tag class="desk-kpi" @(string.IsNullOrEmpty(Model.Href) ? "" : Html.Raw($"href=\"{Model.Href}\"")) @(string.IsNullOrEmpty(Model.Href) ? "" : Html.Raw($"aria-label=\"{Model.Label}: {Model.Value}\""))>
+    <div class="flex items-center justify-between gap-2">
+        <span class="desk-kpi-label">@Model.Label</span>
+        @if (!string.IsNullOrEmpty(Model.Icon))
+        {
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground shrink-0" aria-hidden="true">@Html.Raw(Model.Icon)</svg>
+        }
+    </div>
+    <span class="desk-kpi-value">@Model.Value</span>
+    @if (deltaText is not null || !string.IsNullOrEmpty(Model.Note))
+    {
+        <span class="flex items-center gap-2 text-xs text-muted-foreground">
+            @if (deltaText is not null)
+            {
+                <span class="desk-kpi-delta @deltaTone">
+                    @if (Model.Delta > 0) { <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg> }
+                    else if (Model.Delta < 0) { <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg> }
+                    @deltaText
+                </span>
+            }
+            @if (!string.IsNullOrEmpty(Model.Note)) { <span>@Model.Note</span> }
+        </span>
+    }
+</@tag>

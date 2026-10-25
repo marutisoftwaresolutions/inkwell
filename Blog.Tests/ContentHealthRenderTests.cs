@@ -75,7 +75,7 @@ public class ContentHealthRenderTests : IClassFixture<WebApplicationFactory<Prog
 
         Assert.Contains("Published", html);
         Assert.Contains("Review overdue", html);
-        Assert.Contains("No Key Facts", html);
+        Assert.Contains("No key facts", html);
         Assert.Contains("Stale year in title", html);
         _out.WriteLine($"rendered {html.Length} bytes");
     }

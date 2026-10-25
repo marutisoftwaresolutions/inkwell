@@ -27,6 +27,7 @@ public class BlogController : Controller
     private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
     private readonly ILogger<BlogController> _log;
     private readonly Blog.Web.Services.PreviewLinkService _previewLinks;
+    private readonly Microsoft.AspNetCore.Antiforgery.IAntiforgery _antiforgery;
 
     public BlogController(IPostRepository posts, IPageRepository pages, ICategoryRepository categories,
         ITagRepository tags, ISeriesRepository series, ICommentRepository comments, ISettingRepository settings,
@@ -36,8 +37,10 @@ public class BlogController : Controller
         Blog.Web.Services.Security.IpFirewallService firewall,
         ILogger<BlogController> log,
         Blog.Web.Services.PreviewLinkService previewLinks,
-        Blog.Web.Services.Webhooks.WebhookPublisher webhooks)
+        Blog.Web.Services.Webhooks.WebhookPublisher webhooks,
+        Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery)
     {
+        _antiforgery = antiforgery;
         _webhooks = webhooks;
         _previewLinks = previewLinks;
         _commentToken = commentToken;
@@ -466,14 +469,8 @@ public class BlogController : Controller
             }
         }
         ViewBag.Comments = rootComments;
-        // Signed render-time token for the spam filter; the reply forms read it through ViewData.
-        try { ViewBag.CommentFormToken = _commentToken.Issue(post.Id); }
-        catch (Exception ex)
-        {
-            // A broken key ring must not take the page down; comments are rejected until it is fixed.
-            _log.LogError(ex, "Comment-form token could not be issued (Data Protection key ring?).");
-            ViewBag.CommentFormToken = string.Empty;
-        }
+        // No comment tokens here: the page is the same for every reader so it can be cached (ADR-0031).
+        // inkwell-comments.js fetches them from CommentToken; the respond page renders its own.
 
         var settingsId = _tenantContext.IsCloudMode ? ownerId : ownerId;
         ViewBag.OwnerId = settingsId;
@@ -492,7 +489,8 @@ public class BlogController : Controller
 
         // Conditional GET for anonymous readers and crawlers. The validators cover everything that
         // changes the markup — the post, its approved comments, the theme, the site settings and the
-        // deployed build — so a 304 only ever stands in for a byte-identical page. "Most read" is not
+        // deployed build. The one exception is responsive image copies (ADR-0032): a page cached before an image's copies
+        // existed is served without its srcset until the post changes; it is still correct, only heavier. "Most read" is not
         // counted here: the page-view beacon counts it (TrafficRecorder → PostViewTally, ADR-0014), so
         // a crawler, a script or a revalidation adds nothing, and both view figures mean the same.
 
@@ -557,41 +555,93 @@ public class BlogController : Controller
         return View(post);
     }
 
-    [HttpPost("{slug}/comment")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddComment(string slug, string authorName, string authorEmail, string content, Guid? parentId)
+    // ── Comments (ADR-0031) ─────────────────────────────────────────────────────
+    // A post page carries no tokens and reads no TempData, so it is the same for every reader and can be cached.
+    // inkwell-comments.js fetches the tokens from CommentToken and sends a comment as JSON; without JavaScript a
+    // comment posts normally and the respond page shows the outcome and keeps the draft.
+
+    /// <summary>The live post a comment belongs to, or null when the post is not public or comments are off.</summary>
+    private async Task<Blog.Core.Domain.Post?> CommentablePostAsync(string slug)
     {
         var post = await _posts.GetBySlugAsync(slug);
-        // Only a post readers can see takes comments: drafts and posts in review are not public.
-        if (post == null || !EditorialWorkflow.IsLive(post.Status, post.ScheduledAt, DateTime.UtcNow)) return NotFound();
+        if (post == null || !EditorialWorkflow.IsLive(post.Status, post.ScheduledAt, DateTime.UtcNow)) return null;
+        var settings = await _settings.GetSettingsAsync(await GetOwnerUserIdAsync(_users));
+        return settings.CommentsEnabled ? post : null;
+    }
 
-        // Every outcome lands the reader on the comments block, where the message and the form are,
-        // not at the top of the article. A rejected submission also carries the draft back so the
-        // reader does not retype it (Post.cshtml / _CommentThread.cshtml re-fill from TempData).
-        IActionResult BackToComments() =>
-            LocalRedirect((Url.Action("Post", new { slug }) ?? $"/{slug}") + "#comments");
-        void KeepDraft()
-        {
-            TempData["CommentDraftName"] = authorName ?? "";
-            TempData["CommentDraftEmail"] = authorEmail ?? "";
-            TempData["CommentDraftContent"] = content ?? "";
-            if (parentId.HasValue) TempData["CommentDraftParentId"] = parentId.Value.ToString();
-        }
+    /// <summary>Fresh comment tokens for one post: never cached, never indexed.</summary>
+    [HttpGet("{slug}/comment-token")]
+    public async Task<IActionResult> CommentToken(string slug)
+    {
+        var post = await CommentablePostAsync(slug);
+        if (post == null) return NotFound();
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Robots-Tag"] = "noindex";
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        return Json(new { request = tokens.RequestToken, form = _commentToken.Issue(post.Id) });
+    }
 
-        if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(authorEmail) || string.IsNullOrWhiteSpace(content))
+    /// <summary>The comment form on a page of its own, with fresh tokens: where a reader without JavaScript lands.</summary>
+    [HttpGet("{slug}/respond")]
+    public async Task<IActionResult> Respond(string slug, Guid? replyTo)
+    {
+        var post = await CommentablePostAsync(slug);
+        if (post == null) return NotFound();
+        return await RespondView(post, replyTo, null, false, "", "", "");
+    }
+
+    private async Task<IActionResult> RespondView(Blog.Core.Domain.Post post, Guid? parentId, string? message, bool sent,
+        string name, string email, string content, bool backdate = false, int status = 200, IReadOnlyList<string>? invalid = null)
+    {
+        Blog.Core.Domain.Comment? parent = null;
+        if (parentId is Guid pid)
         {
-            TempData["CommentError"] = "Name, email and comment are all needed.";
-            KeepDraft();
-            return BackToComments();
+            parent = await _comments.GetByIdAsync(pid);
+            if (parent?.PostId != post.Id) parent = null;
         }
+        Response.Headers.CacheControl = "no-store";
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        // After a submission that only failed the token check, the reader has already written the comment: the timing
+        // token counts from before this page so pressing the button once more is not mistaken for a bot.
+        var issued = backdate ? DateTime.UtcNow.AddSeconds(-(Blog.Core.Services.CommentSpamFilter.MinSecondsToWrite + 1)) : DateTime.UtcNow;
+        Response.StatusCode = status;
+        return View("Respond", new Blog.Web.Models.CommentRespondViewModel(post, parent, message, sent, name, email, content,
+            tokens.RequestToken ?? "", _commentToken.Issue(post.Id, issued), invalid));
+    }
+
+    [HttpPost("{slug}/comment")]
+    public async Task<IActionResult> AddComment(string slug, string authorName, string authorEmail, string content, Guid? parentId)
+    {
+        var post = await CommentablePostAsync(slug);
+        if (post == null) return NotFound();
+        var json = Request.Headers.XRequestedWith == "fetch";
+        authorName ??= ""; authorEmail ??= ""; content ??= "";
+
+        // JavaScript readers get JSON; everyone else gets the respond page, which keeps what they typed.
+        Task<IActionResult> Answer(string message, bool ok, int status = 200, bool expired = false, bool backdate = false) => json
+            ? Task.FromResult<IActionResult>(new JsonResult(new { ok, message, expired }) { StatusCode = status })
+            : RespondView(post, parentId, message, ok, ok ? "" : authorName, ok ? "" : authorEmail, ok ? "" : content, backdate, status);
+
+        // The anti-forgery check every form post gets, done here rather than by attribute so a page served from a cache
+        // (whose form had no token yet) loses nothing: the reader is shown the respond page with the draft.
+        if (!await _antiforgery.IsRequestValidAsync(HttpContext))
+            return await Answer(json ? "This comment form has expired. Press the button again to send it."
+                                     : "Your comment has not been sent yet. Check it below and press the button to send it.",
+                false, json ? 400 : 200, expired: true, backdate: true);
+
+        var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(authorName)) missing.Add("authorName");
+        if (string.IsNullOrWhiteSpace(authorEmail)) missing.Add("authorEmail");
+        if (string.IsNullOrWhiteSpace(content)) missing.Add("content");
+        // The respond page's new token is backdated: the reader has already written the comment, so fixing a field and
+        // pressing Post within the minimum writing time must not read as a bot (the same reason as the anti-forgery case).
+        if (missing.Count > 0)
+            return json ? await Answer("Name, email and comment are all needed.", false, 400)
+                        : await RespondView(post, parentId, "Name, email and comment are all needed.", false, authorName, authorEmail, content, backdate: true, 400, missing);
 
         var captchaToken = Request.Form["g-recaptcha-response"].ToString();
         if (!await _recaptcha.ValidateAsync(captchaToken))
-        {
-            TempData["CommentError"] = "The reCAPTCHA check did not pass. Please try again.";
-            KeepDraft();
-            return BackToComments();
-        }
+            return await Answer("The reCAPTCHA check did not pass. Please try again.", false, 400, backdate: true);
 
         var ownerId = await GetOwnerUserIdAsync(_users);
         var moderation = (await _settings.GetSettingsAsync(ownerId)).CommentsModeration;
@@ -623,17 +673,14 @@ public class BlogController : Controller
             {
                 case Blog.Core.Services.CommentSpamAction.AskToRetry:
                     _log.LogInformation("Comment on {Slug} needs a fresh form: {Reason}", slug, verdict.Reason);
-                    TempData["CommentError"] = "This comment form has expired. Please reload the page and try again.";
-                    KeepDraft();
-                    return BackToComments();
+                    return await Answer("This comment form has expired. Press the button again to send it.", false, 400, expired: true, backdate: true);
 
                 case Blog.Core.Services.CommentSpamAction.RejectSilently:
                     // Nothing is stored. The reply is identical to a moderated submission's so the
                     // sender cannot tell which rule fired; the firewall learns about it instead.
                     _log.LogInformation("Comment on {Slug} discarded as spam: {Reason}", slug, verdict.Reason);
                     await _firewall.RegisterCommentSpamAsync(HttpContext, verdict.Reason);
-                    TempData["CommentSuccess"] = "Your comment is awaiting moderation.";
-                    return BackToComments();
+                    return await Answer("Your comment is awaiting moderation.", true);
             }
         }
 
@@ -650,10 +697,7 @@ public class BlogController : Controller
 
         await _comments.CreateAsync(comment);
         await _webhooks.CommentCreatedAsync(HttpContext, comment, post);
-        TempData["CommentSuccess"] = moderation
-            ? "Your comment is awaiting moderation."
-            : "Comment posted.";
-        return BackToComments();
+        return await Answer(moderation ? "Your comment is awaiting moderation." : "Comment posted.", true);
     }
 
     [HttpGet("feed")]

@@ -2,37 +2,33 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Your Profile";
+    ViewData["Description"] = "Manage your account information and preferences.";
 }
 
 <div class="max-w-3xl">
-    <div class="mb-6">
-        <h2 class="text-lg font-semibold text-foreground">Profile Settings</h2>
-        <p class="text-sm text-muted-foreground">Manage your account information and preferences.</p>
-    </div>
-
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+    <div class="mb-6 desk-card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <p class="text-sm text-foreground">
             Two-factor sign-in is <strong>@(Model.TwoFactorEnabled ? "on" : "off")</strong> for your account.
         </p>
-        <a href="/account/security" class="px-3 min-h-10 inline-flex items-center rounded-md border border-input text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+        <a href="/account/security" class="desk-btn desk-btn-outline">
             @(Model.TwoFactorEnabled ? "Manage two-factor sign-in" : "Set up two-factor sign-in")
         </a>
     </div>
 
     @if (!string.IsNullOrEmpty(ViewBag.Error as string))
     {
-        <p id="form-error" role="alert" class="mb-6 p-3 rounded-md border border-destructive text-destructive text-sm">@ViewBag.Error</p>
+        <p id="form-error" role="alert" class="mb-6 rounded-lg border p-3 pill-bad text-sm">@ViewBag.Error</p>
     }
 
     <form method="post" enctype="multipart/form-data" data-track-changes class="space-y-6">
         @Html.AntiForgeryToken()
 
-        <div class="bg-card shadow-sm border border-border rounded-lg overflow-hidden">
+        <div class="desk-card overflow-hidden">
             <div class="p-6 space-y-6">
                 <!-- Avatar Section -->
                 <div class="flex flex-col sm:flex-row gap-6">
                     <div class="flex-shrink-0">
-                        <p class="block text-sm font-medium text-foreground mb-2">Profile picture</p>
+                        <p class="desk-label">Profile picture</p>
                         <div class="relative inline-block">
                             <div class="relative w-24 h-24 rounded-full overflow-hidden bg-muted border border-border">
                                 @if (!string.IsNullOrEmpty(Model.AvatarUrl))
@@ -42,12 +38,12 @@
                                 else
                                 {
                                     <div class="flex items-center justify-center w-full h-full text-muted-foreground">
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                        <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                     </div>
                                 }
                             </div>
                             <button type="button" id="removeAvatarBtn" onclick="removeAvatarImage()" class="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "hidden" : "") absolute top-0 right-0 bg-background text-destructive rounded-full p-1 border border-border shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors opacity-80 hover:opacity-100" aria-label="Remove profile photo" title="Remove profile photo">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
                             </button>
                         </div>
                     </div>
@@ -56,17 +52,17 @@
                         <div>
                             <input type="hidden" id="avatarUrlInput" name="avatarUrl" value="@Model.AvatarUrl" />
                             <input type="hidden" id="removeAvatarInput" name="removeAvatar" value="false" />
-                            <label for="avatarFileInput" class="block text-sm font-medium text-foreground mb-2">Upload profile photo</label>
+                            <label for="avatarFileInput" class="desk-label">Upload profile photo</label>
                             <input type="file" name="avatarFile" id="avatarFileInput" accept="image/*" class="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-colors focus:outline-none" />
                         </div>
                         
                         <div class="pt-4 border-t border-border">
-                            <p class="block text-sm font-medium text-foreground mb-2">Or choose a generated avatar</p>
+                            <p class="desk-label">Or choose a generated avatar</p>
                             <div id="avatarGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
                                 <!-- Populated by JS -->
                             </div>
-                            <button type="button" onclick="generateAvatars()" class="mt-3 text-xs text-primary hover:underline flex items-center gap-1">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
+                            <button type="button" onclick="generateAvatars()" class="desk-btn desk-btn-link desk-btn-sm mt-3">
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
                                 Generate new options
                             </button>
                         </div>
@@ -152,73 +148,73 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Display Name -->
                     <div class="col-span-2 sm:col-span-1">
-                        <label for="displayName" class="block text-sm font-medium text-foreground mb-1">Display name <span class="text-destructive">*</span></label>
-                        <input type="text" name="displayName" id="displayName" value="@Model.DisplayName" required aria-describedby="@(string.IsNullOrEmpty(ViewBag.Error as string) ? null : "form-error")" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
-                        <p class="text-xs text-muted-foreground mt-1">This name will be displayed publicly on your posts.</p>
+                        <label for="displayName" class="desk-label">Display name <span class="text-destructive">*</span></label>
+                        <input type="text" name="displayName" id="displayName" value="@Model.DisplayName" required aria-describedby="@(string.IsNullOrEmpty(ViewBag.Error as string) ? null : "form-error")" class="desk-input" />
+                        <p class="desk-hint">This name will be displayed publicly on your posts.</p>
                     </div>
 
                     <!-- Email -->
                     <div class="col-span-2 sm:col-span-1">
-                        <label for="email" class="block text-sm font-medium text-foreground mb-1">Email address <span class="text-destructive">*</span></label>
-                        <input type="email" name="email" id="email" value="@Model.Email" required class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                        <label for="email" class="desk-label">Email address <span class="text-destructive">*</span></label>
+                        <input type="email" name="email" id="email" value="@Model.Email" required class="desk-input" />
                     </div>
 
                     <!-- Author page slug -->
                     <div class="col-span-2">
-                        <label for="slug" class="block text-sm font-medium text-foreground mb-1">Author page URL</label>
+                        <label for="slug" class="desk-label">Author page URL</label>
                         <div class="relative">
                             <span class="absolute left-3 top-2 text-muted-foreground text-sm">/author/</span>
-                            <input type="text" name="slug" id="slug" value="@Model.Slug" placeholder="auto-generated from your name" class="w-full pl-16 px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                            <input type="text" name="slug" id="slug" value="@Model.Slug" placeholder="auto-generated from your name" class="desk-input pl-16" />
                         </div>
-                        <p class="text-xs text-muted-foreground mt-1">Your public author page (E-E-A-T). Leave blank to auto-generate; letters, numbers and hyphens only.</p>
+                        <p class="desk-hint">Your public author page (E-E-A-T). Leave blank to auto-generate; letters, numbers and hyphens only.</p>
                     </div>
 
                     <!-- Website -->
                     <div class="col-span-2">
-                        <label for="website" class="block text-sm font-medium text-foreground mb-1">Website URL</label>
+                        <label for="website" class="desk-label">Website URL</label>
                         <div class="relative">
                             <span class="absolute left-3 top-2 text-muted-foreground text-sm">https://</span>
-                            <input type="text" name="website" id="website" value="@(Model.Website?.Replace("https://","").Replace("http://",""))" class="w-full pl-16 px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                            <input type="text" name="website" id="website" value="@(Model.Website?.Replace("https://","").Replace("http://",""))" class="desk-input pl-16" />
                         </div>
                     </div>
 
                     <!-- Bio -->
                     <div class="col-span-2">
-                        <label for="bio" class="block text-sm font-medium text-foreground mb-1">Bio</label>
-                        <textarea name="bio" id="bio" rows="4" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input">@Model.Bio</textarea>
-                        <p class="text-xs text-muted-foreground mt-1">Brief description for your author profile.</p>
+                        <label for="bio" class="desk-label">Bio</label>
+                        <textarea name="bio" id="bio" rows="4" class="desk-textarea">@Model.Bio</textarea>
+                        <p class="desk-hint">Brief description for your author profile.</p>
                     </div>
                 </div>
 
                 <div class="pt-6 border-t border-border">
-                    <h3 class="text-base font-medium text-foreground mb-1">Professional Credentials</h3>
-                    <p class="text-xs text-muted-foreground mb-4">Displayed on your post bylines and in search engine author schema. Helps establish E-E-A-T authority for health content.</p>
+                    <h3 class="desk-card-title mb-1">Professional credentials</h3>
+                    <p class="desk-card-description mb-4">Displayed on your post bylines and in search engine author schema. Helps establish E-E-A-T authority for health content.</p>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                            <label for="credentials" class="block text-sm font-medium text-foreground mb-1">Credentials / degrees</label>
-                            <input type="text" name="credentials" id="credentials" value="@Model.Credentials" placeholder="e.g. OD, FAAO, PhD" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
-                            <p class="text-xs text-muted-foreground mt-1">Abbreviations shown after your name.</p>
+                            <label for="credentials" class="desk-label">Credentials / degrees</label>
+                            <input type="text" name="credentials" id="credentials" value="@Model.Credentials" placeholder="e.g. OD, FAAO, PhD" class="desk-input" />
+                            <p class="desk-hint">Abbreviations shown after your name.</p>
                         </div>
                         <div>
-                            <label for="specialty" class="block text-sm font-medium text-foreground mb-1">Specialty</label>
-                            <input type="text" name="specialty" id="specialty" value="@Model.Specialty" placeholder="e.g. Pediatric Optometry" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
-                            <p class="text-xs text-muted-foreground mt-1">Your clinical or professional area.</p>
+                            <label for="specialty" class="desk-label">Specialty</label>
+                            <input type="text" name="specialty" id="specialty" value="@Model.Specialty" placeholder="e.g. Pediatric Optometry" class="desk-input" />
+                            <p class="desk-hint">Your clinical or professional area.</p>
                         </div>
                         <div>
-                            <label for="licenseNumber" class="block text-sm font-medium text-foreground mb-1">License number</label>
-                            <input type="text" name="licenseNumber" id="licenseNumber" value="@Model.LicenseNumber" placeholder="e.g. CA-OD-12345" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
-                            <p class="text-xs text-muted-foreground mt-1">Used in structured data only, not shown publicly.</p>
+                            <label for="licenseNumber" class="desk-label">License number</label>
+                            <input type="text" name="licenseNumber" id="licenseNumber" value="@Model.LicenseNumber" placeholder="e.g. CA-OD-12345" class="desk-input" />
+                            <p class="desk-hint">Used in structured data only, not shown publicly.</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="pt-6 border-t border-border">
-                    <h3 class="text-base font-medium text-foreground mb-4">Security</h3>
+                    <h3 class="desk-card-title mb-4">Security</h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="col-span-2 sm:col-span-1">
-                            <label for="newPassword" class="block text-sm font-medium text-foreground mb-1">New password</label>
-                            <input type="password" name="newPassword" id="newPassword" autocomplete="new-password" placeholder="Leave empty to keep current" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                            <label for="newPassword" class="desk-label">New password</label>
+                            <input type="password" name="newPassword" id="newPassword" autocomplete="new-password" placeholder="Leave empty to keep current" class="desk-input" />
                         </div>
                         <div class="col-span-2 sm:col-span-1">
                             <!-- Confirm password could go here -->
@@ -227,10 +223,10 @@
                 </div>
             </div>
             
-            <div class="bg-muted/50 px-6 py-4 border-t border-border flex items-center justify-end gap-3">
+            <div class="desk-card-footer justify-end bg-muted/50">
                 <span data-dirty-indicator hidden class="text-xs text-muted-foreground mr-auto">Unsaved changes</span>
-                <a href="/admin/dashboard" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Cancel</a>
-                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save changes</button>
+                <a href="/admin/dashboard" class="desk-btn desk-btn-outline">Cancel</a>
+                <button type="submit" class="desk-btn desk-btn-primary">Save changes</button>
             </div>
         </div>
     </form>

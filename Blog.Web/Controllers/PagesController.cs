@@ -54,10 +54,10 @@ public class PagesController : Controller
     }
 
     [HttpGet("create")]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Create(string? mode)
     {
         CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), new Dictionary<string, string>());
-        return View(new Page { IsPublished = true });
+        return View(new Page { IsPublished = true, EditorMode = EditorModes.Normalize(mode) });
     }
 
     private Task<IReadOnlyList<CustomFieldDefinition>> CustomFieldDefinitionsAsync() =>
@@ -112,6 +112,7 @@ public class PagesController : Controller
             }
 
             page.PublishedAt = page.IsPublished ? DateTime.UtcNow : null;
+            ApplyEditorMode(page, page.EditorMode);
             if (!await ApplyCustomFieldsAsync(page, cf, null)) return View(page);
             
             var id = await _pages.CreateAsync(page);
@@ -167,6 +168,10 @@ public class PagesController : Controller
             existing.Title = page.Title;
             existing.Slug = page.Slug;
             existing.Content = page.Content;
+            existing.Markdown = page.Markdown;
+            // A save keeps the stored mode; only SwitchEditorMode changes it.
+            ApplyEditorMode(existing, existing.EditorMode);
+            page.EditorMode = existing.EditorMode;
             existing.FeaturedImageId = page.FeaturedImageId;
             existing.ParentId = page.ParentId;
             existing.SortOrder = page.SortOrder;
@@ -211,6 +216,60 @@ public class PagesController : Controller
             TempData["Error"] = $"Failed to update page: {ex.Message}";
             return View(page);
         }
+    }
+
+    // Markdown authoring (ADR-0022, extended to pages in v1.0.9) ─────────────────────────────
+
+    /// <summary>The editor's preview: the same renderer the save uses, so the preview is what readers get.</summary>
+    [HttpPost("markdown-preview")]
+    [ValidateAntiForgeryToken]
+    public IActionResult MarkdownPreview([FromForm] string? markdown) =>
+        Content(MarkdownRenderer.ToHtml(markdown), "text/html; charset=utf-8");
+
+    /// <summary>
+    /// Switches a saved page between the visual editor and Markdown, exactly as for posts: visual → Markdown
+    /// keeps the HTML as the Markdown source (refused when that would change how the page looks); Markdown →
+    /// visual keeps the rendered HTML and drops the source.
+    /// </summary>
+    [HttpPost("{id:guid}/editor-mode")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SwitchEditorMode(Guid id, string mode)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var page = await _pages.GetByIdAsync(id, userId);
+        if (page == null) return NotFound();
+
+        var target = EditorModes.Normalize(mode);
+        if (target == EditorModes.Normalize(page.EditorMode)) return RedirectToAction(nameof(Edit), new { id });
+        if (target == EditorModes.Markdown)
+        {
+            var html = page.Content ?? string.Empty;
+            if (!MarkdownRenderer.RendersUnchanged(html))
+            {
+                TempData["Error"] = "This page can't be switched to Markdown without changing how it looks: some of its HTML has blank lines inside a block. Remove those blank lines in the visual editor, save, then try again.";
+                return RedirectToAction(nameof(Edit), new { id });
+            }
+            page.Markdown = html;
+        }
+        ApplyEditorMode(page, target);
+        await _pages.UpdateAsync(page);
+        await _audit.LogAsync(AuditActions.PageUpdated, "Page", id.ToString(), page.Title,
+            newValues: target == EditorModes.Markdown ? "Editor: switched to Markdown" : "Editor: switched to the visual editor");
+        await _revisions.RecordAsync(page, target == EditorModes.Markdown ? "Switched to Markdown" : "Switched to the visual editor", User);
+        TempData["Success"] = target == EditorModes.Markdown ? "This page is now written in Markdown." : "This page now uses the visual editor.";
+        return RedirectToAction(nameof(Edit), new { id });
+    }
+
+    /// <summary>A Markdown page's HTML is always rendered here from its Markdown, never taken from the form.</summary>
+    private static void ApplyEditorMode(Page page, string? mode)
+    {
+        page.EditorMode = EditorModes.Normalize(mode);
+        if (page.IsMarkdown)
+        {
+            page.Markdown ??= string.Empty;
+            page.Content = MarkdownRenderer.ToHtml(page.Markdown);
+        }
+        else page.Markdown = null;
     }
 
     [HttpPost("delete/{id}")]

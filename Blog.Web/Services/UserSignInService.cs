@@ -15,20 +15,26 @@ public sealed class UserSignInService
     private readonly IRoleRepository _roles;
     public UserSignInService(IRoleRepository roles) => _roles = roles;
 
-    public async Task SignInAsync(HttpContext http, User user)
+    /// <summary>
+    /// Who a signed-in person is, for the Desk cookie and for API tokens alike (ADR-0033): id, email, name, role and
+    /// the RBAC permissions from the database. One builder, so the two sign-ins cannot drift apart.
+    /// </summary>
+    public static List<Claim> Claims(User user, IEnumerable<string> permissions)
     {
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.DisplayName ?? user.Email),
+            new(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName),
             new(ClaimTypes.Role, user.Role ?? "Author"),
         };
+        claims.AddRange(permissions.Select(p => new Claim("Permission", p)));
+        return claims;
+    }
 
-        // RBAC permissions from the database, as claims
-        foreach (var permission in await _roles.GetPermissionNamesForUserAsync(user.Id))
-            claims.Add(new Claim("Permission", permission));
-
+    public async Task SignInAsync(HttpContext http, User user)
+    {
+        var claims = Claims(user, await _roles.GetPermissionNamesForUserAsync(user.Id));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
         await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal,
             new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7) });

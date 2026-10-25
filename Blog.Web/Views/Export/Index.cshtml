@@ -36,23 +36,23 @@
         }
     </nav>
 
-    <form method="get" action="/admin/export" id="export-options" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3">
+    <form method="get" action="/admin/export" id="export-options" class="desk-card p-4 flex flex-col gap-3">
         <input type="hidden" name="target" value="@Model.Target" />
         <input type="hidden" name="submitted" value="true" />
         <input type="hidden" name="siteAddress" value="@Model.SiteAddress" />
-        <h2 class="text-sm font-semibold text-foreground">What to include</h2>
+        <h2 class="desk-card-title">What to include</h2>
         <label class="flex items-start gap-2 text-sm text-foreground">
-            <input type="checkbox" name="includeDrafts" value="true" checked="@o.IncludeDrafts" class="mt-1 h-4 w-4 rounded border-input" />
+            <input type="checkbox" name="includeDrafts" value="true" checked="@o.IncludeDrafts" class="desk-checkbox mt-1" />
             <span>Unpublished posts <span class="block text-xs text-muted-foreground">Drafts, posts in review and posts sent back. Published and scheduled posts are always included.</span></span>
         </label>
         <label class="flex items-start gap-2 text-sm text-foreground">
-            <input type="checkbox" name="includePages" value="true" checked="@o.IncludePages" class="mt-1 h-4 w-4 rounded border-input" />
+            <input type="checkbox" name="includePages" value="true" checked="@o.IncludePages" class="desk-checkbox mt-1" />
             <span>Pages</span>
         </label>
         @if (wp)
         {
             <label class="flex items-start gap-2 text-sm text-foreground">
-                <input type="checkbox" name="includeComments" value="true" checked="@o.IncludeComments" class="mt-1 h-4 w-4 rounded border-input" />
+                <input type="checkbox" name="includeComments" value="true" checked="@o.IncludeComments" class="desk-checkbox mt-1" />
                 <span>Comments</span>
             </label>
         }
@@ -61,7 +61,7 @@
             <input type="hidden" name="includeComments" value="@o.IncludeComments.ToString().ToLowerInvariant()" />
         }
         <label class="flex items-start gap-2 text-sm text-foreground">
-            <input type="checkbox" name="includeEmails" value="true" checked="@o.IncludeEmails" class="mt-1 h-4 w-4 rounded border-input" />
+            <input type="checkbox" name="includeEmails" value="true" checked="@o.IncludeEmails" class="desk-checkbox mt-1" />
             <span>Email addresses
                 <span class="block text-xs text-muted-foreground">
                     @(wp ? "Authors' and commenters' email addresses. Left out by default because they are personal data."
@@ -69,22 +69,22 @@
                 </span>
             </span>
         </label>
-        <div><button type="submit" class="px-4 min-h-10 border border-input rounded-md text-sm font-medium text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Update the summary</button>
+        <div><button type="submit" class="desk-btn desk-btn-outline">Update the summary</button>
             <span class="text-xs text-muted-foreground" id="options-hint">With JavaScript on, the summary updates as soon as you change a box.</span></div>
     </form>
 
-    <section aria-labelledby="fidelity-title" class="bg-card rounded-lg border border-border overflow-hidden">
-        <h2 id="fidelity-title" class="px-4 pt-4 text-sm font-semibold text-foreground">What carries over to @(wp ? "WordPress" : "Ghost")</h2>
+    <section aria-labelledby="fidelity-title" class="desk-card overflow-hidden">
+        <h2 id="fidelity-title" class="desk-card-title px-4 pt-4">What carries over to @(wp ? "WordPress" : "Ghost")</h2>
         <p class="px-4 pb-3 text-xs text-muted-foreground">For the selection above: @c.Posts posts@(o.IncludePages ? $", {c.Pages} pages" : "").</p>
-        <div class="table-scroll"><table class="w-full text-left text-sm">
+        <div class="table-scroll"><table class="desk-table">
             <thead>
-                <tr class="bg-muted text-muted-foreground border-b border-border">
-                    <th class="px-4 py-3 font-medium">Content</th>
-                    <th class="px-4 py-3 font-medium">Result</th>
-                    <th class="px-4 py-3 font-medium">Details</th>
+                <tr>
+                    <th>Content</th>
+                    <th>Result</th>
+                    <th>Details</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-border">
+            <tbody>
                 @if (nothing)
                 {
                     <tr><td colspan="3" class="px-4 py-8 text-center text-muted-foreground">Nothing to export yet. Publish a post, or tick “Unpublished posts” to include drafts.</td></tr>
@@ -92,42 +92,230 @@
                 @foreach (var row in nothing ? Array.Empty<FidelityRow>() : Model.Fidelity)
                 {
                     <tr>
-                        <td class="px-4 py-3 font-medium text-foreground align-top">@row.Item</td>
-                        <td class="px-4 py-3 align-top"><span class="inline-block text-xs px-2 py-0.5 rounded border whitespace-nowrap @Pill(row.Outcome)">@Word(row.Outcome)</span></td>
-                        <td class="px-4 py-3 text-xs text-muted-foreground align-top min-w-[16rem]">@row.Detail</td>
+                        <td class="font-medium text-foreground align-top">@row.Item</td>
+                        <td class="align-top"><span class="desk-pill @Pill(row.Outcome)">@Word(row.Outcome)</span></td>
+                        <td class="text-xs text-muted-foreground align-top min-w-[16rem]">@row.Detail</td>
                     </tr>
                 }
             </tbody>
         </table></div>
     </section>
 
-    <form method="post" action="/admin/export/download" id="export-form" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3">
+    <form method="post" action="/admin/export/download" id="export-form" class="desk-card p-4 flex flex-col gap-3">
         @Html.AntiForgeryToken()
         <input type="hidden" name="target" value="@Model.Target" />
         <input type="hidden" name="includeDrafts" value="@o.IncludeDrafts.ToString().ToLowerInvariant()" />
         <input type="hidden" name="includePages" value="@o.IncludePages.ToString().ToLowerInvariant()" />
         <input type="hidden" name="includeComments" value="@o.IncludeComments.ToString().ToLowerInvariant()" />
         <input type="hidden" name="includeEmails" value="@o.IncludeEmails.ToString().ToLowerInvariant()" />
-        <h2 class="text-sm font-semibold text-foreground">Download</h2>
+        <h2 class="desk-card-title">Download</h2>
         @if (wp)
         {
             <div class="space-y-1">
-                <label for="siteAddress" class="text-sm font-medium text-foreground">Site address for images</label>
-                <input id="siteAddress" name="siteAddress" value="@Model.SiteAddress" class="w-full max-w-md px-3 py-2 bg-background border border-input rounded-md text-sm" aria-describedby="siteAddress-help siteAddress-error" />
-                <p id="siteAddress-error" class="text-xs text-destructive" hidden></p>
-                <p id="siteAddress-help" class="text-xs text-muted-foreground">WordPress downloads each image from this address during import, so it must be reachable from the WordPress server and use a standard web port: WordPress refuses image downloads from any port other than 80, 443 or 8080. Usually this site's public address.</p>
+                <label for="siteAddress" class="desk-label">Site address for images</label>
+                <input id="siteAddress" name="siteAddress" value="@Model.SiteAddress" class="desk-input max-w-md" aria-describedby="siteAddress-help siteAddress-error" />
+                <p id="siteAddress-error" class="desk-error" hidden></p>
+                <p id="siteAddress-help" class="desk-hint">WordPress downloads each image from this address during import, so it must be reachable from the WordPress server and use a standard web port: WordPress refuses image downloads from any port other than 80, 443 or 8080. Usually this site's public address.</p>
             </div>
         }
         <div class="flex flex-wrap items-center gap-3">
-            <button type="submit" id="export-btn" class="px-4 min-h-10 bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium shadow-sm transition-opacity disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring" disabled="@(nothing ? "disabled" : null)">
+            <button type="submit" id="export-btn" class="desk-btn desk-btn-primary" disabled="@(nothing ? "disabled" : null)">
                 @(wp ? "Download WordPress file (.xml)" : "Download Ghost file (.zip)")
             </button>
             <span id="export-status" class="text-xs text-muted-foreground" role="status" aria-live="polite">@(nothing ? "There is nothing to export for this selection." : "")</span>
         </div>
     </form>
 
-    <div class="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground space-y-2">
-        <h2 class="text-sm font-semibold text-foreground">Importing the file</h2>
+    <section id="push" aria-labelledby="push-title" class="desk-card p-4 flex flex-col gap-4 scroll-mt-16">
+        <div>
+            <h2 id="push-title" class="desk-card-title">Or push straight to a @(wp ? "WordPress" : "Ghost") site</h2>
+            <p class="text-xs text-muted-foreground max-w-2xl">
+                Sends the same selection to a running @(wp ? "WordPress" : "Ghost") site through its API, with no file to upload. It runs in the
+                background, a batch every minute, and continues where it stopped after a rate limit or a failed item.
+                @(wp ? "The password is" : "The key is") kept in this server's memory only while the push runs: it is never saved, logged or shown again.
+                So if this server restarts, the push pauses until you enter the @(wp ? "password" : "key") again; it then continues from the first item not yet sent.
+            </p>
+        </div>
+
+        @if (Model.ActivePush is { } running)
+        {
+            <div class="rounded-lg border pill-info px-4 py-3 text-sm" role="status">
+                A push to @running.SiteUrl is @(running.Status == Blog.Core.Services.Export.Push.PushStatus.Paused ? "paused" : "running").
+                <a href="/admin/export/push/@running.Id" class="underline font-medium">See its progress</a>. Only one push runs at a time.
+            </div>
+        }
+        else
+        {
+            var pushError = TempData["PushError"] as string;
+            var pushField = TempData["PushField"] as string;
+            var conflict = TempData["PushConflict"] as string ?? "Skip";
+            string Invalid(string f) => pushField == f ? "true" : "false";
+            string? Focus(string f) => pushField == f ? "autofocus" : null;
+            string Plural(int n, string one) => n == 1 ? $"1 {one}" : $"{n} {one}s";
+
+            <details class="text-sm">
+                <summary class="cursor-pointer font-medium text-foreground">What a push carries over (it differs from the file)</summary>
+                <div class="mt-3"><div class="table-scroll"><table class="desk-table">
+                    <thead>
+                        <tr>
+                            <th>Content</th>
+                            <th>Result</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (nothing)
+                        {
+                            <tr><td colspan="3" class="px-4 py-8 text-center text-muted-foreground">Nothing to push yet. Publish a post, or tick “Unpublished posts” above to include drafts.</td></tr>
+                        }
+                        @foreach (var row in nothing ? Array.Empty<FidelityRow>() : Model.PushFidelity)
+                        {
+                            <tr>
+                                <td class="font-medium text-foreground align-top">@row.Item</td>
+                                <td class="align-top"><span class="desk-pill @Pill(row.Outcome)">@(row.Outcome == FidelityOutcome.Lost ? "Not pushed" : Word(row.Outcome))</span></td>
+                                <td class="text-xs text-muted-foreground align-top min-w-[16rem]">@row.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table></div></div>
+            </details>
+
+            @if (pushError is not null && pushField is null)
+            {
+                <p class="rounded-lg border pill-bad px-4 py-3 text-sm" role="alert">@pushError</p>
+            }
+
+            <form method="post" action="/admin/export/push" id="push-form" class="flex flex-col gap-4" autocomplete="off"
+                  data-confirm-title="Push to this site?"
+                  data-confirm-body="@($"{Plural(c.Posts, "post")}{(o.IncludePages ? $" and {Plural(c.Pages, "page")}" : "")} will be sent to the address below, a batch every minute. Items already sent cannot be taken back from here; delete them on the other site if you change your mind. Nothing on this site changes.")"
+                  data-confirm-action="Start the push" data-confirm-tone="warning">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="target" value="@Model.Target" />
+                <input type="hidden" name="includeDrafts" value="@o.IncludeDrafts.ToString().ToLowerInvariant()" />
+                <input type="hidden" name="includePages" value="@o.IncludePages.ToString().ToLowerInvariant()" />
+
+                <div class="space-y-1">
+                    <label for="pushSite" class="desk-label">@(wp ? "WordPress" : "Ghost") site address</label>
+                    <input id="pushSite" name="pushSite" type="url" inputmode="url" value="@(TempData["PushSite"] as string)" required
+                           placeholder="https://www.example.com" aria-invalid="@Invalid("pushSite")" autofocus="@Focus("pushSite")" aria-describedby="pushSite-help@(pushField == "pushSite" ? " pushSite-error" : "")"
+                           class="desk-input max-w-md" />
+                    @if (pushField == "pushSite") { <p id="pushSite-error" class="desk-error">@pushError</p> }
+                    <p id="pushSite-help" class="desk-hint">
+                        The address readers use@(wp ? "" : ", as set in Ghost Admin → Settings → General").
+                        @(Model.AllowPrivateTargets ? "This server is set to allow local and http:// addresses, for testing." : "It must start with https://.")
+                    </p>
+                </div>
+
+                @if (wp)
+                {
+                    <div class="space-y-1">
+                        <label for="pushUser" class="desk-label">WordPress user name</label>
+                        <input id="pushUser" name="pushUser" value="@(TempData["PushUser"] as string)" required autocomplete="off" spellcheck="false"
+                               aria-invalid="@Invalid("pushUser")" autofocus="@Focus("pushUser")" aria-describedby="pushUser-help@(pushField == "pushUser" ? " pushUser-error" : "")"
+                               class="desk-input max-w-md" />
+                        @if (pushField == "pushUser") { <p id="pushUser-error" class="desk-error">@pushError</p> }
+                        <p id="pushUser-help" class="desk-hint">An Administrator or Editor. Everything pushed is credited to this user.</p>
+                    </div>
+                    <div class="space-y-1">
+                        <label for="pushSecret" class="desk-label">Application password</label>
+                        <input id="pushSecret" name="pushSecret" type="password" required autocomplete="new-password" spellcheck="false"
+                               aria-invalid="@Invalid("pushSecret")" autofocus="@Focus("pushSecret")" aria-describedby="pushSecret-help@(pushField == "pushSecret" ? " pushSecret-error" : "")"
+                               class="desk-input max-w-md" />
+                        @if (pushField == "pushSecret") { <p id="pushSecret-error" class="desk-error">@pushError</p> }
+                        <p id="pushSecret-help" class="desk-hint">Not the sign-in password. In WordPress, open Users → Profile → Application Passwords, add one named “Inkwell”, and paste it here. Revoke it there when the push is done.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-1">
+                        <label for="pushSecret" class="desk-label">Admin API key</label>
+                        <input id="pushSecret" name="pushSecret" type="password" required autocomplete="new-password" spellcheck="false"
+                               aria-invalid="@Invalid("pushSecret")" autofocus="@Focus("pushSecret")" aria-describedby="pushSecret-help@(pushField == "pushSecret" ? " pushSecret-error" : "")"
+                               class="desk-input max-w-md" />
+                        @if (pushField == "pushSecret") { <p id="pushSecret-error" class="desk-error">@pushError</p> }
+                        <p id="pushSecret-help" class="desk-hint">In Ghost Admin, open Settings → Integrations → Add custom integration, name it “Inkwell”, and copy its Admin API key (two parts separated by a colon). Delete the integration when the push is done.</p>
+                    </div>
+                }
+
+                <fieldset class="space-y-2">
+                    <legend class="desk-label">When a post or page with the same address is already on the site</legend>
+                    @foreach (var (value, label, help) in new[]
+                    {
+                        ("Skip", "Leave it as it is", "Recommended. Running the push again sends only what is missing."),
+                        ("Update", "Replace it with this site's version", "Its title, address, body, status, date, categories, tags and featured image are overwritten."),
+                        ("Duplicate", "Add a second copy", "The site gives the copy a new address, such as /your-post-2/."),
+                    })
+                    {
+                        <label class="flex items-start gap-2 text-sm text-foreground">
+                            <input type="radio" name="conflict" value="@value" checked="@(conflict == value)" class="mt-1 h-4 w-4 border-input" />
+                            <span>@label <span class="block text-xs text-muted-foreground">@help</span></span>
+                        </label>
+                    }
+                </fieldset>
+
+                <div class="space-y-1">
+                    <label for="pushSource" class="desk-label">This site's address</label>
+                    <input id="pushSource" name="siteAddress" value="@Model.SiteAddress" aria-invalid="@Invalid("pushSource")" autofocus="@Focus("pushSource")"
+                           aria-describedby="pushSource-help@(pushField == "pushSource" ? " pushSource-error" : "")"
+                           class="desk-input max-w-md" />
+                    @if (pushField == "pushSource") { <p id="pushSource-error" class="desk-error">@pushError</p> }
+                    <p id="pushSource-help" class="desk-hint">Used to recognise this site's own image links, and as their address when an image file cannot be uploaded.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="submit" class="desk-btn desk-btn-primary"
+                            disabled="@(nothing ? "disabled" : null)">Check the site and start the push</button>
+                    <span class="text-xs text-muted-foreground">@(nothing ? "There is nothing to push for this selection." : $"The address and {(wp ? "password" : "key")} are checked first; nothing is sent if they do not work.")</span>
+                </div>
+            </form>
+        }
+
+        @if (Model.RecentPushes.Count > 0)
+        {
+            <div>
+                <h3 class="desk-card-title mb-2">Recent pushes</h3>
+                <div class="table-scroll"><table class="desk-table">
+                    <thead>
+                        <tr>
+                            <th>Site</th>
+                            <th>Status</th>
+                            <th>Started</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.RecentPushes)
+                        {
+                            <tr>
+                                <td><a href="/admin/export/push/@p.Id" class="underline text-foreground">@p.SiteUrl</a> <span class="text-xs text-muted-foreground">(@p.Target)</span></td>
+                                @{
+                                    var rc = Model.RecentCounts.GetValueOrDefault(p.Id);
+                                    var (rlabel, rpill) = p.Status switch
+                                    {
+                                        Blog.Core.Services.Export.Push.PushStatus.Running => ("Running", "pill-info"),
+                                        Blog.Core.Services.Export.Push.PushStatus.Paused => ("Paused", "pill-warn"),
+                                        Blog.Core.Services.Export.Push.PushStatus.Completed when rc is { Failed: > 0 } => ("Finished with failures", "pill-warn"),
+                                        Blog.Core.Services.Export.Push.PushStatus.Completed => ("Finished", "pill-ok"),
+                                        _ => ("Cancelled", "pill-bad"),
+                                    };
+                                }
+                                <td class="text-xs">
+                                    <span class="desk-pill @rpill">@rlabel</span>
+                                    @if (rc is not null)
+                                    {
+                                        <span class="block mt-1 text-muted-foreground">@rc.Created created · @rc.Updated updated · @rc.Skipped skipped@(rc.Failed > 0 ? $" · {rc.Failed} failed" : "")</span>
+                                    }
+                                </td>
+                                <td class="text-xs text-muted-foreground">@Dates.DateTime(p.StartedAt)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table></div>
+            </div>
+        }
+    </section>
+
+    <div class="desk-card p-4 text-xs text-muted-foreground space-y-2">
+        <h2 class="desk-card-title">Importing the file</h2>
         @if (wp)
         {
             <ol class="list-decimal ms-5 space-y-1">

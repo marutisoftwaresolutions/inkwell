@@ -51,17 +51,17 @@
                          x-transition:leave-start="opacity-100 scale-100"
                          x-transition:leave-end="opacity-0 scale-95"
                          style="display:none; background: var(--card); border-color: var(--border);"
-                         class="absolute right-0 top-full mt-2 min-w-52 rounded-xl shadow-lg border overflow-hidden z-50">
+                         class="absolute end-0 top-full mt-2 min-w-52 rounded-xl shadow-lg border overflow-hidden z-50">
                         <div class="px-4 py-2 text-[9px] uppercase tracking-[0.3em] font-semibold border-b" style="border-color: var(--border); color: var(--muted-foreground); background: var(--muted);">Pages</div>
                         <a href="/"
-                           class="flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:opacity-70 border-l-[3px]"
-                           style="border-left-color: var(--primary); color: var(--foreground); border-bottom: 1px solid var(--border);">
+                           class="flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:opacity-70 border-s-[3px]"
+                           style="border-inline-start-color: var(--primary); color: var(--foreground); border-bottom: 1px solid var(--border);">
                             <i class="bi bi-house-fill text-xs" style="color: var(--primary);"></i> Home
                         </a>
                         @foreach (var p in sortedPages)
                         {
                             <a href="@p.Href" target="@(p.OpenInNewTab ? "_blank" : null)" rel="@(p.OpenInNewTab ? "noopener" : null)"
-                               class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-70 border-l-[3px] border-l-transparent hover:border-l-primary"
+                               class="flex items-center gap-3 px-4 py-3 text-sm font-medium hover:opacity-70 border-s-[3px] border-s-transparent hover:border-s-primary"
                                style="color: var(--foreground); border-bottom: 1px solid var(--border);">
                                 <i class="bi bi-file-text text-xs" style="color: var(--muted-foreground);"></i> @if (p.Depth > 0) { <span aria-hidden="true">— </span> }@p.Title
                             </a>

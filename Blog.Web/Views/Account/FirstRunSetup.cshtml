@@ -1,49 +1,49 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Complete Setup";
+    ViewData["Description"] = "You are signed in with temporary credentials. Set your permanent email and password now, or skip and do it later from your profile.";
     var hasError = !string.IsNullOrEmpty(ViewBag.Error as string);
 }
 
-<div class="max-w-lg mx-auto mt-12 bg-card text-card-foreground border border-border rounded-lg shadow-sm p-8">
-    <h2 class="text-lg font-semibold text-foreground mb-1">Complete your setup</h2>
-    <p class="text-sm text-muted-foreground mb-6">You are signed in with temporary credentials. Set your permanent email and password now, or skip and do it later from your profile.</p>
-
+<div class="desk-card max-w-lg mx-auto mt-6">
+    <div class="desk-card-body">
     @if (hasError)
     {
-        <p id="form-error" role="alert" class="mb-6 p-3 rounded border border-destructive text-destructive text-sm">@ViewBag.Error</p>
+        <p id="form-error" role="alert" class="mb-6 rounded-lg border p-3 pill-bad text-sm">@ViewBag.Error</p>
     }
 
-    <div class="mb-6 p-3 rounded bg-muted border border-border text-sm">
+    <div class="mb-6 p-3 rounded-md bg-muted border border-border text-sm">
         Current email: <strong class="font-medium">@ViewBag.CurrentEmail</strong>
     </div>
 
     <form method="post" data-track-changes class="space-y-5">
         @Html.AntiForgeryToken()
         <div>
-            <label for="email" class="block text-sm font-medium text-foreground mb-1">New email</label>
-            <input type="email" name="email" id="email" value="@ViewBag.CurrentEmail" required autocomplete="username" aria-describedby="@(hasError ? "form-error" : null)" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+            <label for="email" class="desk-label">New email</label>
+            <input type="email" name="email" id="email" value="@ViewBag.CurrentEmail" required autocomplete="username" aria-describedby="@(hasError ? "form-error" : null)" class="desk-input" />
         </div>
         <div>
-            <label for="password" class="block text-sm font-medium text-foreground mb-1">New password</label>
+            <label for="password" class="desk-label">New password</label>
             <div class="relative">
-                <input type="password" name="password" id="password" autocomplete="new-password" minlength="8" aria-describedby="password-hint" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                <input type="password" name="password" id="password" autocomplete="new-password" minlength="8" aria-describedby="password-hint" class="desk-input pr-16" />
                 <button type="button" data-toggle-password="password" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">Show</button>
             </div>
-            <p id="password-hint" class="text-xs text-muted-foreground mt-1">At least 8 characters. Leave blank to keep the current password.</p>
+            <p id="password-hint" class="desk-hint">At least 8 characters. Leave blank to keep the current password.</p>
         </div>
         <div>
-            <label for="confirmPassword" class="block text-sm font-medium text-foreground mb-1">Confirm password</label>
+            <label for="confirmPassword" class="desk-label">Confirm password</label>
             <div class="relative">
-                <input type="password" name="confirmPassword" id="confirmPassword" autocomplete="new-password" class="w-full px-3 py-2 pr-16 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input" />
+                <input type="password" name="confirmPassword" id="confirmPassword" autocomplete="new-password" class="desk-input pr-16" />
                 <button type="button" data-toggle-password="confirmPassword" aria-pressed="false" aria-label="Show password" class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">Show</button>
             </div>
         </div>
         <div class="pt-2 flex items-center gap-3 flex-wrap">
-            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save and continue</button>
-            <a href="/admin/dashboard" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Skip for now</a>
+            <button type="submit" class="desk-btn desk-btn-primary">Save and continue</button>
+            <a href="/admin/dashboard" class="desk-btn desk-btn-outline">Skip for now</a>
             <span data-dirty-indicator hidden class="text-xs text-muted-foreground">Unsaved changes</span>
         </div>
     </form>
+    </div>
 </div>
 <script>
     document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {

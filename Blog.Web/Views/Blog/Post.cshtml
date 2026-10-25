@@ -1,6 +1,9 @@
 @model Blog.Core.Domain.Post
 @inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
+@inject Blog.Web.Services.ResponsiveImageStore Images
 @{
+    // Upload images in the body get srcset, sizes, width and height as the page is rendered (ADR-0032); the stored post is unchanged.
+    Model.Html = Blog.Core.Services.ResponsiveImages.EnhanceHtml(Model.Html, Images.Describe);
     Layout = "_PublicLayout";
     ViewData["Title"] = !string.IsNullOrEmpty(Model.MetaTitle) ? Model.MetaTitle : Model.Title;
     ViewData["Description"] = !string.IsNullOrEmpty(Model.MetaDescription) ? Model.MetaDescription : Blog.Core.Services.TextHelper.SmartTruncate(Model.Plaintext);
@@ -145,31 +148,17 @@ else
     var comments = (List<Blog.Core.Domain.Comment>)ViewBag.Comments;
     ViewData["PostSlug"] = Model.Slug;
 
-    // After a rejected submission AddComment redirects back to #comments with the reader's draft
-    // stashed in TempData, so nothing they typed is lost. A reply draft re-opens its own form.
-    var commentError = TempData["CommentError"] as string;
-    var commentSuccess = TempData["CommentSuccess"] as string;
-    var draftName = TempData["CommentDraftName"] as string ?? "";
-    var draftEmail = TempData["CommentDraftEmail"] as string ?? "";
-    var draftContent = TempData["CommentDraftContent"] as string ?? "";
-    var draftParentId = TempData["CommentDraftParentId"] as string;
-    var mainFormError = draftParentId == null ? commentError : null;
-    ViewData["CommentError"] = commentError;
-    ViewData["CommentDraftName"] = draftName;
-    ViewData["CommentDraftEmail"] = draftEmail;
-    ViewData["CommentDraftContent"] = draftContent;
-    ViewData["CommentDraftParentId"] = draftParentId;
+    // The page is the same for every reader so it can be cached (ADR-0031): no tokens, no drafts, nothing per reader.
+    // inkwell-comments.js fetches the tokens and shows each outcome in the form's status region; without
+    // JavaScript a submission lands on the respond page, which keeps the reader's draft.
+    var draftName = ""; var draftEmail = ""; var draftContent = "";
 
     @if (blogLayout == "Magazine")
     {
-        <section class="ink-comments" id="comments" tabindex="-1">
+        <section class="ink-comments" id="comments" tabindex="-1" data-comment-token-url="/@Model.Slug/comment-token">
             <h2 class="ink-comments-title">
                 Letters <span class="meta" style="font-weight:400;">(@comments.Count)</span>
             </h2>
-            @if (commentSuccess != null)
-            {
-                <div class="ink-form-alert" role="status">@commentSuccess</div>
-            }
             <div style="display:flex;flex-direction:column;gap:var(--sp-6);margin-bottom:var(--sp-10);">
                 @foreach (var comment in comments)
                 {
@@ -178,12 +167,8 @@ else
             </div>
             <div class="ink-comment-form">
                 <h3 id="comment-form-heading">Leave a letter</h3>
-                @if (mainFormError != null)
-                {
-                    <div class="ink-form-alert ink-form-alert--error" role="alert" id="comment-error">@mainFormError</div>
-                }
-                <form method="post" action="/@Model.Slug/comment" style="display:flex;flex-direction:column;gap:var(--sp-6);" aria-labelledby="comment-form-heading" aria-describedby="@(mainFormError != null ? "comment-error" : null)">
-                    @Html.AntiForgeryToken()
+                <div class="ink-form-alert" role="status" aria-live="polite" id="comment-status" data-comment-status hidden></div>
+                <form method="post" action="/@Model.Slug/comment" style="display:flex;flex-direction:column;gap:var(--sp-6);" aria-labelledby="comment-form-heading" aria-describedby="comment-status" data-comment-form>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-6);">
                         <div>
                             <label class="eyebrow" for="comment-name" style="display:block;margin-bottom:var(--sp-2);">Name *</label>
@@ -216,15 +201,11 @@ else
     }
     else
     {
-        <section class="max-w-4xl mx-auto px-4 py-8 lg:py-12" id="comments" tabindex="-1">
+        <section class="max-w-4xl mx-auto px-4 py-8 lg:py-12" id="comments" tabindex="-1" data-comment-token-url="/@Model.Slug/comment-token">
             <div>
                 <h2 class="text-xl font-medium mb-6 border-b border-dashed pb-2" style="border-color: var(--border);">
                     Comments <span class="text-sm font-normal" style="color: var(--muted-foreground);">(@comments.Count)</span>
                 </h2>
-                @if (commentSuccess != null)
-                {
-                    <div class="mb-6 p-4 text-sm border border-dashed rounded-lg" role="status" style="background: var(--muted); border-color: var(--border);">@commentSuccess</div>
-                }
                 <div class="space-y-6 mb-10">
                     @foreach (var comment in comments)
                     {
@@ -233,12 +214,8 @@ else
                 </div>
                 <div class="p-6 border border-dashed rounded-xl" style="background: var(--muted); border-color: var(--border);">
                     <h3 class="text-lg font-medium mb-4" id="comment-form-heading">Leave a Reply</h3>
-                    @if (mainFormError != null)
-                    {
-                        <div class="mb-4 p-4 text-sm border border-dashed rounded-lg" role="alert" id="comment-error" style="background: var(--muted); border-color: var(--border); color: var(--destructive);">@mainFormError</div>
-                    }
-                    <form method="post" action="/@Model.Slug/comment" class="space-y-4" aria-labelledby="comment-form-heading" aria-describedby="@(mainFormError != null ? "comment-error" : null)">
-                        @Html.AntiForgeryToken()
+                    <div class="mb-4 p-4 text-sm border border-dashed rounded-lg" role="status" aria-live="polite" id="comment-status" data-comment-status hidden style="background: var(--muted); border-color: var(--border); color: var(--foreground);"></div>
+                    <form method="post" action="/@Model.Slug/comment" class="space-y-4" aria-labelledby="comment-form-heading" aria-describedby="comment-status" data-comment-form>
                         <div class="grid md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium mb-1" for="comment-name" style="color: var(--foreground);">Name *</label>
@@ -267,6 +244,7 @@ else
         </section>
     }
 
+    <script src="~/js/inkwell-comments.js" asp-append-version="true" defer></script>
     <script>
         function toggleReplyForm(btn) {
             var form = btn.nextElementSibling;

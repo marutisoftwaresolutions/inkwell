@@ -16,7 +16,7 @@ public interface IWebhookSender
 
 /// <summary>
 /// The real sender. Server-side request forgery is stopped at the socket, not just at save time:
-/// <see cref="SocketsHttpHandler.ConnectCallback"/> resolves the host itself and refuses to connect
+/// <see cref="PublicNetwork"/> resolves the host itself and refuses to connect
 /// to any address <see cref="WebhookRules.IsForbiddenAddress"/> rejects, so a public name that
 /// resolves (or re-resolves) to 127.0.0.1, a private range or the cloud metadata address is never
 /// reached. Redirects are not followed; a 3xx counts as a failed attempt.
@@ -30,40 +30,8 @@ public sealed class WebhookSender : IWebhookSender
 
     public WebhookSender()
     {
-        var handler = new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            UseProxy = false,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-            ConnectTimeout = TimeSpan.FromSeconds(5),
-            ConnectCallback = ConnectToPublicAddressAsync,
-        };
-        _http = new HttpClient(handler) { Timeout = Timeout };
+        _http = new HttpClient(PublicNetwork.Handler()) { Timeout = Timeout };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Inkwell-Webhooks/1.0");
-    }
-
-    private static async ValueTask<Stream> ConnectToPublicAddressAsync(SocketsHttpConnectionContext context, CancellationToken ct)
-    {
-        var host = context.DnsEndPoint.Host;
-        var addresses = IPAddress.TryParse(host, out var literal)
-            ? [literal]
-            : await Dns.GetHostAddressesAsync(host, ct);
-
-        if (!WebhookRules.AreAllPublic(addresses))
-            throw new HttpRequestException($"Refused: {host} resolves to a private or reserved address.");
-
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(addresses, context.DnsEndPoint.Port, ct);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
     }
 
     public async Task<WebhookSendResult> SendAsync(string url, string secret, string eventType, Guid eventId, string body, CancellationToken ct)

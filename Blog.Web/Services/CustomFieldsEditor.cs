@@ -27,11 +27,19 @@ public sealed class CustomFieldsEditor
     /// <summary>The fields that apply to posts (or pages). Settings that cannot be read mean no fields: the editor still works.</summary>
     public async Task<IReadOnlyList<CustomFieldDefinition>> DefinitionsAsync(ClaimsPrincipal user, bool pages)
     {
+        Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var userId);
+        return await DefinitionsForOwnerAsync(userId, pages);
+    }
+
+    /// <summary>
+    /// The same, for a known site owner: in cloud mode each owner has their own fields; on a single site the
+    /// first admin's settings hold them. The API uses this for anonymous reads, where there is no signed-in user.
+    /// </summary>
+    public async Task<IReadOnlyList<CustomFieldDefinition>> DefinitionsForOwnerAsync(Guid cloudOwnerId, bool pages)
+    {
         try
         {
-            var ownerId = _tenant.IsCloudMode
-                ? Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!)
-                : (await _users.GetFirstAdminAsync())?.Id ?? Guid.Empty;
+            var ownerId = _tenant.IsCloudMode ? cloudOwnerId : (await _users.GetFirstAdminAsync())?.Id ?? Guid.Empty;
             var s = await _settings.GetSettingsAsync(ownerId);
             return CustomFields.For(s.CustomFields, pages);
         }

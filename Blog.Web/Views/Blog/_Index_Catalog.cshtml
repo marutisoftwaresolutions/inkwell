@@ -32,8 +32,8 @@
     {
         <div style="margin-bottom:var(--sp-8);padding-bottom:var(--sp-6);border-bottom:1px solid var(--border);">
             <span style="font-family:var(--sans);font-size:13px;color:var(--fg-meta);">Results for</span>
-            <strong style="font-family:var(--serif);font-size:1.125rem;margin-left:6px;">"@searchTerm"</strong>
-            <a href="/" style="margin-left:12px;font-family:var(--sans);font-size:11px;color:var(--fg-meta);text-decoration:none;opacity:.7;">Clear ✕</a>
+            <strong style="font-family:var(--serif);font-size:1.125rem;margin-inline-start:6px;">"@searchTerm"</strong>
+            <a href="/" style="margin-inline-start:12px;font-family:var(--sans);font-size:11px;color:var(--fg-meta);text-decoration:none;opacity:.7;">Clear ✕</a>
         </div>
     }
 
@@ -76,7 +76,7 @@
                                  style="width:100%;height:100%;min-height:150px;object-fit:cover;display:block;" />
                         </a>
                     }
-                    <div style="min-width:0;padding:var(--sp-6) var(--sp-6) var(--sp-6) @(hasImage ? "0" : "var(--sp-6)");display:flex;flex-direction:column;justify-content:center;">
+                    <div style="min-width:0;padding-block:var(--sp-6);padding-inline-end:var(--sp-6);padding-inline-start:@(hasImage ? "0" : "var(--sp-6)");display:flex;flex-direction:column;justify-content:center;">
                         @if (category != null)
                         {
                             <a href="/?category=@category.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-3);">@category.Name</a>

@@ -3,11 +3,13 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Settings";
-    var inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
-    var labelCls = "text-sm font-medium leading-none";
-    var helpCls = "text-xs text-muted-foreground";
-    var errCls = "text-sm font-medium text-destructive";
-    var checkCls = "mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background";
+    ViewData["Description"] = "How your site presents itself, what readers can do, and how search engines and answer engines see it. Changes on every tab are saved together with the Save changes button at the bottom.";
+    var inputCls = "desk-input";
+    var selectCls = "desk-select";
+    var labelCls = "desk-label";
+    var helpCls = "desk-hint";
+    var errCls = "desk-error text-destructive"; // text-destructive is also the selector the tab error-counter script uses
+    var checkCls = "desk-checkbox mt-1";
 }
 
 <style>[x-cloak]{display:none!important}</style>
@@ -18,14 +20,6 @@
     on a hidden tab switches to that tab before the browser tries to focus the field.
 *@
 <div class="max-w-5xl mx-auto" x-data="settingsTabs()">
-    <div class="mb-6">
-        <h1 class="text-xl font-semibold text-foreground">Settings</h1>
-        <p class="text-sm text-muted-foreground mt-1">
-            How your site presents itself, what readers can do, and how search engines and answer engines see it.
-            Changes on every tab are saved together with the <strong>Save changes</strong> button at the bottom.
-        </p>
-    </div>
-
     <form asp-action="Update" method="post" data-track-changes x-ref="form" class="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)] items-start">
         @Html.AntiForgeryToken()
 
@@ -58,9 +52,9 @@
 
             @* ────────────────────────────── General ────────────────────────────── *@
             <section id="s-general" role="tabpanel" aria-labelledby="tab-general" x-show="tab === 'general'" x-cloak data-tab="general"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                     class="desk-card p-6 space-y-6 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">General</h2>
+                    <h2 class="desk-card-title">General</h2>
                     <p class="@helpCls mt-1">The name and images that identify the site. They appear in the browser tab, the header and footer, feeds, social previews and structured data.</p>
                 </header>
 
@@ -94,7 +88,7 @@
                             <input asp-for="SiteLogoUrl" id="SiteLogoInput" class="@inputCls" placeholder="https://" />
                             <button type="button"
                                     onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteLogoInput', previewImg: 'SiteLogoPreview', folder: 'images' } })); document.getElementById('SiteLogoPreviewWrapper').classList.remove('hidden');"
-                                    class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                                    class="desk-btn desk-btn-secondary shrink-0">Select</button>
                         </div>
                         <p class="@helpCls">Header logo. Pick from the media library or paste a URL; leave blank to show the site name as text. A transparent PNG or SVG about 400 × 100 px works best.</p>
                     </div>
@@ -107,7 +101,7 @@
                             <input asp-for="SiteFaviconUrl" id="SiteFaviconInput" class="@inputCls" placeholder="https://" />
                             <button type="button"
                                     onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteFaviconInput', previewImg: 'SiteFaviconPreview', folder: 'images' } })); document.getElementById('SiteFaviconPreviewWrapper').classList.remove('hidden');"
-                                    class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                                    class="desk-btn desk-btn-secondary shrink-0">Select</button>
                         </div>
                         <p class="@helpCls">The small icon in browser tabs and bookmarks. A square PNG or ICO, 32 × 32 px or larger.</p>
                     </div>
@@ -122,7 +116,7 @@
                         <input asp-for="SiteCoverUrl" id="SiteCoverInput" class="@inputCls" placeholder="https://" />
                         <button type="button"
                                 onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'SiteCoverInput', previewImg: 'SiteCoverPreview', folder: 'images' } })); document.getElementById('SiteCoverPreviewWrapper').classList.remove('hidden');"
-                                class="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium shrink-0">Select</button>
+                                class="desk-btn desk-btn-secondary shrink-0">Select</button>
                     </div>
                     <p class="@helpCls">Wide hero/banner image at the top of the home page in layouts that show one (recommended 1500 × 500 px). Also the fallback social preview image for pages without their own.</p>
                 </div>
@@ -130,9 +124,9 @@
 
             @* ────────────────────────────── Display ────────────────────────────── *@
             <section id="s-display" role="tabpanel" aria-labelledby="tab-display" x-show="tab === 'display'" x-cloak data-tab="display"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                     class="desk-card p-6 space-y-6 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Display</h2>
+                    <h2 class="desk-card-title">Display</h2>
                     <p class="@helpCls mt-1">How lists, dates and times, and colours are shown. Layouts, presets and fonts live under <a href="/admin/theme" class="underline">Theme</a>.</p>
                 </header>
                 <div class="grid gap-6 md:grid-cols-2">
@@ -144,7 +138,7 @@
                     </div>
                     <div class="space-y-2">
                         <label asp-for="ColorScheme" class="@labelCls"></label>
-                        <select asp-for="ColorScheme" class="@inputCls">
+                        <select asp-for="ColorScheme" class="@selectCls">
                             <option value="system">System — follow each reader's device setting</option>
                             <option value="light">Always light</option>
                             <option value="dark">Always dark</option>
@@ -157,9 +151,9 @@
 
             @* ────────────────────────────── Comments ────────────────────────────── *@
             <section id="s-comments" role="tabpanel" aria-labelledby="tab-comments" x-show="tab === 'comments'" x-cloak data-tab="comments"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                     class="desk-card p-6 space-y-6 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Comments</h2>
+                    <h2 class="desk-card-title">Comments</h2>
                     <p class="@helpCls mt-1">Whether readers can comment and whether a person approves each comment first. The spam filter (honeypot, timing, link and duplicate checks) is always on and needs no setup; what it rejects is reported to the <a href="/admin/security" class="underline">firewall</a>.</p>
                 </header>
                 <div class="space-y-5">
@@ -182,9 +176,9 @@
 
             @* ────────────────────────── Search & analytics ────────────────────────── *@
             <section id="s-analytics" role="tabpanel" aria-labelledby="tab-analytics" x-show="tab === 'analytics'" x-cloak data-tab="analytics"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-8 scroll-mt-16">
+                     class="desk-card p-6 space-y-8 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Search &amp; analytics</h2>
+                    <h2 class="desk-card-title">Search &amp; analytics</h2>
                     <p class="@helpCls mt-1">Prove you own the site to search engines, get new posts indexed fast, and pull real search performance into the Desk. Everything here is optional; blank fields simply switch a feature off.</p>
                 </header>
 
@@ -248,7 +242,7 @@
                     <h3 class="text-sm font-semibold text-foreground">Search Console</h3>
                     @if (Model.SearchConsoleConnectedAs is not null)
                     {
-                        <p class="text-xs rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2">
+                        <p class="text-xs rounded-lg border p-3 pill-ok">
                             Connected to <code>@Model.SearchConsoleProperty</code> as <code>@Model.SearchConsoleConnectedAs</code>.
                             @if (Model.SearchConsoleLatestDate is DateTime latest)
                             {
@@ -262,7 +256,7 @@
                     }
                     else if (Model.SearchConsoleCredentialStored)
                     {
-                        <p class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2">
+                        <p class="text-xs rounded-lg border p-3 pill-warn">
                             A key file is stored but cannot be read (the Data Protection key ring changed) or no property is set. Paste the key file again and set the property.
                         </p>
                     }
@@ -281,7 +275,7 @@
                     </div>
                     <div class="space-y-2">
                         <label asp-for="SearchConsoleServiceAccountJson" class="@labelCls"></label>
-                        <textarea asp-for="SearchConsoleServiceAccountJson" rows="4" autocomplete="off" spellcheck="false" placeholder='@(Model.SearchConsoleCredentialStored ? "Paste a new key file only to replace the stored one." : "{ \"type\": \"service_account\", \"client_email\": \"…\", \"private_key\": \"…\" }")' class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"></textarea>
+                        <textarea asp-for="SearchConsoleServiceAccountJson" rows="4" autocomplete="off" spellcheck="false" placeholder='@(Model.SearchConsoleCredentialStored ? "Paste a new key file only to replace the stored one." : "{ \"type\": \"service_account\", \"client_email\": \"…\", \"private_key\": \"…\" }")' class="desk-textarea text-xs font-mono"></textarea>
                         <p class="@helpCls">Stored encrypted; never shown again, logged, or exported. Leave empty to keep the stored key.</p>
                         <span asp-validation-for="SearchConsoleServiceAccountJson" class="@errCls"></span>
                     </div>
@@ -308,9 +302,9 @@
 
             @* ──────────────────── Notifications & housekeeping ──────────────────── *@
             <section id="s-housekeeping" role="tabpanel" aria-labelledby="tab-housekeeping" x-show="tab === 'housekeeping'" x-cloak data-tab="housekeeping"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-8 scroll-mt-16">
+                     class="desk-card p-6 space-y-8 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Notifications &amp; housekeeping</h2>
+                    <h2 class="desk-card-title">Notifications &amp; housekeeping</h2>
                     <p class="@helpCls mt-1">Alerts for the operator and how long the platform keeps its own working data. The nightly jobs that apply these limits are listed on the <a href="/admin/dashboard" class="underline">dashboard</a>.</p>
                 </header>
                 <div class="space-y-3">
@@ -334,6 +328,12 @@
                         <input asp-for="CrawlerVisitRetentionDays" type="number" min="7" max="3650" class="@inputCls" />
                         <p class="@helpCls">How long <a href="/admin/ai-crawlers" class="underline">Admin → AI Crawlers</a> keeps each crawler request (7–3650 days). Older rows are pruned nightly.</p>
                         <span asp-validation-for="CrawlerVisitRetentionDays" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="PageViewRetentionDays" class="@labelCls"></label>
+                        <input asp-for="PageViewRetentionDays" type="number" min="0" max="3650" class="@inputCls" />
+                        <p class="@helpCls">How long each recorded page view is kept in full (address hash, browser, exact time). <a href="/admin/analytics" class="underline">Admin → Analytics</a> keeps its figures either way, from a daily summary. 0 keeps every view; otherwise 31–3650 days, removed a little at a time each hour.</p>
+                        <span asp-validation-for="PageViewRetentionDays" class="@errCls"></span>
                     </div>
                     <div class="space-y-2">
                         <label asp-for="RevisionsPerItem" class="@labelCls"></label>
@@ -363,9 +363,9 @@
 
             @* ────────────────────────────── Social ────────────────────────────── *@
             <section id="s-social" role="tabpanel" aria-labelledby="tab-social" x-show="tab === 'social'" x-cloak data-tab="social"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                     class="desk-card p-6 space-y-6 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Social</h2>
+                    <h2 class="desk-card-title">Social</h2>
                     <p class="@helpCls mt-1">Profile links shown as icons in the header or footer of most layouts and listed as <code>sameAs</code> in the publisher's structured data. Leave a field blank to hide that icon. Use the full profile URL.</p>
                 </header>
                 <div class="grid gap-6 md:grid-cols-2">
@@ -398,9 +398,9 @@
 
             @* ────────────────────────────── Identity ────────────────────────────── *@
             <section id="s-identity" role="tabpanel" aria-labelledby="tab-identity" x-show="tab === 'identity'" x-cloak data-tab="identity"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16">
+                     class="desk-card p-6 space-y-6 scroll-mt-16">
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Publisher identity</h2>
+                    <h2 class="desk-card-title">Publisher identity</h2>
                     <p class="@helpCls mt-1">
                         Who this publication <em>is</em>, as an entity rather than a website. Search and answer engines
                         resolve a brand by cross-referencing authoritative profiles — this is how they tell you apart
@@ -413,7 +413,7 @@
                 <div class="grid gap-6 md:grid-cols-2">
                     <div class="space-y-2">
                         <label asp-for="EntityType" class="@labelCls">Publisher type</label>
-                        <select asp-for="EntityType" class="@inputCls">
+                        <select asp-for="EntityType" class="@selectCls">
                             <option value="Organization">Organization</option>
                             <option value="Person">Person (a personal publication)</option>
                         </select>
@@ -432,11 +432,27 @@
                         <input asp-for="EntityFoundingDate" class="@inputCls" placeholder="2019 or 2019-04-01" />
                         <p class="@helpCls">A year or a full date. Anything else is left out rather than reshaped.</p>
                     </div>
+                    <div class="space-y-2">
+                        <label asp-for="EntityContactEmail" class="@labelCls">Contact email</label>
+                        <input asp-for="EntityContactEmail" type="email" class="@inputCls" placeholder="hello@example.com" />
+                        <span asp-validation-for="EntityContactEmail" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="EntityContactUrl" class="@labelCls">Contact page</label>
+                        <input asp-for="EntityContactUrl" class="@inputCls" placeholder="/contact or https://…" />
+                        <span asp-validation-for="EntityContactUrl" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2 md:col-span-2">
+                        <label asp-for="EntityContactType" class="@labelCls">Contact type</label>
+                        <input asp-for="EntityContactType" class="@inputCls" placeholder="customer support" maxlength="60" />
+                        <span asp-validation-for="EntityContactType" class="@errCls"></span>
+                        <p class="@helpCls">With an email or a contact page, search and answer engines are told how to reach you (<code>contactPoint</code> in the publisher's structured data; the email is also listed in llms.txt). Leave both empty to publish neither. The type says who answers, for example customer support or editorial.</p>
+                    </div>
                 </div>
 
                 <div class="space-y-2">
                     <label asp-for="EntitySameAs" class="@labelCls">Authority profiles</label>
-                    <textarea asp-for="EntitySameAs" rows="4" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="https://en.wikipedia.org/wiki/Your_Publication&#10;https://www.wikidata.org/wiki/Q123456&#10;https://www.crunchbase.com/organization/your-company"></textarea>
+                    <textarea asp-for="EntitySameAs" rows="4" class="desk-textarea" placeholder="https://en.wikipedia.org/wiki/Your_Publication&#10;https://www.wikidata.org/wiki/Q123456&#10;https://www.crunchbase.com/organization/your-company"></textarea>
                     <p class="@helpCls">
                         One URL per line — Wikipedia, Wikidata, a company register, Crunchbase, an ORCID. These join your
                         social links in <code>sameAs</code>. Only absolute http(s) URLs are used; a bare handle would
@@ -446,7 +462,7 @@
 
                 <div class="space-y-2">
                     <label asp-for="EntityIdentityStatement" class="@labelCls">Identity statement</label>
-                    <textarea asp-for="EntityIdentityStatement" rows="4" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Leave blank to use the generated wording."></textarea>
+                    <textarea asp-for="EntityIdentityStatement" rows="4" class="desk-textarea" placeholder="Leave blank to use the generated wording."></textarea>
                     <p class="@helpCls">
                         Written for answer engines and published verbatim in the Identity section of
                         <code>llms.txt</code>. Say plainly what this publication is — and, if your domain previously
@@ -460,10 +476,10 @@
                 var cfErrors = ViewData["CustomFieldErrors"] as IDictionary<int, string> ?? new Dictionary<int, string>();
             }
             <section id="s-fields" role="tabpanel" aria-labelledby="tab-fields" x-show="tab === 'fields'" x-cloak data-tab="fields"
-                     class="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6 scroll-mt-16"
+                     class="desk-card p-6 space-y-6 scroll-mt-16"
                      x-data='customFieldsEditor(@Json.Serialize(Model.CustomFieldsJson ?? "[]"), @Json.Serialize(cfErrors))'>
                 <header>
-                    <h2 class="text-base font-semibold text-foreground">Custom fields</h2>
+                    <h2 class="desk-card-title">Custom fields</h2>
                     <p class="@helpCls mt-1">Extra facts you record on every post or page, such as a price, a version or an event date. Each field appears in the editor; fields marked <strong>Show to readers</strong> are listed under “Details” on the page and added to its structured data (<code>additionalProperty</code>). Fields are shown in this order.</p>
                 </header>
                 <input type="hidden" name="CustomFieldsPosted" value="true" />
@@ -485,7 +501,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="@labelCls" :for="'cf-type-' + i">Type</label>
-                                    <select class="@inputCls" :id="'cf-type-' + i" x-model="row.Type" :aria-describedby="row.Key && row.Type !== row.origType ? 'cf-typewarn-' + i : null">
+                                    <select class="@selectCls" :id="'cf-type-' + i" x-model="row.Type" :aria-describedby="row.Key && row.Type !== row.origType ? 'cf-typewarn-' + i : null">
                                         <option value="text">Text</option>
                                         <option value="number">Number</option>
                                         <option value="date">Date</option>
@@ -495,7 +511,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="@labelCls" :for="'cf-applies-' + i">Used on</label>
-                                    <select class="@inputCls" :id="'cf-applies-' + i" x-model="row.AppliesTo">
+                                    <select class="@selectCls" :id="'cf-applies-' + i" x-model="row.AppliesTo">
                                         <option value="posts">Posts</option>
                                         <option value="pages">Pages</option>
                                         <option value="both">Posts and pages</option>
@@ -510,16 +526,16 @@
                                 </label>
                                 <div class="flex items-center gap-2">
                                     <span class="@helpCls" x-text="row.Key ? 'Export key: ' + row.Key : 'New field'"></span>
-                                    <button type="button" :id="'cf-up-' + i" class="h-10 min-w-10 px-2 rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :disabled="i === 0" @@click="move(i, -1)" :aria-label="'Move ' + (row.Label || 'this field') + ' up'">↑</button>
-                                    <button type="button" :id="'cf-down-' + i" class="h-10 min-w-10 px-2 rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :disabled="i === rows.length - 1" @@click="move(i, 1)" :aria-label="'Move ' + (row.Label || 'this field') + ' down'">↓</button>
-                                    <button type="button" class="h-10 px-3 rounded-md border border-input text-sm tone-bad hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @@click="remove(i)" :aria-label="'Remove ' + (row.Label || 'this field')">Remove</button>
+                                    <button type="button" :id="'cf-up-' + i" class="desk-btn desk-btn-outline desk-btn-icon" :disabled="i === 0" @@click="move(i, -1)" :aria-label="'Move ' + (row.Label || 'this field') + ' up'">↑</button>
+                                    <button type="button" :id="'cf-down-' + i" class="desk-btn desk-btn-outline desk-btn-icon" :disabled="i === rows.length - 1" @@click="move(i, 1)" :aria-label="'Move ' + (row.Label || 'this field') + ' down'">↓</button>
+                                    <button type="button" class="desk-btn desk-btn-danger-outline" @@click="remove(i)" :aria-label="'Remove ' + (row.Label || 'this field')">Remove</button>
                                 </div>
                             </div>
                         </li>
                     </template>
                 </ol>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button type="button" id="cf-add" @@click="add()" class="h-10 px-4 inline-flex items-center rounded-md border border-input bg-background text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Add field</button>
+                    <button type="button" id="cf-add" @@click="add()" class="desk-btn desk-btn-outline">Add field</button>
                     <p class="@helpCls">Up to @Blog.Core.Services.CustomFields.MaxFields fields. Renaming a field keeps its values. Removing one hides it everywhere but keeps the values already entered: add a field with the same label again and they return.</p>
                 </div>
             </section>
@@ -532,8 +548,8 @@
                         <span>Saving applies the fields on every tab.</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="/admin/settings" class="h-10 px-4 inline-flex items-center rounded-md border border-input bg-background text-sm hover:bg-muted">Discard</a>
-                        <button type="submit" class="h-10 px-5 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
+                        <a href="/admin/settings" class="desk-btn desk-btn-outline">Discard</a>
+                        <button type="submit" class="desk-btn desk-btn-primary">
                             Save changes
                         </button>
                     </div>

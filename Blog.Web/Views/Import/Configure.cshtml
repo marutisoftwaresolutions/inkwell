@@ -2,16 +2,16 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Configure import";
+    ViewData["Description"] = $"What we found in {Model.FileName}. Choose what to bring in before anything is written.";
     var counts = ViewBag.Counts as Dictionary<Blog.Core.Domain.ImportItemType, int> ?? new();
     int Count(Blog.Core.Domain.ImportItemType t) => counts.TryGetValue(t, out var c) ? c : 0;
 }
 
-<div class="flex flex-col gap-6 max-w-3xl">
-    <div>
-        <a href="/admin/import" class="text-sm text-muted-foreground hover:text-primary">← Back to imports</a>
-        <h2 class="font-semibold text-lg mt-2">What we found in <span class="font-mono text-sm">@Model.FileName</span></h2>
-    </div>
+@section PageActions {
+    <a href="/admin/import" class="desk-btn desk-btn-outline">Back to imports</a>
+}
 
+<div class="flex flex-col gap-6 max-w-3xl">
     <!-- Preview counts -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         @foreach (var (label, t) in new[] {
@@ -23,39 +23,39 @@
             ("Comments", Blog.Core.Domain.ImportItemType.Comment),
             ("Authors", Blog.Core.Domain.ImportItemType.Author) })
         {
-            <div class="bg-card border border-border rounded-lg p-3">
-                <div class="text-2xl font-semibold">@Count(t)</div>
+            <div class="desk-card p-3">
+                <div class="text-2xl font-semibold tabular-nums">@Count(t)</div>
                 <div class="text-xs text-muted-foreground">@label</div>
             </div>
         }
     </div>
 
     <!-- Selection form -->
-    <form method="post" action="/admin/import/configure/@Model.Id" class="bg-card border border-border rounded-lg p-5 space-y-5">
+    <form method="post" action="/admin/import/configure/@Model.Id" class="desk-card p-5 space-y-5">
         @Html.AntiForgeryToken()
 
         <div>
-            <h3 class="font-semibold mb-2">What to import</h3>
+            <h2 class="desk-card-title mb-3">What to import</h2>
             <div class="grid grid-cols-2 gap-2 text-sm">
-                <label class="flex items-center gap-2"><input type="checkbox" name="ImportPosts" value="true" checked /> Posts</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="ImportPages" value="true" checked /> Pages</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="ImportCategories" value="true" checked /> Categories</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="ImportTags" value="true" checked /> Tags</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="ImportImages" value="true" checked /> Images (download &amp; convert to WebP)</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="ImportComments" value="true" /> Comments</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ImportPosts" value="true" checked class="desk-checkbox" /> Posts</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ImportPages" value="true" checked class="desk-checkbox" /> Pages</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ImportCategories" value="true" checked class="desk-checkbox" /> Categories</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ImportTags" value="true" checked class="desk-checkbox" /> Tags</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ImportImages" value="true" checked class="desk-checkbox" /> Images (download and convert to WebP)</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ImportComments" value="true" class="desk-checkbox" /> Comments</label>
             </div>
         </div>
 
         <div>
-            <h3 class="font-semibold mb-2">Options</h3>
+            <h2 class="desk-card-title mb-3">Options</h2>
             <div class="space-y-2 text-sm">
-                <label class="flex items-center gap-2"><input type="checkbox" name="PublishedOnly" value="true" /> Only import <strong>published</strong> posts (skip drafts)</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="ConvertToWebP" value="true" checked /> Convert imported images to WebP</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="SanitizeHtml" value="true" checked /> Sanitize imported HTML (recommended)</label>
-                <label class="flex items-center gap-2"><input type="checkbox" name="CreateRedirects" value="true" checked /> Create redirects from old URLs (preserves SEO)</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="PublishedOnly" value="true" class="desk-checkbox" /> Only import <strong>published</strong> posts (skip drafts)</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="ConvertToWebP" value="true" checked class="desk-checkbox" /> Convert imported images to WebP</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="SanitizeHtml" value="true" checked class="desk-checkbox" /> Sanitize imported HTML (recommended)</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="CreateRedirects" value="true" checked class="desk-checkbox" /> Create redirects from old URLs (preserves SEO)</label>
                 @if (Model.Source == Blog.Core.Domain.ImportSource.Ghost)
                 {
-                    <label class="flex items-start gap-2"><input type="checkbox" name="KeepMarkdown" value="true" class="mt-1" />
+                    <label class="flex items-start gap-2"><input type="checkbox" name="KeepMarkdown" value="true" class="desk-checkbox mt-1" />
                         <span>Keep posts written in Markdown as Markdown
                             <span class="block text-xs text-muted-foreground">Ghost posts made of Markdown cards open in the Markdown editor. Everything else imports as HTML either way.</span>
                         </span>
@@ -65,23 +65,21 @@
         </div>
 
         <div>
-            <label class="block text-sm font-medium mb-1">If a slug already exists</label>
-            <select name="SlugConflict" class="px-3 py-2 bg-background border border-input rounded-md text-sm">
-                <option value="Suffix">Keep both — add a suffix (-2)</option>
+            <label for="SlugConflict" class="desk-label">If a slug already exists</label>
+            <select name="SlugConflict" id="SlugConflict" class="desk-select w-auto">
+                <option value="Suffix">Keep both and add a suffix (-2)</option>
                 <option value="Skip">Skip the imported item</option>
                 <option value="Overwrite">Overwrite the existing content</option>
             </select>
         </div>
 
-        <div class="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <p class="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             Imported posts are attributed to you (the site owner) so they publish under your existing blog.
-        </div>
+        </p>
 
         <div class="flex gap-3">
-            <button type="submit" name="action" value="preview"
-                    class="px-4 py-2 border border-input rounded-md text-sm font-medium hover:bg-muted">Preview first</button>
-            <button type="submit" name="action" value="run"
-                    class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Start import →</button>
+            <button type="submit" name="action" value="preview" class="desk-btn desk-btn-outline">Preview first</button>
+            <button type="submit" name="action" value="run" class="desk-btn desk-btn-primary">Start import</button>
         </div>
     </form>
 </div>

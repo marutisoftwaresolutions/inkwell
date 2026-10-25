@@ -1,0 +1,119 @@
+@model Blog.Web.Controllers.FormSubmissionsViewModel
+@using Blog.Web.Models
+@{
+    Layout = "_AdminLayout";
+    var f = Model.Form;
+    ViewData["Title"] = $"{f.Name}: submissions";
+    ViewData["Description"] = f.RetentionDays == 0 ? "Kept until you delete them." : $"Each is deleted automatically {f.RetentionDays} days after it arrives.";
+    var q = ViewData[ListPaging.QueryKey] as string;
+    var total = ViewData[ListPaging.TotalKey] as int? ?? 0;
+    var pageNo = ViewData[ListPaging.PageKey] as int? ?? 1;
+    ViewData["ListSearchPlaceholder"] = "Search submissions";
+    // The first two short fields make the row readable; the full submission opens on its own page.
+    var shown = Model.Fields.Where(x => x.Type is not ("checkbox" or "consent")).Take(2).ToList();
+    Dictionary<string, string> Values(Blog.Core.Domain.FormSubmission s)
+    {
+        try { return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(s.ValuesJson) ?? new(); }
+        catch { return new(); }
+    }
+    string Short(string? v) => string.IsNullOrEmpty(v) ? "—" : v.Length > 80 ? v[..80] + "…" : v;
+}
+
+@section PageActions {
+    <a href="/admin/forms" class="desk-btn desk-btn-outline">Back to forms</a>
+    <a href="/admin/forms/edit/@f.Id" class="desk-btn desk-btn-outline">Edit the form</a>
+    <form method="post" action="/admin/forms/@f.Id/submissions/export">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="desk-btn desk-btn-outline" disabled="@(total == 0 && string.IsNullOrEmpty(q) ? "disabled" : null)">Download CSV</button>
+    </form>
+}
+
+<div class="flex flex-col gap-6">
+    <form id="bulkForm" method="post" action="/admin/forms/@f.Id/submissions/delete"
+          data-confirm-title="Delete the selected submissions?"
+          data-confirm-body="They are deleted for good and cannot be brought back. Download a CSV first if you need a copy."
+          data-confirm-action="Delete submissions" data-confirm-tone="danger">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="q" value="@q" />
+        <input type="hidden" name="page" value="@pageNo" />
+    </form>
+
+    <div class="desk-card overflow-hidden">
+        <partial name="_ListSearch" />
+        @if (Model.Rows.Count == 0)
+        {
+            if (string.IsNullOrEmpty(q))
+            {
+                ViewData["EmptyTitle"] = "Nothing received yet.";
+                ViewData["EmptyHint"] = "Submissions appear here as soon as visitors send the form.";
+            }
+            else
+            {
+                ViewData["EmptyQuery"] = q;
+                ViewData["EmptyClearHref"] = "?";
+                ViewData["EmptyHint"] = "to see them all.";
+            }
+            <partial name="_EmptyState" />
+        }
+        else
+        {
+        <div class="table-scroll"><table class="desk-table">
+            <thead>
+                <tr>
+                    <th class="w-10"><input type="checkbox" id="bulkAll" class="desk-checkbox" aria-label="Select all submissions on this page" /></th>
+                    <th>Received</th>
+                    @foreach (var field in shown)
+                    {
+                        <th>@field.Label</th>
+                    }
+                    <th class="w-[100px]"><span class="sr-only">Open</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Rows)
+                {
+                    var v = Values(s);
+                    <tr class="@(s.ReadAt is null ? "font-semibold" : "")">
+                        <td><input type="checkbox" name="ids" value="@s.Id" form="bulkForm" class="desk-checkbox" aria-label="Select the submission received @Dates.DateTime(s.CreatedAt)" /></td>
+                        <td class="whitespace-nowrap">
+                            @Dates.DateTime(s.CreatedAt)
+                            @if (s.ReadAt is null) { <span class="ml-1 desk-pill pill-info font-normal">New</span> }
+                        </td>
+                        @foreach (var field in shown)
+                        {
+                            <td class="font-normal">@Short(v.GetValueOrDefault(field.Key))</td>
+                        }
+                        <td><a href="/admin/forms/@f.Id/submissions/@s.Id" class="desk-btn desk-btn-outline desk-btn-sm font-normal">Open</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+        }
+    </div>
+    @if (Model.Rows.Count > 0)
+    {
+        <div><button type="submit" form="bulkForm" id="bulkDelete" disabled class="desk-btn desk-btn-danger-outline">Delete selected</button></div>
+    }
+    <partial name="_ListPager" />
+</div>
+
+@section Scripts {
+<script>
+    // Deleting five or more at once asks for the typed word, as every bulk delete in the Desk does.
+    (function () {
+        var form = document.getElementById('bulkForm');
+        var all = document.getElementById('bulkAll'), del = document.getElementById('bulkDelete');
+        function boxes() { return document.querySelectorAll('input[name="ids"][form="bulkForm"]'); }
+        function update() {
+            var n = document.querySelectorAll('input[name="ids"][form="bulkForm"]:checked').length;
+            if (del) del.disabled = n === 0;
+            if (all) { all.checked = n > 0 && n === boxes().length; all.indeterminate = n > 0 && n < boxes().length; }
+            if (n >= 5) form.dataset.confirmTyped = 'DELETE'; else delete form.dataset.confirmTyped;
+            form.dataset.confirmTitle = n === 1 ? 'Delete the selected submission?' : 'Delete the ' + n + ' selected submissions?';
+        }
+        document.addEventListener('change', function (e) { if (e.target && e.target.name === 'ids') update(); });
+        if (all) all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); update(); });
+        update();
+    })();
+</script>
+}

@@ -103,7 +103,7 @@ else
                 <h2 id="on-this-page" style="margin-top:0;font-size:var(--fs-h4);">
                     On this page <span class="vd-score-max">(@(entries.Count + 3))</span>
                 </h2>
-                <ol style="columns:2;column-gap:var(--sp-8);margin:0;padding-left:1.2em;font-size:var(--fs-sm);">
+                <ol style="columns:2;column-gap:var(--sp-8);margin:0;padding-inline-start:1.2em;font-size:var(--fs-sm);">
                     <li><a href="#editors-picks">Editor's picks</a></li>
                     <li><a href="#methodology">How we ranked these tools</a></li>
                     <li><a href="#comparison-table">Comparison table</a></li>
@@ -153,7 +153,7 @@ else
                     {
                         <div class="ink-faq-item" x-data="{ open: false }">
                             <button type="button" @@click="open = !open" class="ink-faq-question"
-                                    style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;background:none;border:none;cursor:pointer;">
+                                    style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:start;background:none;border:none;cursor:pointer;">
                                 <span>@faq.Question</span>
                                 <svg :class="open ? 'rotate-180' : ''" style="flex:none;transition:transform .2s;"
                                      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

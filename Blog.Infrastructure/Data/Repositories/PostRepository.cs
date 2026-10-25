@@ -170,6 +170,23 @@ public class PostRepository : IPostRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<Blog.Core.Services.ContentCalendar.Source>> GetCalendarAsync(DateTime fromUtc, DateTime toUtc, Guid? authorId = null)
+    {
+        using var conn = _ctx.CreateConnection();
+        // Status is stored as the enum's name. A published post sits on its publish date; anything else on its
+        // scheduled (or planned) date.
+        var rows = await conn.QueryAsync<(Guid Id, string Title, string Slug, string Status, DateTime? PublishedAt, DateTime? ScheduledAt)>(@"
+            SELECT Id, ISNULL(Title, '') AS Title, ISNULL(Slug, '') AS Slug, Status, PublishedAt, ScheduledAt
+              FROM Posts
+             WHERE (@AuthorId IS NULL OR AuthorId = @AuthorId)
+               AND ((Status = 'Published' AND PublishedAt >= @FromUtc AND PublishedAt < @ToUtc)
+                 OR (Status IN ('Scheduled', 'Draft', 'InReview', 'NeedsChanges') AND ScheduledAt >= @FromUtc AND ScheduledAt < @ToUtc))",
+            new { FromUtc = fromUtc, ToUtc = toUtc, AuthorId = authorId });
+        return rows.Select(r => new Blog.Core.Services.ContentCalendar.Source(r.Id, r.Title, r.Slug,
+                Enum.TryParse<PostStatus>(r.Status, out var s) ? s : PostStatus.Draft, r.PublishedAt, r.ScheduledAt))
+            .ToList();
+    }
+
     public async Task<Post?> GetByIdAsync(Guid id, Guid? authorId = null)
     {
         using var conn = _ctx.CreateConnection();
@@ -307,7 +324,7 @@ public class PostRepository : IPostRepository
         // Only posts readers can see (the public listing's rule), so a beacon from an anonymous preview
         // of a draft counts nothing.
         return await conn.ExecuteAsync(@"
-            UPDATE Posts SET ViewCount = ViewCount + @Views
+            UPDATE Posts SET ViewCount = ISNULL(ViewCount, 0) + @Views   -- posts inserted before DF_Posts_ViewCount started at NULL
             WHERE Slug = @Slug
               AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= SYSUTCDATETIME()))
               AND (@OwnerId = '00000000-0000-0000-0000-000000000000' OR AuthorId = @OwnerId)",

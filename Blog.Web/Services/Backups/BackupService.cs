@@ -42,9 +42,7 @@ public sealed class BackupService
 
     public BackupPaths Paths => _paths;
 
-    public static string AppVersion =>
-        (typeof(BackupService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "")
-            .Split('+')[0];
+    public static string AppVersion => Blog.Web.Services.AppVersion.Current;
 
     private string PathOf(string name)
     {

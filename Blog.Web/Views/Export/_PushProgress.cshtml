@@ -1,0 +1,56 @@
+@model Blog.Web.Controllers.PushStatusViewModel
+@using Blog.Core.Services.Export.Push
+@{
+    var p = Model.Push;
+    var c = Model.Counts;
+    var total = Math.Max(p.TotalCount, c.Total);
+    var percent = total == 0 ? 100 : (int)Math.Round(100.0 * c.Done / total);
+    var running = p.Status == PushStatus.Running;
+    var (label, pill) = p.Status switch
+    {
+        PushStatus.Running => ("Running", "pill-info"),
+        PushStatus.Paused => ("Paused", "pill-warn"),
+        PushStatus.Completed when c.Failed > 0 => ("Finished with failures", "pill-warn"),
+        PushStatus.Completed => ("Finished", "pill-ok"),
+        _ => ("Cancelled", "pill-bad"),
+    };
+}
+@* While the push runs, only #push-live polls and is replaced: it holds nothing focusable, so a keyboard user's place
+   on an outcome link is kept. The counts inside those links and the announcement are updated in place by out-of-band
+   swaps (same ids). A finished push answers with HX-Refresh, which reloads the page with its final controls. *@
+<div id="push-progress" class="desk-card p-4 flex flex-col gap-3">
+    <div id="push-live" class="flex flex-col gap-3"
+         hx-get="@(running ? $"/admin/export/push/{p.Id}/progress" : null)" hx-trigger="@(running ? "every 5s" : null)"
+         hx-select="#push-live" hx-swap="outerHTML">
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="desk-pill @pill">@label</span>
+            <span class="text-sm text-foreground">@c.Done of @total @(total == 1 ? "item" : "items") done</span>
+        </div>
+        <div class="h-2 w-full rounded bg-muted overflow-hidden" role="progressbar" aria-label="Push progress"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-valuetext="@c.Done of @total items">
+            <div class="h-full bg-primary" style="width: @percent%"></div>
+        </div>
+        @if (running)
+        {
+            <p class="desk-hint">A batch is sent every minute. You can leave this page; the push carries on.</p>
+        }
+    </div>
+    <ul class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm" aria-label="Outcomes">
+        @foreach (var (name, n, show) in new[]
+        {
+            ("Created", c.Created, "created"), ("Updated", c.Updated, "updated"), ("Skipped", c.Skipped, "skipped"),
+            ("Failed", c.Failed, "failed"), ("Waiting", c.Pending, "pending"),
+        })
+        {
+            <li>
+                <a href="/admin/export/push/@p.Id?show=@show"
+                   class="block min-h-10 p-3 rounded-md border border-border hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                    <span class="block text-xs text-muted-foreground">@name</span>
+                    <span id="push-count-@show" hx-swap-oob="true" class="block text-lg font-semibold text-foreground">@n</span>
+                </a>
+            </li>
+        }
+    </ul>
+    @* A live region that stays in the page, so its new text is announced; only its contents are swapped. *@
+    <p id="push-announce" hx-swap-oob="innerHTML" class="text-sm text-muted-foreground empty:hidden" role="status" aria-live="polite">@(string.IsNullOrWhiteSpace(p.Message) ? "" : p.Message)</p>
+</div>

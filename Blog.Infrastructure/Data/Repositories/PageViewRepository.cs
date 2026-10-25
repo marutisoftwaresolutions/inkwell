@@ -1,6 +1,7 @@
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Dapper;
+using System.Data;
 
 namespace Blog.Infrastructure.Data.Repositories;
 
@@ -53,90 +54,69 @@ public class PageViewRepository : IPageViewRepository
         return rows.ToList();
     }
 
-    public async Task<IReadOnlyList<(string Source, string Medium, int Count)>> GetSourceBreakdownAsync(Guid ownerId, DateTime from, DateTime to)
+    // Analytics reads the whole report in one call (ADR-0037): the procedure scans the date range once
+    // through the covering IX_PageViews_OwnerId_CreatedAt and returns eight result sets in a fixed order.
+    // The content-page filter inside the procedure is the same rule as ContentPathFilter above.
+    public async Task<AnalyticsReport> GetReportAsync(Guid ownerId, DateTime from, DateTime to, int top = 20)
     {
         using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<(string Source, string Medium, int Count)>($@"
-            SELECT ISNULL(Source, 'direct') AS Source,
-                   ISNULL(Medium, 'none')   AS Medium,
-                   COUNT(1)                 AS Count
-            FROM PageViews
-            WHERE OwnerId = @OwnerId AND CreatedAt >= @From AND CreatedAt < @To
-              AND {ContentPathFilter}
-            GROUP BY ISNULL(Source, 'direct'), ISNULL(Medium, 'none')
-            ORDER BY Count DESC",
-            new { OwnerId = ownerId, From = from, To = to });
-        return rows.ToList();
+        using var grid = await conn.QueryMultipleAsync("dbo.usp_Analytics_Report",
+            new { OwnerId = ownerId, From = from, To = to, Top = top },
+            commandType: CommandType.StoredProcedure, commandTimeout: ReportTimeoutSeconds);
+
+        return new AnalyticsReport
+        {
+            Total     = await grid.ReadSingleAsync<int>(),
+            Daily     = (await grid.ReadAsync<(DateTime Date, int Count)>()).ToList(),
+            Sources   = (await grid.ReadAsync<(string Source, string Medium, int Count)>()).ToList(),
+            TopPages  = (await grid.ReadAsync<(string Path, int Views)>()).ToList(),
+            Referrers = (await grid.ReadAsync<(string Referrer, int Count)>()).ToList(),
+            Campaigns = (await grid.ReadAsync<(string Campaign, int Count)>()).ToList(),
+            Countries = (await grid.ReadAsync<(string Country, int Count)>()).ToList(),
+            Regions   = (await grid.ReadAsync<(string Region, int Count)>()).ToList(),
+        };
     }
 
-    public async Task<IReadOnlyList<(string Path, int Views)>> GetTopPagesAsync(Guid ownerId, DateTime from, DateTime to, int limit = 20)
+    /// <summary>A report read is an admin page load, not the hot path; give it longer than the 30-second default.</summary>
+    private const int ReportTimeoutSeconds = 90;
+
+    // Summarises finished days into PageViewDaily (ADR-0037). The procedure serialises itself with an app
+    // lock, so a second caller gets (0, 0) instead of inserting the same day twice.
+    public async Task<(int Days, int Rows)> RollUpAsync(DateTime throughDay, int maxDays)
     {
         using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<(string Path, int Views)>($@"
-            SELECT TOP (@Limit) Path, COUNT(1) AS Views
-            FROM PageViews
-            WHERE OwnerId = @OwnerId AND CreatedAt >= @From AND CreatedAt < @To
-              AND {ContentPathFilter}
-            GROUP BY Path
-            ORDER BY Views DESC",
-            new { OwnerId = ownerId, From = from, To = to, Limit = limit });
-        return rows.ToList();
+        return await conn.QuerySingleAsync<(int Days, int Rows)>("dbo.usp_PageViews_RollUp",
+            new { Through = throughDay.Date, MaxDays = maxDays },
+            commandType: CommandType.StoredProcedure, commandTimeout: ReportTimeoutSeconds * 4);
     }
 
-    public async Task<IReadOnlyList<(string Referrer, int Count)>> GetTopReferrersAsync(Guid ownerId, DateTime from, DateTime to, int limit = 20)
+    public async Task<IReadOnlyList<Guid>> GetOwnerIdsAsync()
     {
         using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<(string Referrer, int Count)>($@"
-            SELECT TOP (@Limit) ISNULL(Referrer, '(direct)') AS Referrer, COUNT(1) AS Count
-            FROM PageViews
-            WHERE OwnerId = @OwnerId AND CreatedAt >= @From AND CreatedAt < @To
-              AND Referrer IS NOT NULL AND {ContentPathFilter}
-            GROUP BY Referrer
-            ORDER BY Count DESC",
-            new { OwnerId = ownerId, From = from, To = to, Limit = limit });
-        return rows.ToList();
+        return (await conn.QueryAsync<Guid>("SELECT DISTINCT OwnerId FROM PageViews")).ToList();
     }
 
-    public async Task<IReadOnlyList<(string Campaign, int Count)>> GetCampaignsAsync(Guid ownerId, DateTime from, DateTime to)
-    {
-        using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<(string Campaign, int Count)>($@"
-            SELECT ISNULL(Campaign, '(none)') AS Campaign, COUNT(1) AS Count
-            FROM PageViews
-            WHERE OwnerId = @OwnerId AND CreatedAt >= @From AND CreatedAt < @To
-              AND Campaign IS NOT NULL AND {ContentPathFilter}
-            GROUP BY Campaign
-            ORDER BY Count DESC",
-            new { OwnerId = ownerId, From = from, To = to });
-        return rows.ToList();
-    }
+    /// <summary>Rows per delete: each is a short transaction, so recording views is never held up for long.</summary>
+    private const int PruneBatch = 5_000;
 
-    public async Task<IReadOnlyList<(string Country, int Count)>> GetCountryBreakdownAsync(Guid ownerId, DateTime from, DateTime to, int limit = 20)
+    // Only days already in PageViewDaily are removed: until the roll-up has summarised a day, its raw views are
+    // the only record of it. With no summary at all, nothing is removed.
+    public async Task<int> PruneAsync(Guid ownerId, DateTime olderThanUtc, TimeSpan budget)
     {
         using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<(string Country, int Count)>($@"
-            SELECT TOP (@Limit) ISNULL(Country, 'Unknown') AS Country, COUNT(1) AS Count
-            FROM PageViews
-            WHERE OwnerId = @OwnerId AND CreatedAt >= @From AND CreatedAt < @To
-              AND Country IS NOT NULL AND {ContentPathFilter}
-            GROUP BY Country
-            ORDER BY Count DESC",
-            new { OwnerId = ownerId, From = from, To = to, Limit = limit });
-        return rows.ToList();
-    }
-
-    public async Task<IReadOnlyList<(string Region, int Count)>> GetRegionBreakdownAsync(Guid ownerId, DateTime from, DateTime to, int limit = 20)
-    {
-        using var conn = _ctx.CreateConnection();
-        var rows = await conn.QueryAsync<(string Region, int Count)>($@"
-            SELECT TOP (@Limit) ISNULL(Region, 'Unknown') AS Region, COUNT(1) AS Count
-            FROM PageViews
-            WHERE OwnerId = @OwnerId AND CreatedAt >= @From AND CreatedAt < @To
-              AND Region IS NOT NULL AND {ContentPathFilter}
-            GROUP BY Region
-            ORDER BY Count DESC",
-            new { OwnerId = ownerId, From = from, To = to, Limit = limit });
-        return rows.ToList();
+        var stopAt = DateTime.UtcNow + budget;
+        var removed = 0;
+        int batch;
+        do
+        {
+            batch = await conn.ExecuteAsync(@"
+                DECLARE @Summarised DATETIME2 = DATEADD(DAY, 1, CAST((SELECT MAX([Day]) FROM PageViewDaily) AS DATETIME2));
+                DELETE TOP (@Batch) FROM PageViews
+                 WHERE OwnerId = @OwnerId AND CreatedAt < @Cutoff AND CreatedAt < @Summarised;",
+                new { OwnerId = ownerId, Cutoff = olderThanUtc, Batch = PruneBatch }, commandTimeout: ReportTimeoutSeconds);
+            removed += batch;
+        } while (batch == PruneBatch && DateTime.UtcNow < stopAt);
+        return removed;
     }
 
     public async Task<IReadOnlyList<PageView>> GetRecentAsync(Guid ownerId, int limit = 200)

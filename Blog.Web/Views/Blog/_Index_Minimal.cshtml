@@ -48,7 +48,7 @@
             {
                 <span class="font-semibold" style="color: var(--foreground);">@string.Join(", ", selectedCategories)</span>
             }
-            <a href="/" class="ml-auto underline underline-offset-2 hover:opacity-50">Clear all</a>
+            <a href="/" class="ms-auto underline underline-offset-2 hover:opacity-50">Clear all</a>
         </div>
     }
 
@@ -140,7 +140,7 @@
                             <p class="text-sm leading-relaxed line-clamp-2" style="color: var(--muted-foreground);">@post.MetaDescription</p>
                         }
                     </div>
-                    <div class="flex-shrink-0 text-right flex flex-col items-end gap-1">
+                    <div class="flex-shrink-0 text-end flex flex-col items-end gap-1">
                         <time class="text-xs font-mono font-semibold uppercase tracking-wider block" style="color: var(--muted-foreground);">
                             @Dates.MonthDay(post.PublishedAt)
                         </time>

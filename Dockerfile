@@ -7,6 +7,9 @@
 #           -v inkwell-uploads:/app/wwwroot/uploads \
 #           --name inkwell inkwell
 #
+# The database in that connection string must already exist with DBScripts/init.sql applied
+# (sqlcmd -d blog -f 65001 -i DBScripts/init.sql); docker-compose.yml does both for you.
+#
 # For a complete stack (SQL Server + automatic TLS via Caddy), use docker-compose.yml instead —
 # see the "Deploy with Docker" section of README.md.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -24,21 +27,23 @@ RUN dotnet restore Blog.Web/Blog.Web.csproj
 COPY Blog.Core/ Blog.Core/
 COPY Blog.Infrastructure/ Blog.Infrastructure/
 COPY Blog.Web/ Blog.Web/
+# Blog.Infrastructure embeds a reference-data script from ../DBScripts/, so the build needs it too.
+COPY DBScripts/ DBScripts/
 RUN dotnet publish Blog.Web/Blog.Web.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# curl for the HEALTHCHECK below; a non-root user for the app itself.
+# curl for the HEALTHCHECK below. The app runs as the base image's own non-root user `app`
+# (UID 1654); creating another user with that UID fails the build.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && adduser --disabled-password --gecos "" --uid 1654 inkwell \
     && mkdir -p /app/wwwroot/uploads /app/wwwroot/og-cache /data/keys \
-    && chown -R inkwell:inkwell /app /data
-USER inkwell
+    && chown -R app:app /app /data
+USER app
 
-COPY --from=build --chown=inkwell:inkwell /app/publish .
+COPY --from=build --chown=app:app /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \

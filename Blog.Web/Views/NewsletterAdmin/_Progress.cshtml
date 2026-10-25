@@ -31,10 +31,10 @@
         </div>
     }
     <dl class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Recipients</dt><dd class="text-lg font-semibold text-foreground">@(queued ? "—" : total.ToString("N0"))</dd></div>
-        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Sent</dt><dd class="text-lg font-semibold text-foreground">@p.Sent.ToString("N0")</dd></div>
-        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Waiting</dt><dd class="text-lg font-semibold text-foreground">@p.Pending.ToString("N0")</dd></div>
-        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Failed</dt><dd class="text-lg font-semibold @(p.Failed > 0 ? "tone-bad" : "text-foreground")">@p.Failed.ToString("N0")</dd></div>
-        <div class="rounded-lg border border-border bg-card p-3"><dt class="text-xs text-muted-foreground">Skipped or stopped</dt><dd class="text-lg font-semibold text-foreground">@((p.Skipped + p.Cancelled).ToString("N0"))</dd></div>
+        <div class="desk-card p-3"><dt class="text-xs text-muted-foreground">Recipients</dt><dd class="text-lg font-semibold text-foreground">@(queued ? "—" : total.ToString("N0"))</dd></div>
+        <div class="desk-card p-3"><dt class="text-xs text-muted-foreground">Sent</dt><dd class="text-lg font-semibold text-foreground">@p.Sent.ToString("N0")</dd></div>
+        <div class="desk-card p-3"><dt class="text-xs text-muted-foreground">Waiting</dt><dd class="text-lg font-semibold text-foreground">@p.Pending.ToString("N0")</dd></div>
+        <div class="desk-card p-3"><dt class="text-xs text-muted-foreground">Failed</dt><dd class="text-lg font-semibold @(p.Failed > 0 ? "tone-bad" : "text-foreground")">@p.Failed.ToString("N0")</dd></div>
+        <div class="desk-card p-3"><dt class="text-xs text-muted-foreground">Skipped or stopped</dt><dd class="text-lg font-semibold text-foreground">@((p.Skipped + p.Cancelled).ToString("N0"))</dd></div>
     </dl>
 </div>

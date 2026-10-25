@@ -54,7 +54,7 @@
                     </h1>
                     @if (!string.IsNullOrEmpty(leadExcerpt))
                     {
-                        <p style="font-family:var(--serif);font-size:1.0625rem;line-height:1.65;color:var(--fg-body);margin:0 0 var(--sp-6);border-left:3px solid var(--border);padding-left:var(--sp-6);">@leadExcerpt</p>
+                        <p style="font-family:var(--serif);font-size:1.0625rem;line-height:1.65;color:var(--fg-body);margin:0 0 var(--sp-6);border-inline-start:3px solid var(--border);padding-inline-start:var(--sp-6);">@leadExcerpt</p>
                     }
                     <div style="display:flex;gap:var(--sp-6);font-family:var(--sans);font-size:12px;color:var(--fg-meta);">
                         @if (!string.IsNullOrEmpty(leadPost.AuthorName))
@@ -77,12 +77,12 @@
         @* THREE-COLUMN GRID — compact newspaper columns *@
         @if (columnPosts.Any())
         {
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--border);">
+            <div class="ink-broadsheet-grid" style="display:grid;gap:0;border-top:1px solid var(--border);">
                 @foreach (var p in columnPosts)
                 {
                     var cat = p.Categories?.FirstOrDefault();
                     var excerpt = GetExcerpt(p);
-                    <article style="padding:var(--sp-6);border-right:1px solid var(--border);border-bottom:1px solid var(--border);">
+                    <article style="padding:var(--sp-6);border-inline-end:1px solid var(--border);border-bottom:1px solid var(--border);">
                         @if (cat != null)
                         {
                             <a href="/?category=@cat.Slug" style="display:block;font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:3px;">@cat.Name</a>

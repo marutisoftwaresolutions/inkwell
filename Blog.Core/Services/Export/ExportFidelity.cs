@@ -86,10 +86,72 @@ public static class ExportFidelity
             wp ? "Each value becomes a WordPress custom field under its key, listed in the editor's Custom Fields box. A theme shows them only if it is built to."
                : "Ghost has no custom fields, so these values, and the “Details” list readers see, are not exported. Export to WordPress to keep them.");
 
+        Add(o.IncludePages ? c.WithForms : 0, N(c.WithForms, "page with a contact form", "pages with a contact form"), FidelityOutcome.Lost,
+            "Forms are not exported. The page keeps an empty placeholder where the form was; build the form again on the destination.");
+
         rows.Add(new FidelityRow("Search-engine markup (structured data)", FidelityOutcome.Lost,
             "Not exported; the destination's theme and plugins generate their own."));
         rows.Add(new FidelityRow("Redirect rules, menus, settings, theme, subscribers", FidelityOutcome.Lost,
             "Not part of a content export. Use Backups to move a whole Inkwell site."));
+        return rows;
+    }
+
+    /// <summary>
+    /// The fidelity matrix for a direct push (ADR-0029). It differs from the file export where the targets'
+    /// APIs accept less than their importers: authors, comments, and (on WordPress) SEO-plugin and custom
+    /// fields, none of which the REST API takes without plugin code on the target.
+    /// </summary>
+    public static IReadOnlyList<FidelityRow> ForPush(ExportTarget target, ExportCounts c, ExportOptions o)
+    {
+        var rows = new List<FidelityRow>();
+        void Add(int count, string item, FidelityOutcome outcome, string detail)
+        {
+            if (count > 0) rows.Add(new FidelityRow(item, outcome, detail));
+        }
+        string N(int n, string one, string many) => n == 1 ? $"1 {one}" : $"{n} {many}";
+        var wp = target == ExportTarget.WordPress;
+
+        Add(c.Posts, N(c.Posts, "post", "posts"), FidelityOutcome.Kept,
+            "Title, address (slug), body, dates and status." + (c.Drafts + c.InReview > 0
+                ? wp ? " Posts in review arrive as Pending; drafts and returned posts as Drafts." : " Unpublished posts arrive as drafts."
+                : "") + " A post whose address already exists on the site is handled by the choice below.");
+        Add(o.IncludePages ? c.Pages : 0, N(c.Pages, "page", "pages"), FidelityOutcome.Kept,
+            wp ? "Including parent pages and menu order." : "Ghost pages have no parent, so the page hierarchy is flattened.");
+        if (wp)
+        {
+            Add(c.Categories, N(c.Categories, "category", "categories"), FidelityOutcome.Kept, "Matched by address to existing WordPress categories, or created.");
+            Add(c.Tags, N(c.Tags, "tag", "tags"), FidelityOutcome.Kept, "Matched by address to existing WordPress tags, or created.");
+        }
+        else
+        {
+            Add(c.Categories, N(c.Categories, "category", "categories"), FidelityOutcome.Changed,
+                "Ghost has no categories, so each becomes a tag. Existing Ghost tags with the same address are reused.");
+            Add(c.Tags, N(c.Tags, "tag", "tags"), FidelityOutcome.Kept, "Existing Ghost tags with the same address are reused.");
+        }
+        Add(c.Authors, N(c.Authors, "author", "authors"), FidelityOutcome.Changed,
+            wp ? "Every item is credited to the WordPress user whose application password you enter."
+               : "Every item is credited to the site owner, as Ghost does for all integrations.");
+        Add(c.Comments, N(c.Comments, "comment", "comments"), FidelityOutcome.Lost,
+            wp ? "Not pushed. Use the WordPress file export to keep comments." : "Ghost cannot import comments.");
+        Add(c.Posts + c.Pages, "Images", FidelityOutcome.Kept,
+            (wp ? "Feature and in-body images are uploaded to the WordPress media library"
+                : "Feature and in-body images are uploaded to Ghost")
+            + " once each, and the links rewritten. Alt text and captions of feature images are kept. An image file missing here keeps pointing at this site.");
+        Add(c.WithSeo, N(c.WithSeo, "item with search or social fields", "items with search or social fields"),
+            wp ? FidelityOutcome.Lost : FidelityOutcome.Kept,
+            wp ? "Not pushed: Yoast SEO and Rank Math do not accept their fields through the WordPress API. Use the file export to keep them."
+               : "Into Ghost's own meta title, description, canonical, Open Graph and Twitter fields. Values longer than Ghost allows are cut at a word.");
+        Add(c.WithRoundup + c.WithKeyFacts + c.WithFaq + c.WithHowTo + c.WithAnswerCapsule, "Roundups, key facts, FAQs, how-to steps, answer capsules",
+            FidelityOutcome.Changed, "Rendered as ordinary HTML in the body, exactly as in the file export.");
+        Add(c.InSeries, N(c.InSeries, "post in a series", "posts in a series"), FidelityOutcome.Changed,
+            (wp ? "A tag “Series: …” on each post" : "An internal #series-… tag on each post") + ", plus a “Part N of the series” line at the end.");
+        Add(c.WithCustomFields, N(c.WithCustomFields, "item with custom fields", "items with custom fields"), FidelityOutcome.Lost,
+            wp ? "Not pushed: WordPress accepts custom fields through its API only when a plugin registers them. Use the file export to keep them."
+               : "Ghost has no custom fields.");
+        Add(o.IncludePages ? c.WithForms : 0, N(c.WithForms, "page with a contact form", "pages with a contact form"), FidelityOutcome.Lost,
+            "Forms are not pushed. The page keeps an empty placeholder where the form was; build the form again on the site.");
+        rows.Add(new FidelityRow("Search-engine markup, redirects, menus, settings", FidelityOutcome.Lost,
+            "Not part of a content push. The destination's theme and plugins generate their own markup."));
         return rows;
     }
 }

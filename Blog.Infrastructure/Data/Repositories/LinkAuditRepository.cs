@@ -15,10 +15,14 @@ public class LinkAuditRepository : ILinkAuditRepository
     {
         using var conn = _ctx.CreateConnection();
 
+        // Live means what the post route means (EditorialWorkflow.IsLive): Published, or Scheduled with its time
+        // passed. A scheduled post never flips to Published, so counting Published alone reported every link to a
+        // post that went live on schedule as broken.
         var posts = (await conn.QueryAsync<(string Slug, string Title, string Html)>(@"
             SELECT Slug, Title, ISNULL(Html, '') AS Html
               FROM Posts
-             WHERE Status = 'Published' AND (@OwnerId IS NULL OR AuthorId = @OwnerId);",
+             WHERE (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= SYSUTCDATETIME()))
+               AND (@OwnerId IS NULL OR AuthorId = @OwnerId);",
             new { OwnerId = ownerId })).ToList();
 
         var pages = (await conn.QueryAsync<(string Slug, string Title, string Html)>(@"

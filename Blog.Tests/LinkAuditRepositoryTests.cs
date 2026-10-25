@@ -51,6 +51,33 @@ public class LinkAuditRepositoryTests : IClassFixture<WebApplicationFactory<Prog
     }
 
     [Fact]
+    public async Task A_scheduled_post_counts_as_live_once_its_time_has_passed_and_not_before()
+    {
+        if (!_dbAvailable) { _out.WriteLine("Dev database unavailable — skipping."); return; }
+
+        using var scope = _factory.Services.CreateScope();
+        var data = await scope.ServiceProvider.GetRequiredService<ILinkAuditRepository>().LoadAsync();
+
+        // Scheduled posts never flip to Published; the post route serves them once ScheduledAt passes
+        // (EditorialWorkflow.IsLive). The audit once counted Published only, so on 2026-10-24 it reported three
+        // links to the live /low-dose-atropine-myopia-fda as broken.
+        await using var conn = new SqlConnection(_factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection"));
+        await conn.OpenAsync();
+        var scheduled = new List<(string Slug, bool Due)>();
+        await using (var cmd = new SqlCommand(
+            "SELECT Slug, CAST(CASE WHEN ScheduledAt <= SYSUTCDATETIME() THEN 1 ELSE 0 END AS BIT) FROM Posts WHERE Status = 'Scheduled' AND ScheduledAt IS NOT NULL", conn))
+        await using (var r = await cmd.ExecuteReaderAsync())
+            while (await r.ReadAsync()) scheduled.Add((r.GetString(0), r.GetBoolean(1)));
+        _out.WriteLine($"scheduled posts: {scheduled.Count(s => s.Due)} due, {scheduled.Count(s => !s.Due)} still in the future");
+
+        foreach (var (slug, due) in scheduled)
+        {
+            if (due) Assert.Contains(slug, data.PublishedSlugs);
+            else Assert.DoesNotContain(slug, data.PublishedSlugs);
+        }
+    }
+
+    [Fact]
     public async Task The_page_requires_a_signed_in_editor()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

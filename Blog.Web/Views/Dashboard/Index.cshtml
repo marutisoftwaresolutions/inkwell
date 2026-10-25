@@ -1,152 +1,158 @@
+@using Blog.Web.Models
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Dashboard";
+    var siteName = ViewBag.SiteName as string;
+    ViewData["Description"] = string.IsNullOrWhiteSpace(siteName) ? "What needs you today, and how the site is doing." : $"{siteName}: what needs you today, and how the site is doing.";
+
+    int totalPosts = ViewBag.TotalPosts ?? 0, published = ViewBag.PublishedPosts ?? 0, drafts = ViewBag.DraftPosts ?? 0, pending = ViewBag.PendingComments ?? 0;
+    int views7 = ViewBag.Views7 ?? 0, prev7 = ViewBag.ViewsPrev7 ?? 0;
+    int scheduled = ViewBag.ScheduledPosts ?? 0, overdue = ViewBag.OverdueReviews ?? 0, blocks24 = ViewBag.Blocks24h ?? 0, serverErrors = ViewBag.ServerErrorGroups ?? 0;
+    int[] daily30 = ViewBag.Daily30 as int[] ?? Array.Empty<int>();
+    var startupWarnings = ViewBag.StartupWarnings as IReadOnlyList<string> ?? Array.Empty<string>();
+    var jobs = ViewBag.Jobs as IReadOnlyList<Blog.Web.Services.Jobs.JobStatus> ?? Array.Empty<Blog.Web.Services.Jobs.JobStatus>();
+    var failedJobs = jobs.Where(j => j.LastStartedAt is not null && !j.LastSucceeded && !j.IsRunning).ToList();
+    var reviewItems = (ViewBag.ReviewItems as IEnumerable<Blog.Core.Domain.Post>)?.ToList() ?? new List<Blog.Core.Domain.Post>();
+    var reviewing = (ViewBag.ReviewMode as string) == "review";
+    int reviewCount = ViewBag.ReviewCount ?? reviewItems.Count;
+    var recent = ViewBag.RecentPosts as List<Blog.Core.Domain.Post> ?? new List<Blog.Core.Domain.Post>();
+    var searchState = ViewBag.SearchState as Blog.Web.Services.SearchConsole.SearchDataState;
+
+    // "Needs attention": one row per thing a person should act on, highest consequence first. Empty when the site is calm.
+    var attention = new List<(string Tone, string Text, string Href, string Action)>();
+    foreach (var w in startupWarnings) attention.Add(("bad", w, "/admin/dashboard", "This server"));
+    if (serverErrors > 0) attention.Add(("bad", $"{serverErrors:N0} distinct server error{(serverErrors == 1 ? "" : "s")} recorded", "/admin/errors", "Open Error Monitor"));
+    foreach (var j in failedJobs) attention.Add(("bad", $"Job {j.Name} failed: {(string.IsNullOrWhiteSpace(j.LastMessage) ? "no message" : j.LastMessage)}", "#jobs", "See jobs"));
+    if (pending > 0) attention.Add(("warn", $"{pending:N0} comment{(pending == 1 ? "" : "s")} waiting for moderation", "/admin/comments", "Moderate"));
+    if (reviewing && reviewCount > 0) attention.Add(("warn", $"{reviewCount:N0} post{(reviewCount == 1 ? "" : "s")} waiting for review", "/admin/posts?status=review", "Review"));
+    if (!reviewing && reviewCount > 0) attention.Add(("warn", $"{reviewCount:N0} of your post{(reviewCount == 1 ? "" : "s")} sent back with notes", "/admin/posts?status=changes", "See notes"));
+    if (overdue > 0) attention.Add(("warn", $"{overdue:N0} published post{(overdue == 1 ? " is" : "s are")} past the review date", "/admin/content-health?filter=overdue", "Refresh"));
+    if (blocks24 > 0) attention.Add(("info", $"{blocks24:N0} address{(blocks24 == 1 ? "" : "es")} blocked by the firewall in the last 24 hours", "/admin/security", "Security"));
+    if (scheduled > 0) attention.Add(("info", $"{scheduled:N0} post{(scheduled == 1 ? "" : "s")} scheduled to go live", "/admin/calendar", "Calendar"));
+
+    // Sparkline geometry (pure markup, no chart library on the dashboard).
+    var max = Math.Max(1, daily30.DefaultIfEmpty(0).Max());
+    var points = string.Join(" ", daily30.Select((v, i) => $"{(daily30.Length <= 1 ? 0 : i * 100.0 / (daily30.Length - 1)):0.##},{(30 - v * 28.0 / max):0.##}"));
+    var dailyMax = daily30.DefaultIfEmpty(0).Max();
+}
+
+@section PageActions {
+    <a href="/admin/posts/create" class="desk-btn desk-btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New post
+    </a>
 }
 
 <div class="space-y-6">
-    @* ── Onboarding Checklist (first-time user) ────────────────── *@
+    @* ── Onboarding checklist (first-time user) ─────────────────── *@
     @if (ViewBag.ShowOnboarding == true)
     {
         @await Html.PartialAsync("_OnboardingChecklist", (HashSet<string>)ViewBag.OnboardingCompleted)
     }
 
-    @* ── Startup findings (shadowed routes, ephemeral keys) ─────── *@
-    @{
-        var startupWarnings = ViewBag.StartupWarnings as IReadOnlyList<string> ?? Array.Empty<string>();
-    }
-    @if (startupWarnings.Count > 0)
-    {
-        <div class="p-4 rounded-lg border pill-warn text-sm space-y-1" role="alert">
-            <p class="font-semibold">Needs attention on this server</p>
-            <ul class="list-disc pl-5 space-y-1">
-                @foreach (var w in startupWarnings)
-                {
-                    <li>@w</li>
-                }
-            </ul>
-        </div>
-    }
-
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Total Posts -->
-        <div class="p-6 bg-card text-card-foreground rounded-lg shadow-sm border border-border flex items-center gap-4">
-            <div class="p-3 bg-primary/10 text-primary rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-muted-foreground">Total Posts</p>
-                <p class="text-2xl font-bold">@ViewBag.TotalPosts</p>
-            </div>
-        </div>
-
-        <!-- Published -->
-        <div class="p-6 bg-card text-card-foreground rounded-lg shadow-sm border border-border flex items-center gap-4">
-            <div class="p-3 pill-ok rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-muted-foreground">Published</p>
-                <p class="text-2xl font-bold">@ViewBag.PublishedPosts</p>
-            </div>
-        </div>
-
-        <!-- Drafts -->
-        <div class="p-6 bg-card text-card-foreground rounded-lg shadow-sm border border-border flex items-center gap-4">
-            <div class="p-3 pill-warn rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-muted-foreground">Drafts</p>
-                <p class="text-2xl font-bold">@ViewBag.DraftPosts</p>
-            </div>
-        </div>
-
-        <!-- Pending Comments -->
-        <div class="p-6 bg-card text-card-foreground rounded-lg shadow-sm border border-border flex items-center gap-4 relative overflow-hidden">
-             @if (ViewBag.PendingComments > 0)
+    @* ── Numbers that change decisions, each linked to the screen behind it ─ *@
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        @{
+            var tiles = new[]
             {
-                <div class="absolute top-0 right-0 w-3 h-3 bg-destructive rounded-full mr-2 mt-2 animate-ping"></div>
-                <div class="absolute top-0 right-0 w-3 h-3 bg-destructive rounded-full mr-2 mt-2"></div>
+                new KpiTile("Views, 7 days", views7.ToString("N0"), "/admin/analytics?period=7d", prev7 > 0 || views7 > 0 ? views7 - prev7 : null, "vs previous 7 days",
+                    "<path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>"),
+                new KpiTile("Published", published.ToString("N0"), "/admin/posts?status=published", null, $"of {totalPosts:N0} posts",
+                    "<path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/>"),
+                new KpiTile("Drafts", drafts.ToString("N0"), "/admin/posts?status=draft", null, scheduled > 0 ? $"{scheduled:N0} scheduled" : null,
+                    "<path d=\"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\"/><path d=\"M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z\"/>"),
+                new KpiTile("Comments waiting", pending.ToString("N0"), "/admin/comments", null, pending == 0 ? "queue is clear" : "awaiting moderation",
+                    "<path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/>"),
+            };
+        }
+        @foreach (var tile in tiles)
+        {
+            <partial name="_KpiTile" model="tile" />
+        }
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        @* ── Needs attention ────────────────────────────────────────── *@
+        <section class="desk-card lg:col-span-2" aria-labelledby="attention-title">
+            <div class="desk-card-header flex-row items-center justify-between">
+                <h2 id="attention-title" class="desk-card-title">Needs attention</h2>
+                @if (attention.Count > 0) { <span class="desk-pill @(attention.Any(a => a.Tone == "bad") ? "pill-bad" : "pill-warn")">@attention.Count</span> }
+            </div>
+            @if (attention.Count == 0)
+            {
+                <div class="desk-empty py-10">
+                    <div class="desk-empty-icon pill-ok" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                    <p class="desk-empty-title">Nothing needs you today.</p>
+                    <p class="desk-empty-hint">Comments, reviews, scheduled posts, failed jobs and firewall activity show up here when they need a decision.</p>
+                </div>
             }
-            <div class="p-3 pill-info rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            </div>
-            <div>
-                <p class="text-sm font-medium text-muted-foreground">Pending Comments</p>
-                <p class="text-2xl font-bold">@ViewBag.PendingComments</p>
-            </div>
-        </div>
-    </div>
-
-    @* ── Search Console (28 days) ────────────────────────────────── *@
-    @{
-        var searchState = ViewBag.SearchState as Blog.Web.Services.SearchConsole.SearchDataState;
-    }
-    @if (searchState is { Ready: true })
-    {
-        <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border p-4 flex flex-wrap items-center gap-6">
-            <div>
-                <p class="text-xs font-medium text-muted-foreground">Search clicks · 28d</p>
-                <p class="text-2xl font-bold">@ViewBag.SearchClicks
-                    @{ int sc = ViewBag.SearchClicks, sp = ViewBag.SearchPrevClicks; }
-                    @if (sp > 0)
+            else
+            {
+                <ul class="divide-y divide-border">
+                    @foreach (var (tone, text, href, action) in attention)
                     {
-                        var d = (sc - sp) * 100.0 / sp;
-                        <span class="text-xs font-normal @(d >= 0 ? "tone-ok" : "tone-bad")">@(d >= 0 ? "+" : "")@d.ToString("0")% vs prior 28d</span>
+                        <li class="flex items-center gap-3 px-5 py-3">
+                            <span class="w-2 h-2 rounded-full shrink-0 @(tone == "bad" ? "bg-destructive" : tone == "warn" ? "bg-warning" : "bg-info")" aria-hidden="true"></span>
+                            <span class="flex-1 text-sm min-w-0">@text</span>
+                            <a href="@href" class="desk-btn desk-btn-outline desk-btn-sm shrink-0">@action</a>
+                        </li>
                     }
-                </p>
-            </div>
-            <div>
-                <p class="text-xs font-medium text-muted-foreground">Impressions · 28d</p>
-                <p class="text-2xl font-bold">@ViewBag.SearchImpressions</p>
-            </div>
-            <div>
-                <p class="text-xs font-medium text-muted-foreground">Striking distance</p>
-                <p class="text-2xl font-bold">@ViewBag.SearchStriking <a href="/admin/content-health?filter=striking" class="text-xs font-normal text-primary hover:underline">see posts</a></p>
-            </div>
-            <p class="text-[11px] text-muted-foreground ml-auto">Google Search through @Dates.CalendarDate(searchState.AsOf, Blog.Core.Services.DateStyle.Medium)</p>
-        </div>
-    }
+                </ul>
+            }
+        </section>
 
-    <!-- Quick Actions -->
-    <div class="bg-card rounded-lg shadow-sm border border-border p-6">
-        <h2 class="text-lg font-semibold mb-4">Quick Actions</h2>
-        <div class="flex flex-wrap gap-4">
-            <a href="/admin/posts/create" class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium text-sm shadow-sm">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                New Post
-            </a>
-            <a href="/admin/media" class="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors font-medium text-sm border border-border shadow-sm">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                Upload Media
-            </a>
-            <a href="/admin/comments" class="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors font-medium text-sm border border-border shadow-sm">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                Moderate Comments
-            </a>
-        </div>
+        @* ── 30-day traffic sparkline ────────────────────────────────── *@
+        <section class="desk-card" aria-labelledby="traffic-title">
+            <div class="desk-card-header flex-row items-center justify-between">
+                <h2 id="traffic-title" class="desk-card-title">Views, 30 days</h2>
+                <a href="/admin/analytics" class="text-xs text-muted-foreground hover:text-foreground">Analytics</a>
+            </div>
+            <div class="desk-card-body">
+                @if (daily30.Length == 0 || dailyMax == 0)
+                {
+                    <p class="text-sm text-muted-foreground py-6 text-center">No page views recorded yet. The sparkline appears once readers arrive.</p>
+                }
+                else
+                {
+                    <svg viewBox="0 0 100 32" preserveAspectRatio="none" class="w-full h-24 text-foreground" role="img" aria-label="Daily page views for the last 30 days, peaking at @dailyMax.ToString("N0")">
+                        <polyline points="0,30 @points 100,30" fill="currentColor" fill-opacity="0.08" stroke="none" />
+                        <polyline points="@points" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    </svg>
+                    <div class="flex items-center justify-between mt-2 text-xs text-muted-foreground tabular-nums">
+                        <span>@Dates.CalendarDate(DateTime.UtcNow.Date.AddDays(-29), Blog.Core.Services.DateStyle.Medium)</span>
+                        <span>peak @dailyMax.ToString("N0")/day</span>
+                        <span>today</span>
+                    </div>
+                }
+                @if (searchState is { Ready: true })
+                {
+                    int sc = ViewBag.SearchClicks, sp = ViewBag.SearchPrevClicks;
+                    <dl class="mt-4 pt-4 border-t border-border grid grid-cols-3 gap-2 text-xs">
+                        <div><dt class="text-muted-foreground">Search clicks · 28d</dt><dd class="text-base font-semibold tabular-nums">@sc.ToString("N0")
+                            @if (sp > 0) { var d = (sc - sp) * 100.0 / sp; <span class="text-xs font-normal @(d >= 0 ? "tone-ok" : "tone-bad")">@(d >= 0 ? "+" : "")@d.ToString("0")%</span> }
+                        </dd></div>
+                        <div><dt class="text-muted-foreground">Impressions</dt><dd class="text-base font-semibold tabular-nums">@(((int)ViewBag.SearchImpressions).ToString("N0"))</dd></div>
+                        <div><dt class="text-muted-foreground">Striking distance</dt><dd class="text-base font-semibold tabular-nums"><a href="/admin/content-health?filter=striking" class="hover:underline">@ViewBag.SearchStriking</a></dd></div>
+                    </dl>
+                    <p class="text-[11px] text-muted-foreground mt-2">Google Search through @Dates.CalendarDate(searchState.AsOf, Blog.Core.Services.DateStyle.Medium)</p>
+                }
+            </div>
+        </section>
     </div>
 
-    @* Editorial workflow: a review queue for those who may publish; "sent back to you" for authors. Hidden when empty. *@
-    @{
-        var reviewItems = (ViewBag.ReviewItems as IEnumerable<Blog.Core.Domain.Post>)?.ToList() ?? new List<Blog.Core.Domain.Post>();
-        var reviewing = (ViewBag.ReviewMode as string) == "review";
-    }
+    @* ── Editorial workflow: the queue for those who may publish; "sent back to you" for authors. Hidden when empty. ── *@
     @if (reviewItems.Count > 0)
     {
-        <div class="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-            <div class="p-6 border-b border-border flex flex-wrap items-center justify-between gap-2">
-                <h2 class="text-lg font-semibold">@(reviewing ? "Waiting for review" : "Sent back to you") (@(ViewBag.ReviewCount ?? reviewItems.Count))</h2>
-                <a href="/admin/posts?status=@(reviewing ? "review" : "changes")" class="text-sm font-medium text-primary hover:text-primary/80">
-                    @(reviewing ? "Open the review queue" : "See all")
-                </a>
+        <section class="desk-card overflow-hidden" aria-labelledby="review-title">
+            <div class="desk-card-header flex-row items-center justify-between">
+                <h2 id="review-title" class="desk-card-title">@(reviewing ? "Waiting for review" : "Sent back to you") <span class="text-muted-foreground font-normal">(@reviewCount)</span></h2>
+                <a href="/admin/posts?status=@(reviewing ? "review" : "changes")" class="desk-btn desk-btn-ghost desk-btn-sm">@(reviewing ? "Open the review queue" : "See all")</a>
             </div>
             <ul class="divide-y divide-border">
                 @foreach (var item in reviewItems)
                 {
-                    <li class="px-6 py-3 flex flex-wrap items-center justify-between gap-2">
-                        <a href="/admin/posts/edit/@item.Id" class="font-medium text-foreground hover:underline">@item.Title</a>
+                    <li class="px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                        <a href="/admin/posts/edit/@item.Id" class="font-medium text-foreground hover:underline underline-offset-4">@item.Title</a>
                         <span class="text-xs text-muted-foreground">
                             @(reviewing
                                 ? (string.IsNullOrWhiteSpace(item.AuthorName) ? "Submitted for review" : $"By {item.AuthorName}")
@@ -155,110 +161,91 @@
                     </li>
                 }
             </ul>
-        </div>
+        </section>
     }
 
-    <!-- Recent Posts -->
-    <div class="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-        <div class="p-6 border-b border-border flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Recent Posts</h2>
-            <a href="/admin/posts" class="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1">
-                View all <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-            </a>
+    @* ── Recent posts ───────────────────────────────────────────── *@
+    <section class="desk-card overflow-hidden" aria-labelledby="recent-title">
+        <div class="desk-card-header flex-row items-center justify-between">
+            <h2 id="recent-title" class="desk-card-title">Recent posts</h2>
+            <a href="/admin/posts" class="desk-btn desk-btn-ghost desk-btn-sm">All posts</a>
         </div>
-        
-        @if (ViewBag.RecentPosts != null && ((List<Blog.Core.Domain.Post>)ViewBag.RecentPosts).Any())
+        @if (recent.Any())
         {
-            <div class="divide-y divide-border">
-                @foreach (var post in (List<Blog.Core.Domain.Post>)ViewBag.RecentPosts)
+            <ul class="divide-y divide-border">
+                @foreach (var post in recent)
                 {
-                    <div class="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/50 transition-colors">
-                        <div class="space-y-1">
-                            <a href="/admin/posts/edit/@post.Id" class="font-medium text-foreground hover:text-primary transition-colors block">@post.Title</a>
+                    var displayStatus = post.Status;
+                    if (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow) { displayStatus = Blog.Core.Domain.PostStatus.Published; }
+                    var isLive = displayStatus == Blog.Core.Domain.PostStatus.Published;
+                    <li class="px-5 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="min-w-0 space-y-1">
+                            <a href="/admin/posts/edit/@post.Id" class="font-medium text-foreground hover:underline underline-offset-4 block truncate">@post.Title</a>
                             <div class="flex items-center gap-3 text-xs text-muted-foreground">
-                                @{
-                                    var displayStatus = post.Status;
-                                    if (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)
-                                    {
-                                        displayStatus = Blog.Core.Domain.PostStatus.Published;
-                                    }
-                                }
-                                <span class="capitalize px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide
-                                    @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "pill-ok" :
-                                      displayStatus == Blog.Core.Domain.PostStatus.Draft ? "pill-warn" : "pill-info")">
-                                    @displayStatus
-                                </span>
+                                <span class="desk-pill @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "pill-ok" : displayStatus == Blog.Core.Domain.PostStatus.Draft ? "pill-warn" : "pill-info")">@(displayStatus switch { Blog.Core.Domain.PostStatus.InReview => "In review", Blog.Core.Domain.PostStatus.NeedsChanges => "Needs changes", _ => displayStatus.ToString() })</span>
                                 <span>@Dates.Medium(post.CreatedAt)</span>
-                                <span>@post.ViewCount views</span>
+                                <span class="tabular-nums">@post.ViewCount.ToString("N0") views</span>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                             @if (post.Status == Blog.Core.Domain.PostStatus.Published || (post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow))
+                        <div class="flex items-center gap-1 shrink-0">
+                            @if (isLive)
                             {
-                                <a href="/@post.Slug" target="_blank" class="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="View" aria-label="View @post.Title">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                <a href="/@post.Slug" target="_blank" rel="noopener" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" title="View" aria-label="View @post.Title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                                 </a>
                             }
-                            <a href="/admin/posts/edit/@post.Id" class="px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-input rounded hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm">
-                                Edit
-                            </a>
+                            <a href="/admin/posts/edit/@post.Id" class="desk-btn desk-btn-outline desk-btn-sm">Edit</a>
                         </div>
-                    </div>
+                    </li>
                 }
-            </div>
+            </ul>
         }
         else
         {
-            <div class="p-12 text-center text-muted-foreground">
-                <svg class="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                <p>No posts yet.</p>
-                <a href="/admin/posts/create" class="mt-2 text-primary hover:underline font-medium inline-block">Write your first post →</a>
-            </div>
+            { ViewData["EmptyTitle"] = "No posts yet"; ViewData["EmptyHint"] = "Your first post is a click away. Drafts stay private until you publish."; ViewData["EmptyHref"] = "/admin/posts/create"; ViewData["EmptyAction"] = "Write your first post"; }
+            <partial name="_EmptyState" />
         }
-    </div>
+    </section>
 
     @* ── Scheduled jobs (Admin only) ────────────────────────────── *@
-    @{
-        var jobs = ViewBag.Jobs as IReadOnlyList<Blog.Web.Services.Jobs.JobStatus> ?? Array.Empty<Blog.Web.Services.Jobs.JobStatus>();
-    }
     @if (jobs.Count > 0)
     {
-        <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border">
-            <div class="p-4 border-b border-border flex items-baseline justify-between">
-                <h3 class="font-semibold">Scheduled jobs</h3>
-                <span class="text-xs text-muted-foreground">Nightly housekeeping runs inside the app; no external scheduler.</span>
-            </div>
-            <div class="table-scroll"><table class="w-full text-sm">
-                <thead class="text-xs text-muted-foreground">
+        <details id="jobs" class="desk-card" open="@(failedJobs.Count > 0)">
+            <summary class="desk-card-header flex-row items-baseline justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <h2 class="desk-card-title">Scheduled jobs <span class="text-muted-foreground font-normal">(@jobs.Count)</span></h2>
+                <span class="text-xs text-muted-foreground">Running Inkwell @Blog.Web.Services.AppVersion.Current · housekeeping runs inside the app, no external scheduler</span>
+            </summary>
+            <div class="table-scroll"><table class="desk-table">
+                <thead>
                     <tr>
-                        <th class="text-left px-4 py-2 font-medium">Job</th>
-                        <th class="text-left px-4 py-2 font-medium">Every</th>
-                        <th class="text-left px-4 py-2 font-medium">Last run (UTC)</th>
-                        <th class="text-left px-4 py-2 font-medium">Result</th>
-                        <th class="text-right px-4 py-2 font-medium">Runs</th>
+                        <th>Job</th>
+                        <th>Every</th>
+                        <th>Last run (UTC)</th>
+                        <th>Result</th>
+                        <th class="text-right">Runs</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var j in jobs)
                     {
-                        <tr class="border-t border-border">
-                            <td class="px-4 py-2 font-mono text-xs">@j.Name</td>
-                            <td class="px-4 py-2 text-muted-foreground">@j.Interval.TotalHours h</td>
-                            <td class="px-4 py-2 text-muted-foreground">
+                        <tr>
+                            <td class="font-mono text-xs">@j.Name</td>
+                            <td class="text-muted-foreground">@j.Interval.TotalHours h</td>
+                            <td class="text-muted-foreground">
                                 @if (j.IsRunning) { <span class="tone-warn">running now</span> }
                                 else if (j.LastStartedAt is null) { <span>never — first run within a minute of startup</span> }
                                 else { @Dates.DateTime(j.LastStartedAt) }
                             </td>
-                            <td class="px-4 py-2">
+                            <td>
                                 @if (j.LastStartedAt is null) { <span class="text-muted-foreground">—</span> }
                                 else if (j.LastSucceeded) { <span class="tone-ok">OK</span> <span class="text-muted-foreground">@j.LastMessage</span> }
                                 else { <span class="tone-bad">Failed</span> <span class="text-muted-foreground">@j.LastMessage</span> }
                             </td>
-                            <td class="px-4 py-2 text-right text-muted-foreground">@j.RunCount</td>
+                            <td class="text-right text-muted-foreground tabular-nums">@j.RunCount</td>
                         </tr>
                     }
                 </tbody>
             </table></div>
-        </div>
+        </details>
     }
 </div>

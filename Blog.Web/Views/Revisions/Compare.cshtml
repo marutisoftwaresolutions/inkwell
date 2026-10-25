@@ -14,14 +14,14 @@
 
 <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
     <div>
-        <h2 class="text-lg font-semibold text-foreground">Revision #@revision.Number <span class="text-muted-foreground font-normal">vs current</span></h2>
+        <h2 class="desk-card-title">Revision #@revision.Number <span class="text-muted-foreground font-normal">vs current</span></h2>
         <p class="text-xs text-muted-foreground mt-0.5">
             @revision.Reason · @Dates.DateTime(revision.CreatedAt)@(string.IsNullOrEmpty(revision.AuthorName) ? "" : " · " + revision.AuthorName) · was @revision.Status
-            · <span class="text-emerald-700">+@added</span> <span class="text-red-700">−@removed</span> lines from this revision to now
+            · <span class="tone-ok">+@added</span> <span class="tone-bad">−@removed</span> lines from this revision to now
         </p>
     </div>
     <div class="flex items-center gap-2">
-        <a href="@editUrl" class="h-9 px-3 rounded border border-input text-sm inline-flex items-center hover:bg-muted">Back to editor</a>
+        <a href="@editUrl" class="desk-btn desk-btn-outline">Back to editor</a>
         <form method="post" action="/admin/revisions/@type/@entityId/@revision.Id/restore"
               data-confirm-title="Restore revision #@revision.Number?"
               data-confirm-body="The current title, body, meta and structured blocks are replaced with revision #@revision.Number. The current content is saved as a new revision first, so this can be undone. Slug and publish state do not change."
@@ -36,11 +36,11 @@
 <div class="grid md:grid-cols-2 gap-4 mb-4">
     <div class="rounded-lg border border-border bg-card p-4">
         <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Title — revision #@revision.Number</div>
-        <div class="text-sm @(titleChanged ? "text-red-700" : "text-foreground")">@revision.Title</div>
+        <div class="text-sm @(titleChanged ? "tone-bad" : "text-foreground")">@revision.Title</div>
     </div>
     <div class="rounded-lg border border-border bg-card p-4">
         <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Title — current</div>
-        <div class="text-sm @(titleChanged ? "text-emerald-700" : "text-foreground")">@current.Title</div>
+        <div class="text-sm @(titleChanged ? "tone-ok" : "text-foreground")">@current.Title</div>
     </div>
 </div>
 
@@ -55,7 +55,7 @@
 
 <div class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="px-4 py-2 border-b border-border text-xs text-muted-foreground">
-        Body, revision #@revision.Number → current. <span class="text-red-700">Red</span> lines existed then and are gone now; <span class="text-emerald-700">green</span> lines are new since. HTML shown as stored.
+        Body, revision #@revision.Number → current. <span class="tone-bad">Red</span> lines existed then and are gone now; <span class="tone-ok">green</span> lines are new since. HTML shown as stored.
     </div>
     @if (diff.Count == 0)
     {
@@ -71,8 +71,8 @@
 {
     var cls = line.Kind switch
     {
-        DiffKind.Added => "bg-emerald-50 text-emerald-900",
-        DiffKind.Removed => "bg-red-50 text-red-900 line-through decoration-red-300",
+        DiffKind.Added => "pill-ok",
+        DiffKind.Removed => "pill-bad line-through",
         _ => "text-muted-foreground",
     };
     var mark = line.Kind switch { DiffKind.Added => "+ ", DiffKind.Removed => "− ", _ => "  " };

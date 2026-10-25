@@ -95,7 +95,7 @@ public sealed record ExportCatalog(
 /// <summary>Counts behind the fidelity screen, for the current selection.</summary>
 public sealed record ExportCounts(int Posts, int Pages, int Categories, int Tags, int Authors, int Comments,
     int WithRoundup, int WithFaq, int WithHowTo, int WithKeyFacts, int WithAnswerCapsule, int InSeries,
-    int WithSeo, int Drafts, int InReview, int WithCustomFields = 0);
+    int WithSeo, int Drafts, int InReview, int WithCustomFields = 0, int WithForms = 0);
 
 /// <summary>Reads the content an export writes (implemented over the database in Infrastructure).</summary>
 public interface IExportSource
@@ -104,6 +104,13 @@ public interface IExportSource
     Task<ExportCatalog> LoadCatalogAsync(ExportOptions options);
     IAsyncEnumerable<ExportPost> StreamPostsAsync(ExportOptions options, CancellationToken ct);
     IAsyncEnumerable<ExportPage> StreamPagesAsync(ExportOptions options, CancellationToken ct);
+
+    /// <summary>The posts and pages a selection covers, without bodies: what a push seeds its items from (ADR-0029).</summary>
+    Task<IReadOnlyList<Push.ExportItemRef>> ListItemsAsync(ExportOptions options);
+    /// <summary>One post with its relations, as a push sends it; comments are not loaded. Null when it no longer exists.</summary>
+    Task<ExportPost?> GetPostAsync(Guid id);
+    /// <summary>One page, as a push sends it. Null when it no longer exists.</summary>
+    Task<ExportPage?> GetPageAsync(Guid id);
 }
 
 /// <summary>What a writer produced: counts for the audit trail and the image files it referenced.</summary>

@@ -117,6 +117,11 @@ public static class ThreatScorer
         // for it — stale links and 404s are a normal part of crawling.
         if (isProtectedCrawler) return ThreatVerdict.None;
 
+        // The API answers 401 to every missing or expired bearer token, so a working integration whose token just
+        // ran out would score itself into a block. Wrong passwords and two-factor codes at /api/v1/auth/login are
+        // reported explicitly (RegisterFailedLoginAsync), and probe paths are scored above (ADR-0033).
+        if (statusCode == 401 && path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)) return ThreatVerdict.None;
+
         if (statusCode is 401 or 403)
             return new ThreatVerdict(ForbiddenScore, $"Unauthorized access attempt: {Truncate(path, 120)}");
 

@@ -1,8 +1,9 @@
-@model Blog.Core.Domain.Post
+@model Blog.Core.Domain.IMarkdownAuthored
+@{ var noun = ViewData["EditorNoun"] as string ?? "post"; }
 @* Markdown authoring (ADR-0022). The textarea is the field the form posts; EasyMDE (_MarkdownEditorScripts)
    enhances it and keeps it in sync. Without JavaScript it is a plain, working Markdown textarea. *@
 <div id="markdownPane" class="flex-1 overflow-y-auto">
-    <label for="markdownSource" class="sr-only">Post body in Markdown</label>
+    <label for="markdownSource" class="sr-only">@(char.ToUpperInvariant(noun[0]) + noun[1..]) body in Markdown</label>
     <textarea name="Markdown" id="markdownSource" rows="24" spellcheck="true"
               class="w-full h-full min-h-[24rem] px-6 py-4 bg-background text-foreground font-mono text-sm leading-relaxed focus:outline-none"
               placeholder="Write in Markdown: # Heading, **bold**, *italic*, [link](https://…), - lists, > quotes, | tables |">@Model.Markdown</textarea>

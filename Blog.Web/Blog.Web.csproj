@@ -56,6 +56,8 @@
        command in tailwind.config.js, or build once with -p:BuildTailwindCss=true (requires Node/npx). -->
   <Target Name="BuildTailwindCss" BeforeTargets="BeforeBuild" Condition="'$(BuildTailwindCss)' == 'true'">
     <Exec Command="npx --yes tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <!-- The Desk (admin + auth pages) has its own compiled stylesheet; see tailwind.desk.config.js. -->
+    <Exec Command="npx --yes tailwindcss@3 -c tailwind.desk.config.js -i wwwroot/css/desk.src.css -o wwwroot/css/desk.css --minify" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
 </Project>

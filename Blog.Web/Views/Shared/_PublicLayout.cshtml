@@ -77,9 +77,11 @@
 	// ── Content language (drives <html lang>, hreflang, og:locale, schema inLanguage) ──
 	var siteLang = string.IsNullOrWhiteSpace(userSettings.SiteLanguage) ? "en" : userSettings.SiteLanguage.Trim();
 	var siteLocale = Blog.Core.Services.LocaleHelper.OgLocale(siteLang);
+	// Reading direction follows the language (v1.0.9): right-to-left languages mirror every layout through logical CSS.
+	var siteDir = Blog.Core.Services.TextDirection.For(siteLang);
 }
 <!DOCTYPE html>
-<html lang="@siteLang" data-theme="@colorScheme">
+<html lang="@siteLang" dir="@siteDir" data-theme="@colorScheme">
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -186,14 +188,40 @@
 	<link rel="stylesheet" href="~/css/tailwind.css" asp-append-version="true" />
 
 	<!-- Theme CSS Variables -->
+	@* Defaults always render first; a tenant's saved colours override them, so a missing or partial
+	   colour set never leaves a token undefined (an undefined --background makes menus transparent). *@
+	<style>
+		:root {
+		--background: var(--ink-cream);
+		--foreground: var(--ink-black);
+		--primary: var(--ink-black);
+		--primary-foreground: var(--ink-cream);
+		--secondary: var(--ink-cream-deep);
+		--secondary-foreground: var(--ink-black);
+		--muted: var(--ink-cream-deep);
+		--muted-foreground: var(--ink-sepia);
+		--accent: var(--ink-cream-edge);
+		--accent-foreground: var(--ink-black);
+		--card: var(--ink-cream-deep);
+		--card-foreground: var(--ink-black);
+		--border: var(--ink-cream-edge);
+		--destructive: #8C2A1F;
+		--font-sans: 'Geist', sans-serif;
+		--font-body: 'Source Serif 4', serif;
+		--radius: 2px;
+		}
+	</style>
 	@if (themeSettings.Any())
 	{
 		<style>
 			:root {
-			@foreach (var
-			s in themeSettings.Where(s => s.SettingGroup == "colors"))
+			@* No space between "--" and the key: "-- background" is not a custom property and the whole
+			   declaration is dropped, leaving every Tailwind-namespace token undefined in light mode. *@
+			@foreach (var s in themeSettings.Where(s => s.SettingGroup == "colors"
+			    && !string.IsNullOrEmpty(s.SettingKey)
+			    && s.SettingKey.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-')))
 			{
-				@:-- @(s.SettingKey) : @(s.EffectiveValue);
+				@:--@(s.SettingKey): @(s.EffectiveValue);
 			}
 			--font-sans: '@fontHeading', sans-serif;
 			--font-body: '@fontBody', sans-serif;
@@ -201,30 +229,7 @@
 			}
 		</style>
 	}
-	else
-	{
-		<style>
-			:root {
-			--background: var(--ink-cream);
-			--foreground: var(--ink-black);
-			--primary: var(--ink-black);
-			--primary-foreground: var(--ink-cream);
-			--secondary: var(--ink-cream-deep);
-			--secondary-foreground: var(--ink-black);
-			--muted: var(--ink-cream-deep);
-			--muted-foreground: var(--ink-sepia);
-			--accent: var(--ink-cream-edge);
-			--accent-foreground: var(--ink-black);
-			--card: var(--ink-cream-deep);
-			--card-foreground: var(--ink-black);
-			--border: var(--ink-cream-edge);
-			--destructive: #8C2A1F;
-			--font-sans: 'Geist', sans-serif;
-			--font-body: 'Source Serif 4', serif;
-			--radius: 2px;
-			}
-		</style>
-	}
+
 
 
 	@* Dark scheme for the Tailwind-namespace tokens the older layouts use. Inkwell-namespace tokens
@@ -323,6 +328,9 @@
 
 		var orgFounded = Blog.Core.Services.EntityGraph.FoundingDate(globalSettings.EntityFoundingDate);
 		if (orgFounded is not null) orgData["foundingDate"] = orgFounded;
+		// contactPoint — only when the operator gave an email or a contact page (Settings → Identity).
+		var orgContact = Blog.Core.Services.EntityGraph.ContactPoint(globalSettings, orgBaseUrl);
+		if (orgContact is not null) orgData["contactPoint"] = orgContact;
 		if (!string.IsNullOrEmpty(globalSettings.SiteLogoUrl))
 			orgData["logo"] = new System.Collections.Generic.Dictionary<string, string>
 			{
@@ -432,6 +440,10 @@
 	@if (ViewData["HasGallery"] is true)
 	{
 		<script src="~/js/inkwell-gallery.js" asp-append-version="true" defer></script>
+	}
+	@if (ViewData["HasForm"] is true)
+	{
+		<script src="~/js/inkwell-forms.js" asp-append-version="true" defer></script>
 	}
 	@await RenderSectionAsync("Scripts", required: false)
 	@* Page views are counted when this script reports back, so clients that never run JavaScript are

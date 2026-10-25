@@ -6,61 +6,74 @@
     var subscribers = (int)(ViewBag.Subscribers ?? 0);
     var emailConfigured = (bool)(ViewBag.EmailConfigured ?? false);
     var q = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string;
+    ViewData["Description"] = $"Write an issue, preview it, send a test to yourself, then send it to your {subscribers} confirmed subscriber{(subscribers == 1 ? "" : "s")}.";
+    ViewData["ListSearchPlaceholder"] = "Search by subject";
     string Pill(string status) => status switch
     {
         NewsletterStatus.Sent => "pill-ok",
         NewsletterStatus.Queued or NewsletterStatus.Sending => "pill-info",
         NewsletterStatus.Cancelled => "pill-warn",
-        _ => "border-border text-muted-foreground",
+        _ => "desk-pill-muted",
     };
 }
 
-<div class="max-w-5xl mx-auto space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <h1 class="text-xl font-semibold text-foreground">Newsletter</h1>
-            <p class="text-sm text-muted-foreground mt-1">Write an issue, preview it, send a test to yourself, then send it to your @subscribers confirmed subscriber@(subscribers == 1 ? "" : "s").</p>
-        </div>
-        <a href="/admin/newsletter/new" class="px-4 min-h-10 inline-flex items-center bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">New newsletter</a>
-    </div>
+@section PageActions {
+    <a href="/admin/newsletter/new" class="desk-btn desk-btn-primary">New newsletter</a>
+}
 
+<div class="max-w-5xl space-y-6">
     @if (!emailConfigured)
     {
-        <p class="pill-warn rounded-md border px-3 py-2 text-sm" role="note">Outgoing email is not set up on this server, so newsletters can be written and previewed but not sent. Set the <code>Smtp</code> settings in <code>appsettings.json</code>.</p>
+        <p class="rounded-lg border p-4 pill-warn text-sm" role="note">Outgoing email is not set up on this server, so newsletters can be written and previewed but not sent. Set the <code>Smtp</code> settings in <code>appsettings.json</code>.</p>
     }
 
     <partial name="_ListSearch" />
-    <div class="rounded-lg border border-border bg-card"><div class="table-scroll"><table class="w-full text-left text-sm">
-            <thead class="bg-muted/50 text-xs text-muted-foreground">
+    <div class="desk-card overflow-hidden">
+        @if (!Model.Any())
+        {
+            if (string.IsNullOrEmpty(q))
+            {
+                ViewData["EmptyTitle"] = "No newsletters yet.";
+                ViewData["EmptyHint"] = "Write the first one with New newsletter.";
+                ViewData["EmptyHref"] = "/admin/newsletter/new";
+                ViewData["EmptyAction"] = "New newsletter";
+            }
+            else
+            {
+                ViewData["EmptyQuery"] = q;
+                ViewData["EmptyClearHref"] = "?";
+                ViewData["EmptyHint"] = "to see them all.";
+            }
+            <partial name="_EmptyState" />
+        }
+        else
+        {
+        <div class="table-scroll"><table class="desk-table">
+            <thead>
                 <tr>
-                    <th class="px-4 py-3 font-medium">Subject</th>
-                    <th class="px-4 py-3 font-medium">Status</th>
-                    <th class="px-4 py-3 font-medium">Recipients</th>
-                    <th class="px-4 py-3 font-medium">Updated</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                    <th>Recipients</th>
+                    <th>Updated</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-border">
-                @if (!Model.Any())
-                {
-                    <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-muted-foreground">
-                        @(string.IsNullOrEmpty(q) ? "No newsletters yet. Write the first one with New newsletter." : $"No newsletters have “{q}” in their subject. Clear the search to see them all.")
-                    </td></tr>
-                }
+            <tbody>
                 @foreach (var i in Model)
                 {
-                    <tr class="hover:bg-muted/30">
-                        <td class="px-4 py-3"><a href="/admin/newsletter/@i.Id" class="font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">@i.Subject</a></td>
-                        <td class="px-4 py-3"><span class="@Pill(i.Status) text-xs px-2 py-0.5 rounded-full border">@i.Status</span></td>
-                        <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                    <tr>
+                        <td><a href="/admin/newsletter/@i.Id" class="font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">@i.Subject</a></td>
+                        <td><span class="desk-pill @Pill(i.Status)">@i.Status</span></td>
+                        <td class="text-muted-foreground whitespace-nowrap">
                             @if (i.IsDraft) { <span>—</span> }
                             else if (i.IsActive) { <span>Sending… open it to follow progress</span> }
                             else { <span>@i.SentCount of @i.RecipientCount sent@(i.FailedCount > 0 ? $", {i.FailedCount} failed" : "")</span> }
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">@Dates.DateTime(i.FinishedAt ?? i.QueuedAt ?? i.UpdatedAt)</td>
+                        <td class="text-muted-foreground whitespace-nowrap">@Dates.DateTime(i.FinishedAt ?? i.QueuedAt ?? i.UpdatedAt)</td>
                     </tr>
                 }
             </tbody>
         </table></div>
+        }
     </div>
     <partial name="_ListPager" />
 </div>

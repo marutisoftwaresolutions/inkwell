@@ -1,0 +1,38 @@
+@using Blog.Core.Services
+@model string
+@* Accessibility checks for the post and page editors (v1.0.9). Advisory, like the readiness score: they never block
+   a publish. They read the saved body, so they update after a save. *@
+@{
+    var findings = AccessibilityCheck.Check(Model);
+    var issues = AccessibilityCheck.IssueCount(findings);
+}
+<div x-data="{ a11yOpen: false }" class="border-t border-border pt-4 mt-4" data-accessibility-checks>
+    <button type="button" @@click="a11yOpen = !a11yOpen" :aria-expanded="a11yOpen ? 'true' : 'false'" aria-controls="a11yDetails"
+            class="flex items-center justify-between w-full text-left font-medium text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+        <span class="flex items-center gap-2">
+            Accessibility
+            <span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-muted @(issues == 0 ? "tone-ok" : "tone-warn")">@(issues == 0 ? "No issues" : issues == 1 ? "1 issue" : $"{issues} issues")</span>
+        </span>
+        <svg :class="a11yOpen ? 'rotate-180' : ''" class="transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </button>
+    @if (findings.Count > 0)
+    {
+        <p class="text-[11px] text-muted-foreground mt-1">First to fix: <span class="text-foreground">@findings[0].Title</span>.</p>
+    }
+    <div id="a11yDetails" x-show="a11yOpen" class="pt-3 space-y-2">
+        @if (findings.Count == 0)
+        {
+            <p class="text-xs text-muted-foreground">Every image has alt text, headings go down one level at a time, links say where they lead, tables have a header row and paragraphs are a readable length.</p>
+        }
+        @foreach (var f in findings)
+        {
+            <div class="text-xs">
+                <div class="text-foreground">@f.Title</div>
+                <p class="text-[11px] text-muted-foreground mt-0.5">@f.Advice</p>
+            </div>
+        }
+        <p class="text-[11px] text-muted-foreground pt-2 border-t border-border mt-2">
+            Advisory only: it never blocks a publish. It checks the saved version, so it updates after you save.
+        </p>
+    </div>
+</div>

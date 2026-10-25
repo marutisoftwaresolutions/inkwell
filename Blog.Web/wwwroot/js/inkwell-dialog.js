@@ -1,4 +1,4 @@
-/*
+t.className = 'p-4 rounded-lg border border-border bg-card text-card-foreground flex items-center gap-2 shadow-pop animate-slide-in-right pointer-events-auto ' + (styles[type] || styles.info);/*
  * Inkwell admin dialogs — replaces window.confirm / alert / prompt in the Desk.
  *
  * One <dialog id="inkwell-dialog"> lives in _AdminLayout. This script:
@@ -18,9 +18,10 @@
     'use strict';
 
     const TONES = {
-        danger:  { icon: '⚠', ring: 'text-red-600 bg-red-50',        btn: 'bg-red-600 hover:bg-red-700 text-white' },
-        warning: { icon: '!', ring: 'text-amber-700 bg-amber-50',    btn: 'bg-amber-600 hover:bg-amber-700 text-white' },
-        neutral: { icon: '?', ring: 'text-primary bg-primary/10',    btn: 'bg-primary hover:bg-primary/90 text-primary-foreground' },
+        // Tones use the Desk status tokens (pill-*/desk-btn-*), so the dialog follows the colour scheme.
+        danger:  { icon: '⚠', ring: 'pill-bad border',  btn: 'desk-btn desk-btn-danger' },
+        warning: { icon: '!', ring: 'pill-warn border', btn: 'desk-btn desk-btn-primary' },
+        neutral: { icon: '?', ring: 'pill-info border', btn: 'desk-btn desk-btn-primary' },
     };
 
     function el(id) { return document.getElementById(id); }
@@ -54,7 +55,7 @@
         const ok = el('ikd-ok'), cancel = el('ikd-cancel');
 
         ok.textContent = opts.action || (mode === 'prompt' ? 'Insert' : 'Confirm');
-        ok.className = 'h-9 px-4 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + tone.btn;
+        ok.className = tone.btn;
         cancel.textContent = opts.cancel || 'Cancel';
 
         // Prompt input
@@ -76,7 +77,7 @@
             if (mode === 'prompt') {
                 const msg = opts.validate ? opts.validate(input.value) : null;
                 inputHint.textContent = msg || '';
-                inputHint.className = 'text-xs mt-1 min-h-[1rem] ' + (msg ? 'text-red-600' : 'text-emerald-700');
+                inputHint.className = 'text-xs mt-1 min-h-[1rem] ' + (msg ? 'tone-bad' : 'tone-ok');
                 ok.disabled = !!msg || !input.value.trim();
                 if (!msg && input.value.trim() && opts.valid) inputHint.textContent = opts.valid;
             } else if (word) {
@@ -107,10 +108,10 @@
         const container = el('toast-container');
         if (!container) return;
         const styles = {
-            success: 'bg-green-50 border-green-200 text-green-800',
-            error:   'bg-red-50 border-red-200 text-red-800',
-            warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-            info:    'bg-blue-50 border-blue-200 text-blue-800',
+            success: 'desk-toast toast-ok',
+            error:   'desk-toast toast-bad',
+            warning: 'desk-toast toast-warn',
+            info:    'desk-toast toast-info',
         };
         const t = document.createElement('div');
         t.className = 'p-4 rounded-lg border flex items-center gap-2 shadow-lg animate-slide-in-right pointer-events-auto ' + (styles[type] || styles.info);

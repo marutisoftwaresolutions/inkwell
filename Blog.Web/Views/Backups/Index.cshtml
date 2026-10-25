@@ -2,46 +2,45 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Backups";
+    ViewData["Description"] = "A backup is one ZIP file holding the whole site: posts, pages, taxonomy, users, settings, menus, subscribers, comments, the audit trail and every uploaded file. Restore it into a fresh install from the setup wizard to move the site to a new server or recover it.";
     // Retention deletes the oldest backup when this one lands; say so before it happens.
     var displaced = Model.Files.Count >= Model.Keep ? Model.Files[^1] : null;
 }
 
 <div class="flex flex-col gap-6">
-    <div>
-        <h2 class="text-lg font-semibold text-foreground">Backups</h2>
-        <p class="text-xs text-muted-foreground mt-0.5 max-w-2xl">
-            A backup is one ZIP file holding the whole site: posts, pages, taxonomy, users, settings, menus, subscribers,
-            comments, the audit trail and every uploaded file. Restore it into a fresh install from the setup wizard to move
-            the site to a new server or recover it.
-        </p>
-    </div>
-
-    <form method="post" action="/admin/backups/create" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3 max-w-2xl"
+    <form method="post" action="/admin/backups/create" class="desk-card max-w-2xl"
           data-confirm-title="@(displaced is null ? null : "Make a backup?")"
           data-confirm-body="@(displaced is null ? null : $"The oldest backup ({displaced.Name}, {displaced.CreatedAtUtc:d MMM yyyy}) is deleted to make room, because the newest {Model.Keep} are kept. Download it first if you need it.")"
           data-confirm-action="@(displaced is null ? null : "Make backup")"
           data-confirm-tone="@(displaced is null ? null : "warning")">
         @Html.AntiForgeryToken()
-        <h3 class="text-sm font-semibold text-foreground">Make a backup</h3>
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Make a backup</h2>
+        </div>
+        <div class="desk-card-body flex flex-col gap-3">
         <label class="flex items-start gap-2 text-sm text-foreground">
-            <input type="checkbox" name="includeAnalytics" value="true" class="mt-1 h-4 w-4 rounded border-input" />
+            <input type="checkbox" name="includeAnalytics" value="true" class="desk-checkbox mt-1" />
             <span>
                 Include page-view analytics
                 <span class="block text-xs text-muted-foreground">Can be millions of rows and make the backup much larger and slower. The site works without them.</span>
             </span>
         </label>
         <div class="flex flex-wrap items-center gap-3">
-            <button type="submit" id="make-backup" class="px-4 py-2 min-h-10 bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium shadow-sm transition-opacity disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-ring"
+            <button type="submit" id="make-backup" class="desk-btn desk-btn-primary"
                     disabled="@(Model.InProgress ? "disabled" : null)" aria-describedby="make-backup-hint">Make backup</button>
             <span id="make-backup-hint" class="text-xs text-muted-foreground">@(Model.InProgress ? "A backup is already on its way." : "Runs in the background; the list below updates when it is done.")</span>
+        </div>
         </div>
     </form>
 
     <div id="backup-list">
         <partial name="_BackupList" model="Model" />
     </div>
-    <div class="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground space-y-2 max-w-3xl">
-        <h3 class="text-sm font-semibold text-foreground">Keep backups safe</h3>
+    <div class="desk-card max-w-3xl">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Keep backups safe</h2>
+        </div>
+        <div class="desk-card-body text-xs text-muted-foreground space-y-2">
         <p>A backup contains every account's password hash and every subscriber's email address. Store it the way you would store a password:
            somewhere private, never in a public folder or a shared link.</p>
         <p>What is <strong class="text-foreground">not</strong> in a backup: the encryption key ring (so the Search Console connection and webhook signing
@@ -52,6 +51,7 @@
         <p><strong class="text-foreground">To restore:</strong> install Inkwell on an empty database, copy the ZIP into the new server's backups folder
            (<code>App_Data/backups</code> unless <code>Backups:Path</code> is set), open the site and choose <em>Restore from a backup</em> on the first
            setup screen.</p>
+        </div>
     </div>
 </div>
 

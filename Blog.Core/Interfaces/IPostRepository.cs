@@ -30,6 +30,12 @@ public interface IPostRepository
     Task<Post?> GetByIdAsync(Guid id, Guid? authorId = null);
 
     /// <summary>
+    /// Posts that went or go live, or carry a planned date, between two UTC instants: the content calendar's month
+    /// (ContentCalendar). Only the columns it shows. <paramref name="authorId"/> scopes to one owner (cloud mode).
+    /// </summary>
+    Task<IReadOnlyList<Blog.Core.Services.ContentCalendar.Source>> GetCalendarAsync(DateTime fromUtc, DateTime toUtc, Guid? authorId = null);
+
+    /// <summary>
     /// Scheduled posts whose time arrived in the window (fromUtc, toUtc]. They go live on read, not
     /// through a save, so this is how the webhook job notices them. Title, slug and dates only.
     /// </summary>

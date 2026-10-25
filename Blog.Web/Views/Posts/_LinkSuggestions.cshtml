@@ -5,8 +5,8 @@
     var inbound  = (IReadOnlyList<LinkSuggestion>)ViewBag.Inbound;
 
     string Chip(bool ok) => ok
-        ? "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700"
-        : "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700";
+        ? "px-1.5 py-0.5 rounded text-[10px] font-semibold pill-ok border"
+        : "px-1.5 py-0.5 rounded text-[10px] font-semibold pill-warn border";
 }
 
 @* Where this post stands against the two-in / two-out minimum. *@
@@ -15,7 +15,7 @@
     <span class="@Chip(!status.NeedsInbound)">@status.Inbound inbound</span>
     @if (status.IsOrphan)
     {
-        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">orphan</span>
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold pill-bad border">orphan</span>
     }
 </div>
 
@@ -39,7 +39,7 @@
                 <span class="text-xs text-foreground leading-snug">@s.Title</span>
                 @if (s.Kind == SuggestionKind.UnlinkedMention)
                 {
-                    <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">mentioned</span>
+                    <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold pill-ok border">mentioned</span>
                 }
             </div>
             <div class="text-[11px] text-muted-foreground mt-0.5">@s.Reason</div>
@@ -61,7 +61,7 @@
                 <a href="/admin/posts" class="text-xs text-foreground leading-snug hover:underline">@s.Title</a>
                 @if (s.Kind == SuggestionKind.UnlinkedMention)
                 {
-                    <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">mentioned</span>
+                    <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold pill-ok border">mentioned</span>
                 }
             </div>
             <div class="text-[11px] text-muted-foreground mt-0.5">@s.Reason</div>

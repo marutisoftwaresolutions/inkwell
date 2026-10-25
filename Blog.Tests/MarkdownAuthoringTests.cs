@@ -143,15 +143,18 @@ public class MarkdownAuthoringTests
         var posts = Regex.Matches(ctrl, @"\[HttpPost[^\]]*\]\s*(\[[^\]]+\]\s*)*public").Cast<Match>().ToList();
         Assert.All(posts, m => Assert.Contains("[ValidateAntiForgeryToken]", m.Value));
 
-        var scripts = RepoFile("Blog.Web", "Views", "Posts", "_MarkdownEditorScripts.cshtml");
+        var scripts = RepoFile("Blog.Web", "Views", "Shared", "_MarkdownEditorScripts.cshtml");
         Assert.Contains("autoDownloadFontAwesome: false", scripts);
         Assert.Contains("spellChecker: false", scripts);
         Assert.Contains("~/lib/easymde/easymde.min.js", scripts);
         Assert.DoesNotContain("cdn.", scripts);
-        Assert.Contains("/admin/posts/markdown-preview", scripts);
+        Assert.Contains("'@editorBase/markdown-preview'", scripts);
+        Assert.Contains("ViewData[\"EditorBase\"] as string ?? \"/admin/posts\"", scripts);   // posts are the default
         Assert.Contains("screenReaderLabel", scripts);                                   // the editing area has a name
         Assert.Contains("Tab: false", scripts);                                          // no keyboard trap
         Assert.Contains("ticket === previewSeq", scripts);                               // stale previews are dropped
+        Assert.Contains("keep(btn('preview'", scripts);                                  // preview can be left by clicking it again
+        Assert.Contains("keep(btn('side-by-side'", scripts);
 
         // easymde.min.css loads after admin.css, so the token overrides must out-rank it, and the hidden
         // visual-editor parts must stay hidden despite Tailwind's .flex.
@@ -165,6 +168,87 @@ public class MarkdownAuthoringTests
 
         var api = RepoFile("Blog.Web", "Controllers", "Api", "PostsApiController.cs");
         Assert.Contains("ApplyBody(existing, req.Content, req.Markdown);", api);
+    }
+
+    // ── Pages (v1.0.9) ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void A_markdown_page_revision_keeps_its_source_and_a_rich_one_returns_the_page_to_rich()
+    {
+        var md = new Page { Id = Guid.NewGuid(), Title = "About", Markdown = "## Us\n\nWe **write**.", EditorMode = EditorModes.Markdown };
+        md.Content = MarkdownRenderer.ToHtml(md.Markdown);
+        var rev = RevisionSnapshot.FromPage(md, "Saved", Guid.NewGuid(), "me");
+
+        var restored = new Page { Title = "Later", Content = "<p>later</p>" };
+        RevisionSnapshot.ApplyToPage(rev, restored);
+        Assert.True(restored.IsMarkdown);
+        Assert.Equal(md.Markdown, restored.Markdown);
+        Assert.Equal(md.Content, restored.Content);
+
+        // A rich page without custom fields still records no bag, exactly as before, and restoring it ends Markdown mode.
+        var rich = RevisionSnapshot.FromPage(new Page { Title = "About", Content = "<p>Plain</p>" }, "Saved", Guid.NewGuid(), "me");
+        Assert.Null(rich.StructuredJson);
+        RevisionSnapshot.ApplyToPage(rich, restored);
+        Assert.False(restored.IsMarkdown);
+        Assert.Null(restored.Markdown);
+        Assert.Equal("<p>Plain</p>", restored.Content);
+
+        // An older page revision with only custom fields reads the same way it did.
+        var old = new Revision { Title = "T", Html = "<p>x</p>", StructuredJson = "{\"CustomFieldsJson\":\"{\\\"a\\\":\\\"1\\\"}\"}" };
+        var target = new Page { EditorMode = EditorModes.Markdown, Markdown = "x" };
+        RevisionSnapshot.ApplyToPage(old, target);
+        Assert.Equal("{\"a\":\"1\"}", target.CustomFieldsJson);
+        Assert.False(target.IsMarkdown);
+    }
+
+    [Fact]
+    public void Pages_share_the_markdown_editor_and_the_server_renders_their_html()
+    {
+        var ctrl = RepoFile("Blog.Web", "Controllers", "PagesController.cs");
+        Assert.Contains("ApplyEditorMode(page, page.EditorMode);", ctrl);                  // create
+        Assert.Contains("ApplyEditorMode(existing, existing.EditorMode);", ctrl);          // edit: the stored mode
+        Assert.Contains("MarkdownRenderer.RendersUnchanged(html)", ctrl);                  // the switch never changes the look
+        Assert.Contains("AuditActions.PageUpdated", ctrl[ctrl.IndexOf("SwitchEditorMode", StringComparison.Ordinal)..]);
+        var posts = Regex.Matches(ctrl, @"\[HttpPost[^\]]*\]\s*(\[[^\]]+\]\s*)*public").Cast<Match>().ToList();
+        Assert.All(posts, m => Assert.Contains("[ValidateAntiForgeryToken]", m.Value));
+
+        foreach (var view in new[] { "Edit.cshtml", "Create.cshtml" })
+        {
+            var v = RepoFile("Blog.Web", "Views", "Pages", view);
+            Assert.Contains("<partial name=\"_EditorSwitchGuard\" />", v);
+            Assert.Contains("<partial name=\"_MarkdownPane\" model=\"Model\" />", v);
+            Assert.Contains("ViewData[\"EditorBase\"] = \"/admin/pages\";", v);
+            Assert.Contains("ViewData[\"EditorForm\"] = \"pageForm\";", v);
+        }
+        Assert.Contains("<partial name=\"_EditorModeForm\" model=\"Model\" />", RepoFile("Blog.Web", "Views", "Pages", "Edit.cshtml"));
+        Assert.Contains("@editorBase/@Model.Id/editor-mode", RepoFile("Blog.Web", "Views", "Shared", "_EditorModeForm.cshtml"));
+
+        // Switching with unsaved work never saves a live item as a draft: that unpublished a published page (v1.0.9 UX review).
+        var guard = RepoFile("Blog.Web", "Views", "Shared", "_EditorSwitchGuard.cshtml");
+        Assert.Contains("getAttribute('data-editor-draft-safe') !== 'true'", guard);
+        Assert.Contains("data-editor-draft-safe=\"@(Model.IsPublished ? \"false\" : \"true\")\"", RepoFile("Blog.Web", "Views", "Pages", "Edit.cshtml"));
+        Assert.Contains("data-editor-draft-safe=\"@((Model.Status is Blog.Core.Domain.PostStatus.Draft or Blog.Core.Domain.PostStatus.NeedsChanges)", RepoFile("Blog.Web", "Views", "Posts", "Edit.cshtml"));
+    }
+
+    [Fact]
+    public async Task Every_dev_page_switches_to_markdown_without_changing_its_html_and_existing_pages_stay_rich()
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        string? cs;
+        try
+        {
+            cs = factory.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
+            using var probe = new SqlConnection(new SqlConnectionStringBuilder(cs) { ConnectTimeout = 3 }.ConnectionString);
+            await probe.OpenAsync();
+        }
+        catch (Exception ex) { _out.WriteLine("Dev database unavailable — skipping. " + ex.Message); return; }
+
+        await using var conn = new SqlConnection(cs);
+        var pages = (await conn.QueryAsync<(string Slug, string Content, string EditorMode)>("SELECT Slug, Content, EditorMode FROM Pages WHERE Content IS NOT NULL")).ToList();
+        var changed = pages.Where(p => !MarkdownRenderer.RendersUnchanged(p.Content)).Select(p => p.Slug).ToList();
+        _out.WriteLine($"{pages.Count} pages checked; {changed.Count} would change: {string.Join(", ", changed.Take(10))}");
+        Assert.Empty(changed);
+        Assert.All(pages, p => Assert.Contains(p.EditorMode, new[] { EditorModes.Rich, EditorModes.Markdown }));
     }
 
     // ── Real content (dev database) ─────────────────────────────────────────────

@@ -4,18 +4,14 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Menus";
+    ViewData["Description"] = "Choose the links in your site's header and footer. Until you save a header menu, the header shows the pages marked “Show in navigation”, as it always has. Every theme keeps its own Home link in the header.";
     var json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     var targetsJson = JsonSerializer.Serialize(Model.Targets.ToDictionary(kv => kv.Key, kv => kv.Value.Select(t => new { id = t.Id, title = t.Title, path = t.Path })), json);
-    var btn = "inline-flex items-center justify-center min-w-10 min-h-10 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30 disabled:hover:bg-transparent";
-    var field = "px-2 py-2 bg-background border border-input rounded-md text-sm text-foreground w-full";
+    var btn = "desk-btn desk-btn-ghost desk-btn-icon";
+    var field = "desk-input";
 }
 
 <div class="flex flex-col gap-6 max-w-4xl">
-    <p class="text-sm text-muted-foreground max-w-2xl">
-        Choose the links in your site's header and footer. Until you save a header menu, the header shows the pages
-        marked “Show in navigation”, as it always has. Every theme keeps its own Home link in the header.
-    </p>
-
     @foreach (var (location, title, rows, help) in new[]
     {
         (MenuLocations.Header, "Header menu", Model.Header, "Top-level items appear in the header bar. Nested items appear in the theme's menu and on phones in most themes; the Feed header shows top-level items only."),
@@ -26,7 +22,7 @@
         var failed = Model.ErrorLocation == location;
 
         <form method="post" action="/admin/menus/save" data-track-changes
-              class="bg-card rounded-lg border border-border p-4 space-y-4"
+              class="desk-card p-4 space-y-4"
               x-data="menuEditor('@location', @rowsJson)"
               @@submit="confirmSave($event)"
               aria-labelledby="menu-@location-title">
@@ -38,12 +34,12 @@
 
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h2 id="menu-@location-title" class="text-base font-semibold text-foreground scroll-mt-16">@title</h2>
-                    <p class="text-xs text-muted-foreground mt-0.5 max-w-xl">@help</p>
+                    <h2 id="menu-@location-title" class="desk-card-title scroll-mt-16">@title</h2>
+                    <p class="desk-card-description mt-1 max-w-xl">@help</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <span data-dirty-indicator hidden class="text-xs text-muted-foreground">Unsaved changes</span>
-                    <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Save @title.ToLowerInvariant()</button>
+                    <span data-dirty-indicator hidden class="desk-pill pill-warn">Unsaved changes</span>
+                    <button type="submit" class="desk-btn desk-btn-primary">Save @title.ToLowerInvariant()</button>
                 </div>
             </div>
 
@@ -68,14 +64,14 @@
                                 <span>Links to</span>
                                 <select x-model="row.type" @@change="row.targetId = null; changed(row)" :data-row="row.uid" data-first
                                         :aria-invalid="row.error ? 'true' : null" :aria-describedby="row.error ? 'menu-@location-err-' + row.uid : null"
-                                        class="px-2 py-2 bg-background border border-input rounded-md text-sm text-foreground">
+                                        class="desk-select w-auto">
                                     <template x-for="t in types" :key="t.value"><option :value="t.value" x-text="t.label" :selected="t.value === row.type"></option></template>
                                 </select>
                             </label>
 
                             <label class="flex flex-col gap-1 text-xs text-muted-foreground min-w-0 flex-1 basis-48" x-show="needsTarget(row)">
                                 <span x-text="targetLabel(row)"></span>
-                                <select x-model="row.targetId" @@change="changed(row)" class="@field">
+                                <select x-model="row.targetId" @@change="changed(row)" class="desk-select">
                                     <option value="">Choose…</option>
                                     <template x-for="t in (targets[row.type] || [])" :key="t.id"><option :value="t.id" x-text="t.title" :selected="t.id === row.targetId"></option></template>
                                 </select>
@@ -92,7 +88,7 @@
                             </label>
 
                             <label class="flex items-center gap-1.5 text-xs text-muted-foreground min-h-10">
-                                <input type="checkbox" x-model="row.newTab" @@change="changed(row)" class="h-4 w-4 rounded border-input" /> New tab
+                                <input type="checkbox" x-model="row.newTab" @@change="changed(row)" class="desk-checkbox" /> New tab
                             </label>
 
                             <div class="flex items-center gap-0.5 ml-auto">
@@ -120,7 +116,7 @@
                 </template>
             </ol>
 
-            <button type="button" x-ref="add" @@click="add()" class="px-3 py-2 rounded-md text-sm border border-input hover:bg-muted">Add item</button>
+            <button type="button" x-ref="add" @@click="add()" class="desk-btn desk-btn-outline">Add item</button>
         </form>
     }
 </div>

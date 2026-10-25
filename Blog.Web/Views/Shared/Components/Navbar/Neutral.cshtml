@@ -47,10 +47,10 @@
         <div class="container xl:max-w-6xl mx-auto px-4 flex items-center justify-between" style="height: 2.75rem;">
             @* Left: page links *@
             <div class="flex items-center gap-0 text-xs uppercase tracking-widest hidden md:flex">
-                <a href="/" class="px-3 py-1 hover:opacity-60 transition-opacity border-r border-dashed" style="border-color: var(--border);">Home</a>
+                <a href="/" class="px-3 py-1 hover:opacity-60 transition-opacity border-e border-dashed" style="border-color: var(--border);">Home</a>
                 @foreach (var navPage in sortedPages.Where(l => l.Depth == 0).Take(4))
                 {
-                    <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)" class="px-3 py-1 hover:opacity-60 transition-opacity border-r border-dashed" style="border-color: var(--border);">@if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title</a>
+                    <a href="@navPage.Href" target="@(navPage.OpenInNewTab ? "_blank" : null)" rel="@(navPage.OpenInNewTab ? "noopener" : null)" class="px-3 py-1 hover:opacity-60 transition-opacity border-e border-dashed" style="border-color: var(--border);">@if (navPage.Depth > 0) { <span aria-hidden="true">— </span> }@navPage.Title</a>
                 }
             </div>
 
@@ -60,11 +60,11 @@
             </button>
 
             @* Right: icons *@
-            <div class="flex items-center gap-0 ml-auto">
+            <div class="flex items-center gap-0 ms-auto">
                 @* Pages dropdown (all pages, mobile supplement) *@
                 <div class="relative" x-data="{ pagesOpen: false }">
                     <button @@click="pagesOpen = !pagesOpen" @@click.outside="pagesOpen = false"
-                            class="w-9 h-9 flex items-center justify-center hover:opacity-60 transition-opacity border-l border-dashed"
+                            class="w-9 h-9 flex items-center justify-center hover:opacity-60 transition-opacity border-s border-dashed"
                             style="border-color: var(--border);" title="All Pages">
                         <i class="bi bi-file-text text-sm"></i>
                     </button>
@@ -76,7 +76,7 @@
                          x-transition:leave-start="opacity-100"
                          x-transition:leave-end="opacity-0"
                          style="display:none; background: var(--background); border-color: var(--border);"
-                         class="absolute right-0 top-full min-w-44 border border-dashed z-50">
+                         class="absolute end-0 top-full min-w-44 border border-dashed z-50">
                         <a href="/" class="flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider hover:opacity-60 border-b border-dashed" style="border-color: var(--border);">
                             <i class="bi bi-house text-xs" style="color: var(--muted-foreground);"></i> Home
                         </a>

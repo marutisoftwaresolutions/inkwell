@@ -1,10 +1,10 @@
-﻿@{
+@{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Error";
+    ViewData["Title"] = "Something went wrong";
+    ViewData["Description"] = "An unexpected error occurred. The details are in Error Monitor; try the action again or go back to the dashboard.";
 }
 
-<div class="admin-content">
-    <h1>Something went wrong</h1>
-    <p>An unexpected error occurred. Please try again or contact support.</p>
-    <a href="/admin/dashboard" class="btn btn-primary">← Back to Dashboard</a>
+<div class="desk-card desk-card-body flex flex-wrap items-center gap-3">
+    <a href="/admin/dashboard" class="desk-btn desk-btn-primary">Back to the dashboard</a>
+    <a href="javascript:history.back()" class="desk-btn desk-btn-outline">Go back</a>
 </div>

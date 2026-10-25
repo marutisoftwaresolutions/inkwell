@@ -8,11 +8,11 @@
                 var n = (ta.value || '').trim().length;
                 var msg, cls;
                 if (n === 0) { msg = 'Add a summary — ideal 120–158 characters for search snippets.'; cls = 'text-muted-foreground'; }
-                else if (n < 120) { msg = n + ' characters — a bit short. Aim for 120–158.'; cls = 'text-amber-700'; }
-                else if (n <= 158) { msg = n + ' characters — ideal length ✓'; cls = 'text-emerald-700'; }
+                else if (n < 120) { msg = n + ' characters — a bit short. Aim for 120–158.'; cls = 'tone-warn'; }
+                else if (n <= 158) { msg = n + ' characters — ideal length ✓'; cls = 'tone-ok'; }
                 else { msg = n + ' characters — too long; search engines truncate around 158.'; cls = 'text-destructive'; }
                 label.textContent = msg;
-                label.classList.remove('text-muted-foreground', 'text-amber-700', 'text-emerald-700', 'text-destructive');
+                label.classList.remove('text-muted-foreground', 'tone-warn', 'tone-ok', 'text-destructive');
                 label.classList.add(cls);
             }
             ta.addEventListener('input', update);

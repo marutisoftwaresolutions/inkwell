@@ -54,10 +54,10 @@
             }
             <div class="absolute inset-0 bg-black/40"></div>
 
-            <div class="absolute bottom-0 left-0 right-0 p-8 md:p-16 max-w-5xl mx-auto">
+            <div class="absolute bottom-0 start-0 end-0 p-8 md:p-16 max-w-5xl mx-auto">
                 @if (heroPost.Categories.Any())
                 {
-                    <span class="inline-block px-4 py-2 text-xs font-bold uppercase tracking-widest mb-5 border-l-4"
+                    <span class="inline-block px-4 py-2 text-xs font-bold uppercase tracking-widest mb-5 border-s-4"
                           style="background: var(--card); color: var(--foreground); border-color: var(--primary);">
                         @heroPost.Categories.First().Name
                     </span>
@@ -79,7 +79,7 @@
                 </div>
             </div>
 
-            <div class="absolute top-6 right-6 px-6 py-3 text-sm font-bold uppercase tracking-widest transition-all duration-300 hover:bg-white hover:text-black border-2 border-white text-white">
+            <div class="absolute top-6 end-6 px-6 py-3 text-sm font-bold uppercase tracking-widest transition-all duration-300 hover:bg-white hover:text-black border-2 border-white text-white">
                 Read Article
             </div>
         </a>
@@ -205,7 +205,7 @@
                 @if (Model.Page > 1)
                 {
                     <a href="?page=@(Model.Page - 1)@baseQuery"
-                       class="px-6 py-3 text-sm font-bold uppercase tracking-widest border border-r-0 hover:bg-muted transition-colors"
+                       class="px-6 py-3 text-sm font-bold uppercase tracking-widest border border-e-0 hover:bg-muted transition-colors"
                        style="border-color: var(--border); color: var(--foreground);">
                         Previous
                     </a>
@@ -216,7 +216,7 @@
                 @if (Model.Page < Model.TotalPages)
                 {
                     <a href="?page=@(Model.Page + 1)@baseQuery"
-                       class="px-6 py-3 text-sm font-bold uppercase tracking-widest border border-l-0 hover:bg-muted transition-colors"
+                       class="px-6 py-3 text-sm font-bold uppercase tracking-widest border border-s-0 hover:bg-muted transition-colors"
                        style="border-color: var(--border); color: var(--foreground);">
                         Next
                     </a>

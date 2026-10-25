@@ -8,66 +8,60 @@
     var candidates = allPosts.Where(p => !inSeriesIds.Contains(p.Id)).ToList();
 }
 
+@section PageActions {
+    <a href="/admin/series" class="desk-btn desk-btn-outline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Back to series
+    </a>
+    <a href="/series/@Model.Slug" target="_blank" rel="noopener" class="desk-btn desk-btn-outline" aria-label="View public page (opens in a new tab)">View public page ↗</a>
+}
+
 <div class="flex flex-col gap-6 max-w-4xl">
 
-    <div class="flex items-center justify-between">
-        <a href="/admin/series" class="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-            Back to Series
-        </a>
-        <a href="/series/@Model.Slug" target="_blank" class="text-sm text-muted-foreground hover:text-primary">View public page ↗</a>
-    </div>
-
-    @if (TempData["Success"] != null)
-    {
-        <div class="rounded-md border border-border bg-primary/10 text-foreground px-4 py-3 text-sm">@TempData["Success"]</div>
-    }
-    @if (TempData["Error"] != null)
-    {
-        <div class="rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm">@TempData["Error"]</div>
-    }
-
     <!-- Metadata -->
-    <div class="bg-card rounded-lg border border-border p-5">
-        <h2 class="font-semibold mb-4">Series details</h2>
-        <form method="post" action="/admin/series/edit/@Model.Id" class="space-y-4" data-track-changes>
+    <div class="desk-card">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Series details</h2>
+        </div>
+        <form method="post" action="/admin/series/edit/@Model.Id" class="desk-card-body space-y-4" data-track-changes>
             @Html.AntiForgeryToken()
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1">Title</label>
-                    <input type="text" name="title" id="seriesTitle" required value="@Model.Title" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                    <label class="desk-label" for="seriesTitle">Title</label>
+                    <input type="text" name="title" id="seriesTitle" required value="@Model.Title" class="desk-input" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1">Slug</label>
-                    <input type="text" name="slug" id="seriesSlug" value="@Model.Slug" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                    <label class="desk-label" for="seriesSlug">Slug</label>
+                    <input type="text" name="slug" id="seriesSlug" value="@Model.Slug" class="desk-input" />
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium mb-1">Description</label>
-                <textarea name="description" rows="3" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">@Model.Description</textarea>
+                <label class="desk-label" for="seriesDescription">Description</label>
+                <textarea name="description" id="seriesDescription" rows="3" class="desk-textarea">@Model.Description</textarea>
             </div>
             <div class="flex items-center gap-3">
-            <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save details</button>
+            <button type="submit" class="desk-btn desk-btn-primary">Save details</button>
             <span data-dirty-indicator hidden class="text-xs">Unsaved changes</span>
             </div>
         </form>
     </div>
 
     <!-- Posts manager -->
-    <div class="bg-card rounded-lg border border-border p-5">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="font-semibold">Posts in this series <span class="text-muted-foreground font-normal">(ordered)</span></h2>
+    <div class="desk-card">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Posts in this series <span class="text-muted-foreground font-normal">(ordered)</span></h2>
         </div>
+        <div class="desk-card-body">
 
         <div class="flex flex-col sm:flex-row gap-2 mb-4">
-            <select id="addPostSelect" class="flex-1 px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+            <select id="addPostSelect" class="desk-select flex-1" aria-label="Post to add to this series">
                 <option value="">Add a post to this series…</option>
                 @foreach (var p in candidates)
                 {
                     <option value="@p.Id" data-title="@p.Title">@p.Title</option>
                 }
             </select>
-            <button type="button" id="addPostBtn" class="px-4 py-2 border border-input rounded-md text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap">Add post</button>
+            <button type="button" id="addPostBtn" class="desk-btn desk-btn-outline">Add post</button>
         </div>
 
         <form method="post" action="/admin/series/@Model.Id/posts" id="postsForm" data-track-changes>
@@ -82,18 +76,18 @@
                             @p.Title
                             @if (p.Status != Blog.Core.Domain.PostStatus.Published)
                             {
-                                <span class="ml-2 text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">@p.Status</span>
+                                <span class="ml-2 desk-pill desk-pill-muted">@p.Status</span>
                             }
                         </span>
                         <div class="flex items-center gap-1">
-                            <button type="button" class="move-up p-1 rounded hover:bg-muted text-muted-foreground" title="Move up" aria-label="Move @p.Title up">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+                            <button type="button" class="move-up desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" title="Move up" aria-label="Move @p.Title up">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
                             </button>
-                            <button type="button" class="move-down p-1 rounded hover:bg-muted text-muted-foreground" title="Move down" aria-label="Move @p.Title down">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            <button type="button" class="move-down desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" title="Move down" aria-label="Move @p.Title down">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
                             </button>
-                            <button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series" aria-label="Remove @p.Title from series">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            <button type="button" class="remove-post desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm text-destructive hover:bg-destructive/10 hover:text-destructive" title="Remove from series" aria-label="Remove @p.Title from series">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                             </button>
                         </div>
                     </li>
@@ -101,10 +95,11 @@
             </ul>
             <p id="emptyHint" class="text-sm text-muted-foreground py-3 @(seriesPosts.Any() ? "hidden" : "")">No posts yet — add posts above, order them, then save.</p>
             <div class="mt-4 flex items-center gap-3">
-                <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Save posts &amp; order</button>
+                <button type="submit" class="desk-btn desk-btn-primary">Save posts &amp; order</button>
                 <span data-dirty-indicator hidden class="text-xs">Unsaved changes</span>
             </div>
         </form>
+        </div>
     </div>
 </div>
 
@@ -140,9 +135,9 @@
                 '<span class="text-xs text-muted-foreground w-6 text-center part-num"></span>' +
                 '<span class="flex-1 text-sm truncate"></span>' +
                 '<div class="flex items-center gap-1">' +
-                '<button type="button" class="move-up p-1 rounded hover:bg-muted text-muted-foreground" title="Move up"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg></button>' +
-                '<button type="button" class="move-down p-1 rounded hover:bg-muted text-muted-foreground" title="Move down"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>' +
-                '<button type="button" class="remove-post p-1 rounded hover:bg-destructive/10 text-destructive" title="Remove from series"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>' +
+                '<button type="button" class="move-up desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" title="Move up"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></button>' +
+                '<button type="button" class="move-down desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" title="Move down"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>' +
+                '<button type="button" class="remove-post desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm text-destructive hover:bg-destructive/10 hover:text-destructive" title="Remove from series"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>' +
                 '</div>';
             li.querySelector('.flex-1').textContent = title;
             // Accessible names carry the post title (set as attributes, never via innerHTML, so a title cannot inject markup).

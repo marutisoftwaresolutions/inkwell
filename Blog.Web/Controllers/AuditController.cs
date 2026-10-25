@@ -67,6 +67,13 @@ public class AuditController : Controller
         };
         ViewBag.AllUsers = allUsers.Select(u => (u.Id, u.DisplayName ?? u.Email)).ToList();
 
+        // Shared pager (_ListPager): the filters travel as extra query values so paging keeps them.
+        Blog.Web.Models.ListPaging.Stash(this, Blog.Web.Models.PagingMeta.FromCounts(null, page, total, pageSize, items.Count));
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?>
+        {
+            ["entityType"] = entityType, ["action"] = action, ["userId"] = userId, ["from"] = from, ["to"] = to,
+        };
+
         ViewData["Title"] = "Audit Trail";
         return View();
     }

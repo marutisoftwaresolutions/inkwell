@@ -27,13 +27,13 @@
             @* Center: logo — only when the site has one; the name is already the brand on the left *@
             @if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
             {
-                <a href="/" class="hidden md:flex items-center px-6 border-l border-r" style="border-color: var(--border);">
+                <a href="/" class="hidden md:flex items-center px-6 border-s border-e" style="border-color: var(--border);">
                     <img src="@Model.SiteLogoUrl" alt="@Model.SiteName" class="h-12 w-auto object-contain" />
                 </a>
             }
 
             @* Right: stacked icon cluster *@
-            <div class="flex items-center gap-1 pl-4">
+            <div class="flex items-center gap-1 ps-4">
                 @* Pages *@
                 <div class="relative" x-data="{ pagesOpen: false }">
                     <button @@click="pagesOpen = !pagesOpen" @@click.outside="pagesOpen = false"
@@ -48,8 +48,8 @@
                          x-transition:leave="transition ease-in duration-150"
                          x-transition:leave-start="opacity-100"
                          x-transition:leave-end="opacity-0"
-                         style="display:none; background: var(--background); border-color: var(--border);"
-                         class="absolute right-0 top-full mt-1 min-w-52 border-2 z-50" style="border-color: var(--foreground);">
+                         style="display:none; background: var(--background); border-color: var(--foreground);"
+                         class="absolute end-0 top-full mt-1 min-w-52 border-2 z-50">
                         <div class="px-4 py-2 text-[9px] uppercase tracking-[0.3em] font-bold border-b" style="border-color: var(--border); color: var(--muted-foreground); background: var(--muted);">Navigate</div>
                         <a href="/" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:opacity-60 border-b" style="border-color: var(--border);">
                             <i class="bi bi-house" style="color: var(--primary);"></i> Home

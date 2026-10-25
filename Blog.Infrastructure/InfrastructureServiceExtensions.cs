@@ -42,6 +42,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICrawlerVisitRepository, CrawlerVisitRepository>();
         services.AddScoped<IJobRunRepository, JobRunRepository>();
         services.AddScoped<Blog.Core.Services.Export.IExportSource, ExportRepository>();
+        services.AddScoped<IExportPushRepository, ExportPushRepository>();   // direct push runs (ADR-0029)
+        services.AddScoped<IFormRepository, FormRepository>();               // contact forms (ADR-0030)
         services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
         services.AddScoped<ISearchPerformanceRepository, SearchPerformanceRepository>();
         services.AddScoped<IWebhookRepository, WebhookRepository>();

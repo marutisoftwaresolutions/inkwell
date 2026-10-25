@@ -18,11 +18,14 @@ public class MiscApiController : ControllerBase
     private readonly IMediaRepository _media;
     private readonly IUserRepository _users;
     private readonly ITenantContext _tenantContext;
+    private readonly Blog.Web.Services.AuditService _audit;
+    private const string Bearer = JwtBearerDefaults.AuthenticationScheme;
 
     public MiscApiController(ICategoryRepository categories, ITagRepository tags,
         ICommentRepository comments, IMediaRepository media, IUserRepository users,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext, Blog.Web.Services.AuditService audit)
     {
+        _audit = audit;
         _categories = categories;
         _tags = tags;
         _comments = comments;
@@ -46,55 +49,48 @@ public class MiscApiController : ControllerBase
     }
 
     [HttpGet("comments")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = Bearer)]
     public async Task<IActionResult> GetComments([FromQuery] Guid? postId, [FromQuery] int page = 1)
     {
         var result = await _comments.GetCommentsAsync(new CommentFilter
         {
             PostId = postId, Status = CommentStatus.Approved, Page = page, PageSize = 20
         });
-        return Ok(new { data = result.Items, pagination = new { result.Page, result.PageSize, result.TotalItems, result.TotalPages } });
+        // The shape readers see on the page: never the commenter's email or IP address.
+        var data = result.Items.Select(c => new { c.Id, c.PostId, c.PostSlug, c.ParentId, c.AuthorName, c.AuthorUrl, c.Content, c.CreatedAt });
+        return Ok(new { data, pagination = new { result.Page, result.PageSize, result.TotalItems, result.TotalPages } });
     }
 
-    [HttpPost("comments")]
-    public async Task<IActionResult> PostComment([FromBody] CommentRequest req)
-    {
-        if (string.IsNullOrWhiteSpace(req.AuthorName) || string.IsNullOrWhiteSpace(req.AuthorEmail) || string.IsNullOrWhiteSpace(req.Content))
-            return BadRequest(new { statusCode = 400, error = "Name, email, and content are required." });
-
-        var comment = new Comment
-        {
-            PostId = req.PostId, AuthorName = req.AuthorName, AuthorEmail = req.AuthorEmail,
-            Content = req.Content, Status = CommentStatus.Pending,
-            AuthorIp = HttpContext.Connection.RemoteIpAddress?.ToString()
-        };
-        var id = await _comments.CreateAsync(comment);
-        return Ok(new { data = new { id, status = "Pending" } });
-    }
+    // There is no comment-posting endpoint (ADR-0033): readers comment through the post page, which runs the spam
+    // gate, the comments-enabled check and the firewall reporting. The anonymous POST that skipped all three was removed.
 
     [HttpPatch("comments/{id}/approve")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = Bearer, Policy = "CanManageComments")]
     public async Task<IActionResult> ApproveComment(Guid id)
     {
+        var comment = await _comments.GetByIdAsync(id);
+        if (comment == null) return NotFound(new { statusCode = 404, error = "Comment not found." });
         await _comments.UpdateStatusAsync(id, CommentStatus.Approved);
+        await _audit.LogAsync(AuditActions.CommentApproved, "Comment", id.ToString(), comment.AuthorName, newValues: "Approved through the API");
         return Ok(new { data = "Approved." });
     }
 
     [HttpDelete("comments/{id}")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = Bearer, Policy = "CanManageComments")]
     public async Task<IActionResult> DeleteComment(Guid id)
     {
+        var comment = await _comments.GetByIdAsync(id);
+        if (comment == null) return NotFound(new { statusCode = 404, error = "Comment not found." });
         await _comments.DeleteAsync(id);
+        await _audit.LogAsync(AuditActions.CommentDeleted, "Comment", id.ToString(), comment.AuthorName, newValues: "Deleted through the API");
         return Ok(new { data = "Deleted." });
     }
 
-    [HttpPost("media")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public IActionResult UploadMedia()
-        => RedirectToAction("Upload", "Media");
+    // There is no media upload endpoint: the one here only redirected to the Desk's upload, which needs a
+    // signed-in browser and an anti-forgery token, so it could never work from the API (ADR-0033).
 
     [HttpGet("users/me")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = Bearer)]
     public async Task<IActionResult> GetMe()
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -104,7 +100,7 @@ public class MiscApiController : ControllerBase
     }
 
     [HttpPut("users/me")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = Bearer)]
     public async Task<IActionResult> UpdateMe([FromBody] UpdateMeRequest req)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -115,9 +111,9 @@ public class MiscApiController : ControllerBase
         user.Bio = req.Bio ?? user.Bio;
         user.Website = req.Website ?? user.Website;
         await _users.UpdateAsync(user);
+        await _audit.LogAsync(AuditActions.UserProfileUpdated, "User", userId.ToString(), user.DisplayName, newValues: "Profile updated through the API");
         return Ok(new { data = "Updated." });
     }
 }
 
-public record CommentRequest(Guid PostId, string AuthorName, string AuthorEmail, string Content);
 public record UpdateMeRequest(string? DisplayName, string? Bio, string? Website);

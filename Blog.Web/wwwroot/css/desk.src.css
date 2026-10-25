@@ -1,0 +1,148 @@
+/* Desk Tailwind source — compiled to wwwroot/css/desk.css (see tailwind.desk.config.js).
+     npx tailwindcss@3 -c tailwind.desk.config.js -i wwwroot/css/desk.src.css -o wwwroot/css/desk.css --minify
+   Do NOT edit desk.css by hand — it is generated.
+
+   The @layer components block below is the Desk component vocabulary (UI/UX rule, "shared primitives"):
+   one button, input, card, table and pill, so a screen never re-types the utility string and every
+   screen looks the same. Views use these classes; the utilities stay available for layout. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* ── Buttons ─────────────────────────────────────────────────────────────── */
+  .desk-btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md h-9 px-4 text-sm font-medium
+           transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+           focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50;
+  }
+  .desk-btn svg { @apply shrink-0; }
+  .desk-btn-primary { @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary/90; }
+  .desk-btn-outline { @apply border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground; }
+  .desk-btn-secondary { @apply bg-secondary text-secondary-foreground border border-border hover:bg-secondary/80; }
+  .desk-btn-ghost { @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground; }
+  .desk-btn-danger { @apply bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90; }
+  .desk-btn-danger-outline { @apply border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground; }
+  .desk-btn-link { @apply h-auto px-0 text-primary underline-offset-4 hover:underline; }
+  .desk-btn-sm { @apply h-8 px-3 text-xs; }
+  .desk-btn-lg { @apply h-10 px-6; }
+  .desk-btn-icon { @apply h-9 w-9 p-0; }
+  .desk-btn-icon.desk-btn-sm { @apply h-8 w-8; }
+
+  /* ── Form controls ───────────────────────────────────────────────────────── */
+  .desk-label { @apply block text-sm font-medium text-foreground mb-1.5; }
+  .desk-input,
+  .desk-select,
+  .desk-textarea {
+    @apply flex w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm
+           placeholder:text-muted-foreground transition-colors
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-input
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .desk-input { @apply h-9 py-1; }
+  .desk-select { @apply h-9 py-1 pr-8; }
+  .desk-textarea { @apply min-h-[5rem] py-2 leading-relaxed; }
+  .desk-input-sm, .desk-select-sm { @apply h-8 text-xs; }
+  .desk-hint { @apply mt-1 text-xs text-muted-foreground; }
+  .desk-error { @apply mt-1 text-xs text-destructive; }
+  .desk-checkbox { @apply h-4 w-4 rounded-sm border border-input accent-primary; }
+
+  /* ── Surfaces ────────────────────────────────────────────────────────────── */
+  .desk-card { @apply rounded-lg border border-border bg-card text-card-foreground shadow-card; }
+  .desk-card-header { @apply flex flex-col gap-1 px-5 py-4 border-b border-border; }
+  .desk-card-title { @apply text-base font-semibold leading-none tracking-tight; }
+  .desk-card-description { @apply text-sm text-muted-foreground; }
+  .desk-card-body { @apply p-5; }
+  .desk-card-footer { @apply flex items-center gap-2 px-5 py-4 border-t border-border; }
+  .desk-section-title { @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground; }
+
+  /* ── Tables ──────────────────────────────────────────────────────────────── */
+  .desk-table { @apply w-full text-sm text-left; }
+  .desk-table thead { @apply bg-muted/50 text-muted-foreground; }
+  .desk-table th { @apply px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap; }
+  .desk-table tbody { @apply divide-y divide-border; }
+  .desk-table td { @apply px-4 py-3 align-middle; }
+  .desk-table tbody tr { @apply transition-colors; }
+  .desk-table tbody tr:hover { @apply bg-muted/30; }
+  .desk-table.desk-table-compact td { @apply py-1.5; }
+  .desk-table.desk-table-compact th { @apply py-2; }
+  .desk-row-actions { @apply flex items-center justify-end gap-1; }
+
+  /* ── Pills and tags ──────────────────────────────────────────────────────── */
+  .desk-pill { @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap; }
+  .desk-pill-muted { @apply border-border bg-muted text-muted-foreground; }
+  .desk-badge { @apply inline-flex min-w-[1.25rem] h-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums; }
+  .desk-kbd { @apply inline-flex h-5 items-center rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground; }
+
+  /* ── Page header (Views/Shared/_PageHeader.cshtml) ───────────────────────── */
+  .desk-page-header { @apply flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6; }
+  .desk-page-title { @apply text-2xl font-semibold tracking-tight text-foreground; }
+  .desk-page-description { @apply mt-1 text-sm text-muted-foreground max-w-2xl; }
+  .desk-page-actions { @apply flex flex-wrap items-center gap-2; }
+
+  /* ── Empty state (Views/Shared/_EmptyState.cshtml) ───────────────────────── */
+  .desk-empty { @apply flex flex-col items-center justify-center text-center px-6 py-14 text-muted-foreground; }
+  .desk-empty-icon { @apply mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground; }
+  .desk-empty-title { @apply text-base font-medium text-foreground; }
+  .desk-empty-hint { @apply mt-1 text-sm max-w-md; }
+
+  /* ── Skeleton (Views/Shared/_Skeleton.cshtml) ────────────────────────────── */
+  .desk-skeleton { @apply animate-pulse rounded-md bg-muted; }
+
+  /* ── KPI tile (Views/Shared/_KpiTile.cshtml) ─────────────────────────────── */
+  .desk-kpi { @apply desk-card flex flex-col gap-1 p-5 transition-colors; }
+  a.desk-kpi:hover { @apply border-foreground/30; }
+  .desk-kpi-label { @apply text-xs font-medium uppercase tracking-wider text-muted-foreground; }
+  .desk-kpi-value { @apply text-3xl font-semibold tracking-tight tabular-nums text-foreground; }
+  .desk-kpi-delta { @apply inline-flex items-center gap-1 text-xs font-medium tabular-nums; }
+
+  /* ── Sidebar navigation ──────────────────────────────────────────────────── */
+  .desk-nav-link {
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/80 transition-colors
+           hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+  .desk-nav-link[aria-current="page"] { @apply bg-sidebar-accent text-sidebar-accent-foreground font-semibold; }
+  .desk-nav-link svg { @apply h-[18px] w-[18px] shrink-0; }
+  .desk-nav-group-toggle {
+    @apply flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider
+           text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+  .desk-nav-group[data-collapsed="true"] .desk-nav-group-items { display: none; }
+  .desk-nav-group[data-collapsed="true"] .desk-nav-chevron { transform: rotate(-90deg); }
+  .desk-nav-chevron { @apply transition-transform; }
+
+  /* Collapsed rail (≥ md): icons only, labels in a tooltip via title. */
+  @media (min-width: 768px) {
+    html[data-desk-rail="true"] #sidebar { width: 4rem; }
+    html[data-desk-rail="true"] #sidebar .desk-rail-hide { display: none; }
+    html[data-desk-rail="true"] #sidebar .desk-nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
+    html[data-desk-rail="true"] #sidebar .desk-nav-group-items { display: flex; flex-direction: column; gap: .25rem; }
+    html[data-desk-rail="true"] #sidebar .desk-nav-group-toggle { justify-content: center; }
+    html[data-desk-rail="true"] #sidebar .desk-nav-group-toggle span { display: none; }
+    html[data-desk-rail="true"] #desk-main { margin-left: 4rem; }
+    html[data-desk-rail="true"] #sidebar .desk-rail-toggle svg { transform: rotate(180deg); }
+  }
+
+  /* ── Dropdown / overflow menu (details-based, no JS required) ────────────── */
+  .desk-menu { @apply relative; }
+  .desk-menu > summary { @apply list-none cursor-pointer; }
+  .desk-menu > summary::-webkit-details-marker { display: none; }
+  .desk-menu-panel {
+    @apply absolute right-0 z-40 mt-1 min-w-[11rem] rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-pop;
+  }
+  .desk-menu-item {
+    @apply flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left text-foreground hover:bg-accent hover:text-accent-foreground
+           focus-visible:outline-none focus-visible:bg-accent;
+  }
+  .desk-menu-item-danger { @apply text-destructive hover:bg-destructive/10 hover:text-destructive; }
+  .desk-menu-sep { @apply my-1 h-px bg-border; }
+
+  /* ── Tabs (links or buttons) ─────────────────────────────────────────────── */
+  .desk-tabs { @apply inline-flex items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground; }
+  .desk-tab { @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:text-foreground; }
+  .desk-tab[aria-current="page"], .desk-tab[aria-selected="true"] { @apply bg-background text-foreground shadow-sm; }
+
+  /* ── Command palette ─────────────────────────────────────────────────────── */
+  .desk-cmdk-item { @apply flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-left text-foreground; }
+  .desk-cmdk-item[aria-selected="true"], .desk-cmdk-item:hover { @apply bg-accent text-accent-foreground; }
+}

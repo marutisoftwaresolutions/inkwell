@@ -1,6 +1,7 @@
 @using Blog.Core.Domain
 @{
     Layout = "_AdminLayout";
+    ViewData["Description"] = "Move a URL (301/302) or retire it for good (410 Gone), and turn logged 404s into rules. Renaming a post already writes its own redirect; those rules appear here too.";
     ViewData["Title"] = "Redirects";
 
     var rules     = (IReadOnlyList<RedirectRule>)ViewBag.Rules;
@@ -28,22 +29,6 @@
     };
 }
 
-<div class="mb-5">
-    <h2 class="text-lg font-semibold text-foreground">Redirects</h2>
-    <p class="text-xs text-muted-foreground mt-0.5">
-        Move a URL (301/302) or retire it for good (410 Gone), and turn logged 404s into rules.
-        Renaming a post already writes its own redirect — those rules appear here too.
-    </p>
-</div>
-
-@if (TempData["Success"] != null)
-{
-    <div class="mb-4 rounded-lg border pill-ok px-4 py-2 text-sm">@TempData["Success"]</div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="mb-4 rounded-lg border pill-bad px-4 py-2 text-sm">@TempData["Error"]</div>
-}
 
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
     <div class="rounded-xl border border-border bg-card p-4">

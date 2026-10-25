@@ -2,7 +2,7 @@
 :root {
     --background:                 #FAF7F2;  /* ink-cream */
     --foreground:                 #1A1A1A;  /* ink-black */
-    --card:                       #F4EFE6;  /* surface */
+    --card:                       #FFFDF9;  /* lifted off the cream page so surfaces separate */
     --card-foreground:            #1A1A1A;
     --popover:                    #FAF7F2;
     --popover-foreground:         #1A1A1A;
@@ -27,7 +27,14 @@
     --sidebar-accent-foreground:  #1A1A1A;
     --sidebar-border:             #E8E1D3;
     --sidebar-ring:               #1A1A1A;
-    --radius:                     2px;
+    /* One radius token; the compiled Tailwind scale derives rounded-sm/md/lg/xl from it (tailwind.desk.config.js). */
+    --radius:                     8px;
+    /* One card shadow and one popover shadow, used through shadow-card / shadow-pop. */
+    --shadow-card:                0 1px 2px rgba(26, 26, 26, .04), 0 1px 3px rgba(26, 26, 26, .06);
+    --shadow-pop:                 0 4px 6px -1px rgba(26, 26, 26, .08), 0 10px 24px -8px rgba(26, 26, 26, .18);
+    /* Chart palette (Analytics). Read from script with getPropertyValue so charts follow the scheme. */
+    --chart-1: #1A1A1A; --chart-2: #8B7355; --chart-3: #2D6A4F; --chart-4: #C4632B;
+    --chart-5: #2F5D8A; --chart-6: #8C2A1F; --chart-7: #6B5B95; --chart-8: #B49A78;
 }
 
 body {
@@ -59,6 +66,10 @@ body {
         --sidebar-primary: #F4EFE6; --sidebar-primary-foreground: #16140F;
         --sidebar-accent: #26221C; --sidebar-accent-foreground: #F4EFE6;
         --sidebar-border: #332E26; --sidebar-ring: #F4EFE6;
+        --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .25);
+        --shadow-pop: 0 4px 6px -1px rgba(0, 0, 0, .4), 0 10px 24px -8px rgba(0, 0, 0, .6);
+        --chart-1: #F4EFE6; --chart-2: #B49A78; --chart-3: #7CCB9B; --chart-4: #E9A94A;
+        --chart-5: #8DBDF0; --chart-6: #E06B5E; --chart-7: #B39DDB; --chart-8: #8B7355;
     }
 }
 html[data-theme="dark"] {
@@ -76,4 +87,8 @@ html[data-theme="dark"] {
     --sidebar-primary: #F4EFE6; --sidebar-primary-foreground: #16140F;
     --sidebar-accent: #26221C; --sidebar-accent-foreground: #F4EFE6;
     --sidebar-border: #332E26; --sidebar-ring: #F4EFE6;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .25);
+    --shadow-pop: 0 4px 6px -1px rgba(0, 0, 0, .4), 0 10px 24px -8px rgba(0, 0, 0, .6);
+    --chart-1: #F4EFE6; --chart-2: #B49A78; --chart-3: #7CCB9B; --chart-4: #E9A94A;
+    --chart-5: #8DBDF0; --chart-6: #E06B5E; --chart-7: #B39DDB; --chart-8: #8B7355;
 }

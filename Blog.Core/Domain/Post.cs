@@ -1,6 +1,6 @@
 namespace Blog.Core.Domain;
 
-public class Post
+public class Post : IMarkdownAuthored
 {
     public Guid Id { get; set; }
     public Guid Uuid { get; set; } = Guid.NewGuid();

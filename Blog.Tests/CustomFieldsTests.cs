@@ -191,7 +191,8 @@ public class CustomFieldsTests : IClassFixture<WebApplicationFactory<Program>>
         var view = File.ReadAllText(Path.Combine(dir!.FullName, "Blog.Web", "Views", "Pages", "Edit.cshtml"));
         var ctrl = File.ReadAllText(Path.Combine(dir.FullName, "Blog.Web", "Controllers", "PagesController.cs"));
         var posted = System.Text.RegularExpressions.Regex.Matches(view, "name=\"([A-Z][A-Za-z]+)\"").Select(m => m.Groups[1].Value).Distinct()
-            .Except(new[] { "FeaturedImageUrl" });   // display only; the id is what is stored
+            .Except(new[] { "FeaturedImageUrl",      // display only; the id is what is stored
+                            "EditorMode" });         // redisplay only; a save keeps the stored mode (SwitchEditorMode changes it)
         foreach (var field in posted)
             Assert.True(ctrl.Contains($"existing.{field} = page.{field};"), $"Pages/Edit posts {field} but Edit never saves it.");
     }

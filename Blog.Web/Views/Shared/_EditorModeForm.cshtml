@@ -1,0 +1,18 @@
+@model Blog.Core.Domain.IMarkdownAuthored
+@{
+    // Shared by posts and pages. ViewData["EditorNoun"] ("post" or "page") and ViewData["EditorBase"]
+    // ("/admin/posts" or "/admin/pages") default to the post values.
+    var noun = ViewData["EditorNoun"] as string ?? "post";
+    var editorBase = ViewData["EditorBase"] as string ?? "/admin/posts";
+}
+@* Switching between the visual editor and Markdown (ADR-0022). Its own form, outside the tracked editor:
+   it is a separate, confirmed save, not an edit. The toolbar button submits it with form="editorModeForm". *@
+<form method="post" action="@editorBase/@Model.Id/editor-mode" id="editorModeForm"
+      data-confirm-title="@(Model.IsMarkdown ? "Switch to the visual editor?" : $"Write this {noun} in Markdown?")"
+      data-confirm-body="@(Model.IsMarkdown
+          ? $"The {noun} keeps its current HTML and the Markdown source is no longer used. Unsaved changes on this page are not included: save first."
+          : $"The {noun}'s current HTML becomes its Markdown source, unchanged, and it is shown exactly as before. Unsaved changes on this page are not included: save first.")"
+      data-confirm-action="@(Model.IsMarkdown ? "Use the visual editor" : "Switch to Markdown")" data-confirm-tone="warning">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="mode" value="@(Model.IsMarkdown ? "rich" : "markdown")" />
+</form>

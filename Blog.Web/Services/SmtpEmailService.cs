@@ -73,7 +73,15 @@ public class SmtpEmailService : IEmailService
                 message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(m.Text, System.Text.Encoding.UTF8, "text/plain"));
             message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(m.Html, System.Text.Encoding.UTF8, "text/html"));
             foreach (var (name, value) in m.Headers ?? new Dictionary<string, string>())
+            {
+                // System.Net.Mail writes Reply-To from ReplyToList and drops a raw header of that name.
+                if (string.Equals(name, "Reply-To", StringComparison.OrdinalIgnoreCase))
+                {
+                    try { message.ReplyToList.Add(new MailAddress(value)); } catch (FormatException) { /* not an address: send without it */ }
+                    continue;
+                }
                 message.Headers.Add(name, value);
+            }
 
             await client.SendMailAsync(message, ct);
             return EmailSendResult.Ok;

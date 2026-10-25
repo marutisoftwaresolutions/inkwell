@@ -39,6 +39,11 @@ public class SettingsViewModel
     [Display(Name = "Keep AI-crawler visits for (days)")]
     public int CrawlerVisitRetentionDays { get; set; } = 90;
 
+    [Required]
+    [Range(0, 3650, ErrorMessage = "Enter 0 to keep every page view, or a number of days up to 3650.")]
+    [Display(Name = "Keep page-view details for (days)")]
+    public int PageViewRetentionDays { get; set; } = 0;
+
     [Display(Name = "Display time zone")]
     public string? DisplayTimeZoneId { get; set; } = "UTC";
 
@@ -162,4 +167,18 @@ public class SettingsViewModel
 
     [Display(Name = "Identity statement")]
     public string? EntityIdentityStatement { get; set; }
+
+    [Display(Name = "Contact email")]
+    [EmailAddress(ErrorMessage = "Enter an email address such as hello@example.com.")]
+    [StringLength(254)]
+    public string? EntityContactEmail { get; set; }
+
+    [Display(Name = "Contact page")]
+    [RegularExpression(@"^(https?://\S+|/\S*)$", ErrorMessage = "Enter a full web address starting with https://, or a path on this site such as /contact.")]
+    [StringLength(500)]
+    public string? EntityContactUrl { get; set; }
+
+    [Display(Name = "Contact type")]
+    [StringLength(60)]
+    public string? EntityContactType { get; set; }
 }

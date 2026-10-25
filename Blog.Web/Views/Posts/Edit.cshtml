@@ -1,6 +1,7 @@
 @model Blog.Core.Domain.Post
 @{
     Layout = "_AdminLayout";
+    ViewData["HideHeader"] = true; // the editor carries its own toolbar; the layout breadcrumb still names the page
     ViewData["Title"] = $"Edit: {Model.Title}";
     var formAction = $"/admin/posts/edit/{Model.Id}";
     // Editorial workflow: who may publish decides what the main button does; the server enforces it too.
@@ -16,7 +17,7 @@
 @* Editorial workflow: review banner and actions (their own forms, outside the tracked editor form). Above the
    fixed-height editor, so opening "Request changes" on a phone does not squeeze the canvas. *@
 <partial name="_ReviewPanel" model="Model" />
-<div class="h-[calc(100vh-8rem)] flex flex-col">
+<div class="md:h-[calc(100vh-7.5rem)] flex flex-col">
     <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" value="@Model.Html" />
@@ -24,7 +25,7 @@
         <input type="hidden" name="EditorMode" value="@Model.EditorMode" />
 
         <!-- Toolbar -->
-        <div class="flex items-center justify-between mb-4 gap-4">
+        <div class="flex items-center justify-between mb-3 gap-3 flex-wrap sm:flex-nowrap sticky top-14 md:static z-20 bg-background/95 backdrop-blur md:bg-transparent md:backdrop-blur-none -mx-4 px-4 py-2 md:mx-0 md:px-0 md:py-0 border-b border-border md:border-0">
             <div class="flex items-center gap-4">
                 <a href="/admin/posts" class="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 text-sm font-medium">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
@@ -33,16 +34,16 @@
                 <span id="autosaveStatus" class="text-xs text-muted-foreground"></span> <span data-dirty-indicator hidden>Unsaved changes</span>
             </div>
             <div class="flex items-center gap-2">
-                <button type="submit" form="editorModeForm" data-editor-switch class="hidden md:inline-flex px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+                <button type="submit" form="editorModeForm" data-editor-switch data-editor-draft-safe="@((Model.Status is Blog.Core.Domain.PostStatus.Draft or Blog.Core.Domain.PostStatus.NeedsChanges) ? "true" : "false")" class="hidden md:inline-flex px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
                     @(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")
                 </button>
-                <button type="submit" name="submitAction" value="draft" class="px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">
+                <button type="submit" name="submitAction" value="draft" class="desk-btn desk-btn-outline">
                     Save Draft
                 </button>
-                <button type="button" id="publishBtn" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">
+                <button type="button" id="publishBtn" class="desk-btn desk-btn-primary">
                     @publishLabel
                 </button>
-                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-2 border border-input rounded-md">
+                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden desk-btn desk-btn-outline desk-btn-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </button>
             </div>
@@ -50,19 +51,8 @@
 
         <div class="flex-1 flex gap-0 overflow-hidden rounded-xl border border-border shadow-sm">
             <!-- LEFT: Component Palette -->
-            <div class="w-14 bg-card border-r border-border flex flex-col items-center py-3 gap-1 shrink-0 overflow-y-auto" id="componentPalette" hidden="@Model.IsMarkdown">
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading" aria-label="Heading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text" aria-label="Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image" aria-label="Image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="gallery" draggable="true" title="Gallery" aria-label="Gallery"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button" aria-label="Button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero" aria-label="Hero"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="10" y1="13" x2="14" y2="13"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text" aria-label="Image + Text"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="9" height="18" rx="1"/><line x1="14" y1="8" x2="22" y2="8"/><line x1="14" y1="12" x2="22" y2="12"/><line x1="14" y1="16" x2="20" y2="16"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="quote" draggable="true" title="Quote" aria-label="Quote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="divider" draggable="true" title="Divider" aria-label="Divider"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="spacer" draggable="true" title="Spacer" aria-label="Spacer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M12 5v14"/><path d="M18 8l-6-3-6 3"/><path d="M18 16l-6 3-6-3"/></svg></button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="video" draggable="true" title="Video" aria-label="Video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
-            </div>
+            @{ ViewData["PaletteHidden"] = Model.IsMarkdown; }
+            <partial name="_BuilderPalette" />
             <!-- CENTER: Canvas -->
             <div class="flex-1 flex flex-col bg-card overflow-hidden">
                 <input type="text" name="Title" id="postTitle" value="@Model.Title" aria-label="Title" placeholder="Post Title" required
@@ -91,7 +81,7 @@
                         </button>
                     </div>
                     <div class="md:hidden mb-4">
-                        <button type="submit" form="editorModeForm" data-editor-switch class="w-full min-h-10 px-3 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</button>
+                        <button type="submit" form="editorModeForm" data-editor-switch data-editor-draft-safe="@((Model.Status is Blog.Core.Domain.PostStatus.Draft or Blog.Core.Domain.PostStatus.NeedsChanges) ? "true" : "false")" class="w-full min-h-10 px-3 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</button>
                     </div>
                     
                     <details class="group" data-desk-section="post-publishing" open>
@@ -422,6 +412,8 @@
                     <div class="space-y-4 pt-2 pb-4">
                     <!-- Answer-engine readiness -->
                     @await Html.PartialAsync("_AeoReadiness", Model)
+                    <!-- Accessibility (advisory) -->
+                    @await Html.PartialAsync("_AccessibilityChecks", Model.Html ?? string.Empty)
 
                     <div class="pt-4 border-t border-border">
                         <label for="AnswerCapsule" class="block text-xs font-medium mb-1">Answer capsule</label>
@@ -562,52 +554,7 @@
     })();
 </script>
 
-<!-- Publish Modal -->
-<div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
-    <div class="bg-card w-full max-w-sm rounded-lg shadow-lg border border-border p-6 transform transition-all scale-100">
-        <h3 id="modalTitle" class="text-lg font-semibold mb-2">@modalTitle</h3>
-        <p id="modalDesc" class="text-muted-foreground mb-6">@modalDesc</p>
-        <div class="flex justify-end gap-3">
-            <button type="button" onclick="document.getElementById('publishModal').classList.add('hidden')" class="px-4 py-2 border border-input hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors">Cancel</button>
-            <button type="button" id="modalConfirmBtn" onclick="confirmPublish()" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">Confirm Publish</button>
-        </div>
-    </div>
-</div>
-
-<style>
-    .builder-block{position:relative;border:2px solid transparent;border-radius:.5rem;transition:border-color .15s;margin-bottom:.5rem;cursor:pointer}
-    .builder-block:hover{border-color:color-mix(in srgb,var(--primary) 40%,transparent)}
-    .builder-block.selected{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 15%,transparent)}
-    .builder-block.dragging{opacity:.4}
-    .builder-block .block-toolbar{display:none;position:absolute;top:-14px;right:8px;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-    .builder-block:hover .block-toolbar,.builder-block.selected .block-toolbar{display:flex;gap:2px;align-items:center}
-    .block-toolbar button{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;border-radius:4px;color:var(--muted-foreground)}
-    .block-toolbar button:hover{background:var(--accent);color:var(--foreground)}
-    .drop-indicator{height:3px;background:var(--primary);border-radius:2px;margin:2px 0}
-    .builder-block [contenteditable]:focus{outline:none}
-    .setting-field label { display: block; font-size: 11px; font-weight: 500; color: var(--muted-foreground); margin-bottom: 4px; }
-    .setting-field input, .setting-field select { width: 100%; padding: 6px 10px; border: 1px solid var(--input); border-radius: 6px; font-size: 12px; background: var(--background); color: var(--foreground); }
-    .setting-field input:focus, .setting-field select:focus { outline: none; box-shadow: 0 0 0 2px var(--ring); }
-    .comp-hero{background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 70%,black));color:white;padding:3rem 2rem;border-radius:var(--radius);text-align:center}
-    .comp-hero h2{font-size:2rem;font-weight:800;margin-bottom:.5rem;color:white}
-    .comp-hero p{font-size:1rem;opacity:.9;margin-bottom:1.5rem;color:white}
-    .comp-hero a{display:inline-block;background:white;color:var(--primary);padding:.6rem 1.5rem;border-radius:var(--radius);font-weight:600;font-size:.9rem;text-decoration:none}
-    .comp-imagetext{display:flex;gap:1.5rem;align-items:center}
-    .comp-imagetext img{border-radius:var(--radius);object-fit:cover;min-height:200px;background:var(--muted)}
-    .comp-imagetext .it-content{flex:1}
-    .comp-quote{border-left:4px solid var(--primary);padding:1rem 1.5rem;background:var(--muted);border-radius:0 var(--radius) var(--radius) 0}
-    .comp-quote blockquote{font-style:italic;font-size:1.1rem;color:var(--foreground);margin-bottom:.5rem}
-    .comp-quote cite{font-size:.85rem;color:var(--muted-foreground)}
-    .comp-button{text-align:center;padding:.5rem 0}
-    .comp-button a{display:inline-block;background:var(--primary);color:var(--primary-foreground);padding:.7rem 2rem;border-radius:var(--radius);font-weight:600;text-decoration:none}
-    .comp-spacer{display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:var(--radius)}
-    .comp-spacer span{font-size:9px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:1px}
-    .comp-divider hr{border:none;border-top:1px solid var(--border);margin:.5rem 0}
-    .comp-video{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);background:var(--muted)}
-    .comp-video iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0}
-    .comp-image img{border-radius:var(--radius);display:block}
-    .comp-image .img-placeholder{background:var(--muted);border:2px dashed var(--border);border-radius:var(--radius);padding:3rem;text-align:center;cursor:pointer}
-</style>
+<link rel="stylesheet" href="~/css/inkwell-builder.css" asp-append-version="true" />
 
 @section Scripts {
     <partial name="_EditorSwitchGuard" />
@@ -672,127 +619,32 @@
             }
         }
     </script>
+    <script src="~/js/inkwell-builder.js" asp-append-version="true"></script>
     <script>
         (function(){
-            const canvas=document.getElementById('canvas'),canvasEmpty=document.getElementById('canvasEmpty');
-            const postSettingsView=document.getElementById('postSettingsView'),compSettingsView=document.getElementById('componentSettingsView');
-            const compSettingsTitle=document.getElementById('compSettingsTitle'),compSettingsBody=document.getElementById('compSettingsBody');
-            let dragSrcEl=null,dragFromPalette=null,selectedBlock=null;
-            const C={
-                heading:()=>`<h2 contenteditable="true" style="font-size:1.8rem;font-weight:700;color:var(--foreground);">Your Heading Here</h2>`,
-                text:()=>`<p contenteditable="true" style="font-size:1rem;line-height:1.8;color:var(--foreground);">Click to edit this text block.</p>`,
-                gallery: () => InkwellGallery.pick(),
-                image:()=>`<div class="comp-image"><div class="img-placeholder" onclick="selectBlockImage(this)"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto .5rem;display:block;color:var(--muted-foreground)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="color:var(--muted-foreground);font-size:.85rem;">Click to select image</span></div></div>`,
-                button:()=>`<div class="comp-button"><a href="#" contenteditable="true">Click Me</a></div>`,
-                hero:()=>`<div class="comp-hero"><h2 contenteditable="true">Welcome</h2><p contenteditable="true">A brief description.</p><a href="#" contenteditable="true">Get Started</a></div>`,
-                imagetext:()=>`<div class="comp-imagetext"><img src="" alt="" onclick="selectBlockImage(this)" style="cursor:pointer;width:50%;" /><div class="it-content"><h3 contenteditable="true" style="font-size:1.3rem;font-weight:700;margin-bottom:0.5rem;">Title</h3><p contenteditable="true" style="line-height:1.7;">Description</p></div></div>`,
-                quote:()=>`<div class="comp-quote"><blockquote contenteditable="true">"The best way to predict the future is to create it."</blockquote><cite contenteditable="true">— Abraham Lincoln</cite></div>`,
-                divider:()=>`<div class="comp-divider"><hr/></div>`,
-                spacer:()=>`<div class="comp-spacer" style="height:60px;"><span>spacer</span></div>`,
-                video:()=>{const embed=u=>{const m=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/),v=u.match(/vimeo\.com\/(\d+)/);return m?`https://www.youtube.com/embed/${m[1]}`:v?`https://player.vimeo.com/video/${v[1]}`:null;};
-                    // Desk dialog with live validation instead of the browser prompt; returns a Promise of HTML (add resolves it).
-                    return InkwellDialog.prompt({title:'Embed a video',body:'Paste a YouTube or Vimeo link. The player is embedded lazily and never blocks the page.',label:'Video URL',placeholder:'https://www.youtube.com/watch?v=…',action:'Embed video',validate:v=>v.trim()&&!embed(v.trim())?'That is not a YouTube or Vimeo URL.':null,valid:'Looks good.'}).then(u=>{if(!u)return null;const e=embed(u);return e?`<div class="comp-video"><iframe src="${e}" allowfullscreen loading="lazy"></iframe></div>`:null;});}
-            };
-            const settingsDefs = {
-                gallery: (b) => InkwellGallery.settings(b),
-                heading: (b) => { const h=b.querySelector('h1,h2,h3,h4,h5,h6'); return `<div class="setting-field"><label>Heading Text</label><input type="text" value="${h?.textContent||''}" oninput="updateBlockText(this.value, 'h1,h2,h3,h4,h5,h6')" /></div><div class="setting-field"><label>Heading Level</label><select onchange="changeHeadingLevel(this.value)"><option value="h1" ${h?.tagName==='H1'?'selected':''}>H1 - Large</option><option value="h2" ${h?.tagName==='H2'?'selected':''}>H2 - Medium</option><option value="h3" ${h?.tagName==='H3'?'selected':''}>H3 - Small</option></select></div><div class="setting-field"><label>Alignment</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(h?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${h?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${h?.style.textAlign==='right'?'selected':''}>Right</option></select></div>`; },
-                text: (b) => { const p=b.querySelector('p'); return `<div class="setting-field"><label>Text Content</label><textarea rows="3" oninput="updateBlockText(this.value, 'p')">${p?.textContent||''}</textarea></div><div class="setting-field"><label>Alignment</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(p?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${p?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${p?.style.textAlign==='right'?'selected':''}>Right</option><option value="justify" ${p?.style.textAlign==='justify'?'selected':''}>Justify</option></select></div>`; },
-                button: (b) => { const a=b.querySelector('.comp-button a'); return `<div class="setting-field"><label>Button Label</label><input type="text" value="${a?.textContent||''}" oninput="updateBtnLabel(this.value)" /></div><div class="setting-field"><label>Link URL</label><input type="text" value="${a?.getAttribute('href')||'#'}" oninput="updateBtnUrl(this.value)" placeholder="https://..." /></div><div class="setting-field"><label>Style</label><select onchange="updateBtnStyle(this.value)"><option value="filled" ${a?.style.background?'selected':''}>Filled</option><option value="outline">Outline</option></select></div>`; },
-                image: (b) => { const img=b.querySelector('.comp-image img'); const w=img?.style.width||'100%'; return `<div class="setting-field"><label>Image Size</label><select onchange="updateImgSize(this.value)"><option value="100%" ${w==='100%'?'selected':''}>Full Width</option><option value="75%" ${w==='75%'?'selected':''}>Large (75%)</option><option value="50%" ${w==='50%'?'selected':''}>Medium (50%)</option><option value="33%" ${w==='33%'?'selected':''}>Small (33%)</option></select></div><div class="setting-field"><label>Alt Text</label><input type="text" value="${img?.alt||''}" oninput="updateImgAlt(this.value)" /></div><div class="setting-field"><button type="button" onclick="changeBlockImage()" class="w-full px-3 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-xs font-medium">Change Image</button></div>`; },
-                hero: (b) => { const a=b.querySelector('.comp-hero a'); return `<div class="setting-field"><label>Button Label</label><input type="text" value="${a?.textContent||''}" oninput="updateHeroBtnLabel(this.value)" /></div><div class="setting-field"><label>Button URL</label><input type="text" value="${a?.getAttribute('href')||'#'}" oninput="updateHeroBtnUrl(this.value)" placeholder="https://..." /></div>`; },
-                imagetext: (b) => { const img=b.querySelector('.comp-imagetext img'); const w=img?.style.width||'50%'; return `<div class="setting-field"><label>Image Size</label><select onchange="updateImgTextSize(this.value)"><option value="30%" ${w==='30%'?'selected':''}>Small (30%)</option><option value="40%" ${w==='40%'?'selected':''}>Medium (40%)</option><option value="50%" ${w==='50%'?'selected':''}>Large (50%)</option></select></div><div class="setting-field"><button type="button" onclick="changeBlockImage()" class="w-full px-3 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-xs font-medium">Change Image</button></div>`; },
-                quote: () => `<p class="text-xs text-muted-foreground">Click quote text to edit directly on canvas.</p>`,
-                divider: () => `<p class="text-xs text-muted-foreground">Horizontal divider — no editable settings.</p>`,
-                spacer: (b) => { const s=b.querySelector('.comp-spacer'); const h=parseInt(s?.style.height)||60; return `<div class="setting-field"><label>Height (px)</label><input type="number" value="${h}" min="10" max="300" oninput="updateSpacerHeight(this.value)" /></div>`; },
-                video: (b) => { const iframe=b.querySelector('iframe'); return `<div class="setting-field"><label>Video URL</label><input type="text" value="${iframe?.src||''}" oninput="updateVideoUrl(this.value)" /></div>`; }
-            };
-
-            window.showPostSettings = function() { deselectBlock(); postSettingsView.classList.remove('hidden'); compSettingsView.classList.add('hidden'); };
-            function showComponentSettings(block) {
-                const type = block.dataset.type; const content = block.querySelector('.block-content');
-                const titleMap = { heading:'Heading', text:'Text', image:'Image', button:'Button', hero:'Hero', imagetext:'Image + Text', quote:'Quote', divider:'Divider', spacer:'Spacer', video:'Video', gallery:'Gallery' };
-                compSettingsTitle.textContent = titleMap[type] || 'Component';
-                compSettingsBody.innerHTML = settingsDefs[type] ? settingsDefs[type](content) : '<p class="text-xs text-muted-foreground">No settings available.</p>';
-                postSettingsView.classList.add('hidden'); compSettingsView.classList.remove('hidden');
-            }
-            window.selectBlock = function(block) { deselectBlock(); selectedBlock = block; block.classList.add('selected'); showComponentSettings(block); };
-            function deselectBlock() { if (selectedBlock) selectedBlock.classList.remove('selected'); selectedBlock = null; }
-
-            document.getElementById('canvasScroll').addEventListener('click', (e) => {
-                if (e.target.id === 'canvasScroll' || e.target.id === 'canvas' || e.target.id === 'canvasEmpty') window.showPostSettings();
+            // The block builder is shared with the page editor (wwwroot/js/inkwell-builder.js); this view adds the
+            // post's slug, schedule-aware publish button, plain-text copy and pending social-image uploads.
+            const builder = InkwellBuilder.init({
+                canvas: 'canvas', canvasEmpty: 'canvasEmpty', canvasScroll: 'canvasScroll',
+                settingsView: 'postSettingsView', componentView: 'componentSettingsView',
+                componentTitle: 'compSettingsTitle', componentBody: 'compSettingsBody',
+                content: 'postContent', hydrate: true
             });
-
-            window.changeHeadingLevel = function(lvl) { if(!selectedBlock) return; const o=selectedBlock.querySelector('h1,h2,h3'); if(!o) return; const n=document.createElement(lvl); n.innerHTML=o.innerHTML; n.setAttribute('contenteditable','true'); n.style.cssText=o.style.cssText; const sz={h1:'2.2rem',h2:'1.8rem',h3:'1.4rem'}; n.style.fontSize=sz[lvl]; o.replaceWith(n); };
-            window.changeBlockAlign = function(aln) { if(!selectedBlock) return; const el=selectedBlock.querySelector('[contenteditable]'); if(el) el.style.textAlign=aln; };
-            window.updateBlockText = function(v, sel) { if(!selectedBlock) return; const el=selectedBlock.querySelector(sel); if(el) el.textContent=v; };
-            window.updateBtnLabel = function(v) { const a=selectedBlock?.querySelector('.comp-button a'); if(a) a.textContent=v; };
-            window.updateBtnUrl = function(v) { const a=selectedBlock?.querySelector('.comp-button a'); if(a) a.href=v; };
-            window.updateBtnStyle = function(v) { const a=selectedBlock?.querySelector('.comp-button a'); if(!a) return; if(v==='outline'){a.style.background='transparent';a.style.border='2px solid var(--primary)';a.style.color='var(--primary)';}else{a.style.background='var(--primary)';a.style.border='none';a.style.color='var(--primary-foreground)';} };
-            window.updateImgSize = function(v) { const m=selectedBlock?.querySelector('.comp-image img'); if(m){m.style.width=v;m.style.margin=v==='100%'?'0':'0 auto';m.style.display='block';} };
-            window.updateImgAlt = function(v) { const m=selectedBlock?.querySelector('.comp-image img'); if(m) m.alt=v; };
-            window.changeBlockImage = function() { const m=selectedBlock?.querySelector('img'); if(m){window._pendingImageTarget=m;window.dispatchEvent(new CustomEvent('open-media-selector',{detail:{targetInput:'__blockImage__'}}));} };
-            window.updateHeroBtnLabel = function(v) { const a=selectedBlock?.querySelector('.comp-hero a'); if(a) a.textContent=v; };
-            window.updateHeroBtnUrl = function(v) { const a=selectedBlock?.querySelector('.comp-hero a'); if(a) a.href=v; };
-            window.updateSpacerHeight = function(v) { const s=selectedBlock?.querySelector('.comp-spacer'); if(s) s.style.height=v+'px'; };
-            window.updateImgTextSize = function(v) { const m=selectedBlock?.querySelector('.comp-imagetext img'); if(m) m.style.width=v; };
-            window.updateVideoUrl = function(v) { const ifr=selectedBlock?.querySelector('iframe'); if(ifr) ifr.src=v; };
-
-            const tbHtml=`<div class="block-toolbar"><button type="button" title="Drag" aria-label="Drag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></button><button type="button" onclick="moveBlock(this,-1)" title="Up" aria-label="Up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button><button type="button" onclick="moveBlock(this,1)" title="Down" aria-label="Down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button><button type="button" onclick="duplicateBlock(this)" title="Duplicate" aria-label="Duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><button type="button" onclick="deleteBlock(this)" title="Delete" aria-label="Delete" style="color:var(--destructive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>`;
-            function mk(html,type){const b=document.createElement('div');b.className='builder-block';b.dataset.type=type;b.draggable=true;b.innerHTML=tbHtml+`<div class="block-content">${html}</div>`;b.addEventListener('dragstart',ds);b.addEventListener('dragend',de);b.addEventListener('dragover',dov);b.addEventListener('drop',dd);b.addEventListener('click', (e) => { if (!e.target.closest('.block-toolbar')) selectBlock(b); });return b;}
-            function add(t,before){Promise.resolve(C[t]()).then(h=>{if(h===null||h===undefined)return;const b=mk(h,t);if(before)canvas.insertBefore(b,before);else canvas.appendChild(b);ue();selectBlock(b);});}
-            function ue(){canvasEmpty.style.display=canvas.querySelectorAll('.builder-block').length===0?'flex':'none';}
-            document.querySelectorAll('.palette-item').forEach(btn=>{btn.addEventListener('dragstart',e=>{dragFromPalette=btn.dataset.component;e.dataTransfer.effectAllowed='copy';e.dataTransfer.setData('text/plain','');});btn.addEventListener('dragend',()=>{dragFromPalette=null;});btn.addEventListener('click',()=>{add(btn.dataset.component);});});
-            canvas.addEventListener('dragover',e=>{e.preventDefault();});canvas.addEventListener('drop',e=>{e.preventDefault();if(dragFromPalette){add(dragFromPalette);dragFromPalette=null;}});
-            function ds(e){dragSrcEl=this;this.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/html','');}
-            function de(){this.classList.remove('dragging');canvas.querySelectorAll('.drop-indicator').forEach(el=>el.remove());dragSrcEl=null;}
-            function dov(e){e.preventDefault();if(!dragSrcEl||dragSrcEl===this)return;canvas.querySelectorAll('.drop-indicator').forEach(el=>el.remove());const r=this.getBoundingClientRect();const ind=document.createElement('div');ind.className='drop-indicator';if(e.clientY<r.top+r.height/2)this.parentNode.insertBefore(ind,this);else this.parentNode.insertBefore(ind,this.nextSibling);}
-            function dd(e){e.stopPropagation();e.preventDefault();canvas.querySelectorAll('.drop-indicator').forEach(el=>el.remove());if(dragFromPalette){add(dragFromPalette,this);dragFromPalette=null;return;}if(!dragSrcEl||dragSrcEl===this)return;const r=this.getBoundingClientRect();if(e.clientY<r.top+r.height/2)this.parentNode.insertBefore(dragSrcEl,this);else this.parentNode.insertBefore(dragSrcEl,this.nextSibling);}
-            window.moveBlock=function(btn,dir){const b=btn.closest('.builder-block');if(dir===-1&&b.previousElementSibling?.classList.contains('builder-block'))b.parentNode.insertBefore(b,b.previousElementSibling);else if(dir===1&&b.nextElementSibling?.classList.contains('builder-block'))b.parentNode.insertBefore(b.nextElementSibling,b);};
-            window.deleteBlock=function(btn){const b=btn.closest('.builder-block'); if(b===selectedBlock) showPostSettings(); b.remove();ue();};
-            window.duplicateBlock=function(btn){const b=btn.closest('.builder-block');const c=b.cloneNode(true);c.addEventListener('dragstart',ds);c.addEventListener('dragend',de);c.addEventListener('dragover',dov);c.addEventListener('drop',dd);b.parentNode.insertBefore(c,b.nextSibling);};
-            window._pendingImageTarget=null;
-            window.selectBlockImage=function(el){window._pendingImageTarget=el;window.dispatchEvent(new CustomEvent('open-media-selector',{detail:{targetInput:'__blockImage__'}}));};
-            window.addEventListener('media-selected',function(e){if(window._pendingImageTarget&&e.detail){const t=window._pendingImageTarget;const url=e.detail.url||document.getElementById('__blockImage__')?.value;if(url&&t.tagName==='IMG'){t.src=url;t.style.background='none';}else if(url&&t.classList.contains('img-placeholder')){t.outerHTML=`<img src="${url}" alt="" style="width:100%;border-radius:var(--radius);display:block;"/>`;}window._pendingImageTarget=null; if(selectedBlock) showComponentSettings(selectedBlock); }document.getElementById('RemoveFeaturedImageBtn')?.classList.remove('hidden');});
-            function exH(){let h='';canvas.querySelectorAll('.builder-block').forEach(b=>{const c=b.querySelector('.block-content');if(!c)return;const cl=c.cloneNode(true);cl.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));cl.querySelectorAll('[onclick]').forEach(el=>el.removeAttribute('onclick'));cl.querySelectorAll('.img-placeholder').forEach(el=>el.remove());cl.querySelectorAll('.comp-spacer span').forEach(el=>el.remove());h+=cl.innerHTML.trim()+'\n';});return h.trim();}
-            function exP(){let t='';canvas.querySelectorAll('.builder-block').forEach(b=>{const c=b.querySelector('.block-content');if(c)t+=c.textContent.trim()+'\n';});return t.trim();}
-
-            // ── Hydrate existing content ──
-            function hydrateContent() {
-                const raw = document.getElementById('postContent').value;
-                if (!raw || !raw.trim()) return;
-                const tmp = document.createElement('div'); tmp.innerHTML = raw;
-                tmp.childNodes.forEach(node => {
-                    if (node.nodeType === 3 && !node.textContent.trim()) return;
-                    const el = node.nodeType === 1 ? node : null; if (!el) return;
-                    let type = 'text', html = '';
-                    if (el.classList.contains('comp-hero'))      { type='hero'; el.querySelectorAll('h2,p,a').forEach(x=>x.contentEditable='true'); html=el.outerHTML; }
-                    else if (el.classList.contains('comp-button')){ type='button'; el.querySelector('a').contentEditable='true'; html=el.outerHTML; }
-                    else if (el.classList.contains('comp-quote')) { type='quote'; el.querySelector('blockquote').contentEditable='true'; const c=el.querySelector('cite'); if(c)c.contentEditable='true'; html=el.outerHTML; }
-                    else if (el.classList.contains('comp-imagetext')){ type='imagetext'; el.querySelectorAll('h3,p').forEach(x=>x.contentEditable='true'); const img=el.querySelector('img'); if(img){img.setAttribute('onclick','selectBlockImage(this)');img.style.cursor='pointer';} html=el.outerHTML; }
-                    else if (el.classList.contains('comp-divider')){ type='divider'; html=el.outerHTML; }
-                    else if (el.classList.contains('comp-spacer')) { type='spacer'; el.innerHTML='<span>spacer</span>'; html=el.outerHTML; }
-                    else if (el.classList.contains('comp-video')) { type='video'; html=el.outerHTML; }
-                    else if (el.classList.contains('comp-gallery')) { type='gallery'; html=el.outerHTML; }
-                    else if (el.classList.contains('comp-image') || (el.tagName==='IMG')) { type='image'; if(el.tagName==='IMG') html=`<div class="comp-image">${el.outerHTML}</div>`; else html=el.outerHTML; }
-                    else if (el.tagName?.match(/^H[1-6]$/))      { type='heading'; el.contentEditable='true'; html=el.outerHTML; }
-                    else { type='text'; el.contentEditable='true'; html=el.outerHTML; }
-                    const b = mk(html, type); canvas.appendChild(b);
-                });
-                ue();
-            }
-            hydrateContent();
+            function fill(){document.getElementById('postContent').value=builder.extract();document.getElementById('postPlaintext').value=builder.extractText();}
 
             // Slug
             document.getElementById('postTitle').addEventListener('input',function(){const s=document.querySelector('input[name="Slug"]');if(s&&!s.dataset.manual)s.value=this.value.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/[\s_]+/g,'-').replace(/-+/g,'-').replace(/^-+|-+$/g,'');});
             const slugEl=document.querySelector('input[name="Slug"]');if(slugEl)slugEl.addEventListener('input',function(){this.dataset.manual='true';this.value=this.value.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/[\s_]+/g,'-').replace(/-+/g,'-').replace(/^-+|-+$/g,'');});
 
             // Publish/Schedule
-            var pBtn=document.getElementById('publishBtn'),sI=document.querySelector('input[name="ScheduledAt"]'),mT=document.getElementById('modalTitle'),mD=document.getElementById('modalDesc'),mC=document.getElementById('modalConfirmBtn');
-            function upb(){if(@(canPublish ? "true" : "false")&&sI&&sI.value&&new Date(sI.value)>new Date()){pBtn.innerText='Update Schedule';mT.innerText='Ready to schedule?';mD.innerText='This will schedule your post.';mC.innerText='Confirm Schedule';return;}pBtn.innerText=@Json.Serialize(publishLabel);mT.innerText=@Json.Serialize(modalTitle);mD.innerText=@Json.Serialize(modalDesc);mC.innerText=@Json.Serialize(modalConfirm);}
+            // Publish / schedule / submit confirmation goes through the shared Desk dialog (focus trap, Escape, both schemes).
+            var pBtn=document.getElementById('publishBtn'),sI=document.querySelector('input[name="ScheduledAt"]');
+            var confirmCopy={title:@Json.Serialize(modalTitle),body:@Json.Serialize(modalDesc),action:@Json.Serialize(modalConfirm)};
+            function upb(){if(@(canPublish ? "true" : "false")&&sI&&sI.value&&new Date(sI.value)>new Date()){pBtn.innerText='Update schedule';confirmCopy={title:'Ready to schedule?',body:'The post goes live at the scheduled time and stays hidden until then.',action:'Schedule post'};return;}pBtn.innerText=@Json.Serialize(publishLabel);confirmCopy={title:@Json.Serialize(modalTitle),body:@Json.Serialize(modalDesc),action:@Json.Serialize(modalConfirm)};}
             if(sI){sI.addEventListener('input',upb);upb();}
-            pBtn.addEventListener('click',function(){document.getElementById('publishModal').classList.remove('hidden');});
-            window.confirmPublish=async function(){document.getElementById('postContent').value=exH();document.getElementById('postPlaintext').value=exP();mC.disabled=true;mC.innerText='@(canPublish ? "Publishing..." : "Submitting...")';await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='publish';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='publish';f.appendChild(a);}f.submit();};
-            document.querySelector('button[value="draft"]').addEventListener('click',async function(e){e.preventDefault();this.innerText='Saving...';this.disabled=true;document.getElementById('postContent').value=exH();document.getElementById('postPlaintext').value=exP();await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='draft';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='draft';f.appendChild(a);}f.submit();});
+            pBtn.addEventListener('click',function(){InkwellDialog.confirm({title:confirmCopy.title,body:confirmCopy.body,action:confirmCopy.action,tone:'neutral'}).then(function(ok){if(ok)window.confirmPublish();});});
+            window.confirmPublish=async function(){fill();pBtn.disabled=true;pBtn.innerText='@(canPublish ? "Publishing…" : "Submitting…")';await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='publish';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='publish';f.appendChild(a);}f.submit();};
+            document.querySelector('button[value="draft"]').addEventListener('click',async function(e){e.preventDefault();this.innerText='Saving...';this.disabled=true;fill();await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='draft';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='draft';f.appendChild(a);}f.submit();});
         })();
         // OG/Twitter uploads
         window.previewImage=function(i,p){if(i.files&&i.files[0]){var img=document.getElementById(p);img.src=URL.createObjectURL(i.files[0]);img.classList.remove('hidden');}};

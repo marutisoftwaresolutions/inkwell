@@ -17,3 +17,19 @@ public class PageView
     public string? Region { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>
+/// Everything Admin → Analytics shows for one date range, read in one stored-procedure call
+/// (<c>usp_Analytics_Report</c>, ADR-0037). Counts cover content pages only (home and post slugs).
+/// </summary>
+public class AnalyticsReport
+{
+    public int Total { get; init; }
+    public IReadOnlyList<(DateTime Date, int Count)> Daily { get; init; } = [];
+    public IReadOnlyList<(string Source, string Medium, int Count)> Sources { get; init; } = [];
+    public IReadOnlyList<(string Path, int Views)> TopPages { get; init; } = [];
+    public IReadOnlyList<(string Referrer, int Count)> Referrers { get; init; } = [];
+    public IReadOnlyList<(string Campaign, int Count)> Campaigns { get; init; } = [];
+    public IReadOnlyList<(string Country, int Count)> Countries { get; init; } = [];
+    public IReadOnlyList<(string Region, int Count)> Regions { get; init; } = [];
+}

@@ -2,59 +2,56 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Series";
+    ViewData["Description"] = "Group posts into an ordered reading sequence with Part N of M navigation.";
+    var listQuery = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string ?? "";
 }
 
 <div class="flex flex-col gap-6">
 
-    @if (TempData["Success"] != null)
-    {
-        <div class="rounded-md border border-border bg-primary/10 text-foreground px-4 py-3 text-sm">@TempData["Success"]</div>
-    }
-    @if (TempData["Error"] != null)
-    {
-        <div class="rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm">@TempData["Error"]</div>
-    }
-
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- List -->
         <div class="md:col-span-2 space-y-4">
-            <div class="bg-card rounded-lg border border-border overflow-hidden">
-                <partial name="_ListSearch" />
-<div class="table-scroll"><table class="w-full text-left text-sm">
+            <partial name="_ListSearch" />
+            <div class="desk-card overflow-hidden">
+                @if (!Model.Any())
+                {
+                    if (!string.IsNullOrEmpty(listQuery)) { ViewData["EmptyQuery"] = listQuery; }
+                    else
+                    {
+                        ViewData["EmptyTitle"] = "No series yet";
+                        ViewData["EmptyHint"] = "Add the first one on the right to group posts into an ordered reading sequence.";
+                    }
+                    <partial name="_EmptyState" />
+                }
+                else
+                {
+                <div class="table-scroll"><table class="desk-table">
                     <thead>
-                        <tr class="bg-muted text-muted-foreground border-b border-border">
-                            <th class="px-4 py-3 font-medium">Title</th>
-                            <th class="px-4 py-3 font-medium">Slug</th>
-                            <th class="px-4 py-3 font-medium w-[80px]">Posts</th>
-                            <th class="px-4 py-3 font-medium w-[120px]">Actions</th>
+                        <tr>
+                            <th>Title</th>
+                            <th>Slug</th>
+                            <th class="w-[80px]">Posts</th>
+                            <th class="w-[120px] text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-border">
-                        @if (!Model.Any())
-                        {
-                            <tr>
-                                <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-                                    No series yet. Create one to group posts into an ordered reading sequence.
-                                </td>
-                            </tr>
-                        }
+                    <tbody>
                         @foreach (var series in Model)
                         {
-                            <tr class="group hover:bg-muted/50 transition-colors">
-                                <td class="px-4 py-3 font-medium">
+                            <tr>
+                                <td class="font-medium">
                                     <a href="/admin/series/edit/@series.Id" class="hover:text-primary hover:underline">@series.Title</a>
                                 </td>
-                                <td class="px-4 py-3 text-muted-foreground">@series.Slug</td>
-                                <td class="px-4 py-3 text-muted-foreground">@series.PostCount</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <a href="/admin/series/edit/@series.Id" class="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-muted" title="Edit / manage posts" aria-label="Edit series @series.Title">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+                                <td class="text-muted-foreground">@series.Slug</td>
+                                <td class="text-muted-foreground">@series.PostCount</td>
+                                <td>
+                                    <div class="desk-row-actions">
+                                        <a href="/admin/series/edit/@series.Id" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" title="Edit / manage posts" aria-label="Edit series @series.Title">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
                                         </a>
                                         <form method="post" action="/admin/series/delete/@series.Id" data-confirm-title="Delete this series?" data-confirm-body="“@series.Title” groups @series.PostCount post(s). The posts are kept; only the grouping, its Part N of M navigation and /series/@series.Slug are removed." data-confirm-action="Delete series" data-confirm-tone="danger">
                                             @Html.AntiForgeryToken()
-                                            <button type="submit" aria-label="Delete series @series.Title" class="text-destructive hover:text-destructive/80 transition-colors p-1 rounded hover:bg-destructive/10">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                            <button type="submit" aria-label="Delete series @series.Title" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm text-destructive hover:bg-destructive/10 hover:text-destructive">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                             </button>
                                         </form>
                                     </div>
@@ -63,30 +60,33 @@
                         }
                     </tbody>
                 </table></div>
-<partial name="_ListPager" />
+                }
             </div>
+            <partial name="_ListPager" />
         </div>
 
         <!-- Create Form -->
         <div class="md:col-span-1">
-            <div class="bg-card rounded-lg border border-border p-4 sticky top-6">
-                <h2 class="font-semibold mb-4">Add New Series</h2>
-                <form method="post" action="/admin/series/create" class="space-y-4">
+            <div class="desk-card sticky top-20">
+                <div class="desk-card-header">
+                    <h2 class="desk-card-title">Add new series</h2>
+                </div>
+                <form method="post" action="/admin/series/create" class="desk-card-body space-y-4">
                     @Html.AntiForgeryToken()
                     <div>
-                        <label class="block text-sm font-medium mb-1">Title</label>
-                        <input type="text" name="title" id="seriesTitle" required class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. Getting Started with Optical Retail" />
+                        <label class="desk-label" for="seriesTitle">Title</label>
+                        <input type="text" name="title" id="seriesTitle" required class="desk-input" placeholder="e.g. Getting Started with Optical Retail" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Slug</label>
-                        <input type="text" name="slug" id="seriesSlug" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="optional — auto-generated from title" />
+                        <label class="desk-label" for="seriesSlug">Slug</label>
+                        <input type="text" name="slug" id="seriesSlug" class="desk-input" placeholder="optional — auto-generated from title" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Description</label>
-                        <textarea name="description" rows="3" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Optional — shown on the series page."></textarea>
+                        <label class="desk-label" for="seriesDescription">Description</label>
+                        <textarea name="description" id="seriesDescription" rows="3" class="desk-textarea" placeholder="Optional — shown on the series page."></textarea>
                     </div>
-                    <button type="submit" class="w-full px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">
-                        Add Series
+                    <button type="submit" class="desk-btn desk-btn-primary w-full">
+                        Add series
                     </button>
                 </form>
             </div>

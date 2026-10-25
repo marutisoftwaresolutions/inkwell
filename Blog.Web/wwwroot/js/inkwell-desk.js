@@ -133,6 +133,18 @@
         el.focus({ preventScroll: true });
     }
 
+    // Validation toasts repeat the messages already shown at the fields, and stay until dismissed so a failed save
+    // is never missed. Once the person starts correcting the form they have seen them, and a toast left in the
+    // bottom-right corner would sit over the Save button they need next, so they go; the field messages stay.
+    // Only a person's own typing counts (editors and scripts dispatch synthetic input events), and only in the form
+    // that has the errors, so a search box elsewhere on the page does not dismiss them.
+    document.addEventListener('input', (e) => {
+        if (!e.isTrusted || !e.target.closest) return;
+        const form = e.target.closest('form');
+        if (!form || !form.querySelector('[aria-invalid="true"], .input-validation-error')) return;
+        document.querySelectorAll('.toast-model-error').forEach(t => t.remove());
+    }, true);
+
     function boot() { document.querySelectorAll('form[data-track-changes]').forEach(track); revealFirstError(); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
     // Editors may build their form contents after load (Quill, page builder); re-baseline once they are ready.
@@ -175,4 +187,145 @@
         if (e.key === 'Escape' && sidebar.classList.contains('translate-x-0') && window.innerWidth < 768) setOpen(false);
     });
     window.InkwellDesk = Object.assign(window.InkwellDesk || {}, { navOpen: () => setOpen(true), navClose: () => setOpen(false) });
+})();
+
+/*
+ * 4. Shell — sidebar groups, the collapsed rail, the account menu, toast dismissal and the
+ *    command palette (Ctrl/Cmd K). All state is per-browser (localStorage) and every piece
+ *    degrades: without script the groups are open, the rail is expanded and the links work.
+ */
+(function () {
+    'use strict';
+    const store = {
+        get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode: nothing to remember with */ } },
+    };
+
+    // Toasts: one delegated handler instead of inline onclick attributes.
+    document.addEventListener('click', e => {
+        const btn = e.target.closest && e.target.closest('[data-toast-dismiss]');
+        if (btn) { const t = btn.closest('.desk-toast'); if (t) t.remove(); }
+    });
+
+    // Sidebar groups: collapsible, remembered per group; the group holding the current page never starts collapsed.
+    document.querySelectorAll('.desk-nav-group[data-nav-group]').forEach(group => {
+        const name = group.getAttribute('data-nav-group');
+        const toggle = group.querySelector('[data-nav-group-toggle]');
+        if (!toggle) return;
+        const hasCurrent = !!group.querySelector('[aria-current="page"]');
+        const set = (collapsed) => {
+            group.setAttribute('data-collapsed', collapsed ? 'true' : 'false');
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        };
+        set(!hasCurrent && store.get('desk.nav.' + name) === '0');
+        toggle.addEventListener('click', () => {
+            const collapsed = group.getAttribute('data-collapsed') !== 'true';
+            set(collapsed);
+            store.set('desk.nav.' + name, collapsed ? '0' : '1');
+        });
+    });
+
+    // Rail: icons only at >= md. The attribute is applied before first paint by an inline script in the layout.
+    const rail = document.querySelector('[data-rail-toggle]');
+    if (rail) {
+        const sync = () => {
+            const on = document.documentElement.getAttribute('data-desk-rail') === 'true';
+            rail.setAttribute('aria-pressed', on ? 'true' : 'false');
+            rail.setAttribute('aria-label', on ? 'Expand sidebar' : 'Collapse sidebar');
+        };
+        sync();
+        rail.addEventListener('click', () => {
+            const on = document.documentElement.getAttribute('data-desk-rail') !== 'true';
+            if (on) document.documentElement.setAttribute('data-desk-rail', 'true'); else document.documentElement.removeAttribute('data-desk-rail');
+            store.set('desk.rail', on ? '1' : '0');
+            sync();
+        });
+    }
+
+    // <details> menus close on outside click and Escape, and focus returns to the summary.
+    document.addEventListener('click', e => {
+        document.querySelectorAll('details.desk-menu[open]').forEach(d => { if (!d.contains(e.target)) d.removeAttribute('open'); });
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('details.desk-menu[open]').forEach(d => { d.removeAttribute('open'); const s = d.querySelector('summary'); if (s) s.focus(); });
+    });
+
+    // Command palette.
+    const dlg = document.getElementById('desk-cmdk');
+    const input = document.getElementById('desk-cmdk-input');
+    const list = document.getElementById('desk-cmdk-list');
+    const empty = document.getElementById('desk-cmdk-empty');
+    const dataEl = document.getElementById('desk-cmdk-data');
+    if (!dlg || !input || !list || !dataEl) return;
+    let data = { items: [], commands: [], search: '/admin/posts?search=' };
+    try { data = JSON.parse(dataEl.textContent); } catch (e) { /* palette stays empty */ }
+    const all = [].concat(data.commands || [], data.items || []);
+    const searchIcon = '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>';
+    let results = [], selected = 0, lastTrigger = null;
+
+    function score(entry, q) {
+        if (!q) return 1;
+        const hay = (entry.label + ' ' + entry.group + ' ' + (entry.keywords || '')).toLowerCase();
+        if (entry.label.toLowerCase().startsWith(q)) return 3;
+        if (hay.includes(q)) return 2;
+        let i = 0; for (const ch of hay) { if (ch === q[i]) i++; if (i === q.length) return 1; } // subsequence ("cmt" finds Comments)
+        return 0;
+    }
+    function render() {
+        const raw = input.value.trim(), q = raw.toLowerCase();
+        results = all.map(e => ({ e, s: score(e, q) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).map(x => x.e).slice(0, 12);
+        if (q) results.push({ group: 'Search', label: 'Search posts for “' + raw + '”', href: data.search + encodeURIComponent(raw), icon: searchIcon });
+        selected = 0;
+        list.innerHTML = '';
+        let lastGroup = null;
+        results.forEach((r, i) => {
+            if (r.group !== lastGroup) {
+                const h = document.createElement('div');
+                h.className = 'px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
+                h.textContent = r.group; list.appendChild(h); lastGroup = r.group;
+            }
+            const a = document.createElement('a');
+            a.href = r.href; a.className = 'desk-cmdk-item'; a.setAttribute('role', 'option'); a.id = 'desk-cmdk-opt-' + i;
+            a.setAttribute('aria-selected', i === selected ? 'true' : 'false');
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '16'); svg.setAttribute('height', '16'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2'); svg.setAttribute('aria-hidden', 'true'); svg.classList.add('text-muted-foreground', 'shrink-0');
+            svg.innerHTML = r.icon || '';
+            const span = document.createElement('span'); span.textContent = r.label; span.className = 'truncate';
+            a.append(svg, span);
+            a.addEventListener('mousemove', () => select(i));
+            list.appendChild(a);
+        });
+        empty.hidden = results.length > 0;
+        input.setAttribute('aria-activedescendant', results.length ? 'desk-cmdk-opt-0' : '');
+    }
+    function select(i) {
+        if (!results.length) return;
+        selected = (i + results.length) % results.length;
+        list.querySelectorAll('[role="option"]').forEach((el, j) => el.setAttribute('aria-selected', j === selected ? 'true' : 'false'));
+        const el = document.getElementById('desk-cmdk-opt-' + selected);
+        if (el) { el.scrollIntoView({ block: 'nearest' }); input.setAttribute('aria-activedescendant', el.id); }
+    }
+    function open(trigger) {
+        lastTrigger = trigger || document.activeElement;
+        input.value = ''; render();
+        if (!dlg.open) dlg.showModal();
+        input.focus();
+    }
+    function close() { if (dlg.open) dlg.close(); if (lastTrigger && lastTrigger.focus) lastTrigger.focus(); }
+
+    document.querySelectorAll('[data-cmdk-open]').forEach(b => b.addEventListener('click', e => open(e.currentTarget)));
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); if (dlg.open) close(); else open(null); }
+    });
+    input.addEventListener('input', render);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); select(selected + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); select(selected - 1); }
+        else if (e.key === 'Enter') { e.preventDefault(); const r = results[selected]; if (r) window.location.href = r.href; }
+    });
+    dlg.addEventListener('cancel', e => { e.preventDefault(); close(); });
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    window.InkwellDesk = Object.assign(window.InkwellDesk || {}, { paletteOpen: () => open(null), paletteClose: close });
 })();

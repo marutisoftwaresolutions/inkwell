@@ -123,15 +123,18 @@ public class ReaderAccessibilityTests
         foreach (Match id in Regex.Matches(thread, @"\bid=""([^""]+)"""))
             Assert.Contains("@rid", id.Groups[1].Value);
 
-        // The redirect target and the placed error.
+        // Each form announces its outcome in its own live region (filled by inkwell-comments.js, ADR-0031), and the
+        // cached page reads nothing reader-specific.
         Assert.Contains("id=\"comments\"", post);
-        Assert.Contains("role=\"alert\"", post);
-        Assert.Contains("role=\"alert\"", thread);
-        Assert.Contains("CommentDraftContent", post);
+        Assert.Contains("aria-describedby=\"comment-status\" data-comment-form", post);
+        Assert.Contains("aria-live=\"polite\" id=\"comment-status\"", post);
+        Assert.Contains("aria-describedby=\"reply-status-@rid\" data-comment-form", thread);
+        Assert.DoesNotContain("TempData", post);
+        Assert.DoesNotContain("TempData", thread);
     }
 
     [Fact]
-    public void AddComment_returns_to_the_comments_block_and_keeps_the_draft_on_error()
+    public void AddComment_keeps_the_draft_on_error_without_a_redirect()
     {
         var src = Web("Controllers/BlogController.cs");
         var start = src.IndexOf("public async Task<IActionResult> AddComment(", StringComparison.Ordinal);
@@ -139,12 +142,15 @@ public class ReaderAccessibilityTests
         Assert.True(start > 0 && end > start, "AddComment action not found");
         var action = src[start..end];
 
-        Assert.Contains("#comments", action);
-        Assert.DoesNotContain("RedirectToAction(\"Post\"", action);   // every exit goes through BackToComments()
-        Assert.Contains("TempData[\"CommentDraftName\"]", action);
-        Assert.Contains("TempData[\"CommentDraftEmail\"]", action);
-        Assert.Contains("TempData[\"CommentDraftContent\"]", action);
-        Assert.Contains("TempData[\"CommentDraftParentId\"]", action);
+        // Every exit goes through Answer(): JSON for the script, otherwise the respond page with what the reader typed.
+        Assert.DoesNotContain("TempData", action);
+        Assert.DoesNotContain("Redirect", action);
+        Assert.Contains("ok ? \"\" : authorName, ok ? \"\" : authorEmail, ok ? \"\" : content", action);
+        var respond = Web("Views/Blog/Respond.cshtml");
+        Assert.Contains("value=\"@Model.Name\"", respond);
+        Assert.Contains("value=\"@Model.Email\"", respond);
+        Assert.Contains("@Model.Content</textarea>", respond);
+        Assert.Contains("name=\"parentId\" value=\"@Model.Parent.Id\"", respond);
     }
 
     [Fact]

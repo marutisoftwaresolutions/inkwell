@@ -7,10 +7,9 @@
 @{
     var subscribers = (int)(ViewBag.Subscribers ?? 0);
     var emailConfigured = (bool)(ViewBag.EmailConfigured ?? false);
-    var btn = "px-4 min-h-10 inline-flex items-center rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 }
-<section aria-labelledby="send-title" class="rounded-lg border border-border bg-card p-4 space-y-3">
-    <h2 id="send-title" class="text-sm font-semibold text-foreground">Send</h2>
+<section aria-labelledby="send-title" class="desk-card p-4 space-y-3">
+    <h2 id="send-title" class="desk-card-title">Send</h2>
     @if (!emailConfigured)
     {
         <p class="text-sm text-muted-foreground">Outgoing email is not set up on this server (the <code>Smtp</code> settings), so nothing can be sent yet.</p>
@@ -19,7 +18,7 @@
     <div class="flex flex-wrap items-center gap-3">
         <form method="post" action="/admin/newsletter/@Model.Id/test" data-requires-saved>
             @Html.AntiForgeryToken()
-            <button type="submit" class="@btn border border-input bg-background text-foreground hover:bg-muted" disabled="@(!emailConfigured ? "disabled" : null)">Send a test to me</button>
+            <button type="submit" class="desk-btn desk-btn-outline" disabled="@(!emailConfigured ? "disabled" : null)">Send a test to me</button>
         </form>
         <form method="post" action="/admin/newsletter/@Model.Id/send" data-requires-saved
               data-confirm-title="Send this newsletter?"
@@ -28,7 +27,7 @@
               data-confirm-tone="danger"
               data-confirm-typed="@(subscribers >= 5 ? "SEND" : null)">
             @Html.AntiForgeryToken()
-            <button type="submit" class="@btn bg-primary text-primary-foreground hover:opacity-90" disabled="@(!emailConfigured || subscribers == 0 ? "disabled" : null)">
+            <button type="submit" class="desk-btn desk-btn-primary" disabled="@(!emailConfigured || subscribers == 0 ? "disabled" : null)">
                 Send to @subscribers subscriber@(subscribers == 1 ? "" : "s")
             </button>
         </form>
@@ -37,7 +36,7 @@
               data-confirm-body="“@Model.Subject” is deleted. Nothing has been sent; subscribers are not affected."
               data-confirm-action="Delete draft" data-confirm-tone="danger">
             @Html.AntiForgeryToken()
-            <button type="submit" class="@btn border border-input bg-background tone-bad hover:bg-muted">Delete draft</button>
+            <button type="submit" class="desk-btn desk-btn-danger-outline">Delete draft</button>
         </form>
     </div>
     @if (subscribers == 0)

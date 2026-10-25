@@ -4,8 +4,10 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Webhooks";
+    ViewData["Description"] = "Send a signed JSON request to another service when posts, pages or comments change — to rebuild a static site, post to social media or purge a cache. Deliveries are queued and retried, so a slow service never holds up publishing.";
     var q = ViewData[ListPaging.QueryKey] as string;
     int total = ViewBag.Total ?? 0;
+    var atMax = total >= Blog.Web.Controllers.WebhooksController.MaxWebhooks;
 
     string Ago(DateTime? utc)
     {
@@ -18,108 +20,105 @@
     }
 }
 
-<div class="flex flex-col gap-6">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h2 class="text-lg font-semibold text-foreground">Webhooks</h2>
-            <p class="text-xs text-muted-foreground mt-0.5 max-w-2xl">
-                Send a signed JSON request to another service when posts, pages or comments change — to rebuild a static
-                site, post to social media or purge a cache. Deliveries are queued and retried, so a slow service never
-                holds up publishing.
-            </p>
-        </div>
-        @if (total >= Blog.Web.Controllers.WebhooksController.MaxWebhooks)
-        {
-            <span class="text-right">
-                <span aria-disabled="true" class="inline-block px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm font-medium cursor-not-allowed">New webhook</span>
-                <span class="block text-xs text-muted-foreground mt-1">This site has the maximum of @Blog.Web.Controllers.WebhooksController.MaxWebhooks. Delete one to add another.</span>
-            </span>
-        }
-        else
-        {
-            <a href="/admin/webhooks/new" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm transition-colors">New webhook</a>
-        }
-    </div>
+@section PageActions {
+    @if (atMax)
+    {
+        <span class="text-right">
+            <span aria-disabled="true" class="desk-btn desk-btn-secondary cursor-not-allowed opacity-60">New webhook</span>
+            <span class="block text-xs text-muted-foreground mt-1">This site has the maximum of @Blog.Web.Controllers.WebhooksController.MaxWebhooks. Delete one to add another.</span>
+        </span>
+    }
+    else
+    {
+        <a href="/admin/webhooks/new" class="desk-btn desk-btn-primary">New webhook</a>
+    }
+}
 
-    <div class="bg-card rounded-lg border border-border overflow-hidden">
+<div class="flex flex-col gap-6">
+    <div>
         <partial name="_ListSearch" />
-        <div class="table-scroll"><table class="w-full text-left text-sm">
-            <thead>
-                <tr class="bg-muted text-muted-foreground border-b border-border">
-                    <th class="px-4 py-3 font-medium">Webhook</th>
-                    <th class="px-4 py-3 font-medium">Events</th>
-                    <th class="px-4 py-3 font-medium">Last delivery</th>
-                    <th class="px-4 py-3 font-medium w-[140px]">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                @if (!Model.Any())
+        <div class="desk-card overflow-hidden">
+            @if (!Model.Any())
+            {
+                if (total == 0 || string.IsNullOrEmpty(q))
                 {
+                    ViewData["EmptyTitle"] = "No webhooks yet";
+                    ViewData["EmptyHint"] = "Create the first one with New webhook.";
+                    if (!atMax) { ViewData["EmptyHref"] = "/admin/webhooks/new"; ViewData["EmptyAction"] = "New webhook"; }
+                }
+                else
+                {
+                    ViewData["EmptyQuery"] = q;
+                    ViewData["EmptyHint"] = $"to see all {total}.";
+                }
+                <partial name="_EmptyState" />
+            }
+            else
+            {
+            <div class="table-scroll"><table class="desk-table">
+                <thead>
                     <tr>
-                        <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-                            @if (total == 0 || string.IsNullOrEmpty(q))
-                            {
-                                <text>No webhooks yet. Create the first one with <strong>New webhook</strong>.</text>
-                            }
-                            else
-                            {
-                                <text>No matches for “@q”. <a href="?" class="text-primary hover:underline">Clear the search</a> to see all @total.</text>
-                            }
-                        </td>
+                        <th>Webhook</th>
+                        <th>Events</th>
+                        <th>Last delivery</th>
+                        <th class="w-[140px] text-right">Actions</th>
                     </tr>
-                }
-                @foreach (var w in Model)
-                {
-                    var failed = w.LastDeliveryStatus == WebhookDeliveryStatus.Failed;
-                    <tr class="hover:bg-muted/50 transition-colors">
-                        <td class="px-4 py-3">
-                            <div class="font-medium text-foreground">
-                                @w.Name
-                                @if (!w.IsEnabled)
+                </thead>
+                <tbody>
+                    @foreach (var w in Model)
+                    {
+                        var failed = w.LastDeliveryStatus == WebhookDeliveryStatus.Failed;
+                        <tr>
+                            <td>
+                                <div class="font-medium">
+                                    @w.Name
+                                    @if (!w.IsEnabled)
+                                    {
+                                        <span class="ml-1 desk-pill desk-pill-muted">Paused</span>
+                                    }
+                                </div>
+                                <div class="font-mono text-[11px] text-muted-foreground break-all">@w.Url</div>
+                            </td>
+                            <td class="text-xs text-muted-foreground">@string.Join(", ", w.EventList)</td>
+                            <td class="text-xs whitespace-nowrap @(failed ? "tone-bad" : "text-muted-foreground")" title="@Dates.DateTimeSeconds(w.LastDeliveryAt)">
+                                @if (w.LastDeliveryAt is null)
                                 {
-                                    <span class="ml-1 text-[11px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">Paused</span>
+                                    <text>None yet</text>
                                 }
-                            </div>
-                            <div class="font-mono text-[11px] text-muted-foreground break-all">@w.Url</div>
-                        </td>
-                        <td class="px-4 py-3 text-xs text-muted-foreground">@string.Join(", ", w.EventList)</td>
-                        <td class="px-4 py-3 text-xs whitespace-nowrap @(failed ? "text-destructive" : "text-muted-foreground")" title="@Dates.DateTimeSeconds(w.LastDeliveryAt)">
-                            @if (w.LastDeliveryAt is null)
-                            {
-                                <text>None yet</text>
-                            }
-                            else
-                            {
-                                <text>@w.LastDeliveryStatus@(w.LastResponseCode is int c ? $" · HTTP {c}" : "") · @Ago(w.LastDeliveryAt)</text>
-                            }
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-1">
-                                <a href="/admin/webhooks/@w.Id" class="text-xs px-2 py-1 rounded hover:bg-muted text-foreground" aria-label="Edit webhook @w.Name">Edit</a>
-                                <a href="/admin/webhooks/@w.Id/deliveries" class="text-xs px-2 py-1 rounded hover:bg-muted text-foreground" aria-label="Delivery log for @w.Name">Log</a>
-                                <form method="post" action="/admin/webhooks/delete/@w.Id"
-                                      data-confirm-title="Delete this webhook?"
-                                      data-confirm-body="“@w.Name” stops receiving events and its delivery log is deleted with it. Posts, pages and comments are untouched."
-                                      data-confirm-action="Delete webhook" data-confirm-tone="danger">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="q" value="@ViewData[ListPaging.QueryKey]" />
-                                    <input type="hidden" name="page" value="@ViewData[ListPaging.PageKey]" />
-                                    <button type="submit" aria-label="Delete webhook @w.Name" class="text-destructive hover:text-destructive/80 transition-colors p-1 rounded hover:bg-destructive/10">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table></div>
+                                else
+                                {
+                                    <text>@w.LastDeliveryStatus@(w.LastResponseCode is int c ? $" · HTTP {c}" : "") · @Ago(w.LastDeliveryAt)</text>
+                                }
+                            </td>
+                            <td>
+                                <div class="desk-row-actions">
+                                    <a href="/admin/webhooks/@w.Id" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="Edit webhook @w.Name">Edit</a>
+                                    <a href="/admin/webhooks/@w.Id/deliveries" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="Delivery log for @w.Name">Log</a>
+                                    <form method="post" action="/admin/webhooks/delete/@w.Id"
+                                          data-confirm-title="Delete this webhook?"
+                                          data-confirm-body="“@w.Name” stops receiving events and its delivery log is deleted with it. Posts, pages and comments are untouched."
+                                          data-confirm-action="Delete webhook" data-confirm-tone="danger">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="q" value="@ViewData[ListPaging.QueryKey]" />
+                                        <input type="hidden" name="page" value="@ViewData[ListPaging.PageKey]" />
+                                        <button type="submit" aria-label="Delete webhook @w.Name" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm text-destructive hover:bg-destructive/10 hover:text-destructive">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+            }
+        </div>
         <partial name="_ListPager" />
     </div>
 
-    <details class="rounded-lg border border-border bg-card text-sm">
-        <summary class="px-4 py-3 cursor-pointer font-medium text-foreground">Verifying a delivery</summary>
-        <div class="px-4 pb-4 text-xs text-muted-foreground space-y-2">
+    <details class="desk-card text-sm">
+        <summary class="px-5 py-4 cursor-pointer desk-card-title">Verifying a delivery</summary>
+        <div class="px-5 pb-5 text-xs text-muted-foreground space-y-2">
             <p>Each request is a <code>POST</code> with a JSON body and these headers:
                <code>X-Inkwell-Event</code> (the event name), <code>X-Inkwell-Delivery</code> (an id that stays the same on a redelivery, so you can ignore duplicates) and
                <code>X-Inkwell-Signature</code>, formatted <code>t=&lt;unix seconds&gt;,v1=&lt;hex&gt;</code>.</p>

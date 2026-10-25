@@ -84,6 +84,14 @@ public class UserSettings
     /// </summary>
     public int CrawlerVisitRetentionDays { get; set; } = 90;
 
+    /// <summary>
+    /// How many days of raw page views the page-view-retention job keeps (Admin → Analytics). 0, the default,
+    /// keeps every view, as before this setting existed; otherwise 31–3650. Only days already summarised into
+    /// PageViewDaily are removed, so the Analytics report keeps its full history (ADR-0037). Stored in the
+    /// Settings JSON blob; older payloads fall back to the default.
+    /// </summary>
+    public int PageViewRetentionDays { get; set; } = 0;
+
     // ── Search Console (Admin → Settings → Search Console) ──────────────────
     // Per-tenant service-account access to the Search Console API. The operator pastes the key
     // file Google issues; it is stored Data-Protection-encrypted and never returned to the UI,
@@ -154,6 +162,18 @@ public class UserSettings
     /// stands.
     /// </summary>
     public string EntityIdentityStatement { get; set; } = string.Empty;
+
+    /// <summary>
+    /// How readers and customers reach the publisher, emitted as the Organization's <c>contactPoint</c> (and listed in
+    /// llms.txt) only when an email or a contact page is set. Empty, the structured data is exactly as before.
+    /// </summary>
+    public string EntityContactEmail { get; set; } = string.Empty;
+
+    /// <summary>A contact page (absolute http(s) URL, or a path on this site such as /contact).</summary>
+    public string EntityContactUrl { get; set; } = string.Empty;
+
+    /// <summary>schema.org <c>contactType</c>, for example "customer support" or "editorial". Empty means "customer support".</summary>
+    public string EntityContactType { get; set; } = string.Empty;
 
     // Social Links
     public string SocialTwitter { get; set; } = string.Empty;

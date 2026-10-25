@@ -132,6 +132,23 @@ public sealed class WebhookPublisher
         catch (Exception ex) { _log.LogWarning(ex, "Webhook comment event not queued (non-fatal)."); }
     }
 
+    /// <summary>
+    /// A visitor sent a contact form (ADR-0030). The payload is the form's own fields as the visitor filled them in,
+    /// and nothing else: never the sender's address or its hash.
+    /// </summary>
+    public async Task FormSubmittedAsync(HttpContext context, ContactForm form, long submissionId, IReadOnlyDictionary<string, string> values)
+    {
+        try
+        {
+            await EnqueueAsync(OwnerOf(context), WebhookEvents.FormSubmitted, null, BaseUrl(context), baseUrl => new
+            {
+                form = new { key = form.FormKey, name = form.Name },
+                submission = new { id = submissionId, createdAt = DateTime.UtcNow, values },
+            });
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Webhook form event not queued (non-fatal)."); }
+    }
+
     /// <summary>The body the Desk's "Send test" button sends.</summary>
     public async Task<string> TestPayloadAsync(Guid ownerId, Webhook webhook, HttpContext context)
     {

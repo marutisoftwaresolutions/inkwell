@@ -117,9 +117,9 @@
                         @foreach (var faq in Model.Faqs)
                         {
                             <div x-data="{ open: false }" class="border border-dashed rounded-lg overflow-hidden" style="border-color: var(--border);" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-                                <button type="button" @@click="open = !open" class="w-full flex items-center justify-between px-4 py-3 text-left font-medium text-sm hover:opacity-80 transition-opacity" style="background: var(--muted);">
+                                <button type="button" @@click="open = !open" class="w-full flex items-center justify-between px-4 py-3 text-start font-medium text-sm hover:opacity-80 transition-opacity" style="background: var(--muted);">
                                     <span itemprop="name">@faq.Question</span>
-                                    <svg :class="open ? 'rotate-180' : ''" class="shrink-0 transition-transform ml-2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                    <svg :class="open ? 'rotate-180' : ''" class="shrink-0 transition-transform ms-2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </button>
                                 <div x-show="open" x-transition class="px-4 py-3 text-sm leading-relaxed" style="color: var(--foreground);" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
                                     <span itemprop="text">@faq.Answer</span>

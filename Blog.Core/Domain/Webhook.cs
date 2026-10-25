@@ -67,6 +67,7 @@ public static class WebhookEvents
     public const string PostUnpublished = "post.unpublished";
     public const string PagePublished   = "page.published";
     public const string CommentCreated  = "comment.created";
+    public const string FormSubmitted   = "form.submitted";
     /// <summary>Sent only by the Desk's "Send test" button; not subscribable.</summary>
     public const string Test            = "webhook.test";
 
@@ -77,6 +78,7 @@ public static class WebhookEvents
         (PostUnpublished, "A live post is moved back to draft"),
         (PagePublished,   "A page is published or a published page is saved"),
         (CommentCreated,  "A reader submits a comment (sent while it awaits moderation)"),
+        (FormSubmitted,   "A visitor sends a contact form (the form's fields only)"),
     ];
 
     public static bool IsSubscribable(string name) => All.Any(e => e.Name == name);

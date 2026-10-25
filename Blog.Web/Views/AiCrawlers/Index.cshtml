@@ -2,6 +2,7 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "AI Crawlers";
+    ViewData["Description"] = "Which AI answer engines and search crawlers actually fetch this site, and what they read. Search Console reports generative-AI impressions without naming the engine — this names it. A crawler's name is self-declared, so each visit is checked against the network its operator publishes; visits that fail are someone else using the name and are left out of the totals, trend and top pages.";
 
     var ai       = (IReadOnlyList<CrawlerActivity>)ViewBag.Ai;
     var search   = (IReadOnlyList<CrawlerActivity>)ViewBag.Search;
@@ -35,42 +36,31 @@
     }
 }
 
-<div class="mb-5">
-    <h2 class="text-lg font-semibold text-foreground">AI Crawlers</h2>
-    <p class="text-xs text-muted-foreground mt-0.5">
-        Which AI answer engines and search crawlers actually fetch this site, and what they read.
-        Search Console reports generative-AI impressions without naming the engine — this names it.
-        A crawler's name is self-declared, so each visit is checked against the network its operator
-        publishes; visits that fail are someone else using the name and are left out of the totals, trend
-        and top pages.
-    </p>
-</div>
-
-<div class="flex gap-2 mb-6 text-xs">
-    @foreach (var d in new[] { 7, 30, 90 })
-    {
-        <a href="?days=@d" aria-current="@(days == d ? "page" : null)" class="h-8 px-3 rounded border @(days == d ? "border-primary bg-primary text-primary-foreground" : "border-input text-foreground hover:bg-muted") inline-flex items-center">
-            Last @d days
-        </a>
-    }
-</div>
+@section PageActions {
+    <nav class="desk-tabs" aria-label="Period">
+        @foreach (var d in new[] { 7, 30, 90 })
+        {
+            <a href="?days=@d" class="desk-tab" aria-current="@(days == d ? "page" : null)">Last @d days</a>
+        }
+    </nav>
+}
 
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@aiVisits.ToString("N0")</div>
-        <div class="text-xs text-muted-foreground mt-1">AI crawler visits</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value">@aiVisits.ToString("N0")</div>
+        <div class="desk-kpi-label">AI crawler visits</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold @(aiEngines > 0 ? "tone-ok" : "tone-warn")">@aiEngines</div>
-        <div class="text-xs text-muted-foreground mt-1">AI engines reading you</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value @(aiEngines > 0 ? "tone-ok" : "tone-warn")">@aiEngines</div>
+        <div class="desk-kpi-label">AI engines reading you</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@topPages.Count</div>
-        <div class="text-xs text-muted-foreground mt-1">Pages fetched by AI</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value">@topPages.Count</div>
+        <div class="desk-kpi-label">Pages fetched by AI</div>
     </div>
-    <div class="rounded-xl border border-border bg-card p-4">
-        <div class="text-2xl font-bold text-foreground">@search.Sum(s => s.Visits).ToString("N0")</div>
-        <div class="text-xs text-muted-foreground mt-1">Search crawler visits</div>
+    <div class="desk-kpi">
+        <div class="desk-kpi-value">@search.Sum(s => s.Visits).ToString("N0")</div>
+        <div class="desk-kpi-label">Search crawler visits</div>
     </div>
 </div>
 
@@ -85,8 +75,11 @@
 
 @if (peak > 0)
 {
-    <div class="rounded-xl border border-border bg-card p-4 mb-6">
-        <div class="text-sm font-medium text-foreground mb-3">AI crawler visits per day</div>
+    <div class="desk-card mb-6">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">AI crawler visits per day</h2>
+        </div>
+        <div class="desk-card-body">
         <div class="flex items-end gap-1 h-24" role="img" aria-label="AI crawler visits per day: @string.Join(", ", daily.Select(x => $"{x.Day:d MMM} {x.Visits}"))">
             @foreach (var d in daily)
             {
@@ -96,34 +89,37 @@
                      title="@Dates.CalendarDate(d.Day, Blog.Core.Services.DateStyle.Medium): @d.Visits visits"></div>
             }
         </div>
+        </div>
     </div>
 }
 
-<div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
-    <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">AI answer engines</div>
-    <div class="table-scroll"><table class="w-full text-sm">
+<div class="desk-card overflow-hidden mb-6">
+    <div class="desk-card-header">
+        <h2 class="desk-card-title">AI answer engines</h2>
+    </div>
+    <div class="table-scroll"><table class="desk-table">
         <thead>
-            <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                <th class="px-4 py-2 font-medium">Crawler</th>
-                <th class="px-4 py-2 font-medium">Operator</th>
-                <th class="px-4 py-2 font-medium">What it is for</th>
-                <th class="px-4 py-2 font-medium text-right">Visits</th>
-                <th class="px-4 py-2 font-medium text-right">Pages</th>
-                <th class="px-4 py-2 font-medium">Identity check</th>
-                <th class="px-4 py-2 font-medium">Last seen</th>
+            <tr>
+                <th>Crawler</th>
+                <th>Operator</th>
+                <th>What it is for</th>
+                <th class="text-right">Visits</th>
+                <th class="text-right">Pages</th>
+                <th>Identity check</th>
+                <th>Last seen</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var c in ai)
             {
-                <tr class="border-b border-border/50 hover:bg-muted/40 @(c.Visits == 0 ? "opacity-50" : "")">
-                    <td class="px-4 py-2 font-mono text-xs text-foreground">@c.Crawler</td>
-                    <td class="px-4 py-2 text-xs text-foreground">@c.Operator</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground max-w-[22rem]">@c.Purpose</td>
-                    <td class="px-4 py-2 text-right font-semibold @(c.Visits > 0 ? "text-foreground" : "text-muted-foreground")">@c.Visits.ToString("N0")</td>
-                    <td class="px-4 py-2 text-right text-xs text-muted-foreground">@c.Pages</td>
-                    <td class="px-4 py-2 text-xs @(c.FailedVisits > 0 ? "text-destructive" : "text-muted-foreground") whitespace-nowrap">@Check(c)</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
+                <tr class="@(c.Visits == 0 ? "opacity-50" : "")">
+                    <td class="font-mono text-xs text-foreground">@c.Crawler</td>
+                    <td class="text-xs text-foreground">@c.Operator</td>
+                    <td class="text-xs text-muted-foreground max-w-[22rem]">@c.Purpose</td>
+                    <td class="text-right font-semibold @(c.Visits > 0 ? "text-foreground" : "text-muted-foreground")">@c.Visits.ToString("N0")</td>
+                    <td class="text-right text-xs text-muted-foreground">@c.Pages</td>
+                    <td class="text-xs @(c.FailedVisits > 0 ? "tone-bad" : "text-muted-foreground") whitespace-nowrap">@Check(c)</td>
+                    <td class="text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
                 </tr>
             }
         </tbody>
@@ -132,25 +128,27 @@
 
 @if (topPages.Count > 0)
 {
-    <div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
-        <div class="px-4 py-2 border-b border-border text-sm font-medium text-foreground">Pages AI engines read most</div>
-        <div class="table-scroll"><table class="w-full text-sm">
+    <div class="desk-card overflow-hidden mb-6">
+        <div class="desk-card-header">
+            <h2 class="desk-card-title">Pages AI engines read most</h2>
+        </div>
+        <div class="table-scroll"><table class="desk-table">
             <thead>
-                <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                    <th class="px-4 py-2 font-medium">Page</th>
-                    <th class="px-4 py-2 font-medium text-right">Visits</th>
-                    <th class="px-4 py-2 font-medium text-right">Engines</th>
+                <tr>
+                    <th>Page</th>
+                    <th class="text-right">Visits</th>
+                    <th class="text-right">Engines</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var p in topPages)
                 {
-                    <tr class="border-b border-border/50 hover:bg-muted/40">
-                        <td class="px-4 py-2">
+                    <tr>
+                        <td>
                             <a href="@p.Path" target="_blank" rel="noopener" class="font-mono text-[11px] text-foreground hover:underline break-all">@p.Path</a>
                         </td>
-                        <td class="px-4 py-2 text-right font-semibold text-foreground">@p.Visits.ToString("N0")</td>
-                        <td class="px-4 py-2 text-right text-xs text-muted-foreground">@p.Crawlers</td>
+                        <td class="text-right font-semibold text-foreground">@p.Visits.ToString("N0")</td>
+                        <td class="text-right text-xs text-muted-foreground">@p.Crawlers</td>
                     </tr>
                 }
             </tbody>
@@ -160,34 +158,34 @@
 
 @* Many URLs share one path (/?page=…, /?p=…), so the page table above cannot say what crawlers
    actually fetch. Shown as text, never as a link: these are addresses crawlers chose, not ours. *@
-<div class="rounded-xl border border-border bg-card overflow-hidden mb-6">
-    <div class="px-4 py-2 border-b border-border">
-        <div class="text-sm font-medium text-foreground">Requests with a query string</div>
-        <div class="text-xs text-muted-foreground">What search and AI crawlers requested when the address carried parameters. Visits that failed the identity check are left out.</div>
+<div class="desk-card overflow-hidden mb-6">
+    <div class="desk-card-header">
+        <h2 class="desk-card-title">Requests with a query string</h2>
+        <p class="desk-card-description">What search and AI crawlers requested when the address carried parameters. Visits that failed the identity check are left out.</p>
     </div>
     @if (queried.Count == 0)
     {
-        <p class="px-4 py-3 text-xs text-muted-foreground">No crawler requests with a query string in the last @days days. Visits recorded before this report existed were stored without one.</p>
+        <p class="px-5 py-4 text-xs text-muted-foreground">No crawler requests with a query string in the last @days days. Visits recorded before this report existed were stored without one.</p>
     }
     else
     {
-        <div class="table-scroll"><table class="w-full text-sm">
+        <div class="table-scroll"><table class="desk-table">
             <thead>
-                <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                    <th class="px-4 py-2 font-medium">Path</th>
-                    <th class="px-4 py-2 font-medium">Query string</th>
-                    <th class="px-4 py-2 font-medium text-right">Visits</th>
-                    <th class="px-4 py-2 font-medium text-right">Crawlers</th>
+                <tr>
+                    <th>Path</th>
+                    <th>Query string</th>
+                    <th class="text-right">Visits</th>
+                    <th class="text-right">Crawlers</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var r in queried)
                 {
-                    <tr class="border-b border-border/50 hover:bg-muted/40">
-                        <td class="px-4 py-2 font-mono text-[11px] text-foreground break-all">@r.Path</td>
-                        <td class="px-4 py-2 font-mono text-[11px] text-muted-foreground break-all">?@r.Query</td>
-                        <td class="px-4 py-2 text-right font-semibold text-foreground">@r.Visits.ToString("N0")</td>
-                        <td class="px-4 py-2 text-right text-xs text-muted-foreground">@r.Crawlers</td>
+                    <tr>
+                        <td class="font-mono text-[11px] text-foreground break-all">@r.Path</td>
+                        <td class="font-mono text-[11px] text-muted-foreground break-all">?@r.Query</td>
+                        <td class="text-right font-semibold text-foreground">@r.Visits.ToString("N0")</td>
+                        <td class="text-right text-xs text-muted-foreground">@r.Crawlers</td>
                     </tr>
                 }
             </tbody>
@@ -195,27 +193,27 @@
     }
 </div>
 
-<details class="rounded-xl border border-border bg-card">
-    <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-foreground">Search crawlers</summary>
-    <div class="table-scroll"><table class="w-full text-sm border-t border-border">
+<details class="desk-card overflow-hidden">
+    <summary class="px-5 py-4 cursor-pointer text-base font-semibold text-foreground">Search crawlers</summary>
+    <div class="table-scroll"><table class="desk-table border-t border-border">
         <thead>
-            <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                <th class="px-4 py-2 font-medium">Crawler</th>
-                <th class="px-4 py-2 font-medium">Operator</th>
-                <th class="px-4 py-2 font-medium text-right">Visits</th>
-                <th class="px-4 py-2 font-medium">Identity check</th>
-                <th class="px-4 py-2 font-medium">Last seen</th>
+            <tr>
+                <th>Crawler</th>
+                <th>Operator</th>
+                <th class="text-right">Visits</th>
+                <th>Identity check</th>
+                <th>Last seen</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var c in search)
             {
-                <tr class="border-b border-border/50 @(c.Visits == 0 ? "opacity-50" : "")">
-                    <td class="px-4 py-2 font-mono text-xs text-foreground">@c.Crawler</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground">@c.Operator</td>
-                    <td class="px-4 py-2 text-right font-semibold text-foreground">@c.Visits.ToString("N0")</td>
-                    <td class="px-4 py-2 text-xs @(c.FailedVisits > 0 ? "text-destructive" : "text-muted-foreground") whitespace-nowrap">@Check(c)</td>
-                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
+                <tr class="@(c.Visits == 0 ? "opacity-50" : "")">
+                    <td class="font-mono text-xs text-foreground">@c.Crawler</td>
+                    <td class="text-xs text-muted-foreground">@c.Operator</td>
+                    <td class="text-right font-semibold text-foreground">@c.Visits.ToString("N0")</td>
+                    <td class="text-xs @(c.FailedVisits > 0 ? "tone-bad" : "text-muted-foreground") whitespace-nowrap">@Check(c)</td>
+                    <td class="text-xs text-muted-foreground whitespace-nowrap">@Ago(c.LastSeen)</td>
                 </tr>
             }
         </tbody>

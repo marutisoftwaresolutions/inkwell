@@ -2,6 +2,7 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Content Health";
+    ViewData["Description"] = "Published posts that need maintenance — reviews falling due, missing answer blocks, and snippets that will truncate in search results. Read-only; each row links to the editor.";
 
     var items   = (IReadOnlyList<ContentHealthItem>)ViewBag.Items;
     var summary = (ContentHealthSummary)ViewBag.Summary;
@@ -26,52 +27,61 @@
         return Dates.CalendarDate(utc, Blog.Core.Services.DateStyle.Medium);
     }
     string TileClass(string key) => filter == key
-        ? "rounded-xl border-2 border-emerald-500 bg-card p-4 block"
-        : "rounded-xl border border-border bg-card p-4 block hover:border-emerald-400";
+        ? "desk-kpi border-primary ring-1 ring-primary"
+        : "desk-kpi hover:border-primary/60";
     string? Current(string key) => filter == key ? "page" : null;
+    // Block pills: present → ok, missing → warn. Colour is never the only signal; the text says which.
+    string BlockPill(bool has) => has ? "desk-pill pill-ok" : "desk-pill pill-warn";
+    string AeoPill(int score) => score >= 70 ? "desk-pill pill-ok" : score >= 50 ? "desk-pill pill-warn" : "desk-pill pill-bad";
 }
 
-<div class="mb-5">
-    <h2 class="text-lg font-semibold text-foreground">Content Health</h2>
-    <p class="text-xs text-muted-foreground mt-0.5">
-        Published posts that need maintenance — reviews falling due, missing answer blocks, and snippets
-        that will truncate in search results. Read-only; each row links to the editor.
-    </p>
-</div>
+@if (filter != "attention")
+{
+    @section PageActions {
+        <a href="/admin/content-health" class="desk-btn desk-btn-outline">Everything needing attention</a>
+    }
+}
 
 @* ── Tiles double as filters ───────────────────────────────────────────── *@
-<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
     <a href="?filter=all" class="@TileClass("all")" aria-current="@Current("all")">
-        <div class="text-2xl font-bold text-foreground">@summary.Total</div>
-        <div class="text-xs text-muted-foreground mt-1">Published</div>
+        <div class="desk-kpi-value">@summary.Total</div>
+        <div class="desk-kpi-label">Published</div>
     </a>
     <a href="?filter=overdue" class="@TileClass("overdue")" aria-current="@Current("overdue")">
-        <div class="text-2xl font-bold @(summary.ReviewOverdue > 0 ? "text-red-600" : "text-foreground")">@summary.ReviewOverdue</div>
-        <div class="text-xs text-muted-foreground mt-1">Review overdue</div>
+        <div class="desk-kpi-value @(summary.ReviewOverdue > 0 ? "tone-bad" : "")">@summary.ReviewOverdue</div>
+        <div class="desk-kpi-label">Review overdue</div>
     </a>
     <a href="?filter=duesoon" class="@TileClass("duesoon")" aria-current="@Current("duesoon")">
-        <div class="text-2xl font-bold @(summary.ReviewDueSoon > 0 ? "text-amber-600" : "text-foreground")">@summary.ReviewDueSoon</div>
-        <div class="text-xs text-muted-foreground mt-1">Due in 30 days</div>
+        <div class="desk-kpi-value @(summary.ReviewDueSoon > 0 ? "tone-warn" : "")">@summary.ReviewDueSoon</div>
+        <div class="desk-kpi-label">Due in 30 days</div>
     </a>
     <a href="?filter=unverified" class="@TileClass("unverified")" aria-current="@Current("unverified")">
-        <div class="text-2xl font-bold text-foreground">@summary.NeverVerified</div>
-        <div class="text-xs text-muted-foreground mt-1">Never verified</div>
+        <div class="desk-kpi-value">@summary.NeverVerified</div>
+        <div class="desk-kpi-label">Never verified</div>
     </a>
     <a href="?filter=nokeyfacts" class="@TileClass("nokeyfacts")" aria-current="@Current("nokeyfacts")">
-        <div class="text-2xl font-bold @(summary.MissingKeyFacts > 0 ? "text-amber-600" : "text-foreground")">@summary.MissingKeyFacts</div>
-        <div class="text-xs text-muted-foreground mt-1">No Key Facts</div>
+        <div class="desk-kpi-value @(summary.MissingKeyFacts > 0 ? "tone-warn" : "")">@summary.MissingKeyFacts</div>
+        <div class="desk-kpi-label">No key facts</div>
     </a>
     <a href="?filter=meta" class="@TileClass("meta")" aria-current="@Current("meta")">
-        <div class="text-2xl font-bold @(summary.MetaIssues > 0 ? "text-amber-600" : "text-foreground")">@summary.MetaIssues</div>
-        <div class="text-xs text-muted-foreground mt-1">Snippet issues</div>
+        <div class="desk-kpi-value @(summary.MetaIssues > 0 ? "tone-warn" : "")">@summary.MetaIssues</div>
+        <div class="desk-kpi-label">Snippet issues</div>
     </a>
     <a href="?filter=staleyear" class="@TileClass("staleyear")" aria-current="@Current("staleyear")">
-        <div class="text-2xl font-bold @(summary.StaleYearStamps > 0 ? "text-red-600" : "text-foreground")">@summary.StaleYearStamps</div>
-        <div class="text-xs text-muted-foreground mt-1">Stale year in title</div>
+        <div class="desk-kpi-value @(summary.StaleYearStamps > 0 ? "tone-bad" : "")">@summary.StaleYearStamps</div>
+        <div class="desk-kpi-label">Stale year in title</div>
     </a>
-    <a href="?filter=weakaeo" class="@TileClass("weakaeo")" aria-current="@Current("weakaeo")" title="Average across all published posts: @summary.AverageAeoScore/100">
-        <div class="text-2xl font-bold @(summary.WeakAeo > 0 ? "text-amber-600" : "text-foreground")">@summary.WeakAeo</div>
-        <div class="text-xs text-muted-foreground mt-1">Weak AEO (avg @summary.AverageAeoScore)</div>
+    <a href="?filter=weakaeo" class="@TileClass("weakaeo")" aria-current="@Current("weakaeo")" aria-describedby="tile-weakaeo-hint">
+        <div class="desk-kpi-value @(summary.WeakAeo > 0 ? "tone-warn" : "")">@summary.WeakAeo</div>
+        <div class="desk-kpi-label">Weak AEO (avg @summary.AverageAeoScore)</div>
+        <span id="tile-weakaeo-hint" class="sr-only">Average across all published posts: @summary.AverageAeoScore out of 100</span>
+    </a>
+    @* Not counted up front: the check reads every article body, so it runs when this tile is opened. *@
+    <a href="?filter=a11y" class="@TileClass("a11y")" aria-current="@Current("a11y")" aria-describedby="tile-a11y-hint">
+        <div class="desk-kpi-value">@(filter == "a11y" ? items.Count.ToString() : "Check")</div>
+        <div class="desk-kpi-label">Accessibility</div>
+        <span id="tile-a11y-hint" class="sr-only">Images without alt text, skipped heading levels, vague link text, tables without a header row, very long paragraphs</span>
     </a>
 </div>
 
@@ -79,17 +89,20 @@
 @if (summary.SearchConnected)
 {
     <div class="grid grid-cols-3 gap-3 mb-2">
-        <a href="?filter=striking" class="@TileClass("striking")" aria-current="@Current("striking")" title="Position 8–20 with at least @Blog.Core.Services.SearchPerformanceAnalyzer.StrikingMinImpressions impressions in 28 days">
-            <div class="text-2xl font-bold @(summary.StrikingDistance > 0 ? "text-emerald-600" : "text-foreground")">@summary.StrikingDistance</div>
-            <div class="text-xs text-muted-foreground mt-1">Striking distance</div>
+        <a href="?filter=striking" class="@TileClass("striking")" aria-current="@Current("striking")" aria-describedby="tile-striking-hint">
+            <div class="desk-kpi-value @(summary.StrikingDistance > 0 ? "tone-ok" : "")">@summary.StrikingDistance</div>
+            <div class="desk-kpi-label">Striking distance</div>
+            <span id="tile-striking-hint" class="sr-only">Position 8–20 with at least @Blog.Core.Services.SearchPerformanceAnalyzer.StrikingMinImpressions impressions in 28 days</span>
         </a>
-        <a href="?filter=losing" class="@TileClass("losing")" aria-current="@Current("losing")" title="Impressions at or below @((int)(Blog.Core.Services.SearchPerformanceAnalyzer.LosingRatio * 100))% of the previous 28 days">
-            <div class="text-2xl font-bold @(summary.LosingImpressions > 0 ? "text-red-600" : "text-foreground")">@summary.LosingImpressions</div>
-            <div class="text-xs text-muted-foreground mt-1">Losing impressions</div>
+        <a href="?filter=losing" class="@TileClass("losing")" aria-current="@Current("losing")" aria-describedby="tile-losing-hint">
+            <div class="desk-kpi-value @(summary.LosingImpressions > 0 ? "tone-bad" : "")">@summary.LosingImpressions</div>
+            <div class="desk-kpi-label">Losing impressions</div>
+            <span id="tile-losing-hint" class="sr-only">Impressions at or below @((int)(Blog.Core.Services.SearchPerformanceAnalyzer.LosingRatio * 100))% of the previous 28 days</span>
         </a>
-        <a href="?filter=lowctr" class="@TileClass("lowctr")" aria-current="@Current("lowctr")" title="Page one with CTR under @((Blog.Core.Services.SearchPerformanceAnalyzer.LowCtrFloor * 100).ToString("0.0"))%">
-            <div class="text-2xl font-bold @(summary.LowCtrForPosition > 0 ? "text-amber-600" : "text-foreground")">@summary.LowCtrForPosition</div>
-            <div class="text-xs text-muted-foreground mt-1">Low CTR for rank</div>
+        <a href="?filter=lowctr" class="@TileClass("lowctr")" aria-current="@Current("lowctr")" aria-describedby="tile-lowctr-hint">
+            <div class="desk-kpi-value @(summary.LowCtrForPosition > 0 ? "tone-warn" : "")">@summary.LowCtrForPosition</div>
+            <div class="desk-kpi-label">Low CTR for rank</div>
+            <span id="tile-lowctr-hint" class="sr-only">Page one with CTR under @((Blog.Core.Services.SearchPerformanceAnalyzer.LowCtrFloor * 100).ToString("0.0"))%</span>
         </a>
     </div>
     <p class="text-[11px] text-muted-foreground mb-6">Google Search, web results, 28 days through @Dates.CalendarDate(summary.SearchAsOf, Blog.Core.Services.DateStyle.Medium) against the 28 before.</p>
@@ -103,64 +116,74 @@ else
     <p class="text-[11px] text-muted-foreground mb-6">Connect Search Console under <a href="/admin/settings" class="underline">Settings</a> to add striking-distance, losing-impressions and low-CTR filters here.</p>
 }
 
-@if (filter != "attention")
-{
-    <a href="/admin/content-health" class="inline-block mb-4 text-xs text-emerald-700 hover:underline">← Back to everything needing attention</a>
-}
-
 @* ── Worklist ──────────────────────────────────────────────────────────── *@
 <partial name="_ListSearch" />
 
-<div class="rounded-xl border border-border bg-card overflow-hidden">
-    <div class="table-scroll"><table class="w-full text-sm">
+<div class="desk-card overflow-hidden">
+    @if (items.Count == 0)
+    {
+        if (!string.IsNullOrEmpty(q))
+        {
+            ViewData["EmptyQuery"] = q;
+            ViewData["EmptyClearHref"] = $"?filter={filter}";
+            ViewData["EmptyHint"] = "to see every post in this view.";
+        }
+        else
+        {
+            ViewData["EmptyTitle"] = filter == "a11y" ? "No accessibility problems found in published posts" : "Nothing needs attention here";
+            ViewData["EmptyHint"] = filter == "attention" ? "Every published post is verified, reviewed on time and carries its answer blocks." : "Pick another tile above to see a different check.";
+        }
+        <partial name="_EmptyState" />
+    }
+    else
+    {
+    <div class="table-scroll"><table class="desk-table">
         <thead>
-            <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                <th class="px-4 py-2 font-medium">Post</th>
-                <th class="px-4 py-2 font-medium">Verified</th>
-                <th class="px-4 py-2 font-medium">Review</th>
-                <th class="px-4 py-2 font-medium">Blocks</th>
-                <th class="px-4 py-2 font-medium">Snippet</th>
-                <th class="px-4 py-2 font-medium text-right">AEO</th>
+            <tr>
+                <th>Post</th>
+                <th>Verified</th>
+                <th>Review</th>
+                <th>Blocks</th>
+                <th>Snippet</th>
+                <th class="text-right">AEO</th>
                 @if (summary.SearchConnected)
                 {
-                    <th class="px-4 py-2 font-medium text-right" title="Clicks / impressions / average position, last 28 days">Search · 28d</th>
+                    <th class="text-right"><abbr title="Clicks / impressions / average position, last 28 days" class="no-underline">Search · 28d</abbr></th>
                 }
-                <th class="px-4 py-2 font-medium text-right">Open</th>
+                <th class="text-right"><span class="sr-only">Open</span></th>
             </tr>
         </thead>
         <tbody>
-            @if (items.Count == 0 && !string.IsNullOrEmpty(q))
-            {
-                <tr><td colspan="@(summary.SearchConnected ? 8 : 7)" class="px-4 py-10 text-center text-muted-foreground">No matches for “@q” in this view. Clear the search to see every post here.</td></tr>
-            }
-            else if (items.Count == 0)
-            {
-                <tr><td colspan="@(summary.SearchConnected ? 8 : 7)" class="px-4 py-10 text-center text-muted-foreground">Nothing needs attention here. 🎉</td></tr>
-            }
             @foreach (var i in items)
             {
-                <tr class="border-b border-border/50 align-top hover:bg-muted/40">
-                    <td class="px-4 py-2 max-w-[26rem]">
+                <tr class="align-top">
+                    <td class="align-top max-w-[26rem]">
                         <div class="text-foreground">@i.Title</div>
                         <div class="text-[11px] font-mono text-muted-foreground break-all">/@i.Slug</div>
                         @if (i.StaleYearStamp)
                         {
-                            <span class="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">year stamp is stale</span>
+                            <span class="desk-pill pill-bad mt-1">year stamp is stale</span>
+                        }
+                        @if (i.Accessibility is { Count: > 0 } a11y)
+                        {
+                            <ul class="mt-1 space-y-0.5 text-[11px] tone-warn">
+                                @foreach (var f in a11y) { <li>@f.Title</li> }
+                            </ul>
                         }
                     </td>
-                    <td class="px-4 py-2 text-xs whitespace-nowrap @(i.NeverVerified ? "text-amber-600" : "text-muted-foreground")"
+                    <td class="align-top text-xs whitespace-nowrap @(i.NeverVerified ? "tone-warn" : "text-muted-foreground")"
                         title="@(i.LastVerifiedAt is null ? "never verified" : Dates.CalendarDate(i.LastVerifiedAt))">
                         @(i.NeverVerified ? "never" : Ago(i.LastVerifiedAt))
                     </td>
-                    <td class="px-4 py-2 text-xs whitespace-nowrap @(i.ReviewOverdue ? "text-red-600 font-medium" : i.ReviewDueSoon ? "text-amber-600" : "text-muted-foreground")"
+                    <td class="align-top text-xs whitespace-nowrap @(i.ReviewOverdue ? "tone-bad font-medium" : i.ReviewDueSoon ? "tone-warn" : "text-muted-foreground")"
                         title="@(i.NextReviewAt is null ? "no review date" : Dates.CalendarDate(i.NextReviewAt))">
                         @Due(i.NextReviewAt)
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap">
-                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold @(i.HasKeyFacts ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")">Key Facts</span>
-                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold @(i.HasFaq ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")">FAQ</span>
+                    <td class="align-top whitespace-nowrap">
+                        <span class="@BlockPill(i.HasKeyFacts)">Key facts<span class="sr-only">@(i.HasKeyFacts ? " present" : " missing")</span></span>
+                        <span class="@BlockPill(i.HasFaq)">FAQ<span class="sr-only">@(i.HasFaq ? " present" : " missing")</span></span>
                     </td>
-                    <td class="px-4 py-2 text-xs whitespace-nowrap @(i.MetaMissing || i.MetaTooLong ? "text-amber-600" : "text-muted-foreground")">
+                    <td class="align-top text-xs whitespace-nowrap @(i.MetaMissing || i.MetaTooLong ? "tone-warn" : "text-muted-foreground")">
                         @if (i.MetaMissing)
                         {
                             <span>missing</span>
@@ -170,19 +193,18 @@ else
                             <span>@i.MetaLength chars@(i.MetaTooLong ? " · truncates" : "")</span>
                         }
                     </td>
-                    <td class="px-4 py-2 text-right whitespace-nowrap">
-                        <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold @(i.AeoScore >= 85 ? "bg-emerald-100 text-emerald-700" : i.AeoScore >= 70 ? "bg-emerald-50 text-emerald-700" : i.AeoScore >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")"
-                              title="Answer-engine readiness. Open the post to see what is missing.">@i.AeoScore</span>
+                    <td class="align-top text-right whitespace-nowrap">
+                        <span class="@AeoPill(i.AeoScore)" title="Answer-engine readiness. Open the post to see what is missing.">@i.AeoScore</span>
                     </td>
                     @if (summary.SearchConnected)
                     {
-                        <td class="px-4 py-2 text-right whitespace-nowrap text-xs">
+                        <td class="align-top text-right whitespace-nowrap text-xs">
                             @if (i.Search is { HasData: true } s)
                             {
                                 <span class="text-foreground">@s.Clicks</span><span class="text-muted-foreground"> / @s.Impressions / @s.Position.ToString("0.0")</span>
-                                @if (s.StrikingDistance) { <span class="ml-1 inline-block px-1 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700" title="Striking distance">SD</span> }
-                                @if (s.LosingImpressions) { <span class="ml-1 inline-block px-1 rounded text-[10px] font-semibold bg-red-100 text-red-700" title="Losing impressions">↓</span> }
-                                @if (s.LowCtrForPosition) { <span class="ml-1 inline-block px-1 rounded text-[10px] font-semibold bg-amber-100 text-amber-700" title="Low CTR for rank">CTR</span> }
+                                @if (s.StrikingDistance) { <span class="desk-pill pill-ok ml-1"><abbr title="Striking distance" class="no-underline">SD</abbr></span> }
+                                @if (s.LosingImpressions) { <span class="desk-pill pill-bad ml-1"><span aria-hidden="true">↓</span><span class="sr-only">Losing impressions</span></span> }
+                                @if (s.LowCtrForPosition) { <span class="desk-pill pill-warn ml-1"><abbr title="Low click-through rate for rank" class="no-underline">CTR</abbr></span> }
                             }
                             else
                             {
@@ -190,14 +212,17 @@ else
                             }
                         </td>
                     }
-                    <td class="px-4 py-2 text-right whitespace-nowrap">
-                        <a href="/admin/posts/edit/@i.Id" class="h-7 px-2 rounded border border-input text-xs text-foreground hover:bg-muted inline-flex items-center">Edit</a>
-                        <a href="/@i.Slug" target="_blank" rel="noopener" class="h-7 px-2 rounded border border-input text-xs text-muted-foreground hover:bg-muted inline-flex items-center ml-1">View</a>
+                    <td class="align-top">
+                        <div class="desk-row-actions">
+                            <a href="/admin/posts/edit/@i.Id" class="desk-btn desk-btn-outline desk-btn-sm" aria-label="Edit “@i.Title”">Edit</a>
+                            <a href="/@i.Slug" target="_blank" rel="noopener" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="View “@i.Title” on the site (opens in a new tab)">View</a>
+                        </div>
                     </td>
                 </tr>
             }
         </tbody>
     </table></div>
+    }
 </div>
 
 <partial name="_ListPager" />

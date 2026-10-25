@@ -1,0 +1,53 @@
+@* Switching editors with unsaved work on the page (ADR-0022). On an existing post the switch is a separate
+   save of the stored item, so unsaved edits would be lost: offer to save the draft first where that keeps
+   the status (data-editor-draft-safe), otherwise offer to discard them; never change whether an item is live. On a new post the
+   switch reloads an empty editor: say the text will not come along, and only then leave without the
+   browser's own second prompt. Without unsaved work, the switch proceeds as usual. *@
+@{
+    var noun = ViewData["EditorNoun"] as string ?? "post";
+    var formId = ViewData["EditorForm"] as string ?? "postForm";
+}
+<script>
+document.addEventListener('click', function (e) {
+    var trigger = e.target.closest && e.target.closest('[data-editor-switch]');
+    if (!trigger || !window.InkwellDesk || !InkwellDesk.isDirty() || !window.InkwellDialog) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (trigger.tagName === 'A') {
+        InkwellDialog.confirm({
+            title: 'Switch editors and lose this draft?',
+            body: 'The title and text on this page are not carried over to the other editor. Save the draft first to keep them.',
+            action: 'Discard and switch', cancel: 'Keep editing', tone: 'danger',
+        }).then(function (ok) { if (ok) { InkwellDesk.markClean(); window.location.href = trigger.href; } });
+        return;
+    }
+    // "Save draft" would change the status of a live, scheduled or in-review item (a published page would be
+    // unpublished), so it is offered only where saving as a draft keeps the status. Otherwise the person either
+    // keeps editing and saves with the page's own Update/Publish button, or discards the changes and switches.
+    if (trigger.getAttribute('data-editor-draft-safe') !== 'true') {
+        // One dialog, not two: what happens to the unsaved changes and what the switch itself does. The page is
+        // marked clean only once the person has confirmed, so cancelling keeps the leave-page guard on the edits.
+        var form = document.getElementById('editorModeForm');
+        InkwellDialog.confirm({
+            title: 'Switch editors and lose your changes?',
+            body: 'Switching editors uses the @noun as it was last saved, and saving from here would change whether it is live, so the changes on this page are discarded. Keep editing and save with the @noun\'s own button first to keep them.' + (form && form.dataset.confirmBody ? ' ' + form.dataset.confirmBody.replace(/\s*Unsaved changes on this page are not included: save first\.?/, '') : ''),
+            action: 'Discard changes and switch', cancel: 'Keep editing', tone: 'danger',
+        }).then(function (ok) {
+            if (!ok || !form) return;
+            form.dataset.ikdConfirmed = '1';   // already confirmed above: skip the form's own dialog
+            InkwellDesk.markClean();
+            form.requestSubmit();
+        });
+        return;
+    }
+    InkwellDialog.confirm({
+        title: 'Save your changes first?',
+        body: 'Switching editors uses the @noun as it was last saved, so the changes on this page would be lost. Save the draft, then switch.',
+        action: 'Save draft', cancel: 'Keep editing', tone: 'warning',
+    }).then(function (ok) {
+        if (!ok) return;
+        var save = document.querySelector('#@formId button[value="draft"]');
+        if (save) save.click();
+    });
+}, true);
+</script>

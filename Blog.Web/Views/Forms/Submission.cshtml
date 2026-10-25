@@ -1,0 +1,50 @@
+@model Blog.Web.Controllers.FormSubmissionViewModel
+@{
+    Layout = "_AdminLayout";
+    var f = Model.Form;
+    var s = Model.Submission;
+    ViewData["Title"] = $"Received {Dates.DateTime(s.CreatedAt)}";
+    ViewData["Description"] = $"A submission of “{f.Name}”.";
+    Dictionary<string, string> values;
+    try { values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(s.ValuesJson) ?? new(); }
+    catch { values = new(); }
+    var reply = Blog.Core.Services.Forms.FormRules.ReplyAddress(Model.Fields, values);
+}
+
+@section PageActions {
+    <a href="/admin/forms/@f.Id/submissions" class="desk-btn desk-btn-outline">Back to submissions</a>
+}
+
+<div class="flex flex-col gap-6 max-w-3xl">
+
+    <dl class="desk-card divide-y divide-border">
+        @foreach (var field in Model.Fields)
+        {
+            <div class="px-4 py-3 grid gap-1 sm:grid-cols-[12rem_1fr]">
+                <dt class="text-sm font-medium text-muted-foreground">@field.Label</dt>
+                <dd class="text-sm text-foreground whitespace-pre-wrap break-words">@(values.GetValueOrDefault(field.Key) is { Length: > 0 } v ? v : "—")</dd>
+            </div>
+        }
+        @foreach (var extra in values.Keys.Except(Model.Fields.Select(x => x.Key)))
+        {
+            <div class="px-4 py-3 grid gap-1 sm:grid-cols-[12rem_1fr]">
+                <dt class="text-sm font-medium text-muted-foreground">@extra <span class="text-xs">(field since removed)</span></dt>
+                <dd class="text-sm text-foreground whitespace-pre-wrap break-words">@values[extra]</dd>
+            </div>
+        }
+    </dl>
+
+    <div class="flex flex-wrap items-center gap-3">
+        @if (reply is not null)
+        {
+            <a href="mailto:@reply" class="desk-btn desk-btn-primary">Reply by email</a>
+        }
+        <form method="post" action="/admin/forms/@f.Id/submissions/delete"
+              data-confirm-title="Delete this submission?" data-confirm-body="It is deleted for good and cannot be brought back."
+              data-confirm-action="Delete submission" data-confirm-tone="danger">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ids" value="@s.Id" />
+            <button type="submit" class="desk-btn desk-btn-danger-outline">Delete</button>
+        </form>
+    </div>
+</div>

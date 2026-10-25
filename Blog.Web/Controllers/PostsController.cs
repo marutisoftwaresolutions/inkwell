@@ -90,8 +90,11 @@ public class PostsController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(string? search, string? status, int page = 1)
+    public async Task<IActionResult> Index(string? q, string? search, string? status, int page = 1)
     {
+        // The shared list search posts ?q=; older links and the command palette may still send ?search=.
+        search = string.IsNullOrWhiteSpace(q) ? search : q;
+        if (page < 1) page = 1;
         PostStatus? statusFilter = status switch
         {
             "published" => PostStatus.Published,
@@ -113,6 +116,8 @@ public class PostsController : Controller
 
         ViewBag.Search = search;
         ViewBag.Status = status;
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["status"] = string.IsNullOrEmpty(status) ? null : status };
+        Blog.Web.Models.ListPaging.Stash(this, Blog.Web.Models.PagingMeta.FromCounts(search, page, result.TotalItems, 20, result.Items.Count));
         ViewBag.CurrentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         ViewBag.IsAdmin = User.IsInRole("Admin");
         ViewBag.IsEditor = User.IsInRole("Editor");
@@ -373,7 +378,7 @@ public class PostsController : Controller
 
     [HttpPost("delete/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, string? q, string? status, int page = 1)
     {
         var existingPost = await _posts.GetByIdAsync(id, null);
         if (existingPost == null) return NotFound();
@@ -391,7 +396,8 @@ public class PostsController : Controller
         await _audit.LogAsync(AuditActions.PostDeleted, "Post", id.ToString(), existingPost.Title);
 
         TempData["Success"] = "Post permanently deleted.";
-        return RedirectToAction("Index");
+        // Back to the same filtered page, not page 1 of everything (UI/UX rule 10).
+        return RedirectToAction("Index", new { q, status, page });
     }
 
     // Markdown authoring (ADR-0022) ────────────────────────────────────────────────
@@ -474,10 +480,12 @@ public class PostsController : Controller
     /// </summary>
     [HttpPost("bulk")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Bulk(string action, List<Guid> ids, string? tag)
+    public async Task<IActionResult> Bulk(string action, List<Guid> ids, string? tag, string? q, string? status, int page = 1)
     {
+        // Every exit returns to the same filtered page (UI/UX rule 10).
+        var back = new { q, status, page };
         ids = ids?.Distinct().ToList() ?? new List<Guid>();
-        if (ids.Count == 0) { TempData["Error"] = "Select at least one post."; return RedirectToAction("Index"); }
+        if (ids.Count == 0) { TempData["Error"] = "Select at least one post."; return RedirectToAction("Index", back); }
 
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Editor");
@@ -485,9 +493,9 @@ public class PostsController : Controller
         action = (action ?? string.Empty).Trim().ToLowerInvariant();
         tag = (tag ?? string.Empty).Trim();
 
-        if (action == "tag" && tag.Length == 0) { TempData["Error"] = "Enter the tag to add."; return RedirectToAction("Index"); }
-        if (action == "publish" && !canPublish) { TempData["Error"] = "You do not have permission to publish posts."; return RedirectToAction("Index"); }
-        if (action is not ("publish" or "draft" or "delete" or "tag")) { TempData["Error"] = "Unknown bulk action."; return RedirectToAction("Index"); }
+        if (action == "tag" && tag.Length == 0) { TempData["Error"] = "Enter the tag to add."; return RedirectToAction("Index", back); }
+        if (action == "publish" && !canPublish) { TempData["Error"] = "You do not have permission to publish posts."; return RedirectToAction("Index", back); }
+        if (action is not ("publish" or "draft" or "delete" or "tag")) { TempData["Error"] = "Unknown bulk action."; return RedirectToAction("Index", back); }
 
         int done = 0, refused = 0;
         var publishedUrls = new List<string>();
@@ -548,7 +556,7 @@ public class PostsController : Controller
 
         var verb = action switch { "publish" => "published", "draft" => "moved to draft", "delete" => "deleted", _ => $"tagged “{tagEntity?.Name}”" };
         TempData[refused == 0 ? "Success" : "Warning"] = $"{done} post{(done == 1 ? "" : "s")} {verb}." + (refused > 0 ? $" {refused} skipped: not yours to change." : "");
-        return RedirectToAction("Index");
+        return RedirectToAction("Index", back);
     }
 
     /// <summary>

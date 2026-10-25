@@ -19,6 +19,11 @@ public class DashboardController : Controller
     private readonly Blog.Web.Services.Jobs.JobScheduler _jobs;
     private readonly Blog.Web.Services.StartupWarnings _warnings;
     private readonly Blog.Web.Services.SearchConsole.SearchPerformanceService _search;
+    private readonly IPageViewRepository _pageViews;
+    private readonly IContentHealthRepository _health;
+    private readonly IIpFirewallRepository _firewall;
+    private readonly IErrorLogRepository _errors;
+    private readonly ITenantContext _tenant;
 
     public DashboardController(
         IPostRepository posts,
@@ -29,9 +34,19 @@ public class DashboardController : Controller
         ApplicationDbSeeder seeder,
         Blog.Web.Services.Jobs.JobScheduler jobs,
         Blog.Web.Services.StartupWarnings warnings,
-        Blog.Web.Services.SearchConsole.SearchPerformanceService search)
+        Blog.Web.Services.SearchConsole.SearchPerformanceService search,
+        IPageViewRepository pageViews,
+        IContentHealthRepository health,
+        IIpFirewallRepository firewall,
+        IErrorLogRepository errors,
+        ITenantContext tenant)
     {
         _search = search;
+        _pageViews = pageViews;
+        _health = health;
+        _firewall = firewall;
+        _errors = errors;
+        _tenant = tenant;
         _posts = posts;
         _comments = comments;
         _settings = settings;
@@ -40,6 +55,45 @@ public class DashboardController : Controller
         _seeder = seeder;
         _jobs = jobs;
         _warnings = warnings;
+    }
+
+    /// <summary>
+    /// The "working surface" of the dashboard (v1.0.9): page views for the last 7 days with the delta against the 7
+    /// before, a 30-day daily series for the sparkline, and the "needs attention" counts. Every lookup fails open so a
+    /// missing table or a slow query never blanks the dashboard; a count of zero simply hides its row.
+    /// </summary>
+    private async Task LoadWorkingSurfaceAsync(Guid userId)
+    {
+        var today = DateTime.UtcNow.Date;
+        var ownerId = _tenant.IsCloudMode && _tenant.IsResolved ? _tenant.UserId : Guid.Empty; // PageViewMiddleware records Guid.Empty when self-hosted
+        int views7 = 0, prev7 = 0; IReadOnlyList<(DateTime Date, int Count)> daily = Array.Empty<(DateTime, int)>();
+        try
+        {
+            views7 = await _pageViews.GetTotalAsync(ownerId, today.AddDays(-6), today.AddDays(1));
+            prev7 = await _pageViews.GetTotalAsync(ownerId, today.AddDays(-13), today.AddDays(-6));
+            daily = await _pageViews.GetDailyAsync(ownerId, today.AddDays(-29), today.AddDays(1));
+        }
+        catch { /* analytics unavailable: tiles show zero */ }
+        ViewBag.Views7 = views7; ViewBag.ViewsPrev7 = prev7;
+        // Fill the gaps so the sparkline has one point per day.
+        var byDay = daily.ToDictionary(d => d.Date.Date, d => d.Count);
+        ViewBag.Daily30 = Enumerable.Range(0, 30).Select(i => { var d = today.AddDays(-29 + i); return byDay.TryGetValue(d, out var c) ? c : 0; }).ToArray();
+
+        int scheduled = 0, overdue = 0, blocks24 = 0, serverErrors = 0;
+        try { scheduled = await _posts.GetTotalCountAsync(Blog.Core.Domain.PostStatus.Scheduled, User.HasClaim("Permission", "posts.publish") ? null : userId); } catch { }
+        if (User.HasClaim("Permission", "posts.publish"))
+        {
+            try { overdue = (await _health.GetPublishedAsync(null)).Count(i => i.ReviewOverdue); } catch { }
+        }
+        if (User.IsInRole("Admin"))
+        {
+            try { blocks24 = (await _firewall.GetStatsAsync()).BlocksLast24h; } catch { }
+            try { serverErrors = (await _errors.GetStatsAsync()).ServerErrorGroups; } catch { }
+        }
+        ViewBag.ScheduledPosts = scheduled;
+        ViewBag.OverdueReviews = overdue;
+        ViewBag.Blocks24h = blocks24;
+        ViewBag.ServerErrorGroups = serverErrors;
     }
 
     private Guid GetCurrentUserId()
@@ -91,6 +145,8 @@ public class DashboardController : Controller
         ViewBag.SearchImpressions = pages.Sum(p => p.Impressions);
         ViewBag.SearchPrevClicks = pages.Sum(p => p.PrevClicks);
         ViewBag.SearchStriking = pages.Count(p => p.StrikingDistance);
+
+        await LoadWorkingSurfaceAsync(userId);
 
         // ── Onboarding state ────────────────────────────────────────────────
         if (userSettings != null && !userSettings.OnboardingDismissed)

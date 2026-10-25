@@ -18,16 +18,16 @@ public class AuthApiController : ControllerBase
 {
     private readonly AuthService _auth;
     private readonly IUserRepository _users;
-    private readonly IConfiguration _config;
+    private readonly Blog.Web.Services.ApiTokenService _tokens;
     private readonly Blog.Web.Services.TwoFactorService _twoFactor;
     private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
 
-    public AuthApiController(AuthService auth, IUserRepository users, IConfiguration config,
+    public AuthApiController(AuthService auth, IUserRepository users, Blog.Web.Services.ApiTokenService tokens,
         Blog.Web.Services.TwoFactorService twoFactor, Blog.Web.Services.Security.IpFirewallService firewall)
     {
         _auth = auth;
         _users = users;
-        _config = config;
+        _tokens = tokens;
         _twoFactor = twoFactor;
         _firewall = firewall;
     }
@@ -35,6 +35,10 @@ public class AuthApiController : ControllerBase
     [HttpPost("auth/login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
+        // No usable signing key: the API is off (ADR-0033). Said before the password is checked, so it reveals nothing.
+        if (_tokens.Problem is not null)
+            return StatusCode(503, ApiError(503, "The API is not configured on this site. The site administrator needs to set Jwt:Key."));
+
         var (user, error) = await _auth.ValidateLoginAsync(req.Email, req.Password);
         if (user == null)
         {
@@ -59,42 +63,19 @@ public class AuthApiController : ControllerBase
             return StatusCode(403, ApiError(403, "Two-factor sign-in is required for your role. Set it up in the Desk first."));
         }
 
-        var accessToken = GenerateAccessToken(user);
+        var accessToken = _tokens.Issue(user);
 
-        return Ok(ApiOk(new { accessToken, expiresIn = 900, tokenType = "Bearer" }));
+        return Ok(ApiOk(new { accessToken, expiresIn = _tokens.LifetimeMinutes * 60, tokenType = "Bearer" }));
     }
 
     [HttpPost("auth/logout")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public IActionResult Logout()
     {
-        return Ok(ApiOk("Logged out."));
+        // Tokens are not stored, so one cannot be withdrawn early: the client discards it and it lapses at its expiry.
+        return Ok(ApiOk("Discard the token: it stops working when it expires. Disabling the account ends it at once."));
     }
 
-    private string GenerateAccessToken(User user)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expiry = int.Parse(_config["Jwt:AccessTokenExpiryMinutes"] ?? "15");
-
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.DisplayName),
-            new Claim(ClaimTypes.Role, user.Role),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(expiry),
-            signingCredentials: creds);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
 
     private static object ApiOk(object data) => new { data };
     private static object ApiError(int code, string error) =>

@@ -12,10 +12,10 @@
     var disableError = ErrorFor("disable-password");
 }
 <div class="max-w-2xl flex flex-col gap-6">
-    <div class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3">
+    <div class="desk-card p-5 flex flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
-            <h2 class="text-sm font-semibold text-foreground">Two-factor sign-in</h2>
-            <span class="text-xs px-2 py-0.5 rounded border @(on ? "pill-ok" : "pill-warn")">@(on ? "On" : "Off")</span>
+            <h2 class="desk-card-title">Two-factor sign-in</h2>
+            <span class="desk-pill @(on ? "pill-ok" : "pill-warn")">@(on ? "On" : "Off")</span>
             @if (required)
             {
                 <span class="text-xs text-muted-foreground">Required for your role on this site.</span>
@@ -33,48 +33,48 @@
             <p class="text-sm text-muted-foreground">
                 Add a second step to signing in: a 6-digit code from an authenticator app on your phone. Someone who learns your password still can't get in.
             </p>
-            <div><a href="/account/two-factor/setup" class="px-4 min-h-10 inline-flex items-center bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Set up two-factor sign-in</a></div>
+            <div><a href="/account/two-factor/setup" class="desk-btn desk-btn-primary">Set up two-factor sign-in</a></div>
         }
     </div>
 
     @if (on)
     {
-        <form method="post" action="/account/two-factor/recovery-codes" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3"
+        <form method="post" action="/account/two-factor/recovery-codes" class="desk-card p-5 flex flex-col gap-3"
               data-confirm-title="Create new recovery codes?"
               data-confirm-body="Your current recovery codes stop working straight away. You'll see the new ones once, on the next page."
               data-confirm-action="Create new codes" data-confirm-tone="warning">
             @Html.AntiForgeryToken()
-            <h2 class="text-sm font-semibold text-foreground">New recovery codes</h2>
+            <h2 class="desk-card-title">New recovery codes</h2>
             <p class="text-sm text-muted-foreground">For when you've used some, or lost the list. Confirm with a code from your app.</p>
             <div class="flex flex-wrap items-end gap-3">
                 <div class="space-y-1">
-                    <label for="regen-code" class="text-sm font-medium text-foreground">6-digit code</label>
+                    <label for="regen-code" class="desk-label">6-digit code</label>
                     <input id="regen-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required autofocus="@(regenError is not null)"
                            aria-invalid="@(regenError is null ? "false" : "true")" aria-describedby="@(regenError is null ? null : "regen-code-error")"
-                           class="block w-40 px-3 py-2 bg-background border border-input rounded-md font-mono tracking-widest" />
-                    @if (regenError is not null) { <p id="regen-code-error" class="text-xs text-destructive">@regenError</p> }
+                           class="desk-input w-40 font-mono tracking-widest" />
+                    @if (regenError is not null) { <p id="regen-code-error" class="desk-error">@regenError</p> }
                 </div>
-                <button type="submit" class="px-4 min-h-10 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Create new codes</button>
+                <button type="submit" class="desk-btn desk-btn-outline">Create new codes</button>
             </div>
         </form>
 
         @if (!required)
         {
-            <form method="post" action="/account/two-factor/disable" class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3"
+            <form method="post" action="/account/two-factor/disable" class="desk-card p-5 flex flex-col gap-3"
                   data-confirm-title="Turn off two-factor sign-in?"
                   data-confirm-body="Signing in will need only your password again, and your recovery codes stop working. You can set it up again at any time."
                   data-confirm-action="Turn off" data-confirm-tone="danger">
                 @Html.AntiForgeryToken()
-                <h2 class="text-sm font-semibold text-foreground">Turn off</h2>
+                <h2 class="desk-card-title">Turn off</h2>
                 <div class="flex flex-wrap items-end gap-3">
                     <div class="space-y-1">
-                        <label for="disable-password" class="text-sm font-medium text-foreground">Your password</label>
+                        <label for="disable-password" class="desk-label">Your password</label>
                         <input id="disable-password" name="password" type="password" autocomplete="current-password" required autofocus="@(disableError is not null)"
                                aria-invalid="@(disableError is null ? "false" : "true")" aria-describedby="@(disableError is null ? null : "disable-password-error")"
-                               class="block w-64 px-3 py-2 bg-background border border-input rounded-md" />
-                        @if (disableError is not null) { <p id="disable-password-error" class="text-xs text-destructive">@disableError</p> }
+                               class="desk-input w-64" />
+                        @if (disableError is not null) { <p id="disable-password-error" class="desk-error">@disableError</p> }
                     </div>
-                    <button type="submit" class="px-4 min-h-10 border border-destructive text-destructive rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Turn off two-factor sign-in</button>
+                    <button type="submit" class="desk-btn desk-btn-danger-outline">Turn off two-factor sign-in</button>
                 </div>
             </form>
         }

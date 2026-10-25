@@ -1,0 +1,181 @@
+@model Blog.Web.Controllers.FormEditModel
+@using Blog.Core.Services.Forms
+@{
+    Layout = "_AdminLayout";
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New form" : Model.Name;
+    ViewData["Description"] = isNew ? "Add this form to a page with the Form block in the page editor." : $"{Model.SubmissionCount} submission{(Model.SubmissionCount == 1 ? "" : "s")}. Add this form to a page with the Form block in the page editor.";
+    string? Err(string key) => ViewData.ModelState.TryGetValue(key, out var e) && e.Errors.Count > 0 ? e.Errors[0].ErrorMessage : null;
+    string Invalid(string key) => Err(key) is null ? "false" : "true";
+    string? Focus(string key) => ViewData.ModelState.Where(kv => kv.Value!.Errors.Count > 0).Select(kv => kv.Key).FirstOrDefault() == key ? "autofocus" : null;
+    var fieldErrors = ViewData.ModelState.TryGetValue("Fields", out var fe) ? fe.Errors.Select(e => e.ErrorMessage).ToList() : new List<string>();
+    // Per-row messages ("Fields[2]") go to the Alpine rows, so each shows under the field it is about.
+    var rowErrors = ViewData.ModelState.Where(kv => kv.Key.StartsWith("Fields[") && kv.Value?.Errors.Count > 0)
+        .ToDictionary(kv => kv.Key[7..^1], kv => string.Join(" ", kv.Value!.Errors.Select(e => e.ErrorMessage)));
+    var rowErrorsJson = System.Text.Json.JsonSerializer.Serialize(rowErrors);
+    var keyLocked = Model.SubmissionCount > 0;
+    var types = System.Text.Json.JsonSerializer.Serialize(FormFieldTypes.All.Select(t => new { value = t.Type, label = t.Label }));
+}
+
+@section PageActions {
+    <a href="/admin/forms" class="desk-btn desk-btn-outline">Back to forms</a>
+    @if (!isNew)
+    {
+        <a href="/admin/forms/@Model.Id/submissions" class="desk-btn desk-btn-outline">Submissions</a>
+    }
+}
+
+<div class="flex flex-col gap-6 max-w-3xl">
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <p class="rounded-md border pill-bad px-4 py-3 text-sm" role="alert">The form was not saved. Fix the fields marked below.</p>
+    }
+
+    <form method="post" action="@(isNew ? "/admin/forms/create" : $"/admin/forms/edit/{Model.Id}")" data-track-changes class="flex flex-col gap-5"
+          x-data="formFields(@(Model.FieldsJson ?? "[]"), @types, @rowErrorsJson)" x-init="sync(true)">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="FieldsJson" :value="json" value="@Model.FieldsJson" />
+
+        <div class="desk-card p-4 flex flex-col gap-4">
+            <div class="space-y-1">
+                <label for="Name" class="desk-label">Name</label>
+                <input id="Name" name="Name" value="@Model.Name" required maxlength="@FormRules.MaxLabelLength" aria-invalid="@Invalid("Name")" autofocus="@Focus("Name")"
+                       aria-describedby="@(Err("Name") is null ? "Name-help" : "Name-help Name-error")" class="desk-input max-w-md" />
+                @if (Err("Name") is { } nameErr) { <p id="Name-error" class="desk-error">@nameErr</p> }
+                <p id="Name-help" class="desk-hint">Shown as the form's heading on the page.</p>
+            </div>
+            <div class="space-y-1">
+                <label for="FormKey" class="desk-label">Form address</label>
+                <input id="FormKey" name="FormKey" value="@Model.FormKey" maxlength="@FormRules.MaxKeyLength" readonly="@keyLocked" spellcheck="false"
+                       aria-invalid="@Invalid("FormKey")" autofocus="@Focus("FormKey")" aria-describedby="@(Err("FormKey") is null ? "FormKey-help" : "FormKey-help FormKey-error")"
+                       class="desk-input max-w-md font-mono read-only:bg-muted" />
+                @if (Err("FormKey") is { } keyErr) { <p id="FormKey-error" class="desk-error">@keyErr</p> }
+                <p id="FormKey-help" class="desk-hint">
+                    @(keyLocked ? "Fixed now that the form has submissions, so the pages that show it keep working."
+                                : "Lowercase letters, digits and hyphens. Left empty, it is made from the name.")
+                </p>
+            </div>
+            <label class="flex items-start gap-2 text-sm text-foreground">
+                <input type="checkbox" name="IsActive" value="true" checked="@Model.IsActive" class="desk-checkbox mt-1" />
+                <input type="hidden" name="IsActive" value="false" />   @* after the box: the model binder takes the first value *@
+                <span>Accept submissions <span class="block text-xs text-muted-foreground">When off, pages show nothing in the form's place.</span></span>
+            </label>
+        </div>
+
+        <section aria-labelledby="fields-title" class="desk-card p-4 flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-3">
+                <h2 id="fields-title" class="desk-card-title">Fields</h2>
+                <span class="text-xs text-muted-foreground" x-text="fields.length + ' of @FormRules.MaxFields'"></span>
+            </div>
+            @foreach (var msg in fieldErrors)
+            {
+                <p class="text-xs text-destructive" role="alert">@msg</p>
+            }
+            <ol class="flex flex-col gap-3">
+                <template x-for="(f, i) in fields" :key="f.uid">
+                    <li class="rounded-md border border-border p-3 flex flex-col gap-2" :class="errors[i] ? 'border-destructive' : ''">
+                        <template x-if="errors[i]"><p class="text-xs text-destructive" role="alert" x-text="errors[i]"></p></template>
+                        <div class="grid gap-2 sm:grid-cols-[1fr_12rem]">
+                            <div class="space-y-1">
+                                <label class="text-xs font-medium text-muted-foreground" :for="'label-' + f.uid">Label</label>
+                                <input :id="'label-' + f.uid" x-model="f.label" @@input="sync()" maxlength="@FormRules.MaxLabelLength"
+                                       class="desk-input" />
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-medium text-muted-foreground" :for="'type-' + f.uid">Type</label>
+                                <select :id="'type-' + f.uid" x-model="f.type" @@change="sync()" class="desk-select">
+                                    <template x-for="t in types" :key="t.value"><option :value="t.value" x-text="t.label" :selected="t.value === f.type"></option></template>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="space-y-1" x-show="f.type === 'select'">
+                            <label class="text-xs font-medium text-muted-foreground" :for="'options-' + f.uid">Choices, one per line</label>
+                            <textarea :id="'options-' + f.uid" x-model="f.optionsText" @@input="sync()" rows="3"
+                                      class="desk-textarea"></textarea>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-medium text-muted-foreground" :for="'help-' + f.uid">Hint (optional)</label>
+                            <input :id="'help-' + f.uid" x-model="f.help" @@input="sync()" class="desk-input" />
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label class="flex items-center gap-2 text-sm text-foreground" x-show="f.type !== 'consent'">
+                                <input type="checkbox" x-model="f.required" @@change="sync()" class="desk-checkbox" /> Required
+                            </label>
+                            <span class="text-xs text-muted-foreground" x-show="f.type === 'consent'">Consent boxes must always be ticked.</span>
+                            <span class="flex-1"></span>
+                            <button type="button" @@click="move(i, -1)" :disabled="i === 0" class="desk-btn desk-btn-outline desk-btn-sm"
+                                    :aria-label="'Move ' + (f.label || 'field') + ' up'">Up</button>
+                            <button type="button" @@click="move(i, 1)" :disabled="i === fields.length - 1" class="desk-btn desk-btn-outline desk-btn-sm"
+                                    :aria-label="'Move ' + (f.label || 'field') + ' down'">Down</button>
+                            <button type="button" @@click="remove(i)" class="desk-btn desk-btn-danger-outline desk-btn-sm"
+                                    :aria-label="'Remove ' + (f.label || 'field')">Remove</button>
+                        </div>
+                    </li>
+                </template>
+            </ol>
+            <p class="text-xs text-muted-foreground" x-show="fields.length === 0">No fields yet. Add the first one below.</p>
+            <div><button type="button" @@click="add()" :disabled="fields.length >= @FormRules.MaxFields"
+                         class="desk-btn desk-btn-outline">Add a field</button></div>
+        </section>
+
+        <div class="desk-card p-4 flex flex-col gap-4">
+            <div class="space-y-1">
+                <label for="SubmitLabel" class="desk-label">Button text</label>
+                <input id="SubmitLabel" name="SubmitLabel" value="@Model.SubmitLabel" maxlength="60" placeholder="Send" class="desk-input max-w-md" />
+            </div>
+            <div class="space-y-1">
+                <label for="SuccessMessage" class="desk-label">Message after sending</label>
+                <textarea id="SuccessMessage" name="SuccessMessage" rows="2" maxlength="500" class="desk-textarea">@Model.SuccessMessage</textarea>
+            </div>
+            <div class="space-y-1">
+                <label for="NotifyEmail" class="desk-label">Email each submission to</label>
+                <input id="NotifyEmail" name="NotifyEmail" type="email" value="@Model.NotifyEmail" placeholder="you@example.com" aria-invalid="@Invalid("NotifyEmail")" autofocus="@Focus("NotifyEmail")"
+                       aria-describedby="@(Err("NotifyEmail") is null ? "NotifyEmail-help" : "NotifyEmail-help NotifyEmail-error")" class="desk-input max-w-md" />
+                @if (Err("NotifyEmail") is { } mailErr) { <p id="NotifyEmail-error" class="desk-error">@mailErr</p> }
+                <p id="NotifyEmail-help" class="desk-hint">Optional. Needs outgoing email set up in Settings. Replying to the email answers the visitor when the form has an email field.</p>
+            </div>
+            <div class="space-y-1">
+                <label for="RetentionDays" class="desk-label">Keep submissions for (days)</label>
+                <input id="RetentionDays" name="RetentionDays" type="number" min="0" max="3650" value="@Model.RetentionDays" aria-invalid="@Invalid("RetentionDays")" autofocus="@Focus("RetentionDays")"
+                       aria-describedby="@(Err("RetentionDays") is null ? "RetentionDays-help" : "RetentionDays-help RetentionDays-error")" class="desk-input w-32" />
+                @if (Err("RetentionDays") is { } retErr) { <p id="RetentionDays-error" class="desk-error">@retErr</p> }
+                <p id="RetentionDays-help" class="desk-hint">Older submissions are deleted every night. 0 keeps them until you delete them. Keep personal data no longer than you need it.</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="submit" class="desk-btn desk-btn-primary">Save form</button>
+            <span data-dirty-indicator hidden class="desk-pill pill-warn">Unsaved changes</span>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+    // The field list edits a JSON array that the server validates (FormRules.CleanDefinition) on save.
+    function formFields(initial, types, errors) {
+        let n = 0;
+        const toRow = f => ({ uid: ++n, key: f.key || '', label: f.label || '', type: f.type || 'text', required: !!f.required,
+                              optionsText: (f.options || []).join('\n'), help: f.help || '' });
+        return {
+            types,
+            errors: errors || {},
+            fields: (initial || []).map(toRow),
+            json: '',
+            sync(initial) {
+                this.json = JSON.stringify(this.fields.map(f => ({
+                    key: f.key, label: f.label, type: f.type, required: f.type === 'consent' ? true : f.required,
+                    options: f.type === 'select' ? f.optionsText.split('\n').map(s => s.trim()).filter(Boolean) : [],
+                    help: f.help || null
+                })));
+                // An edit marks the form dirty; the first sync on load must not.
+                if (!initial) this.$nextTick(() => this.$root.dispatchEvent(new Event('input', { bubbles: true })));
+            },
+            add() { this.fields.push(toRow({ label: '', type: 'text' })); this.sync(); },
+            // Rows move and vanish as they are edited; the server-side messages are for the rows as they were saved.
+            remove(i) { this.fields.splice(i, 1); this.errors = {}; this.sync(); },
+            move(i, d) { const j = i + d; if (j < 0 || j >= this.fields.length) return; this.errors = {}; const f = this.fields.splice(i, 1)[0]; this.fields.splice(j, 0, f); this.sync(); }
+        };
+    }
+</script>
+}

@@ -5,11 +5,11 @@
     var first = ViewBag.First is true;
 }
 <div class="max-w-2xl flex flex-col gap-6">
-    <div class="rounded-md border pill-ok px-4 py-3 text-sm" role="status">
+    <div class="rounded-lg border p-4 pill-ok text-sm" role="status">
         @(first ? "Two-factor sign-in is on." : "New recovery codes created. The old ones no longer work.")
     </div>
-    <div class="bg-card rounded-lg border border-border p-4 flex flex-col gap-3 print-only-area">
-        <h2 class="text-sm font-semibold text-foreground">Save your recovery codes</h2>
+    <div class="desk-card p-5 flex flex-col gap-3 print-only-area">
+        <h2 class="desk-card-title">Save your recovery codes</h2>
         <p class="text-sm text-muted-foreground">
             If you lose your phone, each of these codes signs you in once instead of an app code. This is the only time they are shown:
             print them, or keep them in a password manager. Without them, an Admin has to turn off two-factor sign-in for you.
@@ -21,9 +21,9 @@
             }
         </ul>
         <div class="flex flex-wrap items-center gap-3">
-            <button type="button" id="copy-codes" class="px-4 min-h-10 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Copy codes</button>
-            <button type="button" id="print-codes" class="px-4 min-h-10 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Print</button>
-            <a href="/admin/dashboard" class="px-4 min-h-10 inline-flex items-center bg-primary text-primary-foreground hover:opacity-90 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">I've saved them, continue</a>
+            <button type="button" id="copy-codes" class="desk-btn desk-btn-outline">Copy codes</button>
+            <button type="button" id="print-codes" class="desk-btn desk-btn-outline">Print</button>
+            <a href="/admin/dashboard" class="desk-btn desk-btn-primary">I have saved them, continue</a>
         </div>
     </div>
 </div>

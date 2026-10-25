@@ -87,6 +87,9 @@ catch (Exception)
 builder.Services.AddSingleton<Blog.Web.Services.Jobs.JobScheduler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Blog.Web.Services.Jobs.JobScheduler>());
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.CrawlerVisitRetentionJob>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.CrawlerVisitRollupJob>();      // daily crawler summary for AI Crawlers (ADR-0037)
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PageViewRollupJob>();          // daily page-view summary for Analytics (ADR-0037)
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PageViewRetentionJob>();       // PageViewRetentionDays; off by default
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PasswordResetTokenPruneJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.OgCachePruneJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.WebhookDeliveryJob>();
@@ -94,6 +97,7 @@ builder.Services.AddScoped<Blog.Web.Services.Jobs.WebhookDeliveryJob>();
 // Webhooks: publishing only queues (WebhookPublisher); the job above sends through the SSRF-guarded sender.
 builder.Services.AddScoped<Blog.Web.Services.Webhooks.WebhookPublisher>();
 builder.Services.AddScoped<Blog.Web.Services.MenuService>();
+builder.Services.AddScoped<Blog.Web.Services.DeskShellService>(); // admin shell model (sidebar, topbar, command palette), once per request
 builder.Services.AddSingleton<Blog.Web.Services.Webhooks.IWebhookSender, Blog.Web.Services.Webhooks.WebhookSender>();
 // Backups (ADR-0019): ZIPs outside the web root (Backups:Path, default App_Data/backups), made by the job.
 builder.Services.AddSingleton(sp =>
@@ -107,6 +111,17 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddScoped<Blog.Web.Services.Backups.BackupService>();
 // Content export (ADR-0020): WordPress WXR / Ghost ZIP downloads, written to App_Data/exports and deleted on close.
 builder.Services.AddScoped<Blog.Web.Services.Export.ExportService>();
+// Direct push to WordPress / Ghost (ADR-0029): run by the job in batches; credentials held in memory only.
+builder.Services.AddSingleton<Blog.Web.Services.Export.Push.IPushClientFactory, Blog.Web.Services.Export.Push.PushClientFactory>();
+builder.Services.AddSingleton<Blog.Web.Services.Export.Push.PushCredentialStore>();
+builder.Services.AddScoped<Blog.Web.Services.Export.Push.ExportPushService>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.ExportPushJob>();
+// Contact forms (ADR-0030): rendered into pages on the server; submissions pruned nightly by their form's retention.
+builder.Services.AddScoped<Blog.Web.Services.Forms.FormEmbedRenderer>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.FormSubmissionRetentionJob>();
+// Responsive images (ADR-0032): narrower WebP copies of uploads, made at upload and by the job; srcset added at render.
+builder.Services.AddSingleton<Blog.Web.Services.ResponsiveImageStore>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.ImageVariantJob>();
 // Two-factor sign-in (ADR-0021) and the one place a sign-in cookie is issued.
 builder.Services.AddScoped<Blog.Web.Services.TwoFactorService>();
 builder.Services.AddScoped<Blog.Web.Services.CustomFieldsEditor>();   // custom fields in the post and page editors (ADR-0025)
@@ -155,7 +170,7 @@ builder.Services.AddScoped<Blog.Web.Services.Import.ImportProcessor>();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
 
-// ── Authentication (cookie only — no DB, config-based) ────────────────────────
+// ── Authentication: the Desk cookie (default) and API bearer tokens (ADR-0033) ──
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
@@ -167,7 +182,12 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.Cookie.SameSite = SameSiteMode.Lax;
-    });
+        // A cookie for a deleted or disabled account stops working within a minute (at once when an admin acts).
+        options.Events.OnValidatePrincipal = DeskSessionValidator.ValidateAsync;
+    })
+    // Only endpoints that name this scheme (the /api controllers) read a bearer token; the Desk never does.
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => ApiTokenService.Configure(options, builder.Configuration));
+builder.Services.AddSingleton<ApiTokenService>();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -235,6 +255,8 @@ if (keysPath is null)
     startupWarnings.Add("Data Protection keys could not be persisted to disk, so stored secrets and comment-form tokens will not survive a restart. Set DataProtection:KeysPath in appsettings to a writable folder outside the web root.");
 else
     app.Logger.LogInformation("Data Protection keys persisted at {Path}.", keysPath);
+if (ApiTokenService.ConfigProblem(builder.Configuration) is { } jwtProblem)
+    startupWarnings.Add(jwtProblem + " The Desk is not affected.");
 
 // Deploy hygiene — shadowed routes. Static-file middleware runs BEFORE routing, so a file left in
 // wwwroot at the same path as a mapped endpoint silently replaces it: the route still exists,
@@ -278,6 +300,7 @@ using (var scope = app.Services.CreateScope())
     try {
         var migrator = scope.ServiceProvider.GetRequiredService<MigrationService>();
         migrator.RunAsync().Wait();
+        foreach (var deferred in migrator.Deferred) startupWarnings.Add(deferred);
     } catch (Exception ex) {
         app.Logger.LogError(ex, "Migration Error");
     }

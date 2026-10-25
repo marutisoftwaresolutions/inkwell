@@ -30,40 +30,8 @@
     <link rel="stylesheet" href="~/fonts/fonts.css" asp-append-version="true">
     <!-- Desk tokens (light + dark scheme) -->
     <link rel="stylesheet" href="~/css/desk-tokens.css" asp-append-version="true">
-
-    <!-- Tailwind CSS (self-hosted) -->
-    <script src="~/lib/tailwindcss/tailwind.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        background: 'var(--background)',
-                        foreground: 'var(--foreground)',
-                        card: 'var(--card)',
-                        'card-foreground': 'var(--card-foreground)',
-                        primary: 'var(--primary)',
-                        'primary-foreground': 'var(--primary-foreground)',
-                        muted: 'var(--muted)',
-                        'muted-foreground': 'var(--muted-foreground)',
-                        accent: 'var(--accent)',
-                        'accent-foreground': 'var(--accent-foreground)',
-                        destructive: 'var(--destructive)',
-                        'destructive-foreground': 'var(--destructive-foreground)',
-                        border: 'var(--border)',
-                        input: 'var(--input)',
-                        ring: 'var(--ring)',
-                    },
-                    fontFamily: {
-                        sans: ["'Geist'", 'Inter', 'system-ui', 'sans-serif'],
-                    },
-                    borderRadius: {
-                        DEFAULT: 'var(--radius)',
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Desk stylesheet: Tailwind compiled at build time (tailwind.desk.config.js) -->
+    <link rel="stylesheet" href="~/css/desk.css" asp-append-version="true">
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
     <main class="w-full max-w-md bg-card text-card-foreground border border-border rounded-lg shadow-lg p-8">

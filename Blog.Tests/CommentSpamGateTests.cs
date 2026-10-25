@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
@@ -54,11 +55,15 @@ public class CommentSpamGateTests : IClassFixture<WebApplicationFactory<Program>
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var page = await client.GetStringAsync($"/{post.Slug}");
 
-        Assert.Contains("name=\"commentToken\"", page);
+        // The page carries the fields with empty slots (ADR-0031); the tokens come from the token endpoint.
+        Assert.Contains("name=\"commentToken\" value=\"\"", page);
+        Assert.Contains("name=\"__RequestVerificationToken\" value=\"\"", page);
         Assert.Contains("name=\"contact_ref\"", page);
+        Assert.Contains($"data-comment-token-url=\"/{post.Slug}/comment-token\"", page);
 
-        var antiForgery = Regex.Match(page, "__RequestVerificationToken[^>]*value=\"([^\"]+)\"").Groups[1].Value;
-        var formToken = Regex.Match(page, "name=\"commentToken\" value=\"([^\"]+)\"").Groups[1].Value;
+        using var tokens = JsonDocument.Parse(await client.GetStringAsync($"/{post.Slug}/comment-token"));
+        var antiForgery = tokens.RootElement.GetProperty("request").GetString() ?? "";
+        var formToken = tokens.RootElement.GetProperty("form").GetString() ?? "";
         Assert.False(string.IsNullOrEmpty(antiForgery), "anti-forgery token not found on the page");
         Assert.False(string.IsNullOrEmpty(formToken), "comment form token not found on the page");
 
@@ -68,17 +73,17 @@ public class CommentSpamGateTests : IClassFixture<WebApplicationFactory<Program>
         var r1 = await Submit(client, post.Slug, antiForgery, formToken,
             content: "Great read, thanks for the detailed comparison of these systems.",
             honeypot: "https://example.test");
-        Assert.Equal(HttpStatusCode.Redirect, r1.StatusCode);
+        await AssertAnsweredAsSent(r1);
 
         // 2. Raw HTML anchor for a backlink.
         var r2 = await Submit(client, post.Slug, antiForgery, formToken,
             content: "<a href=\"https://example.test/car-rental\">cheap car hire</a>");
-        Assert.Equal(HttpStatusCode.Redirect, r2.StatusCode);
+        await AssertAnsweredAsSent(r2);
 
         // 3. Never fetched the form (no timing token at all).
         var r3 = await Submit(client, post.Slug, antiForgery, formToken: null,
             content: "Great read, thanks for the detailed comparison of these systems.");
-        Assert.Equal(HttpStatusCode.Redirect, r3.StatusCode);
+        await AssertAnsweredAsSent(r3);
 
         var after = (await comments.GetCommentsAsync(new CommentFilter { PostId = post.Id, PageSize = 1 })).TotalItems;
         Assert.Equal(before, after);
@@ -96,7 +101,27 @@ public class CommentSpamGateTests : IClassFixture<WebApplicationFactory<Program>
             ["contact_ref"] = honeypot,
         };
         if (formToken != null) fields["commentToken"] = formToken;
-        return client.PostAsync($"/{slug}/comment", new FormUrlEncodedContent(fields));
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/{slug}/comment") { Content = new FormUrlEncodedContent(fields) };
+        request.Headers.Add("X-Requested-With", "fetch");
+        return client.SendAsync(request);
+    }
+
+    /// <summary>
+    /// Spam gets exactly the reply a moderated comment gets, so the sender learns nothing. When reCAPTCHA is configured (the
+    /// dev site may have it) a submission without one is refused first, which also stores nothing.
+    /// </summary>
+    private async Task AssertAnsweredAsSent(HttpResponseMessage response)
+    {
+        var text = await response.Content.ReadAsStringAsync();
+        if (!string.IsNullOrEmpty(_factory.Services.GetRequiredService<IConfiguration>()["ReCaptcha:SiteKey"]))
+        {
+            Assert.Contains("reCAPTCHA", text);
+            return;
+        }
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{(int)response.StatusCode}: {text}");
+        using var body = JsonDocument.Parse(text);
+        Assert.True(body.RootElement.GetProperty("ok").GetBoolean());
+        Assert.Equal("Your comment is awaiting moderation.", body.RootElement.GetProperty("message").GetString());
     }
 
     private bool ProbeDb()

@@ -44,8 +44,8 @@ public class MediaUxTests
     public void Delete_and_copy_buttons_carry_an_accessible_name_with_the_file_name()
     {
         var html = View();
-        Assert.Matches("<button[^>]*type=\"submit\"[^>]*aria-label=\"Delete @display\"", html);
-        Assert.Matches("<button[^>]*data-copy-url=[^>]*aria-label=\"Copy URL of @display\"", html);
+        Assert.Matches("<button[^>]*type=\"submit\"[^>]*aria-label=\"Delete “?@display”?\"", html);
+        Assert.Matches("<button[^>]*data-copy-url=[^>]*aria-label=\"Copy URL of “?@display”?\"", html);
     }
 
     // ── H3: the upload flow ─────────────────────────────────────────────────────────

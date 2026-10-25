@@ -43,29 +43,29 @@ public class GalleryBlockTests
         Assert.Contains("'media-selected-many'", shared);
         Assert.Contains("e.preventDefault()", shared);                  // an editor click never follows a gallery link
 
-        // The builders: palette button, template, settings panel, and (for saved content) reading it back
-        // before the generic image rule, which would otherwise swallow it.
+        // The builders share one engine (wwwroot/js/inkwell-builder.js) and one palette (_BuilderPalette): the gallery
+        // is registered once with a template, settings panel and title, and recognised before the generic image rule,
+        // which would otherwise swallow a saved gallery.
+        var engine = RepoFile("Blog.Web", "wwwroot", "js", "inkwell-builder.js");
+        Assert.Contains("register('gallery'", engine);
+        Assert.Contains("return InkwellGallery.pick();", engine);
+        Assert.Contains("return InkwellGallery.settings(b);", engine);
+        Assert.Contains("title: 'Gallery', order: 10", engine);
+        Assert.Contains("title: 'Image', order: 80", engine);
+        var palette = RepoFile("Blog.Web", "Views", "Shared", "_BuilderPalette.cshtml");
+        Assert.Matches(new Regex("<button[^>]*data-component=\"gallery\"[^>]*>\\s*<svg[^>]*>.*?</svg>\\s*</button>", RegexOptions.Singleline), palette);
         foreach (var view in new[] { new[] { "Posts", "Edit.cshtml" }, new[] { "Pages", "Edit.cshtml" }, new[] { "Pages", "Create.cshtml" } })
         {
             var src = RepoFile(new[] { "Blog.Web", "Views" }.Concat(view).ToArray());
             var name = string.Join("/", view);
-            Assert.True(src.Contains("data-component=\"gallery\""), name + ": palette");
-            Assert.True(src.Contains("gallery: () => InkwellGallery.pick()"), name + ": template");
-            Assert.True(src.Contains("gallery: (b) => InkwellGallery.settings(b)"), name + ": settings");
-            Assert.True(src.Contains("gallery:'Gallery'"), name + ": panel title");
-            Assert.Matches(new Regex("<button[^>]*data-component=\"gallery\"[^>]*>\\s*<svg[^>]*>.*?</svg>\\s*</button>", RegexOptions.Singleline), src);
-            if (view[1] == "Edit.cshtml")
-            {
-                var gallery = src.IndexOf("contains('comp-gallery')", StringComparison.Ordinal);
-                var image = src.IndexOf("contains('comp-image')", StringComparison.Ordinal);
-                Assert.True(gallery > 0 && gallery < image, name + ": a saved gallery must be recognised before images");
-            }
+            Assert.True(src.Contains("<partial name=\"_BuilderPalette\" />"), name + ": palette");
+            Assert.True(src.Contains("inkwell-builder.js") && src.Contains("InkwellBuilder.init("), name + ": shared engine");
         }
 
         var quill = RepoFile("Blog.Web", "Views", "Shared", "_QuillEditorScripts.cshtml");
         Assert.Contains("GalleryBlot.className = 'comp-gallery'", quill);
         Assert.Contains("label:'Gallery'", RepoFile("Blog.Web", "Views", "Shared", "_SlashCommandMenu.cshtml"));
-        Assert.Contains("btn('gallery'", RepoFile("Blog.Web", "Views", "Posts", "_MarkdownEditorScripts.cshtml"));
+        Assert.Contains("btn('gallery'", RepoFile("Blog.Web", "Views", "Shared", "_MarkdownEditorScripts.cshtml"));
         Assert.Contains("inkwell-gallery-editor.js", RepoFile("Blog.Web", "Views", "Shared", "_MediaSelectorModal.cshtml"));
         Assert.Contains("multiple: true", shared);
         Assert.Contains("'media-selected-many'", RepoFile("Blog.Web", "Views", "Shared", "_MediaSelectorModal.cshtml"));

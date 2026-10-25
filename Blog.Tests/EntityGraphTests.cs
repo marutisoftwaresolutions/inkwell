@@ -152,4 +152,36 @@ public class EntityGraphTests
     [Fact]
     public void A_default_settings_object_declares_an_organization() =>
         Assert.Equal("Organization", EntityGraph.ResolveType(new UserSettings().EntityType));
+    // ── Contact point (v1.0.9) ────────────────────────────────────────────────
+
+    [Fact]
+    public void No_contact_details_means_no_contact_point() =>
+        Assert.Null(EntityGraph.ContactPoint(new UserSettings { EntityContactType = "editorial" }, "https://example.test"));
+
+    [Fact]
+    public void An_email_and_a_page_path_make_a_contact_point_with_a_default_type()
+    {
+        var point = EntityGraph.ContactPoint(new UserSettings { EntityContactEmail = " hello@example.test ", EntityContactUrl = "/contact" }, "https://example.test/")!;
+        Assert.Equal("ContactPoint", point["@type"]);
+        Assert.Equal("customer support", point["contactType"]);
+        Assert.Equal("hello@example.test", point["email"]);
+        Assert.Equal("https://example.test/contact", point["url"]);
+    }
+
+    [Theory]
+    [InlineData("not-an-email", "javascript:alert(1)")]
+    [InlineData("a@b", "//evil.example/contact")]
+    [InlineData("", "ftp://example.test/contact")]
+    public void Unusable_values_are_left_out_rather_than_guessed(string email, string url) =>
+        Assert.Null(EntityGraph.ContactPoint(new UserSettings { EntityContactEmail = email, EntityContactUrl = url }, "https://example.test"));
+
+    [Fact]
+    public void The_contact_type_and_an_absolute_page_are_kept_and_the_email_is_a_listed_fact()
+    {
+        var s = new UserSettings { EntityContactUrl = "https://example.test/write-to-us", EntityContactType = "editorial", EntityContactEmail = "desk@example.test" };
+        var point = EntityGraph.ContactPoint(s, "https://other.test")!;
+        Assert.Equal("editorial", point["contactType"]);
+        Assert.Equal("https://example.test/write-to-us", point["url"]);
+        Assert.Contains(("Contact", "desk@example.test"), EntityGraph.IdentityFacts(s));
+    }
 }

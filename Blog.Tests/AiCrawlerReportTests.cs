@@ -68,20 +68,18 @@ public class AiCrawlerReportTests : IClassFixture<WebApplicationFactory<Program>
             Path = path, StatusCode = 200, UserAgent = "test", VisitedAt = DateTime.UtcNow
         });
 
-        var activity = await repo.GetActivityAsync(null, 1);
-        var mine = Assert.Single(activity, a => a.Crawler == name);
+        var report = await repo.GetReportAsync(null, 1, take: 500);
+        var mine = Assert.Single(report.Activity, a => a.Crawler == name);
 
         Assert.Equal(1, mine.Visits);
         Assert.Equal(1, mine.Pages);
         Assert.True(mine.IsAi);
         Assert.NotNull(mine.LastSeen);
 
-        var pages = await repo.GetTopPagesAsync(null, 1, aiOnly: true, take: 500);
-        Assert.Contains(pages, p => p.Path == path);
+        Assert.Contains(report.TopPages, p => p.Path == path);
 
         // The daily trend must map without a ValueTuple — this is the shape Dapper cannot fill by name.
-        var daily = await repo.GetDailyAiVisitsAsync(null, 1);
-        Assert.True(daily.Sum(d => d.Visits) >= 1);
+        Assert.True(report.Daily.Sum(d => d.Visits) >= 1);
     }
 
     [Fact]
@@ -104,8 +102,8 @@ public class AiCrawlerReportTests : IClassFixture<WebApplicationFactory<Program>
         {
             await repo.RecordManyAsync([Visit(true), Visit(null), Visit(false)]);
 
-            var rows = await repo.GetTopQueriedRequestsAsync(null, 1, take: 500);
-            var mine = Assert.Single(rows, r => r.Query == query);
+            var report = await repo.GetReportAsync(null, 1, take: 500);
+            var mine = Assert.Single(report.Queried, r => r.Query == query);
             Assert.Equal("/", mine.Path);
             Assert.Equal(2, mine.Visits);   // the failed identity check is someone else using the name
         }
@@ -129,9 +127,12 @@ public class AiCrawlerReportTests : IClassFixture<WebApplicationFactory<Program>
         var repo = scope.ServiceProvider.GetRequiredService<ICrawlerVisitRepository>();
 
         // A window that cannot contain rows: aggregates over nothing must not blow up on NULL.
-        var activity = await repo.GetActivityAsync(Guid.NewGuid(), 30);
+        var report = await repo.GetReportAsync(Guid.NewGuid(), 30);
 
-        Assert.Empty(activity);
+        Assert.Empty(report.Activity);
+        Assert.Empty(report.TopPages);
+        Assert.Empty(report.Queried);
+        Assert.Empty(report.Daily);
     }
 
     // ── The admin screen ──────────────────────────────────────────────────────

@@ -76,6 +76,12 @@ public class ContentHealthItem
     /// </summary>
     public PageSearchSummary? Search { get; set; }
 
+    /// <summary>
+    /// Accessibility findings for the post body (<see cref="Blog.Core.Services.AccessibilityCheck"/>), attached by the
+    /// controller only for the accessibility view; null everywhere else, because the other views never load bodies.
+    /// </summary>
+    public IReadOnlyList<Blog.Core.Services.AccessibilityCheck.Finding>? Accessibility { get; set; }
+
     public bool StrikingDistance  => Search?.StrikingDistance  == true;
     public bool LosingImpressions => Search?.LosingImpressions == true;
     public bool LowCtrForPosition => Search?.LowCtrForPosition == true;

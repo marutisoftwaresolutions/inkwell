@@ -28,6 +28,11 @@ public class ErrorsController : Controller
         ViewBag.FilterStatus = status;
         ViewBag.FilterQuery  = q;
 
+        // Shared search box and pager (_ListSearch/_ListPager); ?status= is kept across search and paging.
+        Blog.Web.Models.ListPaging.Stash(this, Blog.Web.Models.PagingMeta.FromCounts(q, page, total, pageSize, items.Count));
+        ViewData["ListSearchPlaceholder"] = "Search path, message or type…";
+        ViewData["ListSearchKeep"] = new Dictionary<string, string?> { ["status"] = status?.ToString() };
+
         ViewData["Title"] = "Error Monitor";
         return View();
     }

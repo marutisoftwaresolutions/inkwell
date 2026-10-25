@@ -2,33 +2,40 @@
 
 @{
     Layout = "_AdminLayout";
+    ViewData["HideHeader"] = true; // the editor carries its own toolbar; the layout breadcrumb still names the page
     ViewData["Title"] = "Edit " + Model.Title;
+    ViewData["EditorNoun"] = "page";
+    ViewData["EditorBase"] = "/admin/pages";
+    ViewData["EditorForm"] = "pageForm";
 }
 
-<div class="h-[calc(100vh-8rem)] flex flex-col" id="pageBuilderApp">
+<div class="md:h-[calc(100vh-7.5rem)] flex flex-col" id="pageBuilderApp">
     <form method="post" action="/admin/pages/edit/@Model.Id" id="pageForm" data-track-changes class="flex-1 flex flex-col h-full">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Content" id="pageContent" value="@Model.Content" />
+        <input type="hidden" name="EditorMode" value="@Model.EditorMode" />
 
         <!-- Top Toolbar -->
-        <div class="flex items-center justify-between mb-3 gap-4">
-            <div class="flex items-center gap-4">
+        <div class="flex items-center justify-between mb-3 gap-3 flex-wrap sm:flex-nowrap sticky top-14 md:static z-20 bg-background/95 backdrop-blur md:bg-transparent md:backdrop-blur-none -mx-4 px-4 py-2 md:mx-0 md:px-0 md:py-0 border-b border-border md:border-0">
+            <div class="flex items-center gap-4 min-w-0 flex-1">
                 <a href="/admin/pages" class="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 text-sm font-medium">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                     Back
                 </a>
                 <span class="text-xs text-muted-foreground hidden sm:inline-block border-l border-border pl-4">Editing: <span class="font-mono">@Model.Slug</span></span>
                 <input type="text" name="Title" id="pageTitle" value="@Model.Title" aria-label="Title" placeholder="Page title…" required
-                       class="text-xl font-bold bg-transparent focus:outline-none placeholder:text-muted-foreground/40 w-64 border-b border-transparent focus:border-primary transition-colors" />
+                       class="text-xl font-bold bg-transparent focus:outline-none placeholder:text-muted-foreground/40 min-w-0 flex-1 sm:flex-none sm:w-64 border-b border-transparent focus:border-primary transition-colors" />
             </div>
-            <div class="flex items-center gap-2">
-                <span data-dirty-indicator hidden>Unsaved changes</span> <button type="submit" name="action" value="draft" class="px-3 py-1.5 border border-input bg-background hover:bg-accent rounded-md text-xs font-medium transition-colors">
+            <div class="flex items-center gap-2 shrink-0">
+                <span data-dirty-indicator hidden>Unsaved changes</span>
+                <button type="submit" form="editorModeForm" data-editor-switch data-editor-draft-safe="@(Model.IsPublished ? "false" : "true")" class="hidden md:inline-flex px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</button>
+                <button type="submit" name="action" value="draft" class="desk-btn desk-btn-outline desk-btn-sm">
                     @(Model.IsPublished ? "Unpublish" : "Save Draft")
                 </button>
-                <button type="button" id="publishBtn" class="px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-xs font-medium shadow-sm transition-colors">
+                <button type="button" id="publishBtn" class="desk-btn desk-btn-primary desk-btn-sm">
                     @(Model.IsPublished ? "Update" : "Publish")
                 </button>
-                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Page settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden px-3 py-1.5 border border-input rounded-md">
+                <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Page settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden desk-btn desk-btn-outline desk-btn-icon desk-btn-sm">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 </button>
             </div>
@@ -39,44 +46,15 @@
         <div class="flex-1 flex gap-0 overflow-hidden rounded-xl border border-border shadow-sm">
 
             <!-- LEFT: Component Palette -->
-            <div class="w-14 bg-card border-r border-border flex flex-col items-center py-3 gap-1 shrink-0 overflow-y-auto" id="componentPalette">
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="heading" draggable="true" title="Heading" aria-label="Heading">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="text" draggable="true" title="Text Block" aria-label="Text Block">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="image" draggable="true" title="Image" aria-label="Image">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="gallery" draggable="true" title="Gallery" aria-label="Gallery">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="button" draggable="true" title="Button" aria-label="Button">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="hero" draggable="true" title="Hero Section" aria-label="Hero Section">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="imagetext" draggable="true" title="Image + Text" aria-label="Image + Text">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><rect x="2" y="3" width="9" height="18" rx="1"/><line x1="14" y1="8" x2="22" y2="8"/><line x1="14" y1="12" x2="22" y2="12"/><line x1="14" y1="16" x2="20" y2="16"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="quote" draggable="true" title="Quote" aria-label="Quote">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="divider" draggable="true" title="Divider" aria-label="Divider">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><line x1="3" y1="12" x2="21" y2="12"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="spacer" draggable="true" title="Spacer" aria-label="Spacer">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><path d="M12 5v14"/><path d="M18 8l-6-3-6 3"/><path d="M18 16l-6 3-6-3"/></svg>
-                </button>
-                <button type="button" class="palette-item w-10 h-10 flex items-center justify-center rounded-lg hover:bg-accent transition-colors group" data-component="video" draggable="true" title="Video Embed" aria-label="Video Embed">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground group-hover:text-foreground"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                </button>
-            </div>
+            @{ ViewData["BuilderForms"] = true; ViewData["PaletteHidden"] = Model.IsMarkdown; }
+            <partial name="_BuilderPalette" />
 
-            <!-- CENTER: Canvas -->
-            <div class="flex-1 overflow-y-auto bg-muted/20" id="canvasScroll">
+            <!-- CENTER: Canvas, or the Markdown source (ADR-0022) -->
+            @if (Model.IsMarkdown)
+            {
+                <div class="flex-1 flex flex-col bg-card overflow-hidden min-w-0"><partial name="_MarkdownPane" model="Model" /></div>
+            }
+            <div class="flex-1 overflow-y-auto bg-muted/20" id="canvasScroll" hidden="@Model.IsMarkdown">
                 <div class="max-w-3xl mx-auto py-8 px-6 min-h-full" id="canvas">
                     <div id="canvasEmpty" class="flex flex-col items-center justify-center py-20 text-center" style="display:none;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-muted-foreground/30 mb-4"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -94,6 +72,9 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
+                    <div class="md:hidden mb-4">
+                        <button type="submit" form="editorModeForm" data-editor-switch data-editor-draft-safe="@(Model.IsPublished ? "false" : "true")" class="w-full min-h-10 px-3 border border-input rounded-md text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</button>
+                    </div>
                     <details class="group" data-desk-section="page-publishing" open>
                     <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center justify-between py-2 text-sm font-semibold text-foreground">
                         <span>Publishing</span>
@@ -110,16 +91,16 @@
                         </div>
                         <div class="pt-3 border-t border-border">
                             <label class="block text-xs font-medium mb-2 text-muted-foreground">Featured Image</label>
-                            <input type="hidden" name="FeaturedImageId" id="FeaturedImageIdInput" value="@Model?.FeaturedImageId" />
-                            <input type="hidden" name="FeaturedImageUrl" id="FeaturedImageUrlInput" value="@Model?.FeaturedImageUrl" />
-                            <img id="FeaturedImagePreview" src="@Model?.FeaturedImageUrl" alt="" class="w-full h-auto rounded-md mb-2 border border-border @(string.IsNullOrEmpty(Model?.FeaturedImageUrl) ? "hidden" : "")" />
+                            <input type="hidden" name="FeaturedImageId" id="FeaturedImageIdInput" value="@Model.FeaturedImageId" />
+                            <input type="hidden" name="FeaturedImageUrl" id="FeaturedImageUrlInput" value="@Model.FeaturedImageUrl" />
+                            <img id="FeaturedImagePreview" src="@Model.FeaturedImageUrl" alt="" class="w-full h-auto rounded-md mb-2 border border-border @(string.IsNullOrEmpty(Model.FeaturedImageUrl) ? "hidden" : "")" />
                             <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-media-selector', { detail: { targetInput: 'FeaturedImageUrlInput', targetIdInput: 'FeaturedImageIdInput', previewImg: 'FeaturedImagePreview' } }))"
                                     class="w-full px-3 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md text-xs font-medium flex items-center justify-center gap-1.5">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                                 Select Image
                             </button>
                             <button type="button" onclick="document.getElementById('FeaturedImageUrlInput').value='';document.getElementById('FeaturedImageIdInput').value='';document.getElementById('FeaturedImagePreview').classList.add('hidden');this.classList.add('hidden');"
-                                    class="mt-1 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model?.FeaturedImageUrl) ? "hidden" : "")" id="RemoveFeaturedImageBtn">Remove</button>
+                                    class="mt-1 text-xs text-destructive hover:underline @(string.IsNullOrEmpty(Model.FeaturedImageUrl) ? "hidden" : "")" id="RemoveFeaturedImageBtn">Remove</button>
                         </div>
                         
                         <div class="pt-3 border-t border-border">
@@ -131,6 +112,8 @@
 
                     </div>
                     </details>
+
+                    @await Html.PartialAsync("_AccessibilityChecks", Model.Content ?? string.Empty)
 
                     <partial name="_CustomFieldsPanel" />
 
@@ -217,6 +200,7 @@
             </aside>
         </div>
     </form>
+    <partial name="_EditorModeForm" model="Model" />
 </div>
 
 <partial name="_MediaSelectorModal" />
@@ -247,275 +231,36 @@
     })();
 </script>
 
-<div id="publishModal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
-    <div class="bg-card w-full max-w-sm rounded-lg shadow-lg border border-border p-6">
-        <h3 class="text-lg font-semibold mb-2">Ready to publish?</h3>
-        <p class="text-muted-foreground mb-6 text-sm">This will update your page.</p>
-        <div class="flex justify-end gap-3">
-            <button type="button" onclick="document.getElementById('publishModal').classList.add('hidden')" class="px-4 py-2 border border-input hover:bg-accent rounded-md text-sm font-medium">Cancel</button>
-            <button type="button" onclick="confirmPublish()" class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium shadow-sm">Confirm</button>
-        </div>
-    </div>
-</div>
+@* Publish confirmation goes through the shared Desk dialog (focus trap, Escape, both schemes); copy: "This will update your page." *@
+<script>window.pagePublishBody = @Json.Serialize("This will update your page.");</script>
 
-<style>
-    .builder-block { position: relative; border: 2px solid transparent; border-radius: 0.5rem; transition: border-color 0.15s, box-shadow 0.15s; margin-bottom: 0.5rem; cursor: pointer; }
-    .builder-block:hover { border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
-    .builder-block.selected { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent); }
-    .builder-block.dragging { opacity: 0.4; }
-    .builder-block .block-toolbar { display: none; position: absolute; top: -14px; right: 8px; z-index: 20; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 2px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
-    .builder-block:hover .block-toolbar, .builder-block.selected .block-toolbar { display: flex; gap: 2px; align-items: center; }
-    .block-toolbar button { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: var(--muted-foreground); }
-    .block-toolbar button:hover { background: var(--accent); color: var(--foreground); }
-    .drop-indicator { height: 3px; background: var(--primary); border-radius: 2px; margin: 2px 0; }
-    .builder-block [contenteditable]:focus { outline: none; }
-    .drag-handle { cursor: grab; }
-    .drag-handle:active { cursor: grabbing; }
-    .setting-field label { display: block; font-size: 11px; font-weight: 500; color: var(--muted-foreground); margin-bottom: 4px; }
-    .setting-field input, .setting-field select { width: 100%; padding: 6px 10px; border: 1px solid var(--input); border-radius: 6px; font-size: 12px; background: var(--background); color: var(--foreground); }
-    .setting-field input:focus, .setting-field select:focus { outline: none; box-shadow: 0 0 0 2px var(--ring); }
-    .comp-hero { background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 70%, black)); color: white; padding: 3rem 2rem; border-radius: var(--radius); text-align: center; }
-    .comp-hero h2 { font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; color: white; }
-    .comp-hero p { font-size: 1rem; opacity: 0.9; margin-bottom: 1.5rem; color: white; }
-    .comp-hero a { display: inline-block; background: white; color: var(--primary); padding: 0.6rem 1.5rem; border-radius: var(--radius); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
-    .comp-imagetext { display: flex; gap: 1.5rem; align-items: center; }
-    .comp-imagetext img { border-radius: var(--radius); object-fit: cover; min-height: 200px; background: var(--muted); }
-    .comp-imagetext .it-content { flex: 1; }
-    .comp-quote { border-left: 4px solid var(--primary); padding: 1rem 1.5rem; background: var(--muted); border-radius: 0 var(--radius) var(--radius) 0; }
-    .comp-quote blockquote { font-style: italic; font-size: 1.1rem; color: var(--foreground); margin-bottom: 0.5rem; }
-    .comp-quote cite { font-size: 0.85rem; color: var(--muted-foreground); }
-    .comp-button { text-align: center; padding: 0.5rem 0; }
-    .comp-button a { display: inline-block; background: var(--primary); color: var(--primary-foreground); padding: 0.7rem 2rem; border-radius: var(--radius); font-weight: 600; text-decoration: none; }
-    .comp-spacer { display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border); border-radius: var(--radius); }
-    .comp-spacer span { font-size: 9px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 1px; }
-    .comp-divider hr { border: none; border-top: 1px solid var(--border); margin: 0.5rem 0; }
-    .comp-video { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: var(--radius); background: var(--muted); }
-    .comp-video iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
-    .comp-image img { border-radius: var(--radius); display: block; }
-    .comp-image .img-placeholder { background: var(--muted); border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem; text-align: center; cursor: pointer; }
-</style>
+<link rel="stylesheet" href="~/css/inkwell-builder.css" asp-append-version="true" />
 
 @section Scripts {
+<partial name="_EditorSwitchGuard" />
+@if (Model.IsMarkdown)
+{
+    <partial name="_MarkdownEditorScripts" />
+}
+<script src="~/js/inkwell-builder.js" asp-append-version="true"></script>
 <script>
 (function() {
-    const canvas = document.getElementById('canvas');
-    const canvasEmpty = document.getElementById('canvasEmpty');
-    const pageSettingsView = document.getElementById('pageSettingsView');
-    const compSettingsView = document.getElementById('componentSettingsView');
-    const compSettingsTitle = document.getElementById('compSettingsTitle');
-    const compSettingsBody = document.getElementById('compSettingsBody');
-    let dragSrcEl = null, dragFromPalette = null, selectedBlock = null;
-
-    const components = {
-        heading: () => `<h2 contenteditable="true" style="font-size:1.8rem;font-weight:700;color:var(--foreground);">Your Heading Here</h2>`,
-        text: () => `<p contenteditable="true" style="font-size:1rem;line-height:1.8;color:var(--foreground);">Click to edit this text block.</p>`,
-        gallery: () => InkwellGallery.pick(),
-        image: () => `<div class="comp-image"><div class="img-placeholder" onclick="selectBlockImage(this)"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto .5rem;display:block;color:var(--muted-foreground)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="color:var(--muted-foreground);font-size:.85rem;">Click to select image</span></div></div>`,
-        button: () => `<div class="comp-button"><a href="#" contenteditable="true">Click Me</a></div>`,
-        hero: () => `<div class="comp-hero"><h2 contenteditable="true">Welcome to Our Site</h2><p contenteditable="true">A brief description.</p><a href="#" contenteditable="true">Get Started</a></div>`,
-        imagetext: () => `<div class="comp-imagetext"><img src="" alt="Image" onclick="selectBlockImage(this)" style="cursor:pointer;width:50%;" /><div class="it-content"><h3 contenteditable="true" style="font-size:1.3rem;font-weight:700;margin-bottom:0.5rem;">Featured Title</h3><p contenteditable="true" style="line-height:1.7;">Describe your feature here.</p></div></div>`,
-        quote: () => `<div class="comp-quote"><blockquote contenteditable="true">"The best way to predict the future is to create it."</blockquote><cite contenteditable="true">— Abraham Lincoln</cite></div>`,
-        divider: () => `<div class="comp-divider"><hr/></div>`,
-        spacer: () => `<div class="comp-spacer" style="height:60px;"><span>spacer</span></div>`,
-        // Asks for the URL through the Desk dialog with live validation; returns a Promise of HTML.
-        video: () => InkwellDialog.prompt({
-            title: 'Embed a video',
-            body: 'Paste a YouTube or Vimeo link. The player is embedded lazily and never blocks the page.',
-            label: 'Video URL', placeholder: 'https://www.youtube.com/watch?v=…', action: 'Embed video',
-            validate: v => v.trim() && !parseVideoUrl(v.trim()) ? 'That is not a YouTube or Vimeo URL.' : null,
-            valid: 'Looks good.'
-        }).then(url => {
-            if (!url) return null;
-            const embedUrl = parseVideoUrl(url);
-            return embedUrl ? `<div class="comp-video"><iframe src="${embedUrl}" allowfullscreen loading="lazy"></iframe></div>` : null;
-        })
-    };
-
-    function parseVideoUrl(url) {
-        let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-        if (m) return `https://www.youtube.com/embed/${m[1]}`;
-        m = url.match(/vimeo\.com\/(\d+)/);
-        if (m) return `https://player.vimeo.com/video/${m[1]}`;
-        return null;
-    }
-
-    // ── COMPONENT SETTINGS ──
-    const settingsDefs = {
-        gallery: (b) => InkwellGallery.settings(b),
-        heading: (block) => { const h = block.querySelector('h2,h3,h1'); return `
-            <div class="setting-field"><label>Level</label><select onchange="changeHeadingLevel(this.value)"><option value="h1" ${h?.tagName==='H1'?'selected':''}>H1</option><option value="h2" ${h?.tagName==='H2'?'selected':''}>H2</option><option value="h3" ${h?.tagName==='H3'?'selected':''}>H3</option></select></div>
-            <div class="setting-field"><label>Align</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(h?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${h?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${h?.style.textAlign==='right'?'selected':''}>Right</option></select></div>`; },
-        text: (block) => { const p = block.querySelector('p'); return `
-            <div class="setting-field"><label>Align</label><select onchange="changeBlockAlign(this.value)"><option value="left" ${(p?.style.textAlign||'left')==='left'?'selected':''}>Left</option><option value="center" ${p?.style.textAlign==='center'?'selected':''}>Center</option><option value="right" ${p?.style.textAlign==='right'?'selected':''}>Right</option><option value="justify" ${p?.style.textAlign==='justify'?'selected':''}>Justify</option></select></div>`; },
-        button: (block) => { const a = block.querySelector('.comp-button a'); return `
-            <div class="setting-field"><label>Label</label><input type="text" value="${a?.textContent||''}" oninput="updateBtnLabel(this.value)" /></div>
-            <div class="setting-field"><label>Link URL</label><input type="text" value="${a?.getAttribute('href')||'#'}" oninput="updateBtnUrl(this.value)" placeholder="https://..." /></div>
-            <div class="setting-field"><label>Style</label><select onchange="updateBtnStyle(this.value)"><option value="filled">Filled</option><option value="outline">Outline</option></select></div>`; },
-        image: (block) => { const img = block.querySelector('.comp-image img'); const w = img?.style.width||'100%'; return `
-            <div class="setting-field"><label>Size</label><select onchange="updateImgSize(this.value)"><option value="100%" ${w==='100%'?'selected':''}>Full</option><option value="75%" ${w==='75%'?'selected':''}>75%</option><option value="50%" ${w==='50%'?'selected':''}>50%</option><option value="33%" ${w==='33%'?'selected':''}>33%</option></select></div>
-            <div class="setting-field"><label>Alt Text</label><input type="text" value="${img?.alt||''}" oninput="updateImgAlt(this.value)" /></div>
-            <div class="setting-field"><button type="button" onclick="changeBlockImage()" class="w-full px-3 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-xs font-medium">Change Image</button></div>`; },
-        hero: (block) => { const a = block.querySelector('.comp-hero a'); return `
-            <div class="setting-field"><label>Button Label</label><input type="text" value="${a?.textContent||''}" oninput="updateHeroBtnLabel(this.value)" /></div>
-            <div class="setting-field"><label>Button URL</label><input type="text" value="${a?.getAttribute('href')||'#'}" oninput="updateHeroBtnUrl(this.value)" /></div>`; },
-        spacer: (block) => { const s = block.querySelector('.comp-spacer'); const h = parseInt(s?.style.height)||60; return `
-            <div class="setting-field"><label>Height (px)</label><input type="number" value="${h}" min="10" max="300" oninput="updateSpacerHeight(this.value)" /></div>`; },
-        imagetext: (block) => { const img = block.querySelector('.comp-imagetext img'); const w = img?.style.width||'50%'; return `
-            <div class="setting-field"><label>Image Size</label><select onchange="updateImgTextSize(this.value)"><option value="30%" ${w==='30%'?'selected':''}>30%</option><option value="40%" ${w==='40%'?'selected':''}>40%</option><option value="50%" ${w==='50%'?'selected':''}>50%</option></select></div>
-            <div class="setting-field"><button type="button" onclick="changeBlockImage()" class="w-full px-3 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-xs font-medium">Change Image</button></div>`; },
-        quote: () => `<p class="text-xs text-muted-foreground">Click text to edit on canvas.</p>`,
-        divider: () => `<p class="text-xs text-muted-foreground">No settings.</p>`,
-        video: (block) => { const iframe = block.querySelector('iframe'); return `
-            <div class="setting-field"><label>Video URL</label><input type="text" value="${iframe?.src||''}" oninput="updateVideoUrl(this.value)" /></div>`; }
-    };
-
-    window.showPageSettings = function() { deselectBlock(); pageSettingsView.classList.remove('hidden'); compSettingsView.classList.add('hidden'); };
-    function showComponentSettings(block) {
-        const type = block.dataset.type; const content = block.querySelector('.block-content');
-        const titles = {heading:'Heading',text:'Text',image:'Image',button:'Button',hero:'Hero',imagetext:'Image + Text',quote:'Quote',divider:'Divider',spacer:'Spacer',video:'Video', gallery:'Gallery'};
-        compSettingsTitle.textContent = titles[type]||'Component';
-        const gen = settingsDefs[type]; compSettingsBody.innerHTML = gen ? gen(content) : '';
-        pageSettingsView.classList.add('hidden'); compSettingsView.classList.remove('hidden');
-    }
-
-    window.changeHeadingLevel = function(level) { if(!selectedBlock) return; const old = selectedBlock.querySelector('h1,h2,h3'); if(!old) return; const nw = document.createElement(level); nw.innerHTML = old.innerHTML; nw.setAttribute('contenteditable','true'); nw.style.cssText = old.style.cssText; nw.style.fontSize = {h1:'2.2rem',h2:'1.8rem',h3:'1.4rem'}[level]; old.replaceWith(nw); };
-    window.changeBlockAlign = function(a) { const el = selectedBlock?.querySelector('[contenteditable]'); if(el) el.style.textAlign = a; };
-    window.updateBtnLabel = function(v) { const a = selectedBlock?.querySelector('.comp-button a'); if(a) a.textContent = v; };
-    window.updateBtnUrl = function(v) { const a = selectedBlock?.querySelector('.comp-button a'); if(a) a.href = v; };
-    window.updateBtnStyle = function(v) { const a = selectedBlock?.querySelector('.comp-button a'); if(!a) return; if(v==='outline'){a.style.background='transparent';a.style.border='2px solid var(--primary)';a.style.color='var(--primary)';} else {a.style.background='var(--primary)';a.style.border='none';a.style.color='var(--primary-foreground)';} };
-    window.updateImgSize = function(v) { const img = selectedBlock?.querySelector('.comp-image img'); if(img){img.style.width=v;img.style.margin=v==='100%'?'0':'0 auto';img.style.display='block';} };
-    window.updateImgAlt = function(v) { const img = selectedBlock?.querySelector('.comp-image img'); if(img) img.alt=v; };
-    window.changeBlockImage = function() { const img = selectedBlock?.querySelector('img'); if(img){window._pendingImageTarget=img;window.dispatchEvent(new CustomEvent('open-media-selector',{detail:{targetInput:'__blockImage__'}}));} };
-    window.updateHeroBtnLabel = function(v) { const a = selectedBlock?.querySelector('.comp-hero a'); if(a) a.textContent=v; };
-    window.updateHeroBtnUrl = function(v) { const a = selectedBlock?.querySelector('.comp-hero a'); if(a) a.href=v; };
-    window.updateSpacerHeight = function(v) { const s = selectedBlock?.querySelector('.comp-spacer'); if(s) s.style.height=v+'px'; };
-    window.updateImgTextSize = function(v) { const img = selectedBlock?.querySelector('.comp-imagetext img'); if(img) img.style.width=v; };
-    window.updateVideoUrl = function(v) { const iframe = selectedBlock?.querySelector('iframe'); if(iframe) iframe.src=v; };
-
-    // ── BLOCK CREATION ──
-    function createBlock(html, type) {
-        const block = document.createElement('div'); block.className = 'builder-block'; block.dataset.type = type; block.draggable = true;
-        block.innerHTML = `<div class="block-toolbar">
-            <button type="button" class="drag-handle" title="Drag" aria-label="Drag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></button>
-            <button type="button" onclick="moveBlock(this,-1)" title="Up" aria-label="Up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
-            <button type="button" onclick="moveBlock(this,1)" title="Down" aria-label="Down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-            <button type="button" onclick="duplicateBlock(this)" title="Duplicate" aria-label="Duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-            <button type="button" onclick="deleteBlock(this)" title="Delete" aria-label="Delete" style="color:var(--destructive)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-        </div><div class="block-content">${html}</div>`;
-        block.addEventListener('dragstart', onBlockDragStart); block.addEventListener('dragend', onBlockDragEnd);
-        block.addEventListener('dragover', onBlockDragOver); block.addEventListener('drop', onBlockDrop);
-        block.addEventListener('click', (e) => { if (!e.target.closest('.block-toolbar')) selectBlock(block); });
-        return block;
-    }
-
-    function selectBlock(block) { deselectBlock(); selectedBlock = block; block.classList.add('selected'); showComponentSettings(block); }
-    function deselectBlock() { if (selectedBlock) selectedBlock.classList.remove('selected'); selectedBlock = null; }
-    document.getElementById('canvasScroll').addEventListener('click', (e) => {
-        if (e.target.id === 'canvasScroll' || e.target.id === 'canvas' || e.target.id === 'canvasEmpty') showPageSettings();
+    // The block builder is shared with the post editor (wwwroot/js/inkwell-builder.js); this page adds its own slug and publish steps.
+    const builder = InkwellBuilder.init({
+        canvas: 'canvas', canvasEmpty: 'canvasEmpty', canvasScroll: 'canvasScroll',
+        settingsView: 'pageSettingsView', componentView: 'componentSettingsView',
+        componentTitle: 'compSettingsTitle', componentBody: 'compSettingsBody',
+        content: 'pageContent', hydrate: true
     });
-
-    function addBlock(type, insertBefore) { Promise.resolve(components[type]()).then(html => { if(html===null||html===undefined) return; const block = createBlock(html,type); if(insertBefore) canvas.insertBefore(block,insertBefore); else canvas.appendChild(block); updateEmptyState(); selectBlock(block); }); }
-    function updateEmptyState() { canvasEmpty.style.display = canvas.querySelectorAll('.builder-block').length === 0 ? 'flex' : 'none'; }
-
-    // ── PALETTE ──
-    document.querySelectorAll('.palette-item').forEach(btn => {
-        btn.addEventListener('dragstart', (e) => { dragFromPalette = btn.dataset.component; e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', btn.dataset.component); });
-        btn.addEventListener('dragend', () => { dragFromPalette = null; });
-        btn.addEventListener('click', () => { addBlock(btn.dataset.component); });
-    });
-    canvas.addEventListener('dragover', (e) => { e.preventDefault(); }); canvas.addEventListener('drop', (e) => { e.preventDefault(); if(dragFromPalette){addBlock(dragFromPalette);dragFromPalette=null;} });
-
-    function onBlockDragStart(e) { dragSrcEl = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/html',''); }
-    function onBlockDragEnd() { this.classList.remove('dragging'); canvas.querySelectorAll('.drop-indicator').forEach(el=>el.remove()); dragSrcEl = null; }
-    function onBlockDragOver(e) {
-        e.preventDefault(); if(!dragSrcEl || dragSrcEl===this) return;
-        canvas.querySelectorAll('.drop-indicator').forEach(el=>el.remove());
-        const rect = this.getBoundingClientRect(); const ind = document.createElement('div'); ind.className = 'drop-indicator';
-        if (e.clientY < rect.top+rect.height/2) this.parentNode.insertBefore(ind,this); else this.parentNode.insertBefore(ind,this.nextSibling);
-    }
-    function onBlockDrop(e) {
-        e.stopPropagation(); e.preventDefault(); canvas.querySelectorAll('.drop-indicator').forEach(el=>el.remove());
-        if(dragFromPalette){addBlock(dragFromPalette,this);dragFromPalette=null;return;}
-        if(!dragSrcEl||dragSrcEl===this) return;
-        const rect = this.getBoundingClientRect();
-        if(e.clientY<rect.top+rect.height/2) this.parentNode.insertBefore(dragSrcEl,this); else this.parentNode.insertBefore(dragSrcEl,this.nextSibling);
-    }
-
-    window.moveBlock = function(btn,dir) { const b = btn.closest('.builder-block'); if(dir===-1&&b.previousElementSibling?.classList.contains('builder-block')) b.parentNode.insertBefore(b,b.previousElementSibling); else if(dir===1&&b.nextElementSibling?.classList.contains('builder-block')) b.parentNode.insertBefore(b.nextElementSibling,b); };
-    window.deleteBlock = function(btn) { const b = btn.closest('.builder-block'); if(b===selectedBlock) showPageSettings(); b.remove(); updateEmptyState(); };
-    window.duplicateBlock = function(btn) {
-        const block = btn.closest('.builder-block'); const clone = block.cloneNode(true);
-        clone.addEventListener('dragstart', onBlockDragStart); clone.addEventListener('dragend', onBlockDragEnd);
-        clone.addEventListener('dragover', onBlockDragOver); clone.addEventListener('drop', onBlockDrop);
-        clone.addEventListener('click', (e) => { if(!e.target.closest('.block-toolbar')) selectBlock(clone); });
-        block.parentNode.insertBefore(clone, block.nextSibling);
-    };
-
-    // ── IMAGE ──
-    window._pendingImageTarget = null;
-    window.selectBlockImage = function(el) { window._pendingImageTarget = el; window.dispatchEvent(new CustomEvent('open-media-selector',{detail:{targetInput:'__blockImage__'}})); };
-    window.addEventListener('media-selected', function(e) {
-        if(window._pendingImageTarget && e.detail) {
-            const target = window._pendingImageTarget;
-            const url = e.detail.url || document.getElementById('__blockImage__')?.value;
-            if(url && target.tagName==='IMG'){target.src=url;target.style.background='none';}
-            else if(url && target.classList.contains('img-placeholder')){target.outerHTML=`<img src="${url}" alt="Image" style="width:100%;border-radius:var(--radius);display:block;" />`;}
-            window._pendingImageTarget=null;
-            if(selectedBlock) showComponentSettings(selectedBlock);
-        }
-        document.getElementById('RemoveFeaturedImageBtn')?.classList.remove('hidden');
-    });
-
-    // ── EXTRACT ──
-    function extractContent() {
-        let html = '';
-        canvas.querySelectorAll('.builder-block').forEach(block => {
-            const content = block.querySelector('.block-content'); if(!content) return;
-            const clone = content.cloneNode(true);
-            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
-            clone.querySelectorAll('[onclick]').forEach(el => el.removeAttribute('onclick'));
-            clone.querySelectorAll('.img-placeholder').forEach(el => el.remove());
-            clone.querySelectorAll('.comp-spacer span').forEach(el => el.remove());
-            html += clone.innerHTML.trim() + '\n';
-        });
-        return html.trim();
-    }
-    document.getElementById('pageForm').addEventListener('submit', function() { document.getElementById('pageContent').value = extractContent(); });
-
-    // ── HYDRATE ──
-    function hydrateContent() {
-        const raw = document.getElementById('pageContent').value.trim();
-        if (!raw) { updateEmptyState(); return; }
-        const temp = document.createElement('div'); temp.innerHTML = raw;
-        const children = Array.from(temp.children);
-        if (children.length === 0) { const b = createBlock(`<div contenteditable="true">${raw}</div>`,'text'); canvas.appendChild(b); }
-        else { children.forEach(child => {
-            let type = 'text', html = child.outerHTML; const tag = child.tagName?.toLowerCase();
-            if(tag==='h1'||tag==='h2'||tag==='h3'){type='heading';child.setAttribute('contenteditable','true');html=child.outerHTML;}
-            else if(tag==='p'){type='text';child.setAttribute('contenteditable','true');html=child.outerHTML;}
-            else if(tag==='hr'){type='divider';html='<div class="comp-divider"><hr/></div>';}
-            else if(child.classList?.contains('comp-hero')){type='hero';child.querySelectorAll('h2,p,a').forEach(el=>el.setAttribute('contenteditable','true'));html=child.outerHTML;}
-            else if(child.classList?.contains('comp-imagetext')){type='imagetext';child.querySelectorAll('h3,p').forEach(el=>el.setAttribute('contenteditable','true'));const img=child.querySelector('img');if(img){img.setAttribute('onclick','selectBlockImage(this)');img.style.cursor='pointer';}html=child.outerHTML;}
-            else if(child.classList?.contains('comp-quote')){type='quote';child.querySelectorAll('blockquote,cite').forEach(el=>el.setAttribute('contenteditable','true'));html=child.outerHTML;}
-            else if(child.classList?.contains('comp-button')){type='button';child.querySelectorAll('a').forEach(el=>el.setAttribute('contenteditable','true'));html=child.outerHTML;}
-            else if(child.classList?.contains('comp-video')){type='video';html=child.outerHTML;}
-            else if(child.classList?.contains('comp-spacer')){type='spacer';const h=child.style.height||'60px';html=`<div class="comp-spacer" style="height:${h};"><span>spacer</span></div>`;}
-            else if(child.classList?.contains('comp-gallery')){type='gallery';html=child.outerHTML;}
-            else if(child.classList?.contains('comp-image')||(tag==='img')){type='image';html=tag==='img'?`<div class="comp-image">${child.outerHTML}</div>`:child.outerHTML;}
-            else {child.setAttribute('contenteditable','true');html=child.outerHTML;}
-            canvas.appendChild(createBlock(html,type));
-        });}
-        updateEmptyState();
-    }
-    hydrateContent();
+    document.getElementById('pageForm').addEventListener('submit', function() { document.getElementById('pageContent').value = builder.extract(); });
 
     // ── SLUG ──
     document.getElementById('slugInput').addEventListener('input', function() { this.dataset.manual='true'; this.value=this.value.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/[\s_]+/g,'-').replace(/-+/g,'-').replace(/^-+|-+$/g,''); });
 
     // ── PUBLISH ──
-    document.getElementById('publishBtn').addEventListener('click', () => { document.getElementById('publishModal').classList.remove('hidden'); });
+    document.getElementById('publishBtn').addEventListener('click', () => { InkwellDialog.confirm({ title: 'Ready to publish?', body: window.pagePublishBody, action: 'Publish page', tone: 'neutral' }).then(ok => { if (ok) window.confirmPublish(); }); });
     window.confirmPublish = function() {
-        document.getElementById('pageContent').value = extractContent();
+        document.getElementById('pageContent').value = builder.extract();
         const form = document.getElementById('pageForm');
         let a = form.querySelector('input[name="action"]'); if(!a){a=document.createElement('input');a.type='hidden';a.name='action';form.appendChild(a);}
         a.value='publish'; form.submit();

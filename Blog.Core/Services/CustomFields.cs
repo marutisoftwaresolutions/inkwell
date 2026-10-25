@@ -185,4 +185,67 @@ public static class CustomFields
         CustomFieldTypes.YesNo => d.Value == "true",
         _ => d.Value,
     };
+
+    // ── The API (v1.0.9, ADR-0025 follow-up) ────────────────────────────────────
+
+    /// <summary>
+    /// The values an API response carries: every field that applies here, in Settings order, as a number, a
+    /// boolean, a string or null when unset. <paramref name="includeHidden"/> false limits it to the fields
+    /// readers see, which is what an anonymous caller gets. A stored value that no longer fits its field's type
+    /// (the type changed in Settings) is returned as the stored text rather than dropped.
+    /// </summary>
+    public static Dictionary<string, object?> ToApi(IEnumerable<CustomFieldDefinition>? applicable, string? json, bool includeHidden)
+    {
+        var values = Parse(json);
+        var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var d in applicable ?? [])
+        {
+            if (!includeHidden && !d.ShowOnPage) continue;
+            if (!values.TryGetValue(d.Key, out var v) || v.Length == 0) { result[d.Key] = null; continue; }
+            result[d.Key] = d.Type switch
+            {
+                CustomFieldTypes.Number when decimal.TryParse(v, NumberStyles.Number, CultureInfo.InvariantCulture, out var n) => n,
+                CustomFieldTypes.YesNo when v is "true" or "false" => v == "true",
+                _ => v,
+            };
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Applies the values an API caller sent. Only the keys sent change: a value sets the field, null or an empty
+    /// string clears it, and every other stored value is kept. Values are validated exactly as in the Desk
+    /// (<see cref="Clean"/>). A key that is not a field for this content type, or a value that is an object or a
+    /// list, is an error, so nothing a caller sends is dropped without saying so.
+    /// </summary>
+    public static CleanResult FromApi(IReadOnlyList<CustomFieldDefinition> applicable, IReadOnlyDictionary<string, JsonElement>? sent, string? existingJson)
+    {
+        if (sent is null || sent.Count == 0) return new CleanResult(existingJson, Parse(existingJson), new Dictionary<string, string>());
+        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+        var raw = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var touched = new List<CustomFieldDefinition>();
+        foreach (var (key, element) in sent)
+        {
+            var d = applicable.FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.Ordinal));
+            if (d is null) { errors[key] = "There is no custom field with this key here. Field keys are listed in Settings → Custom fields."; continue; }
+            string? text = element.ValueKind switch
+            {
+                JsonValueKind.Null or JsonValueKind.Undefined => "",
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.Number => element.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => null,
+            };
+            if (text is null) { errors[key] = "Send a string, a number, true, false or null."; continue; }
+            // A yes/no field takes only true, false or null: a stray string would otherwise be stored as unset.
+            if (d.Type == CustomFieldTypes.YesNo && text.Length > 0 && text is not ("true" or "false"))
+            { errors[key] = "Send true, false or null."; continue; }
+            raw[key] = text;
+            touched.Add(d);
+        }
+        var cleaned = Clean(touched, raw, existingJson);
+        foreach (var (k, m) in cleaned.Errors) errors[k] = m;
+        return new CleanResult(cleaned.Json, cleaned.Values, errors);
+    }
 }

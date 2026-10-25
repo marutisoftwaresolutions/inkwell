@@ -68,12 +68,16 @@ public static class BackupFormat
         new BackupTable("MemberNewsletters", BackupTableRole.Content, "subscriptions"),
         new BackupTable("Emails",            BackupTableRole.Content, "unused legacy issue log"),
         new BackupTable("NewsletterIssues",  BackupTableRole.Content, "newsletter issues, drafts and what was sent (ADR-0028)"),
+        new BackupTable("Forms",             BackupTableRole.Content, "contact forms and their fields (ADR-0030)"),
+        new BackupTable("FormSubmissions",   BackupTableRole.Content, "what visitors sent through the forms; personal data, like subscribers (ADR-0030)"),
         // Record
         new BackupTable("AuditLogs", BackupTableRole.Content, "the audit trail is a record, so it moves with the site"),
         // Analytics
         new BackupTable("PageViews", BackupTableRole.Optional, "reader analytics; can run to millions of rows"),
+        new BackupTable("PageViewDaily", BackupTableRole.Optional, "daily summary behind Analytics; the only history once raw views are pruned"),
         // Never
         new BackupTable("CrawlerVisits",       BackupTableRole.Excluded, "bot traffic log, pruned by retention"),
+        new BackupTable("CrawlerVisitDaily",   BackupTableRole.Excluded, "daily summary of CrawlerVisits, rebuilt by the crawler-visit-rollup job"),
         new BackupTable("ErrorLogs",           BackupTableRole.Excluded, "diagnostics for this server"),
         new BackupTable("Jobs",                BackupTableRole.Excluded, "scheduler ledger for this server"),
         new BackupTable("PasswordResetTokens", BackupTableRole.Excluded, "short-lived secrets"),
@@ -82,6 +86,8 @@ public static class BackupFormat
         new BackupTable("ImportJobs",          BackupTableRole.Excluded, "import staging"),
         new BackupTable("ImportItems",         BackupTableRole.Excluded, "import staging"),
         new BackupTable("NewsletterDeliveries", BackupTableRole.Excluded, "send log; replaying it would re-send newsletters"),
+        new BackupTable("ExportPushes",        BackupTableRole.Excluded, "push run log; resuming it on another server would re-send content (ADR-0029)"),
+        new BackupTable("ExportPushItems",     BackupTableRole.Excluded, "push run log; resuming it on another server would re-send content (ADR-0029)"),
         new BackupTable("Countries",           BackupTableRole.Excluded, "reference catalog every install seeds (IANA/CLDR)"),
         new BackupTable("TimeZones",           BackupTableRole.Excluded, "reference catalog every install seeds (IANA/CLDR)"),
         new BackupTable("DateLocales",         BackupTableRole.Excluded, "reference catalog every install seeds (IANA/CLDR)"),

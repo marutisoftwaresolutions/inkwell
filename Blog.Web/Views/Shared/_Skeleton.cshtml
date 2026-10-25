@@ -1,0 +1,17 @@
+@*
+    Loading skeleton for an htmx panel (UI/UX rule 2): the placeholder a panel shows before its
+    content arrives. ViewData["SkeletonLines"] sets the number of text lines (default 3);
+    ViewData["SkeletonLabel"] the accessible status text (default "Loading").
+*@
+@{
+    var lines = ViewData["SkeletonLines"] as int? ?? 3;
+    var label = ViewData["SkeletonLabel"] as string ?? "Loading";
+    var widths = new[] { "w-3/4", "w-full", "w-5/6", "w-2/3", "w-11/12" };
+}
+<div class="space-y-2.5 py-1" role="status" aria-live="polite" aria-busy="true">
+    <span class="sr-only">@label…</span>
+    @for (var i = 0; i < lines; i++)
+    {
+        <div class="desk-skeleton h-3.5 @widths[i % widths.Length]" aria-hidden="true"></div>
+    }
+</div>

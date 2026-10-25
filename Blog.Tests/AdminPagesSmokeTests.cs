@@ -56,7 +56,10 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
     [InlineData("/admin/redirects?q=x", "Search")]
     [InlineData("/admin/media?q=logo", "Search")]
     [InlineData("/admin/posts", "table-scroll")]
-    [InlineData("/admin/security", "table-scroll")]
+    [InlineData("/admin/calendar", "data-calendar-counts")]
+    [InlineData("/admin/calendar?month=2026-02", "table-scroll")]
+    [InlineData("/admin/calendar?month=not-a-month", "This month")]
+    [InlineData("/admin/security", "desk-page-title")] // an empty rule list shows the empty state, not a table
     [InlineData("/admin/audit", "desk-busy")]          // its table renders only once there are entries
     [InlineData("/admin/errors", "table-scroll")]
     [InlineData("/admin/dashboard", "desk-busy")]
@@ -73,17 +76,19 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
     [InlineData("/admin/link-audit", "desk-busy")]
     [InlineData("/admin/subscribers", "desk-busy")]
     [InlineData("/admin/theme", "desk-busy")]
-    [InlineData("/admin/webhooks", "table-scroll")]
+    [InlineData("/admin/webhooks", "desk-page-title")]
     [InlineData("/admin/webhooks?q=zz-no-such-hook", "Search")]
     [InlineData("/admin/webhooks/new", "data-track-changes")]
     [InlineData("/admin/menus", "data-track-changes")]
-    [InlineData("/admin/backups", "table-scroll")]
-    [InlineData("/admin/newsletter", "table-scroll")]
+    [InlineData("/admin/backups", "desk-page-title")]
+    [InlineData("/admin/newsletter", "desk-page-title")]
     [InlineData("/admin/newsletter/new", "data-track-changes")]
     [InlineData("/account/security", "Two-factor sign-in")]
     [InlineData("/account/two-factor/setup", "qr-box")]
     [InlineData("/admin/export", "table-scroll")]
     [InlineData("/admin/export?target=Ghost&submitted=true&includeEmails=true", "Universal import")]
+    [InlineData("/admin/forms", "role=\"search\"")]
+    [InlineData("/admin/forms/create", "data-track-changes")]
     public async Task Admin_page_renders_for_an_admin(string url, string expectedFragment)
     {
         if (!_dbAvailable) { _out.WriteLine("Dev database unavailable — skipping."); return; }
@@ -99,6 +104,32 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
         if (expectedFragment == "_ListSearch") expectedFragment = "role=\"search\"";
         if (expectedFragment == "Search") expectedFragment = "role=\"search\"";
         Assert.Contains(expectedFragment, html);
+    }
+
+    /// <summary>The push status page and its polled progress panel (ADR-0029), for the newest push on the dev database.</summary>
+    [Fact]
+    public async Task Push_status_page_renders_for_an_admin()
+    {
+        if (!_dbAvailable) { _out.WriteLine("Dev database unavailable — skipping."); return; }
+        using var scope = _factory.Services.CreateScope();
+        var recent = await scope.ServiceProvider.GetRequiredService<Blog.Core.Interfaces.IExportPushRepository>().ListRecentAsync(1);
+        if (recent.Count == 0) { _out.WriteLine("No push on the dev database yet — skipping."); return; }
+        var id = recent[0].Id;
+        var client = AdminClient();
+
+        foreach (var url in new[] { $"/admin/export/push/{id}", $"/admin/export/push/{id}?show=failed&q=zz-none" })
+        {
+            var response = await client.GetAsync(url);
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.True(response.StatusCode == HttpStatusCode.OK, $"{url} → {(int)response.StatusCode}");
+            Assert.Contains("role=\"progressbar\"", html);
+            Assert.Contains("table-scroll", html);
+            Assert.Contains("role=\"search\"", html);
+        }
+        var panel = await client.GetAsync($"/admin/export/push/{id}/progress");
+        Assert.Equal(HttpStatusCode.OK, panel.StatusCode);
+        Assert.Contains("push-progress", await panel.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/admin/export/push/{Guid.NewGuid()}")).StatusCode);
     }
 
     /// <summary>

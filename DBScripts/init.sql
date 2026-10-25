@@ -1,6 +1,6 @@
 -- =============================================================================
 -- init.sql  —  Inkwell Complete Database Schema
--- Version : 1.0.8-dev (2026-10-05d)
+-- Version : 1.0.9 (2026-10-25)
 -- Target  : SQL Server 2019+ / Azure SQL
 -- Usage   : Run once on a fresh database. Every block is idempotent (IF NOT
 --           EXISTS) so it is safe to re-run against an existing database.
@@ -1010,6 +1010,109 @@ ELSE
     PRINT '  [=] NewsletterDeliveries already exists — skipped.';
 
 -- =============================================================================
+-- 36c. ExportPushes + ExportPushItems  —  direct push to WordPress and Ghost (Admin → Export)
+--      (DBScripts/2026-10-14_create-export-pushes.sql, ADR-0029). No credentials are stored.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ExportPushes')
+BEGIN
+    CREATE TABLE ExportPushes (
+        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        Target          NVARCHAR(20)     NOT NULL,
+        SiteUrl         NVARCHAR(300)    NOT NULL,
+        ConflictPolicy  NVARCHAR(20)     NOT NULL CONSTRAINT DF_ExportPushes_ConflictPolicy DEFAULT 'Skip',
+        IncludeDrafts   BIT              NOT NULL CONSTRAINT DF_ExportPushes_IncludeDrafts DEFAULT 0,
+        IncludePages    BIT              NOT NULL CONSTRAINT DF_ExportPushes_IncludePages DEFAULT 1,
+        SourceBaseUrl   NVARCHAR(300)    NOT NULL,
+        Status          NVARCHAR(20)     NOT NULL CONSTRAINT DF_ExportPushes_Status DEFAULT 'Running',
+        Message         NVARCHAR(500)    NULL,
+        TotalCount      INT              NOT NULL CONSTRAINT DF_ExportPushes_TotalCount DEFAULT 0,
+        ResumeAt        DATETIME2        NULL,
+        StartedBy       UNIQUEIDENTIFIER NOT NULL,
+        StartedByName   NVARCHAR(200)    NULL,
+        StartedAt       DATETIME2        NOT NULL CONSTRAINT DF_ExportPushes_StartedAt DEFAULT SYSUTCDATETIME(),
+        UpdatedAt       DATETIME2        NOT NULL CONSTRAINT DF_ExportPushes_UpdatedAt DEFAULT SYSUTCDATETIME(),
+        FinishedAt      DATETIME2        NULL
+    );
+    CREATE INDEX IX_ExportPushes_Status ON ExportPushes (Status, StartedAt);
+    PRINT '  [+] ExportPushes table + index created.';
+END
+ELSE
+    PRINT '  [=] ExportPushes already exists — skipped.';
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ExportPushItems')
+BEGIN
+    CREATE TABLE ExportPushItems (
+        Id              BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        PushId          UNIQUEIDENTIFIER NOT NULL
+                        CONSTRAINT FK_ExportPushItems_Pushes REFERENCES ExportPushes(Id) ON DELETE CASCADE,
+        Kind            NVARCHAR(10)     NOT NULL,
+        SourceKey       NVARCHAR(400)    NOT NULL,
+        Title           NVARCHAR(300)    NULL,
+        Seq             INT              NOT NULL CONSTRAINT DF_ExportPushItems_Seq DEFAULT 0,
+        Status          NVARCHAR(20)     NOT NULL CONSTRAINT DF_ExportPushItems_Status DEFAULT 'Pending',
+        Attempts        INT              NOT NULL CONSTRAINT DF_ExportPushItems_Attempts DEFAULT 0,
+        NextAttemptAt   DATETIME2        NOT NULL CONSTRAINT DF_ExportPushItems_NextAttemptAt DEFAULT SYSUTCDATETIME(),
+        RemoteId        NVARCHAR(100)    NULL,
+        RemoteUrl       NVARCHAR(1000)   NULL,
+        Error           NVARCHAR(500)    NULL,
+        UpdatedAt       DATETIME2        NOT NULL CONSTRAINT DF_ExportPushItems_UpdatedAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT UX_ExportPushItems_Push_Kind_Key UNIQUE (PushId, Kind, SourceKey)
+    );
+    CREATE INDEX IX_ExportPushItems_Due ON ExportPushItems (PushId, Status, Seq);
+    PRINT '  [+] ExportPushItems table + indexes created.';
+END
+ELSE
+    PRINT '  [=] ExportPushItems already exists — skipped.';
+
+-- =============================================================================
+-- 36d. Forms + FormSubmissions  —  contact forms (Admin → Forms)
+--      (DBScripts/2026-10-14_create-forms.sql, ADR-0030).
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Forms')
+BEGIN
+    CREATE TABLE Forms (
+        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        OwnerId         UNIQUEIDENTIFIER NOT NULL,
+        FormKey         NVARCHAR(60)     NOT NULL,
+        Name            NVARCHAR(120)    NOT NULL,
+        FieldsJson      NVARCHAR(MAX)    NOT NULL,
+        SubmitLabel     NVARCHAR(60)     NULL,
+        SuccessMessage  NVARCHAR(500)    NULL,
+        NotifyEmail     NVARCHAR(255)    NULL,
+        RetentionDays   INT              NOT NULL CONSTRAINT DF_Forms_RetentionDays DEFAULT 365,
+        IsActive        BIT              NOT NULL CONSTRAINT DF_Forms_IsActive DEFAULT 1,
+        CreatedAt       DATETIME2        NOT NULL CONSTRAINT DF_Forms_CreatedAt DEFAULT SYSUTCDATETIME(),
+        UpdatedAt       DATETIME2        NOT NULL CONSTRAINT DF_Forms_UpdatedAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT UX_Forms_Owner_Key UNIQUE (OwnerId, FormKey)
+    );
+    PRINT '  [+] Forms table created.';
+END
+ELSE
+    PRINT '  [=] Forms already exists — skipped.';
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'FormSubmissions')
+BEGIN
+    CREATE TABLE FormSubmissions (
+        Id              BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        FormId          UNIQUEIDENTIFIER NOT NULL
+                        CONSTRAINT FK_FormSubmissions_Forms REFERENCES Forms(Id) ON DELETE CASCADE,
+        OwnerId         UNIQUEIDENTIFIER NOT NULL,
+        ValuesJson      NVARCHAR(MAX)    NOT NULL,
+        SearchText      NVARCHAR(1000)   NULL,
+        AddressHash     NVARCHAR(100)    NULL,
+        ContentHash     NVARCHAR(64)     NULL,
+        CreatedAt       DATETIME2        NOT NULL CONSTRAINT DF_FormSubmissions_CreatedAt DEFAULT SYSUTCDATETIME(),
+        ReadAt          DATETIME2        NULL
+    );
+    CREATE INDEX IX_FormSubmissions_Form_Created ON FormSubmissions (FormId, CreatedAt DESC);
+    CREATE INDEX IX_FormSubmissions_Address ON FormSubmissions (AddressHash, CreatedAt);
+    CREATE INDEX IX_FormSubmissions_Content ON FormSubmissions (FormId, ContentHash);
+    PRINT '  [+] FormSubmissions table + indexes created.';
+END
+ELSE
+    PRINT '  [=] FormSubmissions already exists — skipped.';
+
+-- =============================================================================
 -- 37. Column top-ups on tables created above
 --     These arrived after their table did, so a database created by an older
 --     copy of this file needs them added rather than the table recreated.
@@ -1148,6 +1251,27 @@ BEGIN
     PRINT '  [+] Pages.CustomFieldsJson added.';
 END
 
+-- Pages Markdown authoring (DBScripts/2026-10-14_add-markdown-to-pages.sql, ADR-0022 follow-up).
+IF COL_LENGTH('Pages', 'Markdown') IS NULL
+BEGIN
+    ALTER TABLE Pages ADD Markdown NVARCHAR(MAX) NULL;
+    PRINT '  [+] Pages.Markdown added.';
+END
+IF COL_LENGTH('Pages', 'EditorMode') IS NULL
+BEGIN
+    ALTER TABLE Pages ADD EditorMode NVARCHAR(20) NOT NULL CONSTRAINT DF_Pages_EditorMode DEFAULT 'rich' WITH VALUES;
+    PRINT '  [+] Pages.EditorMode added.';
+END
+
+-- Posts.ViewCount defaults to 0 (DBScripts/2026-10-15_default-post-viewcount-to-zero.sql).
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints dc
+               JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+               WHERE dc.parent_object_id = OBJECT_ID('Posts') AND c.name = 'ViewCount')
+BEGIN
+    ALTER TABLE Posts ADD CONSTRAINT DF_Posts_ViewCount DEFAULT 0 FOR ViewCount;
+    PRINT '  [+] Posts.ViewCount defaults to 0.';
+END
+
 -- =============================================================================
 -- 38. Index top-ups on tables created above
 --     Same reason as section 37: the CREATE TABLE blocks never run again on a
@@ -1188,6 +1312,47 @@ BEGIN
 END
 ELSE
     PRINT '  [=] IX_Comments_CreatedAt already exists — skipped.';
+
+-- Report indexes (ADR-0037; DBScripts/2026-10-22_add-covering-indexes-for-report-procedures.sql).
+-- PageViews: the date index covers every column usp_Analytics_Report reads.
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes i
+      JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 1
+      JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+     WHERE i.object_id = OBJECT_ID('PageViews') AND i.name = 'IX_PageViews_OwnerId_CreatedAt' AND c.name = 'Region')
+BEGIN
+    -- drop + create, not DROP_EXISTING: the latter can rebuild from the old index with a lookup per row (ADR-0037)
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('PageViews') AND name = 'IX_PageViews_OwnerId_CreatedAt')
+        DROP INDEX IX_PageViews_OwnerId_CreatedAt ON PageViews;
+    CREATE INDEX IX_PageViews_OwnerId_CreatedAt ON PageViews (OwnerId, CreatedAt DESC)
+        INCLUDE (Path, Source, Medium, Referrer, Campaign, Country, Region);
+    PRINT '  [+] IX_PageViews_OwnerId_CreatedAt covers the Analytics report.';
+END
+ELSE
+    PRINT '  [=] IX_PageViews_OwnerId_CreatedAt already covering — skipped.';
+
+-- CrawlerVisits: no query seeks the owner+path or owner+crawler indexes, both cost a write per crawler
+-- request, and Owner_Path's key can exceed the 1,700-byte limit (Path is NVARCHAR(1024)).
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('CrawlerVisits') AND name = 'IX_CrawlerVisits_Owner_Path')
+BEGIN
+    DROP INDEX IX_CrawlerVisits_Owner_Path ON CrawlerVisits;
+    PRINT '  [-] IX_CrawlerVisits_Owner_Path dropped.';
+END
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('CrawlerVisits') AND name = 'IX_CrawlerVisits_Owner_Crawler')
+BEGIN
+    DROP INDEX IX_CrawlerVisits_Owner_Crawler ON CrawlerVisits;
+    PRINT '  [-] IX_CrawlerVisits_Owner_Crawler dropped.';
+END
+
+-- CrawlerVisits: date-leading covering index, so a site reading every owner can seek the window.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('CrawlerVisits') AND name = 'IX_CrawlerVisits_VisitedAt')
+BEGIN
+    CREATE INDEX IX_CrawlerVisits_VisitedAt ON CrawlerVisits (VisitedAt DESC)
+        INCLUDE (OwnerId, Crawler, Operator, IsAi, Path, Query, Verified);
+    PRINT '  [+] IX_CrawlerVisits_VisitedAt created.';
+END
+ELSE
+    PRINT '  [=] IX_CrawlerVisits_VisitedAt already exists — skipped.';
 -- =============================================================================
 -- 39. Reference catalogs: countries, time zones and date locales (ADR-0027)
 --     Verbatim from DBScripts/2026-10-05_create-and-seed-countries-timezones-date-locales.sql (IANA tzdata
@@ -2530,6 +2695,340 @@ PRINT 'Countries, time zones and date locales are up to date.';
 SET NOCOUNT OFF;
 
 -- =============================================================================
+-- 40. CrawlerVisitDaily  —  daily summary of CrawlerVisits for Admin → AI Crawlers (ADR-0037)
+--     Derived data, filled by the crawler-visit-rollup job; never backed up.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'CrawlerVisitDaily')
+BEGIN
+    CREATE TABLE CrawlerVisitDaily (
+        Id        BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        OwnerId   UNIQUEIDENTIFIER NOT NULL,
+        [Day]     DATE             NOT NULL,
+        Crawler   NVARCHAR(60)     NOT NULL,
+        Operator  NVARCHAR(60)     NOT NULL,
+        IsAi      BIT              NOT NULL,
+        Path      NVARCHAR(1024)   NOT NULL,
+        Verified  BIT              NULL,
+        Visits    INT              NOT NULL,
+        LastSeen  DATETIME2        NOT NULL
+    );
+    CREATE INDEX IX_CrawlerVisitDaily_Day ON CrawlerVisitDaily ([Day] DESC)
+        INCLUDE (OwnerId, Crawler, Operator, IsAi, Path, Verified, Visits, LastSeen);
+    PRINT '  [+] CrawlerVisitDaily table + index created.';
+END
+ELSE
+    PRINT '  [=] CrawlerVisitDaily already exists — skipped.';
+
+-- =============================================================================
+-- 41. PageViewDaily  —  daily summary of PageViews behind Admin → Analytics (ADR-0037)
+--     Filled by the page-view-rollup job; the long-range history once raw views are pruned.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'PageViewDaily')
+BEGIN
+    CREATE TABLE PageViewDaily (
+        Id        BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        OwnerId   UNIQUEIDENTIFIER NOT NULL,
+        [Day]     DATE             NOT NULL,
+        Dimension TINYINT          NOT NULL,
+        Value1    NVARCHAR(1000)   NULL,
+        Value2    NVARCHAR(100)    NULL,
+        Views     INT              NOT NULL
+    );
+    CREATE INDEX IX_PageViewDaily_Owner_Dimension_Day ON PageViewDaily (OwnerId, Dimension, [Day] DESC)
+        INCLUDE (Value1, Value2, Views);
+    CREATE INDEX IX_PageViewDaily_Day ON PageViewDaily ([Day] DESC);
+    PRINT '  [+] PageViewDaily table + indexes created.';
+END
+ELSE
+    PRINT '  [=] PageViewDaily already exists — skipped.';
+
+-- =============================================================================
+-- 42. Report stored procedures (ADR-0037)
+--     Verbatim from DBScripts/2026-10-22_create-report-stored-procedures.sql (quotes doubled for
+--     sp_executesql); ReportProcedureTests keeps the copies identical. CREATE OR ALTER must start its
+--     own batch; sp_executesql gives it one, so this file still runs as a single batch (no GO).
+-- =============================================================================
+EXEC sys.sp_executesql N'
+CREATE OR ALTER PROCEDURE dbo.usp_Analytics_Report
+    @OwnerId UNIQUEIDENTIFIER,
+    @From    DATETIME2,
+    @To      DATETIME2,
+    @Top     INT = 20
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Days up to @Rolled come from PageViewDaily (one row per owner x day x section value); later days,
+    -- normally just today, from the raw table. The roll-up job only ever extends a contiguous run of days,
+    -- so MAX(Day) is the boundary. Callers pass whole-day bounds.
+    DECLARE @Rolled  DATE = (SELECT MAX([Day]) FROM dbo.PageViewDaily);
+    DECLARE @FromDay DATE = CAST(@From AS DATE);
+    DECLARE @RawFrom DATETIME2 = CASE WHEN @Rolled IS NULL OR @Rolled < @FromDay THEN @From
+                                      ELSE DATEADD(DAY, 1, CAST(@Rolled AS DATETIME2)) END;
+
+    -- Dimension: 0 day total, 1 page, 2 source + medium, 3 referrer, 4 campaign, 5 country, 6 region.
+    CREATE TABLE #s (Dimension TINYINT NOT NULL, [Day] DATE NOT NULL, Value1 NVARCHAR(1000) NULL,
+                     Value2 NVARCHAR(100) NULL, Views BIGINT NOT NULL);
+
+    INSERT INTO #s (Dimension, [Day], Value1, Value2, Views)
+    SELECT Dimension, [Day], Value1, Value2, Views
+      FROM dbo.PageViewDaily
+     WHERE OwnerId = @OwnerId AND [Day] >= @FromDay AND [Day] <= @Rolled AND [Day] < @To;
+
+    -- The rest of the range, read once through IX_PageViews_OwnerId_CreatedAt (covering). The content-page
+    -- rule (home and single-segment post slugs) matches PageViewRepository.ContentPathFilter.
+    SELECT CAST(CreatedAt AS DATE) AS [Day], Source, Medium, Path, Referrer, Campaign, Country, Region
+      INTO #pv
+      FROM dbo.PageViews
+     WHERE OwnerId = @OwnerId AND CreatedAt >= @RawFrom AND CreatedAt < @To
+       AND (Path = N''/'' OR (CHARINDEX(N''/'', Path, 2) = 0 AND Path NOT IN (
+            N''/feed'', N''/sitemap.xml'', N''/robots.txt'',
+            N''/admin'', N''/account'', N''/newsletter'', N''/avatar'', N''/og-image'', N''/landing'', N''/error'')));
+
+    INSERT INTO #s (Dimension, [Day], Value1, Value2, Views)
+    SELECT 0, [Day], NULL, NULL, COUNT(*) FROM #pv GROUP BY [Day]
+    UNION ALL SELECT 1, [Day], Path, NULL, COUNT(*) FROM #pv GROUP BY [Day], Path
+    UNION ALL SELECT 2, [Day], Source, Medium, COUNT(*) FROM #pv GROUP BY [Day], Source, Medium
+    UNION ALL SELECT 3, [Day], Referrer, NULL, COUNT(*) FROM #pv WHERE Referrer IS NOT NULL GROUP BY [Day], Referrer
+    UNION ALL SELECT 4, [Day], Campaign, NULL, COUNT(*) FROM #pv WHERE Campaign IS NOT NULL GROUP BY [Day], Campaign
+    UNION ALL SELECT 5, [Day], Country, NULL, COUNT(*) FROM #pv WHERE Country IS NOT NULL GROUP BY [Day], Country
+    UNION ALL SELECT 6, [Day], Region, NULL, COUNT(*) FROM #pv WHERE Region IS NOT NULL GROUP BY [Day], Region;
+
+    SELECT CAST(ISNULL(SUM(Views), 0) AS INT) AS Total FROM #s WHERE Dimension = 0;
+    SELECT [Day] AS [Date], CAST(SUM(Views) AS INT) AS [Count]
+      FROM #s WHERE Dimension = 0 GROUP BY [Day] HAVING SUM(Views) > 0 ORDER BY [Day];
+    SELECT ISNULL(Value1, N''direct'') AS Source, ISNULL(Value2, N''none'') AS Medium, CAST(SUM(Views) AS INT) AS [Count]
+      FROM #s WHERE Dimension = 2
+     GROUP BY ISNULL(Value1, N''direct''), ISNULL(Value2, N''none'')
+     ORDER BY [Count] DESC, Source, Medium;
+    SELECT TOP (@Top) Value1 AS Path, CAST(SUM(Views) AS INT) AS Views
+      FROM #s WHERE Dimension = 1 GROUP BY Value1 ORDER BY Views DESC, Path;
+    SELECT TOP (@Top) Value1 AS Referrer, CAST(SUM(Views) AS INT) AS [Count]
+      FROM #s WHERE Dimension = 3 GROUP BY Value1 ORDER BY [Count] DESC, Referrer;
+    SELECT Value1 AS Campaign, CAST(SUM(Views) AS INT) AS [Count]
+      FROM #s WHERE Dimension = 4 GROUP BY Value1 ORDER BY [Count] DESC, Campaign;
+    SELECT TOP (@Top) Value1 AS Country, CAST(SUM(Views) AS INT) AS [Count]
+      FROM #s WHERE Dimension = 5 GROUP BY Value1 ORDER BY [Count] DESC, Country;
+    SELECT TOP (@Top) Value1 AS Region, CAST(SUM(Views) AS INT) AS [Count]
+      FROM #s WHERE Dimension = 6 GROUP BY Value1 ORDER BY [Count] DESC, Region;
+END;
+';
+EXEC sys.sp_executesql N'
+CREATE OR ALTER PROCEDURE dbo.usp_CrawlerVisits_Report
+    @OwnerId  UNIQUEIDENTIFIER = NULL,   -- NULL reads every owner (self-hosted)
+    @SinceDay DATE,                      -- first whole day of the window (UTC)
+    @Take     INT = 20
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Days up to @Rolled come from the daily summary; later days (normally just today) from the raw table.
+    -- The roll-up job only ever extends a contiguous run of days, so MAX(Day) is the boundary.
+    DECLARE @Rolled DATE = (SELECT MAX([Day]) FROM dbo.CrawlerVisitDaily);
+    DECLARE @RawFrom DATE = CASE WHEN @Rolled IS NULL OR @Rolled < @SinceDay THEN @SinceDay ELSE DATEADD(DAY, 1, @Rolled) END;
+
+    -- One row per crawler x path x check result x day; three of the four sections read this small set.
+    -- RECOMPILE gives the owner and every-owner calls their own plans.
+    SELECT Crawler, Operator, IsAi, Path, Verified, [Day], Visits, LastSeen
+      INTO #g
+      FROM (
+            SELECT Crawler, Operator, CAST(IsAi AS TINYINT) AS IsAi, Path, Verified, [Day],
+                   CAST(Visits AS BIGINT) AS Visits, LastSeen
+              FROM dbo.CrawlerVisitDaily
+             WHERE [Day] >= @SinceDay AND [Day] <= @Rolled AND (@OwnerId IS NULL OR OwnerId = @OwnerId)
+            UNION ALL
+            SELECT Crawler, MAX(Operator), MAX(CAST(IsAi AS TINYINT)), Path, Verified, CAST(VisitedAt AS DATE),
+                   COUNT_BIG(*), MAX(VisitedAt)
+              FROM dbo.CrawlerVisits
+             WHERE VisitedAt >= @RawFrom AND (@OwnerId IS NULL OR OwnerId = @OwnerId)
+             GROUP BY Crawler, Path, Verified, CAST(VisitedAt AS DATE)
+           ) AS w
+    OPTION (RECOMPILE);
+
+    SELECT Crawler,
+           MAX(Operator)                                                   AS [Operator],
+           CAST(MAX(IsAi) AS BIT)                                          AS IsAi,
+           CAST(SUM(Visits) AS INT)                                        AS Visits,
+           COUNT(DISTINCT Path)                                            AS Pages,
+           CAST(SUM(CASE WHEN Verified = 1 THEN Visits ELSE 0 END) AS INT) AS VerifiedVisits,
+           CAST(SUM(CASE WHEN Verified = 0 THEN Visits ELSE 0 END) AS INT) AS FailedVisits,
+           MAX(LastSeen)                                                   AS LastSeen
+      FROM #g
+     GROUP BY Crawler
+     ORDER BY Visits DESC, Crawler;
+
+    -- A failed identity check is someone else using the name: left out of pages, requests and trend.
+    SELECT TOP (@Take) Path, CAST(SUM(Visits) AS INT) AS Visits, COUNT(DISTINCT Crawler) AS Crawlers
+      FROM #g
+     WHERE IsAi = 1 AND (Verified IS NULL OR Verified = 1)
+     GROUP BY Path
+     ORDER BY Visits DESC, Path;
+
+    -- The query string is too high-cardinality to summarise usefully (/?page=N), so this section alone
+    -- reads the raw table, through IX_CrawlerVisits_VisitedAt (covering).
+    SELECT TOP (@Take) Path, Query, COUNT(1) AS Visits, COUNT(DISTINCT Crawler) AS Crawlers
+      FROM dbo.CrawlerVisits
+     WHERE VisitedAt >= @SinceDay AND (@OwnerId IS NULL OR OwnerId = @OwnerId)
+       AND Query IS NOT NULL AND (Verified IS NULL OR Verified = 1)
+     GROUP BY Path, Query
+     ORDER BY Visits DESC, Path, Query
+    OPTION (RECOMPILE);
+
+    SELECT [Day], CAST(SUM(Visits) AS INT) AS Visits
+      FROM #g
+     WHERE IsAi = 1 AND (Verified IS NULL OR Verified = 1)
+     GROUP BY [Day]
+     ORDER BY [Day];
+END;
+';
+EXEC sys.sp_executesql N'
+CREATE OR ALTER PROCEDURE dbo.usp_CrawlerVisits_RollUp
+    @Through DATE,          -- last day to summarise; the caller passes a day that has fully ended
+    @MaxDays INT = 31       -- days with visits to summarise in one call, so a first run is bounded
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    -- One roll-up at a time, so two callers can never both insert the same day.
+    DECLARE @lock INT;
+    EXEC @lock = sys.sp_getapplock @Resource = N''usp_CrawlerVisits_RollUp'', @LockMode = N''Exclusive'',
+                                   @LockOwner = N''Session'', @LockTimeout = 0;
+    IF @lock < 0
+    BEGIN
+        SELECT 0 AS Days, 0 AS [Rows];
+        RETURN;
+    END;
+
+    BEGIN TRY
+        -- Continue after the last summarised day; days without visits are skipped, not counted, so an idle
+        -- stretch can never stall the job short of newer days.
+        DECLARE @day DATE = DATEADD(DAY, 1, (SELECT MAX([Day]) FROM dbo.CrawlerVisitDaily));
+        IF @day IS NULL
+            SET @day = (SELECT CAST(MIN(VisitedAt) AS DATE) FROM dbo.CrawlerVisits);
+        ELSE
+            SET @day = (SELECT CAST(MIN(VisitedAt) AS DATE) FROM dbo.CrawlerVisits WHERE VisitedAt >= @day);
+
+        CREATE TABLE #day (OwnerId UNIQUEIDENTIFIER NOT NULL, Crawler NVARCHAR(60) NOT NULL, Operator NVARCHAR(60) NOT NULL,
+                           IsAi BIT NOT NULL, Path NVARCHAR(1024) NOT NULL, Verified BIT NULL, Visits INT NOT NULL,
+                           LastSeen DATETIME2 NOT NULL);
+
+        DECLARE @days INT = 0, @rows INT = 0;
+        WHILE @day IS NOT NULL AND @day <= @Through AND @days < @MaxDays
+        BEGIN
+            -- Aggregate the day before the transaction opens: the transaction then only swaps a few hundred rows,
+            -- so the AI Crawlers report, which reads CrawlerVisitDaily, never waits behind a long scan.
+            TRUNCATE TABLE #day;
+            INSERT INTO #day (OwnerId, Crawler, Operator, IsAi, Path, Verified, Visits, LastSeen)
+            SELECT OwnerId, Crawler, MAX(Operator), CAST(MAX(CAST(IsAi AS TINYINT)) AS BIT), Path, Verified,
+                   COUNT(*), MAX(VisitedAt)
+              FROM dbo.CrawlerVisits
+             WHERE VisitedAt >= @day AND VisitedAt < DATEADD(DAY, 1, @day)
+             GROUP BY OwnerId, Crawler, Path, Verified;
+
+            BEGIN TRANSACTION;
+            DELETE FROM dbo.CrawlerVisitDaily WHERE [Day] = @day;
+            INSERT INTO dbo.CrawlerVisitDaily (OwnerId, [Day], Crawler, Operator, IsAi, Path, Verified, Visits, LastSeen)
+            SELECT OwnerId, @day, Crawler, Operator, IsAi, Path, Verified, Visits, LastSeen FROM #day;
+            SET @rows += @@ROWCOUNT;
+            COMMIT TRANSACTION;
+
+            SET @days += 1;
+            SET @day = (SELECT CAST(MIN(VisitedAt) AS DATE) FROM dbo.CrawlerVisits WHERE VisitedAt >= DATEADD(DAY, 1, @day));
+        END;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        EXEC sys.sp_releaseapplock @Resource = N''usp_CrawlerVisits_RollUp'', @LockOwner = N''Session'';
+        THROW;
+    END CATCH;
+
+    EXEC sys.sp_releaseapplock @Resource = N''usp_CrawlerVisits_RollUp'', @LockOwner = N''Session'';
+    SELECT @days AS Days, @rows AS [Rows];
+END;
+';
+EXEC sys.sp_executesql N'
+CREATE OR ALTER PROCEDURE dbo.usp_PageViews_RollUp
+    @Through DATE,          -- last day to summarise; the caller passes a day that has fully ended
+    @MaxDays INT = 31       -- days with views to summarise in one call, so a first run is bounded
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    -- One roll-up at a time, so two callers can never both insert the same day.
+    DECLARE @lock INT;
+    EXEC @lock = sys.sp_getapplock @Resource = N''usp_PageViews_RollUp'', @LockMode = N''Exclusive'',
+                                   @LockOwner = N''Session'', @LockTimeout = 0;
+    IF @lock < 0
+    BEGIN
+        SELECT 0 AS Days, 0 AS [Rows];
+        RETURN;
+    END;
+
+    BEGIN TRY
+        -- PageViews has no date-leading index, so every read below goes owner by owner through
+        -- IX_PageViews_OwnerId_CreatedAt (covering), a seek per owner.
+        DECLARE @owners TABLE (OwnerId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY);
+        INSERT INTO @owners (OwnerId) SELECT DISTINCT OwnerId FROM dbo.PageViews;
+
+        CREATE TABLE #d (OwnerId UNIQUEIDENTIFIER NOT NULL, Path NVARCHAR(500) NOT NULL, Source NVARCHAR(100) NULL,
+                         Medium NVARCHAR(100) NULL, Referrer NVARCHAR(1000) NULL, Campaign NVARCHAR(200) NULL,
+                         Country NVARCHAR(2) NULL, Region NVARCHAR(200) NULL);
+
+        -- Continue after the last summarised day; days without views are skipped, not counted.
+        DECLARE @from DATETIME2 = ISNULL(DATEADD(DAY, 1, CAST((SELECT MAX([Day]) FROM dbo.PageViewDaily) AS DATETIME2)), ''0001-01-01'');
+        DECLARE @day DATE = (SELECT CAST(MIN(n.FirstView) AS DATE) FROM @owners o
+                              CROSS APPLY (SELECT MIN(p.CreatedAt) AS FirstView FROM dbo.PageViews p
+                                            WHERE p.OwnerId = o.OwnerId AND p.CreatedAt >= @from) n);
+
+        DECLARE @days INT = 0, @rows INT = 0, @next DATETIME2;
+        WHILE @day IS NOT NULL AND @day <= @Through AND @days < @MaxDays
+        BEGIN
+            SET @next = DATEADD(DAY, 1, CAST(@day AS DATETIME2));
+
+            -- The content-page rule matches PageViewRepository.ContentPathFilter and usp_Analytics_Report.
+            TRUNCATE TABLE #d;
+            INSERT INTO #d (OwnerId, Path, Source, Medium, Referrer, Campaign, Country, Region)
+            SELECT p.OwnerId, p.Path, p.Source, p.Medium, p.Referrer, p.Campaign, p.Country, p.Region
+              FROM @owners o
+              JOIN dbo.PageViews p ON p.OwnerId = o.OwnerId AND p.CreatedAt >= @day AND p.CreatedAt < @next
+             WHERE p.Path = N''/'' OR (CHARINDEX(N''/'', p.Path, 2) = 0 AND p.Path NOT IN (
+                   N''/feed'', N''/sitemap.xml'', N''/robots.txt'',
+                   N''/admin'', N''/account'', N''/newsletter'', N''/avatar'', N''/og-image'', N''/landing'', N''/error''));
+
+            BEGIN TRANSACTION;
+            DELETE FROM dbo.PageViewDaily WHERE [Day] = @day;
+            -- Every owner gets a day total, even of zero, so a day of only non-content views still moves
+            -- MAX(Day) on and is not read again.
+            INSERT INTO dbo.PageViewDaily (OwnerId, [Day], Dimension, Value1, Value2, Views)
+            SELECT o.OwnerId, @day, 0, NULL, NULL, (SELECT COUNT(*) FROM #d d WHERE d.OwnerId = o.OwnerId) FROM @owners o
+            UNION ALL SELECT OwnerId, @day, 1, Path, NULL, COUNT(*) FROM #d GROUP BY OwnerId, Path
+            UNION ALL SELECT OwnerId, @day, 2, Source, Medium, COUNT(*) FROM #d GROUP BY OwnerId, Source, Medium
+            UNION ALL SELECT OwnerId, @day, 3, Referrer, NULL, COUNT(*) FROM #d WHERE Referrer IS NOT NULL GROUP BY OwnerId, Referrer
+            UNION ALL SELECT OwnerId, @day, 4, Campaign, NULL, COUNT(*) FROM #d WHERE Campaign IS NOT NULL GROUP BY OwnerId, Campaign
+            UNION ALL SELECT OwnerId, @day, 5, Country, NULL, COUNT(*) FROM #d WHERE Country IS NOT NULL GROUP BY OwnerId, Country
+            UNION ALL SELECT OwnerId, @day, 6, Region, NULL, COUNT(*) FROM #d WHERE Region IS NOT NULL GROUP BY OwnerId, Region;
+            SET @rows += @@ROWCOUNT;
+            COMMIT TRANSACTION;
+
+            SET @days += 1;
+            SET @day = (SELECT CAST(MIN(n.FirstView) AS DATE) FROM @owners o
+                         CROSS APPLY (SELECT MIN(p.CreatedAt) AS FirstView FROM dbo.PageViews p
+                                       WHERE p.OwnerId = o.OwnerId AND p.CreatedAt >= @next) n);
+        END;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        EXEC sys.sp_releaseapplock @Resource = N''usp_PageViews_RollUp'', @LockOwner = N''Session'';
+        THROW;
+    END CATCH;
+
+    EXEC sys.sp_releaseapplock @Resource = N''usp_PageViews_RollUp'', @LockOwner = N''Session'';
+    SELECT @days AS Days, @rows AS [Rows];
+END;
+';
+PRINT '  [=] Report procedures are in place.';
 
 PRINT '';
 PRINT '==========================================================';

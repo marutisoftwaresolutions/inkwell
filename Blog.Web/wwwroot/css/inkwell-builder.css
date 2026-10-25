@@ -1,0 +1,38 @@
+/* The block builder's editor canvas (post and page editors). Loaded only by the editors; readers get their own block styles. */
+.builder-block { position: relative; border: 2px solid transparent; border-radius: 0.5rem; transition: border-color 0.15s, box-shadow 0.15s; margin-bottom: 0.5rem; cursor: pointer; }
+.builder-block:hover { border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.builder-block.selected { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent); }
+.builder-block.dragging { opacity: 0.4; }
+.builder-block .block-toolbar { display: none; position: absolute; top: -14px; right: 8px; z-index: 20; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 2px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.builder-block:hover .block-toolbar, .builder-block.selected .block-toolbar { display: flex; gap: 2px; align-items: center; }
+.block-toolbar button { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: var(--muted-foreground); }
+.block-toolbar button:hover { background: var(--accent); color: var(--foreground); }
+.drop-indicator { height: 3px; background: var(--primary); border-radius: 2px; margin: 2px 0; }
+.builder-block [contenteditable]:focus { outline: none; }
+.drag-handle { cursor: grab; }
+.drag-handle:active { cursor: grabbing; }
+.setting-field label { display: block; font-size: 11px; font-weight: 500; color: var(--muted-foreground); margin-bottom: 4px; }
+.setting-field input, .setting-field select, .setting-field textarea { width: 100%; padding: 6px 10px; border: 1px solid var(--input); border-radius: 6px; font-size: 12px; background: var(--background); color: var(--foreground); }
+.setting-field input:focus, .setting-field select:focus, .setting-field textarea:focus { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.comp-hero { background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 70%, black)); color: white; padding: 3rem 2rem; border-radius: var(--radius); text-align: center; }
+.comp-hero h2 { font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; color: white; }
+.comp-hero p { font-size: 1rem; opacity: 0.9; margin-bottom: 1.5rem; color: white; }
+.comp-hero a { display: inline-block; background: white; color: var(--primary); padding: 0.6rem 1.5rem; border-radius: var(--radius); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+.comp-imagetext { display: flex; gap: 1.5rem; align-items: center; }
+.comp-imagetext img { border-radius: var(--radius); object-fit: cover; min-height: 200px; background: var(--muted); }
+.comp-imagetext .it-content { flex: 1; }
+.comp-quote { border-left: 4px solid var(--primary); padding: 1rem 1.5rem; background: var(--muted); border-radius: 0 var(--radius) var(--radius) 0; }
+.comp-quote blockquote { font-style: italic; font-size: 1.1rem; color: var(--foreground); margin-bottom: 0.5rem; }
+.comp-quote cite { font-size: 0.85rem; color: var(--muted-foreground); }
+.comp-button { text-align: center; padding: 0.5rem 0; }
+.comp-button a { display: inline-block; background: var(--primary); color: var(--primary-foreground); padding: 0.7rem 2rem; border-radius: var(--radius); font-weight: 600; text-decoration: none; }
+.comp-spacer { display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border); border-radius: var(--radius); }
+.comp-spacer span { font-size: 9px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 1px; }
+.comp-divider hr { border: none; border-top: 1px solid var(--border); margin: 0.5rem 0; }
+.comp-video { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: var(--radius); background: var(--muted); }
+.comp-video iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
+.comp-image img { border-radius: var(--radius); display: block; }
+.comp-image .img-placeholder { background: var(--muted); border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem; text-align: center; cursor: pointer; }
+.comp-form { border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem 1rem; text-align: center; color: var(--muted-foreground); background: var(--muted); }
+.comp-form::before { content: "Form: " attr(data-form-name); font-weight: 600; color: var(--foreground); }
+.comp-form::after { content: "Readers see the real form here."; display: block; font-size: .8rem; margin-top: .25rem; }

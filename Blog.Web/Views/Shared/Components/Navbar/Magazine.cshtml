@@ -50,7 +50,7 @@
                              x-transition:leave-start="opacity-100 scale-100"
                              x-transition:leave-end="opacity-0 scale-95"
                              style="display:none; background: var(--card); border-color: var(--border);"
-                             class="absolute right-0 top-full mt-2 min-w-52 rounded-xl shadow-2xl border overflow-hidden z-50">
+                             class="absolute end-0 top-full mt-2 min-w-52 rounded-xl shadow-2xl border overflow-hidden z-50">
                             <div class="px-4 py-2.5 text-[9px] uppercase tracking-[0.3em] font-bold border-b" style="border-color: var(--border); color: var(--muted-foreground); background: var(--muted);">Jump To</div>
                             <a href="/" class="flex items-center gap-3 px-4 py-3.5 text-sm font-bold hover:opacity-70 border-b" style="border-color: var(--border); color: var(--foreground);">
                                 <i class="bi bi-house-fill text-xs" style="color: var(--primary);"></i> Home
@@ -68,7 +68,7 @@
                     @if (User.Identity != null && User.Identity.IsAuthenticated)
                     {
                         <a href="/admin/dashboard"
-                           class="hidden md:flex items-center px-4 h-9 text-xs font-bold uppercase tracking-wider rounded-md ml-1 hover:opacity-80 transition-opacity"
+                           class="hidden md:flex items-center px-4 h-9 text-xs font-bold uppercase tracking-wider rounded-md ms-1 hover:opacity-80 transition-opacity"
                            style="background: var(--primary-foreground); color: var(--primary);">
                             Dashboard
                         </a>
