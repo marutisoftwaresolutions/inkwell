@@ -263,7 +263,7 @@
         document.getElementById('pageContent').value = builder.extract();
         const form = document.getElementById('pageForm');
         let a = form.querySelector('input[name="action"]'); if(!a){a=document.createElement('input');a.type='hidden';a.name='action';form.appendChild(a);}
-        a.value='publish'; form.submit();
+        a.value='publish'; InkwellDesk.submit(form);
     };
 })();
 </script>

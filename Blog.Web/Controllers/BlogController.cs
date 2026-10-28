@@ -84,11 +84,16 @@ public class BlogController : Controller
         // Home-feed filter URLs (/?tags=x, /?category=y) duplicate the canonical /tag/{slug} and
         // /category/{slug} archives, and were being indexed in their own right — Search Console
         // 2026-08-15 shows ~45 such URLs drawing ~1,400 impressions. Consolidate the single-value
-        // case onto the clean route with a 301 so the equity lands on one URL. Multi-value
-        // combinations (?tags=a,b) have no canonical equivalent, so they stay here and remain
-        // noindex,follow as before.
+        // case onto the clean route with a 301 so the equity lands on one URL; multi-value
+        // combinations collapse the same way (below).
         if (string.IsNullOrWhiteSpace(search))
         {
+            // Multi-value combinations collapse onto one archive too (ADR-0038): they were an unbounded,
+            // noindex URL tree that AI crawlers walked millions of times. The chips no longer link to them;
+            // this answers the ones already in crawler queues and in old links.
+            if (ListingQuery.CollapseFacets(category, tags) is { } collapsed)
+                return RedirectPermanent(collapsed);
+
             var suffix = page > 1 ? $"?page={page}" : "";
             if (string.IsNullOrWhiteSpace(category) && TrySingleSlug(tags, out var tagSlug))
                 return RedirectPermanent($"/tag/{tagSlug}{suffix}");

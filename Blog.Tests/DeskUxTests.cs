@@ -160,6 +160,49 @@ public class DeskUxSourceTests
     }
 
     [Fact]
+    public void Editors_save_through_the_desk_helper_so_the_browser_never_asks_mid_save()
+    {
+        // form.submit() fires no submit event, so the unsaved-changes guard stayed armed and the browser showed
+        // "Leave site?" during Publish; Cancel there cancelled the save (owner report, 2026-10-27).
+        var root = Path.Combine(Root(), "Blog.Web", "Views");
+        foreach (var view in new[] { "Posts/Edit.cshtml", "Posts/Create.cshtml", "Pages/Edit.cshtml", "Pages/Create.cshtml" })
+        {
+            var html = File.ReadAllText(Path.Combine(root, view));
+            Assert.DoesNotMatch(new Regex(@"(f|form).submit()"), html);
+        }
+        var desk = File.ReadAllText(Path.Combine(Root(), "Blog.Web", "wwwroot", "js", "inkwell-desk.js"));
+        Assert.Contains("const submit = (form) => { markClean(); form.submit(); };", desk);
+        Assert.Contains("title: 'Leave without saving?'", desk);        // Desk links on a dirty page ask with the Desk dialog
+        Assert.Contains("InkwellDesk.leave(r.href)", desk);             // and so does the command palette
+    }
+
+    [Fact]
+    public void The_desk_dialog_is_centred_despite_the_universal_margin_reset()
+    {
+        // admin.css resets every element's margin to 0, which also removes the browser's `margin: auto` on <dialog>:
+        // the Desk dialog and the command palette then open in the top-left corner (owner report, 2026-10-27).
+        var css = File.ReadAllText(Path.Combine(Root(), "Blog.Web", "wwwroot", "css", "admin.css"));
+        Assert.Contains("dialog { margin: auto; }", css);
+    }
+
+    [Fact]
+    public void Post_editors_decide_publish_or_schedule_in_the_site_zone_not_the_browser_clock()
+    {
+        // The schedule field is in the site's display zone and the server compares it with "now" in that zone. The
+        // button used the browser's clock, so a time the server would treat as a future schedule read as "Publish",
+        // and the post quietly stayed hidden (owner report, 2026-10-27).
+        foreach (var view in new[] { "Posts/Edit.cshtml", "Posts/Create.cshtml" })
+        {
+            var html = View(view);
+            Assert.Contains("name=\"ScheduledAt\"", html);
+            Assert.Contains("data-now=\"@scheduleNow\"", html);
+            Assert.Contains("Times are in the site's time zone", html);
+            Assert.DoesNotContain("new Date(sI.value)", html);
+            Assert.DoesNotContain("new Date(scheduleInput.value)", html);
+        }
+    }
+
+    [Fact]
     public void The_layout_ships_the_busy_bar_and_desk_script()
     {
         var layout = View("Shared/_AdminLayout.cshtml");

@@ -1,4 +1,4 @@
-t.className = 'p-4 rounded-lg border border-border bg-card text-card-foreground flex items-center gap-2 shadow-pop animate-slide-in-right pointer-events-auto ' + (styles[type] || styles.info);/*
+/**
  * Inkwell admin dialogs — replaces window.confirm / alert / prompt in the Desk.
  *
  * One <dialog id="inkwell-dialog"> lives in _AdminLayout. This script:

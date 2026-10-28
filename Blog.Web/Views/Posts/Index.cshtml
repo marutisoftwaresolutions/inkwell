@@ -178,7 +178,14 @@
                             </td>
                             <td class="text-right tabular-nums hidden sm:table-cell">@post.ViewCount.ToString("N0")</td>
                             <td class="text-right tabular-nums hidden sm:table-cell @(post.CommentCount > 0 ? "" : "text-muted-foreground")">@post.CommentCount</td>
-                            <td class="text-muted-foreground whitespace-nowrap hidden lg:table-cell"><span title="@Dates.DateTimeSeconds(post.CreatedAt)">@Dates.Medium(post.CreatedAt)</span></td>
+                            @{
+                                // The date a reader of this list actually wants: when it goes live for a scheduled post,
+                                // when it went live for a published one, otherwise when it was created.
+                                var isScheduledAhead = post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt > DateTime.UtcNow;
+                                var rowDate = isScheduledAhead ? post.ScheduledAt : (isLive ? (post.PublishedAt ?? post.ScheduledAt ?? post.CreatedAt) : post.CreatedAt);
+                                var rowDateLabel = isScheduledAhead ? "Goes live " : "";
+                            }
+                            <td class="text-muted-foreground whitespace-nowrap hidden lg:table-cell"><span title="@Dates.DateTimeSeconds(rowDate)">@rowDateLabel@(isScheduledAhead ? Dates.DateTime(rowDate) : Dates.Medium(rowDate))</span></td>
                             <td>
                                 <div class="desk-row-actions">
                                     @if (canEdit)

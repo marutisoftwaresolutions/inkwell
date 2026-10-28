@@ -131,6 +131,7 @@ public class PostsController : Controller
         ViewBag.Categories = await _categories.GetAllAsync(userId);
         ViewBag.Tags = await _tags.GetAllAsync(userId);
         CustomFieldsEditor.Show(ViewData, await CustomFieldDefinitionsAsync(), new Dictionary<string, string>());
+        ViewBag.DisplayTimeZone = await DisplayTimeZoneAsync();   // the schedule field compares with "now" in the site's zone
         return View(new Post { EditorMode = EditorModes.Normalize(mode) });
     }
 

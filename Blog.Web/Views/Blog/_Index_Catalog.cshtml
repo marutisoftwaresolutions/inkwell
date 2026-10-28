@@ -46,7 +46,7 @@
             @foreach (var cat in allCategories)
             {
                 var on = selectedCategories.Contains(cat.Slug);
-                <a href="/?category=@cat.Slug" style="font-family:var(--sans);font-size:13px;font-weight:600;text-decoration:none;padding:6px 14px;border-radius:999px;border:1px solid @(on ? "var(--link)" : "var(--border)");
+                <a href="/category/@cat.Slug" style="font-family:var(--sans);font-size:13px;font-weight:600;text-decoration:none;padding:6px 14px;border-radius:999px;border:1px solid @(on ? "var(--link)" : "var(--border)");
                            background:@(on ? "var(--link)" : "transparent");color:@(on ? "var(--bg)" : "var(--fg-body)");">@cat.Name</a>
             }
         </nav>
@@ -79,7 +79,7 @@
                     <div style="min-width:0;padding-block:var(--sp-6);padding-inline-end:var(--sp-6);padding-inline-start:@(hasImage ? "0" : "var(--sp-6)");display:flex;flex-direction:column;justify-content:center;">
                         @if (category != null)
                         {
-                            <a href="/?category=@category.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-3);">@category.Name</a>
+                            <a href="/category/@category.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-3);">@category.Name</a>
                         }
                         <h2 style="font-family:var(--serif);font-size:clamp(1.0625rem,2vw,1.375rem);font-weight:700;line-height:1.3;margin:0 0 var(--sp-3);">
                             <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>

@@ -44,7 +44,7 @@
                     </time>
                     @if (cat != null)
                     {
-                        <a href="/?category=@cat.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-4);">@cat.Name</a>
+                        <a href="/category/@cat.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-4);">@cat.Name</a>
                     }
                     @if (!string.IsNullOrEmpty(post.AuthorName))
                     {

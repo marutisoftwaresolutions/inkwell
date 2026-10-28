@@ -140,8 +140,10 @@
     if (roundup is not null)
     {
         var listItems = new List<object>();
+        var position = 0;
         foreach (var e in roundup.Ranked)
         {
+            position++;
             var reviewed = new Dictionary<string, object>
             {
                 ["@type"] = string.IsNullOrWhiteSpace(roundup.ListType) ? "SoftwareApplication" : roundup.ListType,
@@ -197,7 +199,7 @@
             listItems.Add(new Dictionary<string, object>
             {
                 ["@type"] = "ListItem",
-                ["position"] = e.Rank,
+                ["position"] = position,   // list order, never the editorial rank: unranked first-party entries carry rank 0
                 ["item"] = reviewed
             });
         }

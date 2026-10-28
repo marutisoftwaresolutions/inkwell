@@ -257,7 +257,7 @@ public class StructuredDataLinterTests
             roundup: "{\"Entries\":[{\"Name\":\"OptoSoft\",\"Score\":9.4,\"Website\":\"https://www.opto-soft.com\"}]}"));
 
         Assert.True(HasError(findings));
-        Assert.Contains(findings, f => f.Message.Contains("our own product"));
+        Assert.Contains(findings, f => f.Message.Contains("publisher's own product"));
     }
 
     [Fact]
@@ -265,10 +265,33 @@ public class StructuredDataLinterTests
     {
         // Featuring it is fine — the ban is on us rating ourselves.
         var findings = StructuredDataLinter.Lint(PostWith(
-            roundup: "{\"Entries\":[{\"Name\":\"OptoSoft\",\"Score\":0,\"Website\":\"https://www.opto-soft.com\"}," + ValidEntry + "]}"));
+            roundup: "{\"Entries\":[" + ValidEntry + ",{\"Name\":\"OptoSoft\",\"Rank\":0,\"Score\":0,\"FirstParty\":true,\"Website\":\"https://www.opto-soft.com\"}]}"));
 
         Assert.True(StructuredDataLinter.CanPublish(findings));
-        Assert.DoesNotContain(findings, f => f.Message.Contains("our own product"));
+        Assert.DoesNotContain(findings, f => f.Message.Contains("publisher's own product"));
+    }
+
+    [Theory]
+    // First-Party Products rule (2026-10-25): crowning our own product is as self-serving as scoring it.
+    [InlineData("{\"Name\":\"RetaPOS\",\"Rank\":1,\"FirstParty\":true,\"Website\":\"https://www.retapos.com\"}", "ranked first")]
+    [InlineData("{\"Name\":\"RetaPOS\",\"Rank\":0,\"Badge\":\"Editor's pick\",\"FirstParty\":true,\"Website\":\"https://www.retapos.com\"}", "pick badge")]
+    [InlineData("{\"Name\":\"RetaPOS\",\"Rank\":0,\"Badge\":\"Best overall\",\"FirstParty\":true,\"Website\":\"https://www.retapos.com\"}", "pick badge")]
+    [InlineData("{\"Name\":\"RetaPOS\",\"Rank\":0,\"Score\":8.4,\"FirstParty\":true,\"Website\":\"https://www.retapos.com\"}", "self-authored score")]
+    public void Ranking_badging_or_scoring_a_flagged_first_party_product_blocks_publish(string entry, string message)
+    {
+        var findings = StructuredDataLinter.Lint(PostWith(roundup: "{\"Entries\":[" + ValidEntry + "," + entry + "]}"));
+
+        Assert.False(StructuredDataLinter.CanPublish(findings));
+        Assert.Contains(findings, f => f.Message.Contains(message));
+    }
+
+    [Fact]
+    public void The_first_party_flag_is_what_marks_an_entry_not_its_name()
+    {
+        // Tenant-neutral: any product the author flags is first-party; an unflagged product on an unknown domain is not.
+        Assert.True(new Blog.Core.Domain.RoundupEntry { Name = "RetaPOS", FirstParty = true, Website = "https://www.retapos.com" }.IsFirstParty);
+        Assert.False(new Blog.Core.Domain.RoundupEntry { Name = "RetaPOS", Website = "https://www.retapos.com" }.IsFirstParty);
+        Assert.True(new Blog.Core.Domain.RoundupEntry { Name = "OptoSoft", Website = "https://www.opto-soft.com" }.IsFirstParty);   // legacy fallback
     }
 
     [Fact]

@@ -14,7 +14,7 @@
             @if (primaryCategory != null)
             {
                 <span style="font-family:var(--sans);font-size:11px;color:var(--fg-meta);">·</span>
-                <a href="/?category=@primaryCategory.Slug"
+                <a href="/category/@primaryCategory.Slug"
                    style="font-family:var(--sans);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:var(--fg-meta);text-decoration:none;">@primaryCategory.Name</a>
             }
         </div>
@@ -135,7 +135,7 @@
             <div class="ink-tags">
                 @foreach (var tag in Model.Tags)
                 {
-                    <a href="/?tags=@tag.Slug" class="ink-tag">#@tag.Name</a>
+                    <a href="/tag/@tag.Slug" class="ink-tag">#@tag.Name</a>
                 }
             </div>
         }

@@ -5,7 +5,10 @@
 }
 <section class="vd-entry" id="@Model.Anchor">
     <div class="vd-entry-head">
-        <span class="vd-entry-rank">@Model.Rank</span>
+        @if (Model.Rank > 0)
+        {
+            <span class="vd-entry-rank">@Model.Rank</span>
+        }
 
         @if (!string.IsNullOrEmpty(Model.LogoUrl))
         {
@@ -18,10 +21,6 @@
                 @if (!string.IsNullOrEmpty(Model.Badge))
                 {
                     <span class="vd-badge">@Model.Badge</span>
-                }
-                @if (Model.IsFirstParty)
-                {
-                    <span class="vd-badge" style="background:var(--vd-pro-bg);color:var(--vd-pro);">Our platform</span>
                 }
                 @if (!string.IsNullOrEmpty(Model.Category))
                 {
@@ -51,6 +50,12 @@
     @if (!string.IsNullOrEmpty(Model.Body))
     {
         <p class="vd-entry-body">@Model.Body</p>
+    }
+
+    @if (Model.IsFirstParty)
+    {
+        @* The one disclosure for a first-party product (First-Party Products rule): neutral, in the entry, never a sales badge. *@
+        <p class="vd-entry-disclosure">Made by this site's publisher.</p>
     }
 
     @if (s is not null && (s.Features > 0 || s.Ease > 0 || s.Value > 0))

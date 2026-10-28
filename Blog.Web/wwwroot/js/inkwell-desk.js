@@ -153,7 +153,36 @@
     // markClean: the page has already asked about the unsaved work (e.g. "Discard and switch") and is about to
     // leave on purpose, so the browser's own leave prompt would be a second, redundant question.
     const markClean = () => tracked.forEach((s, form) => setDirty(form, false));
-    window.InkwellDesk = { busy, track, isDirty: () => Array.from(tracked.values()).some(s => s.dirty), markClean };
+    // submit(form): a page's own save path (Publish, Save draft) calls form.submit(), which fires no submit event, so
+    // the guard still counted the page as dirty and the browser asked "Leave site?" in the middle of the save; pressing
+    // Cancel there cancelled the save. The page is being saved, so it is clean by definition.
+    const submit = (form) => { markClean(); form.submit(); };
+
+    // leave(href): leaving a dirty page by one of the Desk's own links asks with the Desk's dialog, not the browser's.
+    // (Closing the tab, refreshing and the Back button can only ever get the browser's prompt.)
+    const isDirty = () => Array.from(tracked.values()).some(s => s.dirty && !s.submitted);
+    const leave = (href) => {
+        if (!isDirty() || !window.InkwellDialog) { window.location.href = href; return; }
+        InkwellDialog.confirm({
+            title: 'Leave without saving?',
+            body: 'The changes on this page are not saved and are lost if you leave. Save first to keep them.',
+            action: 'Leave page', cancel: 'Keep editing', tone: 'danger',
+        }).then(ok => { if (ok) { markClean(); window.location.href = href; } });
+    };
+    document.addEventListener('click', (e) => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-editor-switch')) return;
+        if (a.closest('form') && a.closest('form').matches('[data-track-changes]') && a.getAttribute('href').startsWith('#')) return;
+        const href = a.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+        if (a.origin !== window.location.origin) return;
+        if (!isDirty()) return;
+        e.preventDefault();
+        leave(a.href);
+    }, true);
+
+    window.InkwellDesk = { busy, track, isDirty, markClean, submit, leave };
 })();
 
 /*
@@ -323,7 +352,7 @@
     input.addEventListener('keydown', e => {
         if (e.key === 'ArrowDown') { e.preventDefault(); select(selected + 1); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); select(selected - 1); }
-        else if (e.key === 'Enter') { e.preventDefault(); const r = results[selected]; if (r) window.location.href = r.href; }
+        else if (e.key === 'Enter') { e.preventDefault(); const r = results[selected]; if (r) InkwellDesk.leave(r.href); }
     });
     dlg.addEventListener('cancel', e => { e.preventDefault(); close(); });
     dlg.addEventListener('click', e => { if (e.target === dlg) close(); });

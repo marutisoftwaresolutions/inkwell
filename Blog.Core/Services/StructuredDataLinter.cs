@@ -164,7 +164,16 @@ public static class StructuredDataLinter
             // bans and Google's policy prohibits.
             if (e.IsFirstParty && e.Score > 0)
                 findings.Add(new(LintSeverity.Error, "Roundup",
-                    $"\"{name}\" is our own product and carries a self-authored score. Remove the score, or cite a real third-party source.", n));
+                    $"\"{name}\" is the publisher's own product and carries a self-authored score. Remove the score, or cite a real third-party source.", n));
+
+            // Ranking the publisher's own product first, or badging it as the pick, is the same self-serving
+            // signal as scoring it (First-Party Products rule): it is listed after the independent picks, unranked.
+            if (e.IsFirstParty && e.Rank == 1)
+                findings.Add(new(LintSeverity.Error, "Roundup",
+                    $"\"{name}\" is the publisher's own product and is ranked first. List it after the independent picks with rank 0.", n));
+            if (e.IsFirstParty && IsPickBadge(e.Badge))
+                findings.Add(new(LintSeverity.Error, "Roundup",
+                    $"\"{name}\" is the publisher's own product and is badged \"{e.Badge}\". Remove the pick badge.", n));
         }
 
         foreach (var g in data.Entries.Where(e => e.Rank > 0).GroupBy(e => e.Rank).Where(g => g.Count() > 1))
@@ -203,6 +212,13 @@ public static class StructuredDataLinter
               .GroupBy(v => v!.Trim(), StringComparer.OrdinalIgnoreCase)
               .Where(g => g.Count() > 1)
               .Select(g => g.Key);
+
+    /// <summary>Badges that crown an entry ("Editor's pick", "Best overall", "Winner", "Top pick").</summary>
+    private static bool IsPickBadge(string? badge) =>
+        !string.IsNullOrWhiteSpace(badge) &&
+        (badge.Contains("pick", StringComparison.OrdinalIgnoreCase) ||
+         badge.Contains("best overall", StringComparison.OrdinalIgnoreCase) ||
+         badge.Contains("winner", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsAbsoluteHttpUrl(string value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&

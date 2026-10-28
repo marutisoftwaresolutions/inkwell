@@ -1,106 +1,59 @@
-# Inkwell v1.0.9
+# Inkwell v1.0.10
 
-**Release date:** 2026-10-25
-**Type:** Feature, security and fix release (backward-compatible for readers and content: existing tenants keep their layout, theme, content and settings; sign-up, the API and Docker change, see Upgrade notes)
+**Release date:** 2026-10-28
+**Type:** Fix release (backward-compatible: no schema change; existing tenants keep their layout, theme, content and settings; filter URLs and `robots.txt` change, see Upgrade notes)
 
-v1.0.9: **"Close the loops."** v1.0.8 opened Inkwell up; each of its features stopped at a known
-edge. This release finishes those edges. Push your content straight into WordPress or Ghost, write
-pages in Markdown, let a CDN cache your posts, and see which version is running. It also adds contact
-forms and responsive images, and the Desk gets a new shell. The Docker deployment now actually works.
+v1.0.10 fixes the Desk confirmations that v1.0.9 broke, and stops crawlers from looping through
+endless filter combinations. **If you run v1.0.9, upgrade:** in that build, Publish, Save, Delete and
+every other Desk confirmation do nothing.
 
 ## Highlights
 
-### 🚚 Push straight to WordPress or Ghost
+### ✅ The Desk works again
 
-- **Admin → Export now sends your content to a running WordPress or Ghost site** through its API, as
-  well as downloading a file. Images are uploaded once each, and running the push again sends only
-  what is missing. The credential is held in memory while the push runs and is never stored, logged
-  or audited. Tested by real pushes of 67 posts and pages into WordPress 7.1.3 and Ghost 6.70.0.
+- **Every Desk confirmation responds again.** In v1.0.9 the dialog script failed to load, so Publish
+  and Save on posts and pages, deletes, the editor switch and the typed confirmations silently did
+  nothing. A test now checks that every Desk script loads cleanly.
+- **Saving can no longer be cancelled by the browser's "Leave site?" prompt** during Publish or Save.
+  Leaving an editor with unsaved changes through a Desk link or the command palette now asks in the
+  Desk's own dialog.
+- **Publish publishes.** The Publish button and the server now judge the schedule in the site's time
+  zone, so a post is no longer scheduled quietly when your computer's clock and the site disagree.
+  The schedule field names the zone, and the posts list shows "Goes live" for scheduled posts.
+- Desk dialogs and the command palette open in the centre of the screen again.
 
-### 🧱 The website pieces every site needs
+### 🕸️ Crawlers read your pages, not endless filter URLs
 
-- **Contact forms.** Admin → Forms builds a form, and the new **Form** block places it on a page.
-  Readers can send it without JavaScript. It uses the same spam checks as comments, stores
-  submissions for as long as you choose, and can email them to you and export them as CSV.
-- **Responsive images.** Uploads get 480, 800 and 1200 px WebP copies, and pages offer them with
-  `srcset`, width and height. On the development site a phone loads about 77 KB of images for the
-  home page instead of about 1 MB. Images already on your site get their copies in the background.
-- **Post pages can be cached by a CDN,** like the home page. Comment forms fetch their tokens when a
-  reader reaches them, and commenting still works without JavaScript.
+- **Category and tag chips open the archive they name** (`/category/{slug}`, `/tag/{slug}`), and the
+  active chip clears the filter. Before, each listing linked dozens of `?category=…&tags=…`
+  combinations that each linked dozens more, an endless set of URLs for crawlers to walk.
+- **Older filter-combination URLs answer 301** with the single archive they narrow to.
+- **`robots.txt` puts every allowed search and AI crawler in one group.** Each AI crawler used to have
+  its own `Allow: /` group, which made it ignore every other rule. Private areas, search results and
+  filter parameters are now out of reach for all of them, and every public page stays allowed, which
+  a new test checks against the sitemap. Anthropic's `Claude-User` and `Claude-SearchBot` are named.
 
-### ✍️ Write and publish with fewer gaps
+### ⚖️ Roundups that disclose the publisher's own products
 
-- **Pages in Markdown,** like posts, with a lossless switch either way.
-- **Custom fields over the API,** and a new `GET /api/v1/pages/{slug}` for headless front ends.
-- **Accessibility checks** in the post and page editors, a **content calendar**, and **right-to-left
-  sites**: every layout and preset mirrors for Arabic, Hebrew, Persian, Urdu and other RTL languages.
-
-### 🗂️ A new Desk
-
-- **A grouped, collapsible sidebar** with count badges, a **Ctrl/Cmd K command palette**, and a
-  dashboard that lists what needs your attention.
-- **A precompiled stylesheet:** the Desk no longer loads a 407 KB in-browser compiler on every page.
-- **The running version** shows in the Desk (never on public pages), so you can confirm a deploy.
-- **Analytics and AI Crawlers open in seconds on busy sites.** They used to take minutes or fail,
-  and now read a daily summary through one stored procedure. Page-view details can optionally be
-  deleted after a set number of days.
-
-## Security
-
-- **Sign-up closes once a site has its first account.** It used to stay open and give every new
-  account the Author role, which can publish. If your site has been public, review Users for accounts
-  you did not create.
-- **API writes follow the Desk's permissions,** tokens are re-checked against the account on every
-  request, and the example `Jwt:Key` no longer works.
-- **The API no longer exposes commenters' email or IP addresses,** and `GET /api/v1/posts/{slug}`
-  returns only what readers see.
-- **Disabling or deleting a user ends their Desk session** within a minute instead of up to seven days.
-
-## Fixed
-
-- **A fresh clone could not build, and the Docker deployment did not work.** A SQL file the build
-  embeds was missing from the repository, so v1.0.8 compiled only on machines that already had it.
-  The repository now includes it, along with the dated schema scripts named in the upgrade notes.
-  The image also clashed with the .NET 10 base image's built-in user, and nothing created the
-  database on first boot.
-  `docker compose up` now builds and seeds the database through a one-off `db-init` service, and a
-  GitHub Actions workflow boots the full stack on an empty database on every push. Thanks to the
-  community member who reported it and shared a working fork.
-- The API's write endpoints answered with a server error, because API sign-in was never switched on.
-- Posts written in the Desk never counted views, so they never appeared in "Most read".
-- Switching editors with unsaved changes could unpublish a live page or post.
-- Link Audit listed links to scheduled posts as broken after the posts went live.
-- Comments could be posted with comments switched off.
-- Four layouts scrolled sideways on phones, and header menus were see-through on sites with saved
-  theme colours.
-- Smaller fixes to the Markdown preview, the block builders, Feed header menus and validation
-  messages are in the CHANGELOG.
+- **A roundup entry can be marked `"firstParty": true`.** It then shows one short line, "Made by this
+  site's publisher.", is listed without a rank number, and is left out of rating structured data. The
+  pre-publish linter blocks a post that scores such a product, ranks it first or gives it a pick badge.
+- Roundup `ItemList` positions now follow the order the entries appear in, so an unranked entry is
+  never numbered 0.
 
 ## Upgrade notes
 
-- **Schema is automatic.** On startup, `MigrationService` adds the tables `ExportPushes`,
-  `ExportPushItems`, `Forms`, `FormSubmissions`, `PageViewDaily` and `CrawlerVisitDaily`, the
-  report stored procedures, and new columns on `Pages`. It also sets missing post view counts to 0.
-  For a manual upgrade, run these idempotent scripts from `DBScripts/` in order:
-  `2026-10-14_add-markdown-to-pages`, `2026-10-14_create-export-pushes`, `2026-10-14_create-forms`,
-  `2026-10-15_default-post-viewcount-to-zero`, `2026-10-22_create-pageviewdaily-table`,
-  `2026-10-22_create-crawlervisitdaily-table`, `2026-10-22_create-report-stored-procedures`.
-  The two `*-to-settings` scripts change no schema. A fresh install gets the full schema from
-  `DBScripts/init.sql` alone. Before this release, that was verified by diffing `sys.columns`
-  against a live database in both directions, and re-running it was shown to change nothing.
-- **Large analytics tables:** if `PageViews` or `CrawlerVisits` holds more than 200,000 rows, the
-  covering index is not built at startup. The dashboard shows a "Needs attention" line until you run
-  `DBScripts/2026-10-22_add-covering-indexes-for-report-procedures.sql` in a quiet period.
-- **Sign-up is closed after the first account.** Invite people from Users → Invite.
-- **API:** set a real `Jwt:Key` of at least 32 bytes, plus `Jwt:Issuer` and `Jwt:Audience`, or the
-  API stays off. `POST /api/v1/comments` and `POST /api/v1/media` are removed, and
-  `GET /api/v1/posts/{slug}` returns a smaller, explicit shape.
-- **Docker:** `docker compose up` now creates and seeds the database itself. If you run a single
-  container against your own SQL Server, create the database and run `DBScripts/init.sql` against it
-  first. The image runs as the base image's `app` user (UID 1654).
-- **Push to WordPress or Ghost** is Admin-only, accepts only public `https://` targets, and is hidden
-  in cloud mode.
-- **Backward-compatible otherwise.** Forms, page-view retention, push and Markdown pages change
-  nothing until you use them. Left-to-right sites look exactly as before.
+- **No schema change.** No new tables or columns, and no dated scripts to run. `DBScripts/init.sql`
+  is unchanged and still builds the complete schema on an empty database (verified before this
+  release by a `sys.columns` diff in both directions).
+- **Filtering by several categories or tags at once is no longer offered.** Existing links to such
+  URLs keep working: they redirect (301) to one archive.
+- **`robots.txt` changes on its own** after the upgrade. If you edited crawler rules by hand somewhere
+  in front of Inkwell, check they still say what you intend. Re-submitting your sitemap in Search
+  Console is optional; nothing indexable is newly blocked.
+- **Roundups that feature your own products:** add `"firstParty": true` to those entries. Earlier
+  roundups that link the product's site are recognised without the flag, but a post that ranks such a
+  product first, scores it or badges it as the pick is now held back at publish until that is removed.
+- **Backward-compatible otherwise.** Layouts, presets and settings are unchanged.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete list.

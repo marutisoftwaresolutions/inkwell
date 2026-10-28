@@ -16,7 +16,7 @@
                 @foreach (var e in Model.Ranked)
                 {
                     <tr>
-                        <td class="vd-table-rank">@e.Rank</td>
+                        <td class="vd-table-rank">@if (e.Rank > 0) { @e.Rank } else { <span aria-label="Not ranked">–</span> }</td>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 @if (!string.IsNullOrEmpty(e.LogoUrl))

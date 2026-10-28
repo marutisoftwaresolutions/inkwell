@@ -1678,6 +1678,14 @@
   margin: var(--sp-4) 0;
 }
 
+/* Disclosure for the publisher's own product: quiet but legible, never styled as a badge. */
+.vd-entry-disclosure {
+  font-size: var(--fs-ui);
+  font-style: italic;
+  color: var(--fg-meta);
+  margin: var(--sp-3) 0;
+}
+
 /* ── Pros / cons ──────────────────────────────────────────── */
 .vd-proscons {
   display: grid;

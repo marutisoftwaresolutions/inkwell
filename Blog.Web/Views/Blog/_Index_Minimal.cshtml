@@ -5,32 +5,9 @@
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
     var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
 
-    string GetToggleUrl(string type, string slug)
-    {
-        var currentCats = new List<string>(selectedCategories);
-        var currentTags = new List<string>(selectedTags);
-        if (type == "category") { if (currentCats.Contains(slug)) currentCats.Remove(slug); else currentCats.Add(slug); }
-        else if (type == "tags") { if (currentTags.Contains(slug)) currentTags.Remove(slug); else currentTags.Add(slug); }
-        // A single-value filter has a canonical archive route, and the controller 301-redirects
-        // ?tags={slug} / ?category={slug} onto it. Emit that route directly so an in-page link
-        // never spends a redirect hop. Multi-value combinations (?tags=a,b) have no canonical
-        // equivalent and stay as query URLs, exactly as before.
-        if (string.IsNullOrEmpty(searchTerm))
-        {
-            if (currentCats.Count == 0 && currentTags.Count == 1) return $"/tag/{currentTags[0]}";
-            if (currentTags.Count == 0 && currentCats.Count == 1) return $"/category/{currentCats[0]}";
-        }
-
-        var q = new List<string>();
-        if (!string.IsNullOrEmpty(searchTerm)) q.Add("search=" + Uri.EscapeDataString(searchTerm));
-        if (currentCats.Any()) q.Add("category=" + string.Join(",", currentCats));
-        if (currentTags.Any()) q.Add("tags=" + string.Join(",", currentTags));
-        // Root the multi-value URL at the home feed. A bare "?tags=a,b" is RELATIVE, so from
-        // /tag/{slug} it resolved to /tag/{slug}?tags=a,b — the archive route ignores the query,
-        // silently dropping the second tag and minting a crawlable duplicate of the archive for
-        // every chip (GSC 2026-09-04 caught one indexed at position 6).
-        return q.Any() ? "/?" + string.Join("&", q) : "/";
-    }
+    string GetToggleUrl(string type, string slug) =>
+        // Each chip goes to its own archive (or clears when active); never a filter combination (ADR-0038).
+        Blog.Core.Services.ListingQuery.FacetUrl(type, slug, selectedCategories, selectedTags);
 }
 
 <div class="container xl:max-w-3xl mx-auto px-4 py-12 md:py-20">
@@ -126,7 +103,7 @@
                     <div class="flex-1 min-w-0 flex flex-col gap-2">
                         @if (post.Categories != null && post.Categories.Any())
                         {
-                            <a href="/?category=@post.Categories.First().Slug"
+                            <a href="/category/@post.Categories.First().Slug"
                                class="text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-60 transition-opacity"
                                style="color: var(--primary);">
                                 @post.Categories.First().Name

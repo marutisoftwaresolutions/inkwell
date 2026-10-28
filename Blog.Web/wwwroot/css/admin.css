@@ -49,6 +49,11 @@
   padding: 0;
 }
 
+/* The universal margin reset above also removes the browser's `margin: auto` on <dialog>, which is what
+   centres a modal dialog; without this the Desk dialog and the command palette sit in the top-left corner. */
+dialog { margin: auto; }
+#desk-cmdk { margin-top: 10vh; }
+
 body {
   font-family: var(--font);
   background: var(--color-bg);

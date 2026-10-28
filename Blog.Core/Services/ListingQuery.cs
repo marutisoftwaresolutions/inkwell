@@ -73,6 +73,45 @@ public static class ListingQuery
     }
 
     /// <summary>
+    /// Where a category or tag chip on a listing links (ADR-0038). Each chip goes to its own archive
+    /// (<c>/category/{slug}</c>, <c>/tag/{slug}</c>), or to the home feed when it is the active filter, so it
+    /// clears. Chips used to toggle the clicked value into the current set, which minted a new
+    /// <c>/?category=…&amp;tags=…</c> URL per chip per page: an unbounded tree crawlers walked millions of times.
+    /// </summary>
+    public static string FacetUrl(string type, string slug,
+        IReadOnlyCollection<string> selectedCategories, IReadOnlyCollection<string> selectedTags)
+    {
+        var isCategory = string.Equals(type, "category", StringComparison.OrdinalIgnoreCase);
+        var active = isCategory
+            ? selectedCategories.Contains(slug, StringComparer.OrdinalIgnoreCase)
+            : selectedTags.Contains(slug, StringComparer.OrdinalIgnoreCase);
+        if (active || !IsSlug(slug)) return "/";
+        return isCategory ? $"/category/{slug.ToLowerInvariant()}" : $"/tag/{slug.ToLowerInvariant()}";
+    }
+
+    /// <summary>
+    /// For a home-feed URL that combines more than one filter value (<c>?tags=a,b</c>,
+    /// <c>?category=x&amp;tags=y</c>), the single archive it collapses to: the last tag (the one a chip added
+    /// most recently), else the last category; <c>/</c> when a value is not a valid slug. Null when the
+    /// URL holds at most one value, which the single-value redirect already handles (ADR-0038).
+    /// </summary>
+    public static string? CollapseFacets(string? category, string? tags)
+    {
+        static string[] Split(string? raw) =>
+            string.IsNullOrWhiteSpace(raw) ? [] : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var cats = Split(category);
+        var tagList = Split(tags);
+        if (cats.Length + tagList.Length <= 1) return null;
+
+        var (route, slug) = tagList.Length > 0 ? ("tag", tagList[^1]) : ("category", cats[^1]);
+        return IsSlug(slug) ? $"/{route}/{slug.ToLowerInvariant()}" : "/";
+    }
+
+    private static bool IsSlug(string value) =>
+        value.Length is > 0 and <= 200 && value.All(c => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '-');
+
+    /// <summary>
     /// True when <paramref name="page"/> asks for a page after the last one. Page 1 is never "past the
     /// end": an empty listing's first page is a real page with an empty state, not a missing one.
     /// </summary>

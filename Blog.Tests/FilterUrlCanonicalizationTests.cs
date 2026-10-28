@@ -64,19 +64,29 @@ public class FilterUrlCanonicalizationTests : IClassFixture<WebApplicationFactor
         Assert.NotEqual(HttpStatusCode.Found, response.StatusCode);
     }
 
+    // Multi-value and mixed filters used to stay on the home feed as noindex,follow pages. Each linked dozens
+    // more, an unbounded tree AI crawlers walked 7.77M times in 30 days (ADR-0038), so they now collapse onto
+    // one archive: the last tag, else the last category.
     [Theory]
-    [InlineData("/?tags=cloud-based-ehr,revolution-ehr")]                  // no canonical equivalent
-    [InlineData("/?category=practice-management-software&tags=eyefinity")] // mixed filters
-    [InlineData("/?search=compulink&tags=cloud-based-ehr")]                // search wins
-    public async Task Multi_value_and_mixed_filters_are_left_on_the_home_feed(string requested)
+    [InlineData("/?tags=cloud-based-ehr,revolution-ehr", "/tag/revolution-ehr")]
+    [InlineData("/?category=practice-management-software&tags=eyefinity", "/tag/eyefinity")]
+    public async Task Multi_value_and_mixed_filters_collapse_onto_one_archive(string requested, string expected)
+    {
+        var response = await Client().GetAsync(requested);
+
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal(expected, response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Search_with_a_filter_stays_on_the_home_feed_and_out_of_the_index()
     {
         if (!_dbAvailable) { _out.WriteLine("Dev database unavailable — skipping."); return; }
 
-        var response = await Client().GetAsync(requested);
+        var response = await Client().GetAsync("/?search=compulink&tags=cloud-based-ehr");   // search wins
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("noindex", html);   // still kept out of the index
+        Assert.Contains("noindex", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

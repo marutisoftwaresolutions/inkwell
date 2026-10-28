@@ -228,8 +228,13 @@
                     <!-- Scheduling -->
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-1">Schedule Publish</label>
-                        <input type="datetime-local" name="ScheduledAt" value="@(Model.ScheduledAt?.ToString("yyyy-MM-ddTHH:mm"))" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring text-muted-foreground" />
-                        <p class="text-xs text-muted-foreground mt-1">Leave blank to publish immediately.</p>
+                        @{
+                            // The field shows and reads the site's display zone, so "now" for the Publish/Schedule decision is in that zone too.
+                            var scheduleZone = Blog.Core.Services.TimeZoneHelper.ToIana(ViewBag.DisplayTimeZone as string);
+                            var scheduleNow = Blog.Core.Services.TimeZoneHelper.ToDisplay(DateTime.UtcNow, ViewBag.DisplayTimeZone as string).ToString("yyyy-MM-ddTHH:mm");
+                        }
+                        <input type="datetime-local" name="ScheduledAt" value="@(Model.ScheduledAt?.ToString("yyyy-MM-ddTHH:mm"))" data-now="@scheduleNow" aria-describedby="schedule-hint" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring text-muted-foreground" />
+                        <p id="schedule-hint" class="text-xs text-muted-foreground mt-1">Leave blank to publish immediately. Times are in the site's time zone (@scheduleZone, set under Settings → Dates).</p>
                     </div>
 
                     <!-- Comments Toggle -->
@@ -594,8 +599,8 @@
 
         function updatePublishButton() {
             if (@(canPublish ? "true" : "false") && scheduleInput && scheduleInput.value) {
-                var selectedDate = new Date(scheduleInput.value);
-                if (selectedDate > new Date()) {
+                // Compare in the site's zone (data-now), never the browser's clock: the server decides "scheduled" the same way.
+                if (scheduleInput.value > (scheduleInput.dataset.now || '')) {
                     if (publishBtn) publishBtn.innerText = 'Schedule';
                     confirmCopy = { title: 'Ready to schedule?', body: 'The post goes live at the scheduled time and stays hidden until then.', action: 'Schedule post' };
                     return;
@@ -634,7 +639,7 @@
                  input.value = 'publish';
                  form.appendChild(input);
              }
-             form.submit();
+             InkwellDesk.submit(form);
         }
 
         // Intercept Draft Save too
@@ -658,7 +663,7 @@
                 input.value = 'draft';
                 form.appendChild(input);
             }
-            form.submit();
+            InkwellDesk.submit(form);
         });
 
         // Preview Image client-side instantly

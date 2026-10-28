@@ -12,7 +12,7 @@
         <i class="bi bi-chevron-right text-xs"></i>
         @if (Model.Categories.Any())
         {
-            <a href="/?category=@Model.Categories.First().Slug" class="hover:opacity-80">@Model.Categories.First().Name</a>
+            <a href="/category/@Model.Categories.First().Slug" class="hover:opacity-80">@Model.Categories.First().Name</a>
             <i class="bi bi-chevron-right text-xs"></i>
         }
         <span>@Model.Title</span>
@@ -25,7 +25,7 @@
                 <div class="flex flex-wrap gap-2 mb-4">
                     @foreach (var cat in Model.Categories)
                     {
-                        <a href="/?category=@cat.Slug" class="text-xs uppercase font-bold px-3 py-1 border border-dashed hover:opacity-80" style="border-color: var(--border); background: var(--muted);">@cat.Name</a>
+                        <a href="/category/@cat.Slug" class="text-xs uppercase font-bold px-3 py-1 border border-dashed hover:opacity-80" style="border-color: var(--border); background: var(--muted);">@cat.Name</a>
                     }
                 </div>
 
@@ -140,7 +140,7 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach (var tag in Model.Tags)
                         {
-                            <a href="/?tags=@tag.Slug" class="py-1 px-3 text-sm border hover:opacity-80" style="background: var(--background); border-color: var(--border);">@tag.Name</a>
+                            <a href="/tag/@tag.Slug" class="py-1 px-3 text-sm border hover:opacity-80" style="background: var(--background); border-color: var(--border);">@tag.Name</a>
                         }
                     </div>
                 </div>

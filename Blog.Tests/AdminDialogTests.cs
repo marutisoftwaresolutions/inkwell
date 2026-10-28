@@ -106,6 +106,25 @@ public class AdminDialogTests
     }
 
     [Fact]
+    public void Every_desk_script_starts_cleanly_so_one_stray_statement_cannot_take_the_dialog_down()
+    {
+        // v1.0.9 shipped inkwell-dialog.js with a leftover "t.className = …" statement glued before its opening comment.
+        // The script threw on line 1, InkwellDialog never existed, and every confirmation in the Desk (Publish, deletes,
+        // the editor switch) silently did nothing (owner report, 2026-10-27). Each script must open with a comment or
+        // its own function wrapper, never a bare statement.
+        var dir = Path.Combine(RepoRoot(), "Blog.Web", "wwwroot", "js");
+        foreach (var file in Directory.GetFiles(dir, "inkwell-*.js"))
+        {
+            var first = File.ReadLines(file).Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? "";
+            Assert.True(first.StartsWith("/*") || first.StartsWith("//") || first.StartsWith("(function") || first.StartsWith("'use strict'") || first.StartsWith("\"use strict\""),
+                $"{Path.GetFileName(file)} starts with a bare statement: {first[..Math.Min(60, first.Length)]}");
+            // And the opening comment, when there is one, is closed: an unterminated one swallows the whole script.
+            var text = File.ReadAllText(file);
+            if (first.StartsWith("/*")) Assert.Contains("*/", text);
+        }
+    }
+
+    [Fact]
     public void The_layout_ships_the_dialog_and_its_script()
     {
         var root = RepoRoot();

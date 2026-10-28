@@ -7,6 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.0.10] — 2026-10-28
+
+### Changed
+
+- **Roundups present the publisher's own products as an independent guide would.** A roundup entry can be marked `"firstParty": true`; the site then shows one short line in that entry ("Made by this site's publisher.") instead of an "Our platform" badge, lists it without a rank number, and leaves it out of rating structured data. The pre-publish linter now also blocks a post that ranks such a product first or gives it a pick badge, as it already blocked a score. Earlier roundups that link the product's site are still recognised without the flag.
+
+### Fixed
+
+- **Roundup structured data could number an unranked entry as position 0.** `ItemList` positions now follow the order the entries appear in.
+- **AI crawlers spent millions of requests on endless filter combinations.** Every listing linked to dozens of `?category=…&tags=…` variations, each linking to dozens more, and `robots.txt` gave each AI crawler its own `Allow: /` group, which made it ignore every other rule. Category and tag chips now open the archive they name (the active chip clears the filter), any older multi-value filter URL answers 301 with the single archive it narrows to, and `robots.txt` puts every allowed search and AI crawler in one group that keeps private areas, search results and filter parameters out of reach. Every public page stays allowed for every crawler, which a new test checks against the sitemap. Anthropic's `Claude-User` and `Claude-SearchBot` are now named. Selecting several filters at once is no longer offered.
+- **Publish, Save, Delete and every other confirmation in the Desk did nothing.** The dialog script shipped in 1.0.9 with a stray line in front of its opening comment, so it failed to load and no confirmation could open: Publish and Save on posts and pages, deletes, the editor switch and the typed confirmations all silently stopped. The line is removed, and a test now checks every Desk script opens cleanly.
+- **Saving a post or page could be cancelled by the browser's own "Leave site?" prompt.** The unsaved-changes guard did not know a save was in progress, so the browser asked during Publish and Save; Cancel there lost the save. Saving now clears the guard first.
+- **Leaving an editor with unsaved changes by a Desk link or the command palette now asks with the Desk's own dialog** ("Leave without saving?") instead of the browser's. Closing the tab, refreshing or using Back still gets the browser's prompt, which no site can replace.
+- **Desk dialogs opened in the top-left corner** instead of the centre of the screen; the admin stylesheet's margin reset had removed the browser's dialog centring. The dialog and the command palette are centred again.
+- **Publish could quietly schedule a post instead of publishing it.** The Publish button judged "is the schedule in the future?" by the browser's clock while the server judged it in the site's time zone, so a time already past on your PC could still be a future schedule on the site, and the post stayed hidden under a "Publish" label. Both now use the site's zone, and the schedule field says which zone that is.
+- **The posts list showed the creation date for scheduled posts.** A scheduled post now shows "Goes live" with its scheduled time, and a live post shows its publish date.
+
 ## [1.0.9] — 2026-10-25
 
 ### Added

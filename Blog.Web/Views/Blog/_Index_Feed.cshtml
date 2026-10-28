@@ -47,7 +47,7 @@
                     <div style="min-width:0;">
                         @if (category != null)
                         {
-                            <a href="/?category=@category.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-4);">@category.Name</a>
+                            <a href="/category/@category.Slug" style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--link);text-decoration:none;margin-bottom:var(--sp-4);">@category.Name</a>
                         }
                         <h2 style="font-family:var(--serif);font-size:clamp(1.125rem,2.5vw,1.5rem);font-weight:700;line-height:1.25;margin:0 0 var(--sp-4);">
                             <a href="/@post.Slug" style="color:var(--fg);text-decoration:none;">@post.Title</a>

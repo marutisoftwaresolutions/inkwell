@@ -7,7 +7,7 @@
     <div class="flex-1 min-w-0 flex flex-col gap-2">
         @if (Model.Categories != null && Model.Categories.Any())
         {
-            <a href="/?category=@Model.Categories.First().Slug"
+            <a href="/category/@Model.Categories.First().Slug"
                class="text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-60"
                style="color: var(--primary);">
                 @Model.Categories.First().Name

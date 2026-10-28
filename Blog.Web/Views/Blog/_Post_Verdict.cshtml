@@ -27,7 +27,7 @@ else
             <span aria-hidden="true"> › </span>
             @if (Model.Categories.Any())
             {
-                <a href="/?category=@Model.Categories.First().Slug" style="color:inherit;">@Model.Categories.First().Name</a>
+                <a href="/category/@Model.Categories.First().Slug" style="color:inherit;">@Model.Categories.First().Name</a>
                 <span aria-hidden="true"> › </span>
             }
             <span style="color:var(--fg);">@Model.Title</span>
@@ -175,7 +175,7 @@ else
                     <div style="display:flex;flex-wrap:wrap;gap:8px;">
                         @foreach (var tag in Model.Tags)
                         {
-                            <a href="/?tags=@tag.Slug" class="vd-chip" style="text-decoration:none;">@tag.Name</a>
+                            <a href="/tag/@tag.Slug" class="vd-chip" style="text-decoration:none;">@tag.Name</a>
                         }
                     </div>
                 </div>

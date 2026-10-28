@@ -99,12 +99,19 @@ public class RoundupEntry
     public bool HasWebsite => !string.IsNullOrWhiteSpace(Website);
 
     /// <summary>
-    /// True when this entry is the operator's own first-party product (OptoSoft). First-party
-    /// entries are shown with an on-page disclosure and must NOT emit a self-authored
-    /// Review/AggregateRating in JSON-LD (self-serving ratings violate Google's policy and the
-    /// SEO/AEO Rule). Derived from the website domain — no stored flag.
+    /// Set in the roundup JSON (<c>"firstParty": true</c>) when the product is made by the site's publisher.
+    /// Tenant-neutral: the author marks it, nothing is inferred from a product name.
+    /// </summary>
+    public bool FirstParty { get; set; }
+
+    /// <summary>
+    /// True when this entry is the publisher's own product. First-party entries render a neutral
+    /// in-entry disclosure, carry no score or pick badge (StructuredDataLinter), and never emit a
+    /// self-authored Review/AggregateRating in JSON-LD (Google's policy, the SEO/AEO Rule). The explicit
+    /// flag is the rule; the two domains are a fallback for roundups written before the flag existed.
     /// </summary>
     public bool IsFirstParty =>
+        FirstParty ||
         (Website?.Contains("opto-soft.com", StringComparison.OrdinalIgnoreCase) ?? false) ||
         (Website?.Contains("opticalsoftware.org", StringComparison.OrdinalIgnoreCase) ?? false);
 

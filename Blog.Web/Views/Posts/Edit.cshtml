@@ -245,8 +245,13 @@
                     <!-- Scheduling -->
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-1">Schedule Publish</label>
-                        <input type="datetime-local" name="ScheduledAt" value="@(Model.ScheduledAt?.ToString("yyyy-MM-ddTHH:mm"))" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring text-muted-foreground" />
-                        <p class="text-xs text-muted-foreground mt-1">Leave blank to publish immediately.</p>
+                        @{
+                            // The field shows and reads the site's display zone, so "now" for the Publish/Schedule decision is in that zone too.
+                            var scheduleZone = Blog.Core.Services.TimeZoneHelper.ToIana(ViewBag.DisplayTimeZone as string);
+                            var scheduleNow = Blog.Core.Services.TimeZoneHelper.ToDisplay(DateTime.UtcNow, ViewBag.DisplayTimeZone as string).ToString("yyyy-MM-ddTHH:mm");
+                        }
+                        <input type="datetime-local" name="ScheduledAt" value="@(Model.ScheduledAt?.ToString("yyyy-MM-ddTHH:mm"))" data-now="@scheduleNow" aria-describedby="schedule-hint" class="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring text-muted-foreground" />
+                        <p id="schedule-hint" class="text-xs text-muted-foreground mt-1">Leave blank to publish immediately. Times are in the site's time zone (@scheduleZone, set under Settings → Dates).</p>
                     </div>
 
                     <!-- Comments Toggle -->
@@ -640,11 +645,12 @@
             // Publish / schedule / submit confirmation goes through the shared Desk dialog (focus trap, Escape, both schemes).
             var pBtn=document.getElementById('publishBtn'),sI=document.querySelector('input[name="ScheduledAt"]');
             var confirmCopy={title:@Json.Serialize(modalTitle),body:@Json.Serialize(modalDesc),action:@Json.Serialize(modalConfirm)};
-            function upb(){if(@(canPublish ? "true" : "false")&&sI&&sI.value&&new Date(sI.value)>new Date()){pBtn.innerText='Update schedule';confirmCopy={title:'Ready to schedule?',body:'The post goes live at the scheduled time and stays hidden until then.',action:'Schedule post'};return;}pBtn.innerText=@Json.Serialize(publishLabel);confirmCopy={title:@Json.Serialize(modalTitle),body:@Json.Serialize(modalDesc),action:@Json.Serialize(modalConfirm)};}
+            // Compare in the site's zone (data-now), never the browser's clock: the server decides "scheduled" the same way.
+            function upb(){if(@(canPublish ? "true" : "false")&&sI&&sI.value&&sI.value>(sI.dataset.now||'')){pBtn.innerText='Update schedule';confirmCopy={title:'Ready to schedule?',body:'The post goes live at the scheduled time and stays hidden until then.',action:'Schedule post'};return;}pBtn.innerText=@Json.Serialize(publishLabel);confirmCopy={title:@Json.Serialize(modalTitle),body:@Json.Serialize(modalDesc),action:@Json.Serialize(modalConfirm)};}
             if(sI){sI.addEventListener('input',upb);upb();}
             pBtn.addEventListener('click',function(){InkwellDialog.confirm({title:confirmCopy.title,body:confirmCopy.body,action:confirmCopy.action,tone:'neutral'}).then(function(ok){if(ok)window.confirmPublish();});});
-            window.confirmPublish=async function(){fill();pBtn.disabled=true;pBtn.innerText='@(canPublish ? "Publishing…" : "Submitting…")';await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='publish';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='publish';f.appendChild(a);}f.submit();};
-            document.querySelector('button[value="draft"]').addEventListener('click',async function(e){e.preventDefault();this.innerText='Saving...';this.disabled=true;fill();await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='draft';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='draft';f.appendChild(a);}f.submit();});
+            window.confirmPublish=async function(){fill();pBtn.disabled=true;pBtn.innerText='@(canPublish ? "Publishing…" : "Submitting…")';await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='publish';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='publish';f.appendChild(a);}InkwellDesk.submit(f);};
+            document.querySelector('button[value="draft"]').addEventListener('click',async function(e){e.preventDefault();this.innerText='Saving...';this.disabled=true;fill();await uploadPendingImages();var f=document.getElementById('postForm');var a=f.querySelector('input[name="submitAction"]');if(a)a.value='draft';else{a=document.createElement('input');a.type='hidden';a.name='submitAction';a.value='draft';f.appendChild(a);}InkwellDesk.submit(f);});
         })();
         // OG/Twitter uploads
         window.previewImage=function(i,p){if(i.files&&i.files[0]){var img=document.getElementById(p);img.src=URL.createObjectURL(i.files[0]);img.classList.remove('hidden');}};

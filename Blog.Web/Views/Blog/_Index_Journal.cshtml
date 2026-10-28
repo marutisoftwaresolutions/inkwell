@@ -128,7 +128,7 @@
                         <div style="padding:var(--sp-6);display:flex;flex-wrap:wrap;gap:var(--sp-4);">
                             @foreach (var c in cats)
                             {
-                                <a href="/?category=@c.Slug" style="font-family:var(--sans);font-size:12px;font-weight:600;color:var(--link);text-decoration:none;">@c.Name</a>
+                                <a href="/category/@c.Slug" style="font-family:var(--sans);font-size:12px;font-weight:600;color:var(--link);text-decoration:none;">@c.Name</a>
                             }
                         </div>
                     </div>
