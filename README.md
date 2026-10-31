@@ -6,6 +6,24 @@ typography, content ownership, and a calm editorial experience.
 
 🌐 https://www.useinkwell.app · 📄 MIT licensed · 🔒 No telemetry, no cloud account
 
+## Screenshots
+
+| The Desk dashboard | Visual editor |
+|---|---|
+| ![The Desk dashboard: what needs attention, review queue, recent posts](.github/screenshots/desk-dashboard.png) | ![The visual editor with the post settings panel](.github/screenshots/editor-visual.png) |
+
+| Markdown editor | Theme settings with live preview |
+|---|---|
+| ![The same post written in Markdown](.github/screenshots/editor-markdown.png) | ![Theme settings: 20 layouts, 16 presets, live preview](.github/screenshots/theme-settings.png) |
+
+| Journal layout, Linen preset | Grid layout, Folio preset |
+|---|---|
+| ![Public site in the Journal layout](.github/screenshots/layout-journal.png) | ![Public site in the Grid layout](.github/screenshots/layout-grid.png) |
+
+![A post page: series navigation, breadcrumb, verified and review dates, answer capsule](.github/screenshots/post-page.png)
+
+Captured from the demo content in `DemoDeployment/` on Inkwell 1.0.10.
+
 ## Why Inkwell
 
 - **Self-hosted & private** — your content, your server, your data. You are the sole data controller.

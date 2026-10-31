@@ -2,7 +2,8 @@
 @model PagedResult<Blog.Core.Domain.Post>
 @{
     // Magazine layout owns its own header and footer — suppress the shared layout chrome
-    ViewData["HideLayoutChrome"] = true;
+    // HideLayoutChrome is set by Index.cshtml, not here: a partial's ViewData is a copy and
+    // never reaches _PublicLayout (LayoutChromeTests guards this).
 
     var searchTerm = ViewBag.SearchTerm as string;
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();

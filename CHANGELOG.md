@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Magazine layout showed two headers and two footers.** Magazine draws its own masthead, section navigation and footer, but the shared navbar and footer were rendered as well, so the home page carried both and two newsletter boxes. The flag that hides the shared chrome was set inside the layout partial, where it never reached the page layout; it is now set by the page itself, and a source test keeps it there.
+
 ## [1.0.10] — 2026-10-28
 
 ### Changed

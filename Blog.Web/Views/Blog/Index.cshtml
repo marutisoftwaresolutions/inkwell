@@ -36,6 +36,15 @@
 
     var blogLayout = (string)(ViewBag.LayoutIndex ?? "Neutral");
 
+    // Magazine draws its own masthead, section nav and footer, so the layout's Navbar and Footer
+    // components must stay out. The flag has to be set HERE, in the view: a partial gets a copy of
+    // ViewData, so a flag set inside _Index_Magazine never reached _PublicLayout and the home page
+    // rendered two headers and two footers (issue #2, "theming doesn't work", 2026-10-31).
+    if (blogLayout == "Magazine")
+    {
+        ViewData["HideLayoutChrome"] = true;
+    }
+
     // ── CollectionPage schema (listing pages: home / category / tag) ──────────
     var collBase = $"{Context.Request.Scheme}://{Context.Request.Host}";
     var collData = new Dictionary<string, object>

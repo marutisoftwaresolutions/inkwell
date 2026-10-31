@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in Inkwell does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Security problems go to hello@useinkwell.app instead (see SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Inkwell version
+      description: The release tag you installed, for example v1.0.10.
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker Compose (bundled SQL Server and Caddy)
+        - Single container (docker run) with my own SQL Server
+        - dotnet run / Kestrel
+        - IIS
+        - Other (say below)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Start from a known state (fresh install, or one you describe) and list each action.
+      placeholder: |
+        1. Sign in as admin
+        2. Open Theme and pick a preset
+        3. Open the public home page
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Include the exact error text, a screenshot, or the relevant lines from the app log or Admin > Error Monitor.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, SQL Server edition, browser, reverse proxy.

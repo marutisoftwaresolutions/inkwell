@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or help
+    url: https://github.com/marutisoftwaresolutions/inkwell/discussions
+    about: Ask how to do something or get help with your setup.
+  - name: Security report
+    url: https://github.com/marutisoftwaresolutions/inkwell/blob/main/SECURITY.md
+    about: Please report vulnerabilities privately by email, not as an issue.
