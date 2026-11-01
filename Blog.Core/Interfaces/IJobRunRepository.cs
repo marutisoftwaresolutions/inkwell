@@ -19,4 +19,10 @@ public interface IJobRunRepository
 
     /// <summary>Upsert the row for <paramref name="name"/> with the outcome of the run that just finished.</summary>
     Task RecordAsync(string name, DateTime startedAtUtc, DateTime finishedAtUtc, bool succeeded, string? message);
+
+    /// <summary>Pause or resume a job (ADR-0040). Creates the row if the job has never run. A paused job is never claimed.</summary>
+    Task SetPausedAsync(string name, bool paused);
+
+    /// <summary>Replace (or with null, clear) the interval declared in code. Creates the row if needed.</summary>
+    Task SetIntervalOverrideAsync(string name, int? minutes);
 }

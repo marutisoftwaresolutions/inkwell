@@ -10,7 +10,7 @@
 
 <div class="flex gap-4 pb-6 border-b border-dashed last:border-b-0" style="border-color: var(--border); @(Model.Depth > 0 ? $"margin-inline-start: {Model.Depth * 2}rem; border-inline-start: 2px solid var(--border); padding-inline-start: 1rem;" : "")">
     <div class="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden">
-        <img src="/avatar/@System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)" alt="" class="w-full h-full object-cover" loading="lazy" />
+        <img src="/avatar/@Uri.EscapeDataString(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)" alt="" class="w-full h-full object-cover" loading="lazy" />
     </div>
     <div class="flex-1">
         <div class="flex items-baseline justify-between mb-1">

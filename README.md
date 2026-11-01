@@ -4,7 +4,20 @@
 Multi-tenant by default, themeable, and crafted for writers and teams who care about
 typography, content ownership, and a calm editorial experience.
 
-🌐 https://www.useinkwell.app · 📄 MIT licensed · 🔒 No telemetry, no cloud account
+🌐 https://www.useinkwell.app · ▶ **[Try the live demo](https://demo.useinkwell.app/)** · 📄 MIT licensed · 🔒 No telemetry, no cloud account
+
+## Try it live
+
+A public demo runs the current release with sample content, so you can judge Inkwell before installing
+anything: read the site as a visitor, then sign in to the Desk and write, schedule, restyle and read the
+reports as an owner would.
+
+**→ [Try the live demo](https://demo.useinkwell.app/)** — the reader site, as a visitor sees it.
+**→ [Sign-in details for the Desk](https://www.useinkwell.app/demo)** — the demo page on useinkwell.app
+shows the shared demo accounts to a person (not to a crawler) and links the Desk sign-in.
+
+The demo resets to its starting content every weekend, and the demo accounts are restored every hour, so
+nothing you try there is kept. Please do not enter personal data; the site is shared and public.
 
 ## Screenshots
 
@@ -22,7 +35,7 @@ typography, content ownership, and a calm editorial experience.
 
 ![A post page: series navigation, breadcrumb, verified and review dates, answer capsule](.github/screenshots/post-page.png)
 
-Captured from the demo content in `DemoDeployment/` on Inkwell 1.0.10.
+Captured from the [public demo](https://www.useinkwell.app/demo) on Inkwell 1.0.10.
 
 ## Why Inkwell
 
@@ -78,6 +91,8 @@ Create that database and run `DBScripts/init.sql` against it first.
 - **Error Monitor** — a global exception handler and status-code logger record 4xx/5xx errors into an `ErrorLogs` table, grouped by signature (status + normalized path + exception type) so similar/repeat errors collapse into one counted row. Admin → Error Monitor lists groups with counts, first/last-seen, and filters; optional SMTP email alerts notify configured recipients the first time a new server error appears.
 - **IP Firewall (automatic blocking)** — every failing request is weighed by a threat scorer: exploit probes (`.php`/`wp-admin`/`.env`/path traversal/SQL-injection payloads) score 5, rejected sign-ins 3, ordinary 404s 1. When an address crosses the threshold (default 10 points in 10 minutes) it is blocked automatically — 24 hours on the first offense, a week on the second, permanently on the third — and refused with a bare 403 before any other work happens. Admin → Security shows active rules, the live watchlist of addresses building a score, and per-rule denied-request counts; addresses can be blocked or allowlisted by hand (also one-click from Admin → Error Monitor, which now records each signature's last client IP). Rules live in `IpFirewallRules` so blocks survive a restart; enforcement reads an in-memory snapshot, so an attack costs no per-request database work. Search and AI crawlers (Googlebot, Bingbot, GPTBot, ClaudeBot, …) are never blocked for 404s — unless the address has been proven not to be that crawler (outside its published IP list and with foreign reverse DNS; Google, Bing and Apple) — loopback and private ranges are never blocked at all, and the firewall fails open if the database is unreachable.
 - **Redirects & 404 manager** — Admin → Redirects lists, creates, edits and removes redirect rules with 301, 302 or **410 Gone**, including the rules post renames and imports write automatically. The 404 log becomes a worklist ranked by evidence that a reader hit it — another page links to it, or it closely matches a real published slug — with one-click "301 to the suggested post" or "410 to retire it"; scanner noise is collapsed out of the way. Loops, chains and rules pointing at a retired URL are refused. Admin-only; every change audited.
+- **Job controls** — every built-in job (backups, rollups, retention, newsletter sending, image variants, scheduled scripts) can be paused, resumed, re-timed in minutes or run now from Admin → Dashboard → Scheduled jobs, without a redeploy; `Jobs:LockedJobs` names the ones a Desk account may not pause or re-time. All of it audited.
+- **Scheduled scripts** — Admin → Scheduled scripts runs `.sql` files from the server's scripts folder (`ScheduledScripts:Folder`, default `App_Data/jobs`) hourly, daily or weekly in UTC, through the site's own connection, batch by batch on `GO`, with the output kept on the row. Enable, disable, edit, remove or run now; every run is audited. Only files already on the server can be chosen, so a Desk account never submits SQL text; schedules pinned in `ScheduledScripts:Jobs` are read-only in the Desk. For hosts with no Task Scheduler or `sqlcmd`.
 - **Webhooks** — Admin → Webhooks sends a signed JSON `POST` to any public address when a post is published, updated or unpublished (including a scheduled post reaching its time), a page is published, a reader submits a comment, or a visitor sends a contact form. Deliveries are queued and sent by the scheduler, never on the publish request, and retried after 1 minute, 5 minutes, 30 minutes and 2 hours before being marked failed; each endpoint has a 30-day delivery log with the response code, **Redeliver**, and **Send test**. Requests carry `X-Inkwell-Event`, a stable `X-Inkwell-Delivery` id and an HMAC-SHA256 `X-Inkwell-Signature` over the timestamp and body; the signing secret is stored Data-Protection-encrypted and never shown again. Addresses on the server itself or a private network are refused, including host names that resolve to one. Payloads never include commenter email addresses or IPs. Admin-only and audited.
 - **REST API** — `/api/v1` for scripts and headless front ends. Anyone can read published posts (`GET /posts`, `/posts/{slug}`), pages (`/pages/{slug}`), categories and tags, in an explicit public shape (what a reader sees on the page, never review notes, schedules or internal fields). Sign in with `POST /auth/login` (email, password and, with two-factor on, `code`) for a 15-minute bearer token, then create, update, publish and delete posts (HTML as `content` or Markdown as `markdown`, plus `customFields`), moderate comments and edit your profile. Tokens carry your Desk permissions: a Contributor drafts and edits only their own posts, publishing needs the publish permission, a published post can be changed or deleted only by someone who may publish, publishing runs the same structured-data check as the Desk (and is refused with the problems listed), saves are kept in revision history, and every write is in the audit trail. Errors come back as JSON. An expired token is not counted against the caller by the IP firewall. Disabling an account stops its token at once. The API stays off until `Jwt:Key` is set to a real secret.
 - **Navigation menus** — Admin → Menus builds the header and footer menus from pages, categories, tags, series, the home feed (footer) or custom links, ordered and nested one level, with an optional new-tab setting. Items point at content by id, so renaming a slug never breaks a menu, and content that is deleted or unpublished drops out on its own. Every navbar and footer variant renders them. Until a header menu is saved the header shows the pages marked “Show in navigation” exactly as before, and a site with no footer menu shows no extra footer row. Custom links accept a site path or an http(s) address only.
@@ -120,7 +135,7 @@ Create that database and run `DBScripts/init.sql` against it first.
 - **Cacheable home and post pages** — an anonymous request for `/` or for a post sets no cookie and is not marked `no-store`, so a CDN edge rule can cache them. The newsletter form fetches its anti-forgery token only when a reader presses Subscribe (without JavaScript, a short confirm page carries it). The comment and reply forms fetch theirs when a reader reaches the comments and send in place, with the outcome announced next to the form; without JavaScript a comment lands on a short page that keeps what the reader typed and sends it on the next press.
 - **Revision history** — every saved change to a post or page with different content writes a revision (title, body, meta, structured blocks, plus the slug and status at the time). The editor sidebar lists them; Compare shows a line-level diff against the current body with restore in one click. A restore first records the current content as a revision, so it is itself reversible, and never changes the slug or publish state. The number kept per item is a setting (default 25).
 - **UTC everywhere, displayed in your zone** — publish, schedule and visibility checks all run in UTC, so a post is never live at its URL yet missing from the homepage, feed and sitemap because the host's clock differs from the stamp's. Admin → Settings → Display → **Date and time** sets the site's country, time zone, date format and clock: every date readers and staff see follows them, and a typed schedule time is read in that zone.
-- **Dates in your country's format** — pick a country and its IANA time zones and date formats are offered (249 countries, 419 zones, 548 country locales, generated from the IANA Time Zone Database and Unicode CLDR into database tables by a dated script), or use ISO 8601 (2026-10-05) everywhere; force a 24-hour or 12-hour clock if you like. Every layout, post card, footer and Desk screen shows dates in that format and zone, with a live preview in Settings. Calendar dates ("last verified", "next review") never shift between zones, sites on Arabic, Thai or Persian locales show the Gregorian year, and structured data, feeds and sitemaps keep their standard UTC formats. `tools/RefDataGenerator` rebuilds the catalogs when tzdata or CLDR publish.
+- **Dates in your country's format** — pick a country and its IANA time zones and date formats are offered (249 countries, 419 zones, 548 country locales, generated from the IANA Time Zone Database and Unicode CLDR into database tables by a dated script), or use ISO 8601 (2026-10-05) everywhere; force a 24-hour or 12-hour clock if you like. Every layout, post card, footer and Desk screen shows dates in that format and zone, with a live preview in Settings. Calendar dates ("last verified", "next review") never shift between zones, sites on Arabic, Thai or Persian locales show the Gregorian year, and structured data, feeds and sitemaps keep their standard UTC formats.
 - **Self-service password reset** — "Forgot your password?" on the sign-in page emails a single-use link that expires in 30 minutes. Only the hash of the token is stored, the response is identical whether or not the address has an account, requests per account are capped at three an hour, and both the request and the reset are audited. When SMTP is not configured the page says so instead of failing silently.
 - **The Desk** — the admin is one shell for every screen: a grouped, collapsible sidebar (Content, Audience, Growth, System, Settings) with count badges for comments awaiting moderation and posts waiting for review, an icon rail for small laptops, a breadcrumb and page title with the primary action beside it, an account menu, and a **Ctrl/Cmd K** command palette that jumps to any screen or action and searches posts. The dashboard is a working surface: linked tiles with the 7-day change in page views, a "Needs attention" list (moderation, reviews, overdue refreshes, scheduled posts, failed jobs, server errors, firewall blocks) that is honest when empty, a 30-day sparkline, the review queue and recent posts. Every screen shares one component vocabulary (buttons, inputs, cards, tables, pills, tabs, overflow menus) compiled into one stylesheet at build time, renders in both colour schemes and works at phone width; destructive actions and publishing go through one accessible dialog.
 - **Version in the Desk** — the running version appears under the sign-out button and on the dashboard, so an operator can confirm a deploy; public pages never show it.
@@ -177,7 +192,6 @@ Create that database and run `DBScripts/init.sql` against it first.
 |---|---|
 | Schema migrations | `MigrationService` — `IF NOT EXISTS` guards run on every startup |
 | DB scripts | `DBScripts/YYYY-MM-DD_description.sql` — idempotent, dated |
-| OG image CLI | `tools/FeatureImageGenerator` — .NET 10 console app (SixLabors.ImageSharp) |
 | CSS build | Public `wwwroot/css/tailwind.css` is compiled from `tailwind.config.js` + `tailwind.src.css` and committed. Regenerate after adding utility classes with `npx tailwindcss@3 -c tailwind.config.js -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.css --minify`, or build with `-p:BuildTailwindCss=true` (needs Node). `dotnet build` alone needs no Node. |
 | Tests | `Blog.Tests` (xUnit) — SEO unit guards (title branding, meta-description truncation, robots.txt tokens and an RFC 9309 evaluation that no sitemap URL is blocked for any search or AI crawler, locale mapping) plus `WebApplicationFactory` HTTP smoke tests (home/robots/sitemap/llms/search/post). Integration tests self-skip when no SQL Server is reachable. Run with `dotnet test`. |
 | Solution format | `Blog.slnx` (modern .NET solution file) |
@@ -191,8 +205,6 @@ Create that database and run `DBScripts/init.sql` against it first.
 Blog.Core/              Domain models, interfaces, AuditActions constants
 Blog.Infrastructure/    Dapper repositories, MigrationService, seeders, DapperContext
 Blog.Web/               ASP.NET Core 10 MVC — controllers, views, middleware, services
-tools/
-  FeatureImageGenerator/ OG image generation CLI
 DBScripts/              Idempotent, dated SQL scripts (YYYY-MM-DD_description.sql)
 ```
 
@@ -325,11 +337,8 @@ Scripts are idempotent and use `IF NOT EXISTS` / `IF COL_LENGTH(...)` guards. `M
 dotnet watch run --project Blog.Web   # hot-reload
 ```
 
-Generate OG / feature images for posts:
-
-```bash
-dotnet run --project tools/FeatureImageGenerator
-```
+Feature images for posts are set in the post editor; the platform falls back to a generated `/og-image/{slug}.png`
+social card when a post has none.
 
 ---
 

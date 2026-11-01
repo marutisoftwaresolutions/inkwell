@@ -45,6 +45,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IExportPushRepository, ExportPushRepository>();   // direct push runs (ADR-0029)
         services.AddScoped<IFormRepository, FormRepository>();               // contact forms (ADR-0030)
         services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
+        services.AddScoped<IScheduledScriptRepository, ScheduledScriptRepository>();   // Admin → Scheduled scripts (ADR-0039)
         services.AddScoped<ISearchPerformanceRepository, SearchPerformanceRepository>();
         services.AddScoped<IWebhookRepository, WebhookRepository>();
         services.AddScoped<IMenuRepository, MenuRepository>();

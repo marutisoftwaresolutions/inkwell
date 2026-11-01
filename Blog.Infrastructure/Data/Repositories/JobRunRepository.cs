@@ -15,7 +15,7 @@ public class JobRunRepository : IJobRunRepository
     {
         using var conn = _ctx.CreateConnection();
         return await conn.QueryFirstOrDefaultAsync<JobRun>(
-            "SELECT Name, LastStartedAt, LastFinishedAt, LastSucceeded, LastMessage, RunCount FROM Jobs WHERE Name = @Name",
+            "SELECT Name, LastStartedAt, LastFinishedAt, LastSucceeded, LastMessage, RunCount, Paused, IntervalOverrideMinutes FROM Jobs WHERE Name = @Name",
             new { Name = name });
     }
 
@@ -23,7 +23,7 @@ public class JobRunRepository : IJobRunRepository
     {
         using var conn = _ctx.CreateConnection();
         return (await conn.QueryAsync<JobRun>(
-            "SELECT Name, LastStartedAt, LastFinishedAt, LastSucceeded, LastMessage, RunCount FROM Jobs ORDER BY Name")).ToList();
+            "SELECT Name, LastStartedAt, LastFinishedAt, LastSucceeded, LastMessage, RunCount, Paused, IntervalOverrideMinutes FROM Jobs ORDER BY Name")).ToList();
     }
 
     public async Task<bool> TryClaimAsync(string name, DateTime nowUtc, TimeSpan interval)
@@ -46,7 +46,7 @@ public class JobRunRepository : IJobRunRepository
         // UPDATE finds the job still due moves LastStartedAt; everyone else affects zero rows.
         var claimed = await conn.ExecuteAsync(@"
             UPDATE Jobs SET LastStartedAt = @Now
-            WHERE Name = @Name AND (LastStartedAt IS NULL OR LastStartedAt <= @DueBefore);",
+            WHERE Name = @Name AND Paused = 0 AND (LastStartedAt IS NULL OR LastStartedAt <= @DueBefore);",
             new { Name = name, Now = nowUtc, DueBefore = JobSchedule.DueBefore(nowUtc, interval) });
         return claimed == 1;
     }
@@ -67,5 +67,30 @@ public class JobRunRepository : IJobRunRepository
                 Name = name, StartedAt = startedAtUtc, FinishedAt = finishedAtUtc, Succeeded = succeeded,
                 Message = message is { Length: > 1000 } ? message[..1000] : message
             });
+    }
+
+    private async Task EnsureRowAsync(System.Data.IDbConnection conn, string name)
+    {
+        try
+        {
+            await conn.ExecuteAsync(@"
+                INSERT INTO Jobs (Name, LastStartedAt, LastFinishedAt, LastSucceeded, LastMessage, RunCount)
+                SELECT @Name, NULL, NULL, 0, NULL, 0 WHERE NOT EXISTS (SELECT 1 FROM Jobs WHERE Name = @Name);", new { Name = name });
+        }
+        catch (SqlException ex) when (ex.Number is 2627 or 2601) { }
+    }
+
+    public async Task SetPausedAsync(string name, bool paused)
+    {
+        using var conn = _ctx.CreateConnection();
+        await EnsureRowAsync(conn, name);
+        await conn.ExecuteAsync("UPDATE Jobs SET Paused = @Paused WHERE Name = @Name;", new { Name = name, Paused = paused });
+    }
+
+    public async Task SetIntervalOverrideAsync(string name, int? minutes)
+    {
+        using var conn = _ctx.CreateConnection();
+        await EnsureRowAsync(conn, name);
+        await conn.ExecuteAsync("UPDATE Jobs SET IntervalOverrideMinutes = @Minutes WHERE Name = @Name;", new { Name = name, Minutes = minutes });
     }
 }

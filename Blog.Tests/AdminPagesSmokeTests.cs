@@ -54,6 +54,8 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
     [InlineData("/admin/users", "Search")]
     [InlineData("/admin/import", "Search")]
     [InlineData("/admin/redirects?q=x", "Search")]
+    [InlineData("/admin/scheduled-scripts", "_ListSearch")]
+    [InlineData("/admin/scheduled-scripts?q=zz-no-such-script", "Search")]
     [InlineData("/admin/media?q=logo", "Search")]
     [InlineData("/admin/posts", "table-scroll")]
     [InlineData("/admin/calendar", "data-calendar-counts")]

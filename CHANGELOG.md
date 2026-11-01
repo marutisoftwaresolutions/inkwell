@@ -7,8 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Scheduled scripts.** Admin → Scheduled scripts runs SQL script files from the server's scripts folder (`ScheduledScripts:Folder`, default `App_Data/jobs`) hourly, daily or weekly in UTC, through the site's own database connection, batch by batch on `GO`, with the output captured on the schedule's row. Enable, disable, edit, remove or run now from the Desk; every run is in the audit log. Only files already on the server can be scheduled, so a Desk account never submits SQL text. Schedules pinned in configuration (`ScheduledScripts:Jobs`) are re-asserted on every start and shown read-only, for housekeeping nobody may switch off. Built for hosts with no Task Scheduler or `sqlcmd`.
+- **Job controls on the Dashboard.** Each built-in job (backups, rollups, retention, newsletter sending, image variants, scheduled scripts and the rest) can now be paused and resumed, given a different interval in minutes, or run immediately from Admin → Dashboard → Scheduled jobs, without a redeploy. A paused job is never claimed by the scheduler; Run now still works while paused. Jobs named in `Jobs:LockedJobs` are shown and runnable but cannot be paused or re-timed from the Desk. Every control is audited.
+- **The Desk uses the site's favicon.** The Desk tab now carries the favicon set under Settings → Branding instead of the app's bundled icon.
+- **`/admin` opens the Desk.** The short address now redirects permanently to `/admin/dashboard` (and on to sign-in when needed) instead of returning a 404.
+
 ### Fixed
 
+- **Author avatars were broken on IIS for multi-word names.** The generated avatar URL encoded the space in a display name as `+`, which IIS request filtering rejects in a path, so "Demo Admin" showed a broken image in the Desk and on post pages. The name is now percent-encoded, and a source test keeps it that way.
 - **The Magazine layout showed two headers and two footers.** Magazine draws its own masthead, section navigation and footer, but the shared navbar and footer were rendered as well, so the home page carried both and two newsletter boxes. The flag that hides the shared chrome was set inside the layout partial, where it never reached the page layout; it is now set by the page itself, and a source test keeps it there.
 
 ## [1.0.10] — 2026-10-28

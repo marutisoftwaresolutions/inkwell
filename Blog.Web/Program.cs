@@ -129,6 +129,25 @@ builder.Services.AddScoped<Blog.Web.Services.SiteDates>();   // every human-read
 builder.Services.AddScoped<Blog.Web.Services.DateSettingsCatalog>();   // countries, zones and date formats offered in Settings (ADR-0027)
 builder.Services.AddScoped<Blog.Web.Services.UserSignInService>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.BackupJob>();
+
+// Scheduled scripts (ADR-0039): SQL files from ScheduledScripts:Folder (default App_Data/jobs) run hourly/daily/weekly
+// by the in-process scheduler; schedules pinned in ScheduledScripts:Jobs are re-asserted at startup and read-only in the Desk.
+builder.Services.AddSingleton(sp =>
+{
+    var o = new Blog.Web.Services.Jobs.ScheduledScriptOptions();
+    builder.Configuration.GetSection("ScheduledScripts").Bind(o);
+    return o;
+});
+builder.Services.AddScoped<Blog.Web.Services.Jobs.ScheduledScriptRunner>();
+
+// Built-in job controls (ADR-0040): Jobs:LockedJobs lists jobs the Desk may not pause or re-time.
+builder.Services.AddSingleton(sp =>
+{
+    var o = new Blog.Web.Services.Jobs.JobControlOptions();
+    builder.Configuration.GetSection("Jobs").Bind(o);
+    return o;
+});
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.ScheduledScriptJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.NewsletterSendJob>();   // queued newsletters, in batches (ADR-0028)
 builder.Services.AddScoped<Blog.Web.Services.Newsletter.NewsletterService>();
 
@@ -314,6 +333,34 @@ using (var scope = app.Services.CreateScope())
     }
 
     try {
+        // Scheduled scripts pinned in configuration (ADR-0039): upsert each as a read-only "config" row so the
+        // scheduler runs them and no Desk user can remove them; a config entry that disappears is deleted.
+        var scriptOptions = scope.ServiceProvider.GetRequiredService<Blog.Web.Services.Jobs.ScheduledScriptOptions>();
+        var scriptRepo = scope.ServiceProvider.GetRequiredService<Blog.Core.Interfaces.IScheduledScriptRepository>();
+        var existingConfig = scriptRepo.GetAllAsync().GetAwaiter().GetResult().Where(s => s.IsFromConfig).ToList();
+        var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in scriptOptions.Jobs)
+        {
+            if (!TimeSpan.TryParse(c.TimeUtc, out var time)) time = new TimeSpan(3, 0, 0);
+            int? day = null;
+            if (!string.IsNullOrWhiteSpace(c.DayOfWeek))
+                day = int.TryParse(c.DayOfWeek, out var n) ? n : Enum.TryParse<DayOfWeek>(c.DayOfWeek, true, out var dw) ? (int)dw : null;
+            var error = Blog.Core.Services.ScriptSchedule.Validate(c.Name, c.File, c.Frequency?.ToLowerInvariant(), day, time);
+            if (error is not null) { startupWarnings.Add($"ScheduledScripts:Jobs entry \"{c.Name}\" ignored: {error}"); continue; }
+            wanted.Add(c.Name.Trim());
+            var row = scriptRepo.GetByNameAsync(c.Name.Trim()).GetAwaiter().GetResult() ?? new Blog.Core.Domain.ScheduledScript { Name = c.Name.Trim() };
+            row.ScriptFile = c.File.Trim(); row.Frequency = c.Frequency!.ToLowerInvariant(); row.DayOfWeek = day; row.TimeOfDayUtc = time;
+            row.Enabled = true; row.Source = Blog.Core.Domain.ScriptSources.Config;
+            row.NextRunAt ??= Blog.Core.Services.ScriptSchedule.NextRun(row, DateTime.UtcNow);
+            scriptRepo.UpsertAsync(row).GetAwaiter().GetResult();
+        }
+        foreach (var stale in existingConfig.Where(s => !wanted.Contains(s.Name)))
+            scriptRepo.DeleteAsync(stale.Id).GetAwaiter().GetResult();
+    } catch (Exception ex) {
+        app.Logger.LogError(ex, "Scheduled scripts config sync error");
+    }
+
+    try {
         // Backfill author-page slugs for any pre-existing users that have none (idempotent).
         var userRepo = scope.ServiceProvider.GetRequiredService<Blog.Core.Interfaces.IUserRepository>();
         var filled = userRepo.BackfillMissingSlugsAsync().GetAwaiter().GetResult();
@@ -426,6 +473,10 @@ app.UseTenantResolution();
 app.UseCrawlerVisitTracking();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// "/admin" on its own: every Desk screen lives under /admin/<area>, and people type the short form
+// (and docs say "sign in at /admin"). Without this it was a 404 that also fed the firewall's 404 score.
+app.MapGet("/admin", () => Results.Redirect("/admin/dashboard", permanent: true));
+
 // Attribute-routed controllers (admin, API)
 app.MapControllers();
 

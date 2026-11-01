@@ -35,8 +35,8 @@ public sealed class DeskShellService
     {
         if (_cached is not null) return _cached;
 
-        string siteName = "Inkwell", scheme = "system";
-        string avatar = "/avatar/" + System.Net.WebUtility.UrlEncode(user.Identity?.Name ?? "A");
+        string siteName = "Inkwell", scheme = "system", favicon = "/favicon.ico";
+        string avatar = "/avatar/" + Uri.EscapeDataString(user.Identity?.Name ?? "A");
         int pending = 0, review = 0;
         bool cloud = false;
         try { cloud = _tenant.IsCloudMode; } catch { /* no tenant: single-site defaults */ }
@@ -46,6 +46,7 @@ public sealed class DeskShellService
             var primaryAdmin = await _users.GetFirstAdminAsync();
             var settings = await _settings.GetSettingsAsync(primaryAdmin?.Id ?? Guid.Empty);
             if (!string.IsNullOrWhiteSpace(settings?.SiteName)) siteName = settings!.SiteName;
+            if (!string.IsNullOrWhiteSpace(settings?.SiteFaviconUrl)) favicon = settings!.SiteFaviconUrl;
             if (settings?.Theme is "light" or "dark") scheme = settings!.Theme;
         }
         catch { /* settings unavailable: defaults */ }
@@ -75,6 +76,7 @@ public sealed class DeskShellService
         return _cached = new DeskShellModel
         {
             SiteName = siteName,
+            FaviconUrl = favicon,
             ColorScheme = scheme,
             UserName = user.Identity?.Name ?? "",
             AvatarUrl = avatar,

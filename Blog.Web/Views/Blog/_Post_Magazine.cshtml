@@ -38,7 +38,7 @@
             @{
                 var authorImg = !string.IsNullOrEmpty(Model.AvatarUrl)
                     ? Model.AvatarUrl
-                    : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
+                    : $"/avatar/{Uri.EscapeDataString(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
             }
             <div style="display:flex;align-items:center;gap:12px;">
                 <img src="@authorImg" alt="@Model.AuthorName"

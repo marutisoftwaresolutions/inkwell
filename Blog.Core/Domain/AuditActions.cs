@@ -150,4 +150,19 @@ public static class AuditActions
     public const string FormDeleted            = "Form.Deleted";
     public const string FormSubmissionDeleted  = "FormSubmission.Deleted";
     public const string FormSubmissionExported = "FormSubmission.Exported";
+
+    // Scheduled scripts (ADR-0039): schedule rows and every run, manual or timed; never the script text
+    public const string ScheduledScriptCreated  = "ScheduledScript.Created";
+    public const string ScheduledScriptUpdated  = "ScheduledScript.Updated";
+    public const string ScheduledScriptDeleted  = "ScheduledScript.Deleted";
+    public const string ScheduledScriptEnabled  = "ScheduledScript.Enabled";
+    public const string ScheduledScriptDisabled = "ScheduledScript.Disabled";
+    public const string ScheduledScriptRan      = "ScheduledScript.Ran";
+    public const string ScheduledScriptFailed   = "ScheduledScript.Failed";
+
+    // Built-in job controls from Admin → Dashboard (ADR-0040)
+    public const string JobPaused          = "Job.Paused";
+    public const string JobResumed         = "Job.Resumed";
+    public const string JobIntervalChanged = "Job.IntervalChanged";
+    public const string JobRunNow          = "Job.RunNow";
 }

@@ -432,6 +432,40 @@ public class MigrationService
                     CREATE INDEX IX_PasswordResetTokens_User_CreatedAt ON PasswordResetTokens (UserId, CreatedAt DESC);
                 END
 
+                -- Scheduled SQL script files, Admin → Scheduled scripts (DBScripts/2026-11-01_create-scheduledscripts-table.sql, ADR-0039)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ScheduledScripts')
+                BEGIN
+                    CREATE TABLE ScheduledScripts (
+                        Id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        Name           NVARCHAR(100)    NOT NULL,
+                        ScriptFile     NVARCHAR(260)    NOT NULL,
+                        Frequency      NVARCHAR(10)     NOT NULL,
+                        DayOfWeek      TINYINT          NULL,
+                        TimeOfDayUtc   TIME(0)          NOT NULL,
+                        Enabled        BIT              NOT NULL DEFAULT 1,
+                        Source         NVARCHAR(10)     NOT NULL DEFAULT 'desk',
+                        NextRunAt      DATETIME2        NULL,
+                        LastRunAt      DATETIME2        NULL,
+                        LastSucceeded  BIT              NULL,
+                        LastOutput     NVARCHAR(MAX)    NULL,
+                        LastDurationMs INT              NULL,
+                        CreatedAt      DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+                        UpdatedAt      DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+                        CONSTRAINT UQ_ScheduledScripts_Name UNIQUE (Name)
+                    );
+                    CREATE INDEX IX_ScheduledScripts_Due ON ScheduledScripts (Enabled, NextRunAt);
+                END
+
+                -- Job controls: pause and interval override per built-in job (DBScripts/2026-11-01_add-job-controls-to-jobs.sql, ADR-0040)
+                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Jobs') AND COL_LENGTH('Jobs', 'Paused') IS NULL
+                BEGIN
+                    ALTER TABLE Jobs ADD Paused BIT NOT NULL CONSTRAINT DF_Jobs_Paused DEFAULT 0;
+                END
+                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Jobs') AND COL_LENGTH('Jobs', 'IntervalOverrideMinutes') IS NULL
+                BEGIN
+                    ALTER TABLE Jobs ADD IntervalOverrideMinutes INT NULL;
+                END
+
                 -- Search Console daily rows (DBScripts/2026-09-15_create-search-performance-table.sql)
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SearchPerformance')
                 BEGIN

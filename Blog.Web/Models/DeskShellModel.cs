@@ -9,6 +9,8 @@ namespace Blog.Web.Models;
 public sealed class DeskShellModel
 {
     public string SiteName { get; init; } = "Inkwell";
+    /// <summary>The site's own favicon (Settings → Branding), so the Desk tab carries the tenant's mark, not the app's bundled /favicon.ico.</summary>
+    public string FaviconUrl { get; init; } = "/favicon.ico";
     public string ColorScheme { get; init; } = "system";
     public string UserName { get; init; } = "";
     public string AvatarUrl { get; init; } = "/avatar/A";

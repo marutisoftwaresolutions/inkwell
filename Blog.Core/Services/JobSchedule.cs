@@ -24,4 +24,18 @@ public static class JobSchedule
     /// </summary>
     public static DateTime DueBefore(DateTime nowUtc, TimeSpan interval) =>
         interval <= TimeSpan.Zero ? nowUtc : nowUtc - interval;
+
+    /// <summary>The shortest cadence an operator may set from the Desk (ADR-0040); the scheduler ticks once a minute anyway.</summary>
+    public static readonly TimeSpan MinimumInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// The interval the scheduler actually uses: the operator's override in minutes when set
+    /// (clamped to <see cref="MinimumInterval"/>), otherwise the interval the job declares in code.
+    /// </summary>
+    public static TimeSpan EffectiveInterval(TimeSpan declared, int? overrideMinutes)
+    {
+        if (overrideMinutes is null || overrideMinutes <= 0) return declared;
+        var o = TimeSpan.FromMinutes(overrideMinutes.Value);
+        return o < MinimumInterval ? MinimumInterval : o;
+    }
 }

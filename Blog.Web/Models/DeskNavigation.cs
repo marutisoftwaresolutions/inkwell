@@ -101,6 +101,7 @@ public static class DeskNavigation
         new Item(System, "Error Monitor", "/admin/errors", "Errors", IcErrors, AdminOnly: true, Keywords: "exceptions logs"),
         new Item(System, "Audit Trail", "/admin/audit", "Audit", IcAudit, AdminOnly: true, Keywords: "history who changed"),
         new Item(System, "Backups", "/admin/backups", "Backups", IcBackups, AdminOnly: true, HideInCloud: true, Keywords: "restore snapshot"),
+        new Item(System, "Scheduled scripts", "/admin/scheduled-scripts", "ScheduledScripts", IcBackups, AdminOnly: true, HideInCloud: true, Keywords: "jobs cron sql maintenance schedule"),
         new Item(System, "Export", "/admin/export", "Export", IcExport, AdminOnly: true, HideInCloud: true, Keywords: "wordpress ghost wxr download"),
         new Item(System, "Webhooks", "/admin/webhooks", "Webhooks", IcWebhooks, AdminOnly: true, Keywords: "integrations events"),
 

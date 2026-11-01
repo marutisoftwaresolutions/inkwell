@@ -200,6 +200,59 @@ public class DashboardController : Controller
 
     // ── Onboarding AJAX endpoints ────────────────────────────────────────────
 
+    // ── Built-in job controls (ADR-0040): pause/resume, cadence override, run now. Admin only, audited. ──
+
+    private IActionResult JobsRedirect() => Redirect("/admin/dashboard#jobs");
+
+    [HttpPost("jobs/pause")]
+    [Authorize(Policy = "AdminOnly")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PauseJob(string name, bool paused, [FromServices] IJobRunRepository ledger,
+        [FromServices] Blog.Web.Services.Jobs.JobControlOptions controls, [FromServices] Blog.Web.Services.AuditService audit)
+    {
+        name = (name ?? "").Trim();
+        if (!(await _jobs.GetStatusAsync()).Any(j => j.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) { TempData["Error"] = "Unknown job."; return JobsRedirect(); }
+        if (controls.IsLocked(name)) { TempData["Error"] = $"{name} is locked by the server configuration and cannot be paused here."; return JobsRedirect(); }
+        await ledger.SetPausedAsync(name, paused);
+        await audit.LogAsync(paused ? Blog.Core.Domain.AuditActions.JobPaused : Blog.Core.Domain.AuditActions.JobResumed, "Job", name, name);
+        TempData["Success"] = paused ? $"{name} paused. It will not run until resumed; Run now still works." : $"{name} resumed.";
+        return JobsRedirect();
+    }
+
+    [HttpPost("jobs/interval")]
+    [Authorize(Policy = "AdminOnly")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetJobInterval(string name, int? minutes, [FromServices] IJobRunRepository ledger,
+        [FromServices] Blog.Web.Services.Jobs.JobControlOptions controls, [FromServices] Blog.Web.Services.AuditService audit)
+    {
+        name = (name ?? "").Trim();
+        var job = (await _jobs.GetStatusAsync()).FirstOrDefault(j => j.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (job is null) { TempData["Error"] = "Unknown job."; return JobsRedirect(); }
+        if (controls.IsLocked(name)) { TempData["Error"] = $"{name} is locked by the server configuration and keeps its declared interval."; return JobsRedirect(); }
+        if (minutes is not null && (minutes < 1 || minutes > 60 * 24 * 90)) { TempData["Error"] = "Enter an interval between 1 minute and 90 days, or leave it empty to use the job's own interval."; return JobsRedirect(); }
+        await ledger.SetIntervalOverrideAsync(name, minutes);
+        await audit.LogAsync(Blog.Core.Domain.AuditActions.JobIntervalChanged, "Job", name, name,
+            oldValues: System.Text.Json.JsonSerializer.Serialize(new { Minutes = job.OverrideMinutes }),
+            newValues: System.Text.Json.JsonSerializer.Serialize(new { Minutes = minutes }));
+        TempData["Success"] = minutes is null ? $"{name} is back on its own interval ({job.Interval.TotalHours:0.##} h)." : $"{name} now runs every {minutes} minute(s).";
+        return JobsRedirect();
+    }
+
+    [HttpPost("jobs/run")]
+    [Authorize(Policy = "AdminOnly")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunJobNow(string name, [FromServices] Blog.Web.Services.AuditService audit)
+    {
+        name = (name ?? "").Trim();
+        var result = await _jobs.RunNowAsync(name, HttpContext.RequestAborted);
+        if (result is null) { TempData["Error"] = "Unknown job."; return JobsRedirect(); }
+        await audit.LogAsync(Blog.Core.Domain.AuditActions.JobRunNow, "Job", name, name,
+            newValues: System.Text.Json.JsonSerializer.Serialize(new { result.Value.ok, result.Value.message }));
+        if (result.Value.ok) TempData["Success"] = $"{name} ran: {result.Value.message}";
+        else TempData["Error"] = $"{name} did not complete: {result.Value.message}";
+        return JobsRedirect();
+    }
+
     [HttpPost("onboarding/dismiss")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DismissOnboarding()

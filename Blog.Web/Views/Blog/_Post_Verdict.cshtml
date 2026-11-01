@@ -13,7 +13,7 @@ else
     var entries = roundup.Ranked.ToList();
     var authorImage = !string.IsNullOrEmpty(Model.AvatarUrl)
         ? Model.AvatarUrl
-        : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
+        : $"/avatar/{Uri.EscapeDataString(string.IsNullOrEmpty(Model.AuthorName) ? "A" : Model.AuthorName)}";
     var authorLine = string.IsNullOrEmpty(Model.AuthorName) ? "Anonymous" : Model.AuthorName;
     if (!string.IsNullOrEmpty(Model.AuthorCredentials)) { authorLine += $", {Model.AuthorCredentials}"; }
 

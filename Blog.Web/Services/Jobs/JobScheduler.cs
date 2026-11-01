@@ -4,7 +4,19 @@ namespace Blog.Web.Services.Jobs;
 
 /// <summary>Live view of one job for Admin → Dashboard: what the ledger says plus whether it is running now.</summary>
 public sealed record JobStatus(string Name, TimeSpan Interval, DateTime? LastStartedAt, DateTime? LastFinishedAt,
-    bool LastSucceeded, string? LastMessage, int RunCount, bool IsRunning);
+    bool LastSucceeded, string? LastMessage, int RunCount, bool IsRunning,
+    bool Paused = false, int? OverrideMinutes = null, bool Locked = false)
+{
+    /// <summary>The cadence actually in force: the operator's override when set, else the declared interval.</summary>
+    public TimeSpan EffectiveInterval => Blog.Core.Services.JobSchedule.EffectiveInterval(Interval, OverrideMinutes);
+}
+
+/// <summary>Jobs the Desk may not pause or re-time (appsettings <c>Jobs:LockedJobs</c>), for housekeeping an operator pins.</summary>
+public sealed class JobControlOptions
+{
+    public List<string> LockedJobs { get; set; } = new();
+    public bool IsLocked(string name) => LockedJobs.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+}
 
 /// <summary>
 /// The platform's only scheduler: one hosted service that wakes every minute, asks the Jobs ledger
@@ -30,14 +42,48 @@ public sealed class JobScheduler : BackgroundService
 
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<JobScheduler> _log;
+    private readonly JobControlOptions _controls;
     private readonly HashSet<string> _running = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _ledgerWarned = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gate = new();
 
-    public JobScheduler(IServiceScopeFactory scopes, ILogger<JobScheduler> log)
+    public JobScheduler(IServiceScopeFactory scopes, ILogger<JobScheduler> log, JobControlOptions? controls = null)
     {
         _scopes = scopes;
         _log = log;
+        _controls = controls ?? new JobControlOptions();
+    }
+
+    /// <summary>
+    /// Run one job immediately from the Desk (ADR-0040): same single-winner claim (with a zero interval,
+    /// so "due" is simply "not already claimed this instant"), same ledger record, same in-process guard
+    /// against overlapping with a timed run. Returns the outcome message, or null when the job is unknown
+    /// or could not be claimed (already running elsewhere).
+    /// </summary>
+    public async Task<(bool ok, string message)?> RunNowAsync(string name, CancellationToken ct)
+    {
+        using var scope = _scopes.CreateScope();
+        var job = scope.ServiceProvider.GetServices<IScheduledJob>().FirstOrDefault(j => string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (job is null) return null;
+        var ledger = scope.ServiceProvider.GetRequiredService<IJobRunRepository>();
+        if (!TryMarkRunning(job.Name)) return (false, "Already running.");
+        var started = DateTime.UtcNow;
+        try
+        {
+            // A paused job may still be run by hand: the pause stops the timer, not the operator.
+            var row = await ledger.GetAsync(job.Name);
+            if (row?.Paused == true) await ledger.SetPausedAsync(job.Name, false);
+            var claimed = await ledger.TryClaimAsync(job.Name, started, TimeSpan.Zero);
+            if (row?.Paused == true) await ledger.SetPausedAsync(job.Name, true);
+            if (!claimed) return (false, "Could not claim the job; another instance may be running it.");
+
+            bool ok; string message;
+            try { message = await job.RunAsync(ct); ok = true; }
+            catch (Exception ex) { ok = false; message = ex.GetType().Name + ": " + ex.Message; _log.LogWarning(ex, "Job {Job} failed (run now).", job.Name); }
+            try { await ledger.RecordAsync(job.Name, started, DateTime.UtcNow, ok, message); } catch (Exception ex) { _log.LogDebug(ex, "Could not record run of {Job}.", job.Name); }
+            return (ok, message);
+        }
+        finally { ClearRunning(job.Name); }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,16 +107,24 @@ public sealed class JobScheduler : BackgroundService
         var jobs   = scope.ServiceProvider.GetServices<IScheduledJob>().ToList();
         var ledger = scope.ServiceProvider.GetRequiredService<IJobRunRepository>();
 
+        // Operator controls (ADR-0040): one read per tick; the claim itself still refuses a paused row in SQL.
+        Dictionary<string, Blog.Core.Domain.JobRun> rows;
+        try { rows = (await ledger.GetAllAsync()).ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase); }
+        catch { rows = new Dictionary<string, Blog.Core.Domain.JobRun>(StringComparer.OrdinalIgnoreCase); }
+
         foreach (var job in jobs)
         {
             if (ct.IsCancellationRequested) return;
+            rows.TryGetValue(job.Name, out var row);
+            if (row?.Paused == true) continue;          // paused by the operator; nothing is claimed
             if (!TryMarkRunning(job.Name)) continue;   // already running in this process (overlapping tick)
 
             // The claim is the only "is it due" check: one atomic UPDATE that a second process
             // serving the same database cannot also win. The same instant is recorded as the start.
             var started = DateTime.UtcNow;
+            var interval = Blog.Core.Services.JobSchedule.EffectiveInterval(job.Interval, row?.IntervalOverrideMinutes);
             bool claimed;
-            try { claimed = await ledger.TryClaimAsync(job.Name, started, job.Interval); }
+            try { claimed = await ledger.TryClaimAsync(job.Name, started, interval); }
             catch (Exception ex)
             {
                 // No ledger (table missing, DB down): skip rather than run blind. A scheduler that
@@ -121,7 +175,8 @@ public sealed class JobScheduler : BackgroundService
                 rows.TryGetValue(j.Name, out var r);
                 bool running; lock (_gate) running = _running.Contains(j.Name);
                 return new JobStatus(j.Name, j.Interval, r?.LastStartedAt, r?.LastFinishedAt,
-                    r?.LastSucceeded ?? false, r?.LastMessage, r?.RunCount ?? 0, running);
+                    r?.LastSucceeded ?? false, r?.LastMessage, r?.RunCount ?? 0, running,
+                    r?.Paused ?? false, r?.IntervalOverrideMinutes, _controls.IsLocked(j.Name));
             }).OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList();
         }
         catch (Exception ex)

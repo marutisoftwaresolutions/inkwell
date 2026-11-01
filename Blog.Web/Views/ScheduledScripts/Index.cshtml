@@ -1,0 +1,166 @@
+@using Blog.Core.Domain
+@using Blog.Core.Services
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Scheduled Scripts";
+    ViewData["Description"] = "Run SQL script files from the server's scripts folder on a schedule: hourly, daily or weekly, in UTC. Only files already on the server can be chosen; nothing typed here is executed.";
+
+    var scripts = (IReadOnlyList<ScheduledScript>)ViewBag.Scripts;
+    var files   = (IReadOnlyList<string>)ViewBag.Files;
+    var folder  = (string)ViewBag.Folder;
+    var editing = ViewBag.Editing as ScheduledScript;
+    int total   = ViewBag.Total;
+    var q = Context.Request.Query["q"].ToString();
+
+    string When(DateTime? utc) => utc is null ? "—" : utc.Value.ToString("yyyy-MM-dd HH:mm") + " UTC";
+    string Pill(ScheduledScript s) => !s.Enabled ? "desk-pill-muted" : s.LastSucceeded == false ? "pill-bad" : s.LastSucceeded == true ? "pill-ok" : "pill-info";
+    string PillText(ScheduledScript s) => !s.Enabled ? "Disabled" : s.LastSucceeded == false ? "Last run failed" : s.LastSucceeded == true ? "OK" : "Not run yet";
+}
+
+@* ── Add / edit ──────────────────────────────────────────────────────────── *@
+<form method="post" action="/admin/scheduled-scripts/save" class="desk-card mb-6" data-track-changes>
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="@(editing?.Id)" />
+    <div class="desk-card-header">
+        <div class="desk-card-title">@(editing is null ? "Add a schedule" : $"Edit {editing.Name}")</div>
+        <div class="desk-card-description">
+            Scripts folder: <code>@folder</code>.
+            @if (files.Count == 0)
+            {
+                <span>It is empty: copy a .sql file there (FTP or deploy), then reload this page.</span>
+            }
+        </div>
+    </div>
+    <div class="desk-card-body grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-3 items-end">
+        <div>
+            <label class="desk-label" for="ss-name">Name</label>
+            <input id="ss-name" name="name" required maxlength="100" value="@(editing?.Name)" placeholder="Weekly cleanup" class="desk-input" />
+        </div>
+        <div>
+            <label class="desk-label" for="ss-file">Script file</label>
+            <select id="ss-file" name="scriptFile" required class="desk-select" @(files.Count == 0 ? "disabled" : "")>
+                @foreach (var f in files)
+                {
+                    <option value="@f" selected="@(editing?.ScriptFile == f)">@f</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="desk-label" for="ss-frequency">Frequency</label>
+            <select id="ss-frequency" name="frequency" class="desk-select">
+                <option value="hourly" selected="@(editing?.Frequency == ScriptFrequencies.Hourly)">Hourly</option>
+                <option value="daily" selected="@(editing is null || editing.Frequency == ScriptFrequencies.Daily)">Daily</option>
+                <option value="weekly" selected="@(editing?.Frequency == ScriptFrequencies.Weekly)">Weekly</option>
+            </select>
+        </div>
+        <div>
+            <label class="desk-label" for="ss-day">Day (weekly)</label>
+            <select id="ss-day" name="dayOfWeek" class="desk-select">
+                @for (var d = 0; d < 7; d++)
+                {
+                    <option value="@d" selected="@((editing?.DayOfWeek ?? 0) == d)">@((DayOfWeek)d)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="desk-label" for="ss-time">Time (UTC)</label>
+            <input id="ss-time" name="timeUtc" type="time" value="@((editing?.TimeOfDayUtc ?? new TimeSpan(3, 0, 0)).ToString(@"hh\:mm"))" class="desk-input" />
+            <p class="desk-hint">Hourly uses only the minutes.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" value="true" class="desk-checkbox" checked="@(editing?.Enabled ?? true)" /> Enabled</label>
+            <button type="submit" class="desk-btn desk-btn-primary" @(files.Count == 0 ? "disabled" : "")>@(editing is null ? "Add schedule" : "Save")</button>
+            @if (editing is not null)
+            {
+                <a href="/admin/scheduled-scripts" class="desk-btn desk-btn-ghost">Cancel</a>
+            }
+        </div>
+    </div>
+</form>
+
+@* ── List ────────────────────────────────────────────────────────────────── *@
+<div class="desk-card">
+    <partial name="_ListSearch" />
+    @if (total == 0)
+    {
+        <partial name="_EmptyState" view-data='new ViewDataDictionary(ViewData) { ["EmptyTitle"] = "No scheduled scripts yet.", ["EmptyHint"] = files.Count == 0 ? "Copy a .sql file into the scripts folder, then add a schedule above." : "Add the first one above." }' />
+    }
+    else if (scripts.Count == 0)
+    {
+        <partial name="_EmptyState" view-data='new ViewDataDictionary(ViewData) { ["EmptyTitle"] = $"No matches for “{q}”.", ["EmptyQuery"] = q, ["EmptyClearHref"] = "/admin/scheduled-scripts", ["EmptyAction"] = "Clear the search", ["EmptyHint"] = $"Clear the search to see all {total}." }' />
+    }
+    else
+    {
+        <div class="table-scroll"><table class="desk-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Script</th>
+                    <th>Schedule</th>
+                    <th>Status</th>
+                    <th>Next run</th>
+                    <th>Last run</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var s in scripts)
+            {
+                <tr>
+                    <td class="font-medium text-foreground">
+                        @s.Name
+                        @if (s.IsFromConfig)
+                        {
+                            <span class="desk-pill desk-pill-muted ml-2" title="Defined in appsettings; edit it there">config</span>
+                        }
+                    </td>
+                    <td class="font-mono text-xs">@s.ScriptFile</td>
+                    <td class="text-xs">@ScriptSchedule.Describe(s)</td>
+                    <td><span class="desk-pill @Pill(s)">@PillText(s)</span></td>
+                    <td class="text-xs whitespace-nowrap">@(s.Enabled ? When(s.NextRunAt) : "—")</td>
+                    <td class="text-xs">
+                        @When(s.LastRunAt)
+                        @if (!string.IsNullOrEmpty(s.LastOutput))
+                        {
+                            <details class="mt-1">
+                                <summary class="cursor-pointer text-muted-foreground">Output (@(s.LastDurationMs ?? 0) ms)</summary>
+                                <pre class="mt-1 max-h-64 overflow-auto whitespace-pre-wrap text-[11px] text-muted-foreground">@s.LastOutput</pre>
+                            </details>
+                        }
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                        <form method="post" action="/admin/scheduled-scripts/run" class="inline"
+                              data-confirm-title="Run @s.Name now?" data-confirm-body="@s.ScriptFile runs immediately against this site's database, in addition to its schedule. The output appears in its row when it finishes." data-confirm-action="Run now" data-confirm-tone="warning">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm" aria-label="Run @s.Name now">Run now</button>
+                        </form>
+                        @if (!s.IsFromConfig)
+                        {
+                            <form method="post" action="/admin/scheduled-scripts/toggle" class="inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@s.Id" />
+                                <button type="submit" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="@(s.Enabled ? "Disable" : "Enable") @s.Name">@(s.Enabled ? "Disable" : "Enable")</button>
+                            </form>
+                            <a href="/admin/scheduled-scripts?edit=@s.Id" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="Edit @s.Name">Edit</a>
+                            <form method="post" action="/admin/scheduled-scripts/delete" class="inline"
+                                  data-confirm-title="Remove this schedule?" data-confirm-body="@s.Name stops running. The file @s.ScriptFile stays in the scripts folder and can be scheduled again." data-confirm-action="Remove schedule" data-confirm-tone="danger">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@s.Id" />
+                                <button type="submit" class="desk-btn desk-btn-danger-outline desk-btn-sm" aria-label="Remove @s.Name">Remove</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        <partial name="_ListPager" />
+    }
+</div>
+
+<p class="desk-hint mt-4">
+    Scripts run through the site's own database connection, batch by batch on <code>GO</code>, with PRINT output captured.
+    A failing batch stops that script and marks the run failed; other schedules are unaffected. Times are UTC; the
+    scheduler checks once a minute. Every run is written to the audit log.
+</p>

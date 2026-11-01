@@ -170,7 +170,7 @@
                                     @{
                                         var pAuthorImg = !string.IsNullOrEmpty(post.AvatarUrl)
                                             ? post.AvatarUrl
-                                            : $"/avatar/{System.Net.WebUtility.UrlEncode(string.IsNullOrEmpty(post.AuthorName) ? "A" : post.AuthorName)}";
+                                            : $"/avatar/{Uri.EscapeDataString(string.IsNullOrEmpty(post.AuthorName) ? "A" : post.AuthorName)}";
                                     }
                                     <img src="@pAuthorImg" alt="" width="24" height="24" class="w-6 h-6 rounded-full object-cover bg-muted" loading="lazy" />
                                     <span class="truncate">@(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)</span>

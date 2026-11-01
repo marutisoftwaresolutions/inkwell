@@ -1272,6 +1272,21 @@ BEGIN
     PRINT '  [+] Posts.ViewCount defaults to 0.';
 END
 
+-- Jobs.Paused / IntervalOverrideMinutes: per-job pause and cadence override from Admin → Dashboard
+-- (DBScripts/2026-11-01_add-job-controls-to-jobs.sql, ADR-0040). Defaults keep every job running as declared in code.
+IF COL_LENGTH('Jobs', 'Paused') IS NULL
+BEGIN
+    ALTER TABLE Jobs ADD Paused BIT NOT NULL CONSTRAINT DF_Jobs_Paused DEFAULT 0;
+    PRINT '  [+] Jobs.Paused added.';
+END
+ELSE PRINT '  [=] Jobs.Paused already exists — skipped.';
+IF COL_LENGTH('Jobs', 'IntervalOverrideMinutes') IS NULL
+BEGIN
+    ALTER TABLE Jobs ADD IntervalOverrideMinutes INT NULL;
+    PRINT '  [+] Jobs.IntervalOverrideMinutes added.';
+END
+ELSE PRINT '  [=] Jobs.IntervalOverrideMinutes already exists — skipped.';
+
 -- =============================================================================
 -- 38. Index top-ups on tables created above
 --     Same reason as section 37: the CREATE TABLE blocks never run again on a
@@ -3029,6 +3044,36 @@ BEGIN
 END;
 ';
 PRINT '  [=] Report procedures are in place.';
+
+-- =============================================================================
+-- 43. ScheduledScripts  —  SQL script files run on a schedule by the in-process scheduler,
+--     Admin → Scheduled scripts (DBScripts/2026-11-01_create-scheduledscripts-table.sql, ADR-0039)
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ScheduledScripts')
+BEGIN
+    CREATE TABLE ScheduledScripts (
+        Id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        Name           NVARCHAR(100)    NOT NULL,
+        ScriptFile     NVARCHAR(260)    NOT NULL,
+        Frequency      NVARCHAR(10)     NOT NULL,
+        DayOfWeek      TINYINT          NULL,
+        TimeOfDayUtc   TIME(0)          NOT NULL,
+        Enabled        BIT              NOT NULL DEFAULT 1,
+        Source         NVARCHAR(10)     NOT NULL DEFAULT 'desk',
+        NextRunAt      DATETIME2        NULL,
+        LastRunAt      DATETIME2        NULL,
+        LastSucceeded  BIT              NULL,
+        LastOutput     NVARCHAR(MAX)    NULL,
+        LastDurationMs INT              NULL,
+        CreatedAt      DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt      DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT UQ_ScheduledScripts_Name UNIQUE (Name)
+    );
+    CREATE INDEX IX_ScheduledScripts_Due ON ScheduledScripts (Enabled, NextRunAt);
+    PRINT '  [+] ScheduledScripts table created.';
+END
+ELSE
+    PRINT '  [=] ScheduledScripts already exists — skipped.';
 
 PRINT '';
 PRINT '==========================================================';

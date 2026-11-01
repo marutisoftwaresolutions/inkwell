@@ -73,6 +73,10 @@ public class JobSchedulerClaimTests
             Recorded.Add((name, succeeded, message));
             return Task.CompletedTask;
         }
+        public readonly Dictionary<string, bool> Paused = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, int?> Overrides = new(StringComparer.OrdinalIgnoreCase);
+        public Task SetPausedAsync(string name, bool paused) { Paused[name] = paused; return Task.CompletedTask; }
+        public Task SetIntervalOverrideAsync(string name, int? minutes) { Overrides[name] = minutes; return Task.CompletedTask; }
     }
 
     private sealed class FakeJob : Blog.Core.Interfaces.IScheduledJob

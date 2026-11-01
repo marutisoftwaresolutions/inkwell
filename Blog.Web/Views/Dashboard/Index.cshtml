@@ -223,14 +223,36 @@
                         <th>Last run (UTC)</th>
                         <th>Result</th>
                         <th class="text-right">Runs</th>
+                        <th class="text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var j in jobs)
                     {
                         <tr>
-                            <td class="font-mono text-xs">@j.Name</td>
-                            <td class="text-muted-foreground">@j.Interval.TotalHours h</td>
+                            <td class="font-mono text-xs">
+                                @j.Name
+                                @if (j.Paused) { <span class="desk-pill desk-pill-muted ml-1">paused</span> }
+                                @if (j.Locked) { <span class="desk-pill desk-pill-muted ml-1" title="Locked by the server configuration (Jobs:LockedJobs)">locked</span> }
+                            </td>
+                            <td class="text-muted-foreground">
+                                @if (j.Locked)
+                                {
+                                    <span>@(j.EffectiveInterval.TotalHours >= 1 ? $"{j.EffectiveInterval.TotalHours:0.##} h" : $"{j.EffectiveInterval.TotalMinutes:0} min")</span>
+                                }
+                                else
+                                {
+                                    <form method="post" action="/admin/dashboard/jobs/interval" class="inline-flex items-center gap-1">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="name" value="@j.Name" />
+                                        <label class="sr-only" for="job-interval-@j.Name">Interval in minutes for @j.Name</label>
+                                        <input id="job-interval-@j.Name" name="minutes" type="number" min="1" max="129600" inputmode="numeric" class="desk-input w-24 h-8 text-xs" value="@j.OverrideMinutes" placeholder="@j.Interval.TotalMinutes.ToString("0")" />
+                                        <span class="text-xs">min</span>
+                                        <button type="submit" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="Save interval for @j.Name">Set</button>
+                                    </form>
+                                    @if (j.OverrideMinutes is not null) { <div class="text-[11px]">code: @j.Interval.TotalHours.ToString("0.##") h</div> }
+                                }
+                            </td>
                             <td class="text-muted-foreground">
                                 @if (j.IsRunning) { <span class="tone-warn">running now</span> }
                                 else if (j.LastStartedAt is null) { <span>never — first run within a minute of startup</span> }
@@ -242,6 +264,24 @@
                                 else { <span class="tone-bad">Failed</span> <span class="text-muted-foreground">@j.LastMessage</span> }
                             </td>
                             <td class="text-right text-muted-foreground tabular-nums">@j.RunCount</td>
+                            <td class="text-right whitespace-nowrap">
+                                <form method="post" action="/admin/dashboard/jobs/run" class="inline"
+                                      data-confirm-title="Run @j.Name now?" data-confirm-body="The job runs immediately, in addition to its schedule, and its result appears in this row. A job already running elsewhere is left alone." data-confirm-action="Run now" data-confirm-tone="warning">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="name" value="@j.Name" />
+                                    <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm" aria-label="Run @j.Name now" @(j.IsRunning ? "disabled" : "")>Run now</button>
+                                </form>
+                                @if (!j.Locked)
+                                {
+                                    <form method="post" action="/admin/dashboard/jobs/pause" class="inline"
+                                          data-confirm-title="@(j.Paused ? $"Resume {j.Name}?" : $"Pause {j.Name}?")" data-confirm-body="@(j.Paused ? "The job returns to its schedule and runs when next due." : "The job stops running on its schedule until you resume it. Run now still works while paused.")" data-confirm-action="@(j.Paused ? "Resume" : "Pause")" data-confirm-tone="warning">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="name" value="@j.Name" />
+                                        <input type="hidden" name="paused" value="@(j.Paused ? "false" : "true")" />
+                                        <button type="submit" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="@(j.Paused ? "Resume" : "Pause") @j.Name">@(j.Paused ? "Resume" : "Pause")</button>
+                                    </form>
+                                }
+                            </td>
                         </tr>
                     }
                 </tbody>
