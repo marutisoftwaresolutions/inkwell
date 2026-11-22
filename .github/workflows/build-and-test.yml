@@ -27,6 +27,11 @@ jobs:
     env:
       # A throwaway container, filled below with init.sql and a small sample site (Blog.Tests/Fixtures/ci-seed.sql).
       ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=inkwell_ci;User Id=sa;Password=Ci-Build-Aa1!-not-a-secret;TrustServerCertificate=True;"
+      # The REST API signs nobody in without a signing key, and the key is never in the repository. A throwaway one,
+      # so the tests that need a signed-in API caller run here instead of leaving early.
+      Jwt__Key: "ci-only-signing-key-not-a-secret-0123456789abcdefghijklmnopqrstuvwxyz-ABCDEFGH"
+      Jwt__Issuer: "inkwell-ci.invalid"
+      Jwt__Audience: "inkwell-ci.invalid"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-dotnet@v5

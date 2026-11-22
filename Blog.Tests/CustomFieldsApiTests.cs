@@ -124,6 +124,7 @@ public class CustomFieldsApiTests : IClassFixture<WebApplicationFactory<Program>
             await probe.OpenAsync();
         }
         catch (Exception ex) { _out.WriteLine("Dev database unavailable — skipping. " + ex.Message); return; }
+        if (!TestDatabase.ApiConfigured(_factory.Services)) { _out.WriteLine(TestDatabase.NoApiKey); return; }
 
         using var scope = _factory.Services.CreateScope();
         var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingRepository>();

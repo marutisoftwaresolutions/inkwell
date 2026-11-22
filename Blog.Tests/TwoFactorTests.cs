@@ -266,6 +266,7 @@ public class TwoFactorTests
             Assert.Equal(9, await tf.RecoveryCodesLeftAsync(userId));
 
             // The API needs the code too, and the code used at enrolment cannot be replayed.
+            if (!TestDatabase.ApiConfigured(factory.Services)) { _out.WriteLine(TestDatabase.NoApiKey); return; }   // the finally below still removes the user
             var api = factory.CreateClient();
             var noCode = await api.PostAsync("/api/v1/auth/login", new StringContent(JsonSerializer.Serialize(new { email, password }), Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.Unauthorized, noCode.StatusCode);

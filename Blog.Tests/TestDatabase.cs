@@ -12,6 +12,17 @@ namespace Blog.Tests;
 /// </summary>
 public static class TestDatabase
 {
+    /// <summary>What a test writes when it leaves early because the API has no signing key.</summary>
+    public const string NoApiKey = "Jwt:Key is not set on this machine, so the REST API signs nobody in; skipping the API part.";
+
+    /// <summary>
+    /// Whether the REST API can sign anyone in here. It needs a real <c>Jwt:Key</c>, which lives in the local settings
+    /// file and never in the repository, so a fresh clone has none: the API then answers 503 by design, and a test that
+    /// needs a signed-in API caller leaves early instead of failing. CI sets a throwaway key so these tests run there.
+    /// </summary>
+    public static bool ApiConfigured(IServiceProvider services) =>
+        Blog.Core.Services.ApiSigningKey.IsUsable(services.GetRequiredService<IConfiguration>()["Jwt:Key"]);
+
     private static readonly object Gate = new();
     private static bool? _available;
 
