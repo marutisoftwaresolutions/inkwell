@@ -60,11 +60,13 @@ public class ImageProcessingService : IImageProcessingService
             ext = ".svg";
             mime = "image/svg+xml";
         }
-        // The file size limit does not bound the decoded picture; refuse an oversized one before it is stored or decoded.
-        if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) && ext != ".svg") ImageGuard.Check(bytes);
         // A file that only claims to be a picture (text renamed to .png) is not stored under a picture's name and type.
+        // Checked by signature before anything is decoded, so a file of another format (a TIFF named .png) never
+        // reaches a decoder the upload was not meant to use.
         if ((RasterMimes.Contains(mime) || string.Equals(mime, "image/webp", StringComparison.OrdinalIgnoreCase)) && !ImageGuard.IsPicture(bytes))
             throw new NotAPictureException();
+        // The file size limit does not bound the decoded picture; refuse an oversized one before it is stored or decoded.
+        if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) && ext != ".svg") ImageGuard.Check(bytes);
 
         var baseName = Guid.NewGuid().ToString("N");
         int? width = null, height = null;

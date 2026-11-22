@@ -1,0 +1,14 @@
+# Advisories on packages Inkwell depends on that are known, looked at, and not yet fixed by an upgrade.
+# The "No package with a known vulnerability" step in build-and-test.yml fails on any advisory that is
+# not listed here, so a new one is never accepted by default. One advisory per line: its id, then why
+# it is accepted. Remove a line as soon as the package is upgraded past the fix.
+#
+# SixLabors.ImageSharp 3.1.12. All six are fixed in 3.2.0, which needs a Six Labors licence key to
+# build; Inkwell stays on 3.1.12 until the image library is upgraded or replaced (planned for the
+# release after v1.1.0). Reviewed 2026-11-22.
+GHSA-v76p-62qx-wwq2  TIFF reader (tiled fax). Not reachable: TIFF detection is removed at startup (ImageFormatPolicy), uploads are checked by signature before decoding.
+GHSA-wmxv-xphr-5c9g  TIFF reader (BigTIFF directory loop). Not reachable, same reason.
+GHSA-j9gm-c75j-xc9q  TIFF writer (CCITT T4). Not reachable: Inkwell never writes TIFF and the on-request resizer has no TIFF format.
+GHSA-jjfr-hcj7-qf5w  TIFF writer (CCITT T6). Not reachable, same reason.
+GHSA-j3p4-wp97-rph4  Histogram equalisation filter. Not reachable: Inkwell does not call it and the resizer does not offer it.
+GHSA-gwg2-r3hj-4w44  Colour-profile (ICC) parsing allocates from unvalidated sizes. OPEN: not shown to be unreachable. Limited to signed-in accounts that may upload and to Admin-run imports; uploads are capped in file size and at 40 megapixels.

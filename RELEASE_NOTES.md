@@ -80,6 +80,12 @@ in every earlier release an Author could create an Admin account by sending the 
   checked type; profile photos are re-encoded; SVG uploads are sanitised; a file that only claims to
   be a picture, or declares an enormous one, is refused.
 - **Security headers on every response**, with a content security policy in report-only mode by default.
+- **TIFF files are never decoded, and known advisories in dependencies are listed.** The image library
+  (ImageSharp 3.1.12) has six published advisories that are fixed only in a version that needs a licence
+  key to build. Five are in code Inkwell cannot reach: TIFF is switched off, and one filter is never
+  called. One, in colour-profile parsing (GHSA-gwg2-r3hj-4w44), remains open; it needs a signed-in
+  account that may upload, or an Admin-run import. `.github/accepted-advisories.txt` gives the reason
+  for each, and the build fails on any advisory not listed there.
 - **A role change or password reset takes effect at once:** sessions end, and a reset revokes the
   account's API keys. Five wrong passwords in 15 minutes impose a wait.
 
@@ -101,6 +107,10 @@ in every earlier release an Author could create an Admin account by sending the 
 - **Review accounts and uploads if you have untrusted users.** Check Users and the Audit Trail for
   accounts or role changes you do not recognise, and `wwwroot/uploads/avatars` and the media folders
   for files that are not pictures or documents.
+- **TIFF images get no resized copies.** An imported or existing `.tif` file is still served as it
+  is, but the resizer no longer reads or writes TIFF. Uploads never accepted TIFF.
+- **Give upload rights only to people you trust** until the image library is upgraded: one advisory in
+  it remains open (see Security above).
 - **Public pages carry `<meta name="generator" content="Inkwell">`**, with no version. Set
   `Site:GeneratorTag` to `false` to leave it out.
 - **New settings are off by default:** the MCP endpoint, maintenance mode, share links, the contact

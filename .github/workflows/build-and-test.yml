@@ -44,7 +44,14 @@ jobs:
       - name: No package with a known vulnerability
         run: |
           dotnet list Blog.Tests/Blog.Tests.csproj package --vulnerable --include-transitive | tee audit.txt
-          if grep -qi "has the following vulnerable packages" audit.txt; then exit 1; fi
+          # Every advisory found must be one this project has looked at and written down, with the reason,
+          # in .github/accepted-advisories.txt. Anything else, including a new advisory on a listed package,
+          # fails the build.
+          grep -oE 'GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}' audit.txt | sort -u > found.txt || true
+          grep -oE '^GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}' .github/accepted-advisories.txt | sort -u > accepted.txt || true
+          comm -23 found.txt accepted.txt > unaccepted.txt
+          if [ -s unaccepted.txt ]; then echo "Advisories that are not in .github/accepted-advisories.txt:"; cat unaccepted.txt; exit 1; fi
+          echo "Accepted advisories still present: $(comm -12 found.txt accepted.txt | wc -l)"
       - name: Software bill of materials (CycloneDX)
         run: |
           dotnet tool install --global CycloneDX

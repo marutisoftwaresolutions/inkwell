@@ -251,7 +251,10 @@ builder.Services.AddSingleton<Blog.Web.Services.CommentNoticeThrottle>();
 builder.Services.AddScoped<Blog.Web.Services.CommentNotifier>();
 builder.Services.AddSingleton<Blog.Web.Services.TrafficRecorder>();
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
-builder.Services.AddImageSharp();
+// TIFF is not a format this site reads or writes (ImageFormatPolicy says why). The shared configuration loses its
+// TIFF detector, and the on-request resizer gets a configuration that has no TIFF at all.
+Blog.Web.Services.ImageFormatPolicy.Apply();
+builder.Services.AddImageSharp(options => options.Configuration = Blog.Web.Services.ImageFormatPolicy.WithoutTiff());
 
 var oldUploads = Path.Combine(builder.Environment.ContentRootPath, "Uploads");
 var newUploads = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "uploads");

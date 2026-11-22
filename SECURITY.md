@@ -44,7 +44,8 @@ We will not pursue or support legal action against anyone who finds and reports 
 
 - Fixed vulnerabilities are published as [GitHub security advisories](https://github.com/marutisoftwaresolutions/inkwell/security/advisories) and listed under a **Security** heading in the [changelog](CHANGELOG.md).
 - Each release's notes name the .NET runtime patch level the release was built and tested on. Inkwell runs on the .NET runtime you install, so keep that runtime patched: a fix in ASP.NET Core reaches your site when you update the runtime, not when you update Inkwell.
-- Every build is checked for NuGet packages with a known vulnerability, and a software bill of materials (CycloneDX) is produced by the build.
+- Every build is checked for NuGet packages with a known vulnerability, and a software bill of materials (CycloneDX) is produced by the build. An advisory that cannot be fixed by an upgrade yet is listed in [`.github/accepted-advisories.txt`](.github/accepted-advisories.txt) with the reason it is accepted and whether Inkwell can reach the affected code; the build fails on any advisory not listed there.
+- Known and open as of v1.1.0: the image library (ImageSharp 3.1.12) has six advisories fixed only in a later version. Inkwell never decodes or writes TIFF and never calls the affected filter, which covers five of them. One, in colour-profile parsing (GHSA-gwg2-r3hj-4w44), is not shown to be unreachable: it needs a signed-in account that may upload, or an Admin-run import.
 
 ## For site operators
 
