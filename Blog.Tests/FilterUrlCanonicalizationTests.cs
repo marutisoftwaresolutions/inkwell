@@ -40,6 +40,7 @@ public class FilterUrlCanonicalizationTests : IClassFixture<WebApplicationFactor
     [InlineData("/?tags=optical-pos&page=2", "/tag/optical-pos?page=2")] // pagination preserved
     public async Task A_single_value_filter_301s_to_the_canonical_archive(string requested, string expected)
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         // The redirect is decided before any database work, so this holds even without a database.
         var response = await Client().GetAsync(requested);
 
@@ -72,6 +73,7 @@ public class FilterUrlCanonicalizationTests : IClassFixture<WebApplicationFactor
     [InlineData("/?category=practice-management-software&tags=eyefinity", "/tag/eyefinity")]
     public async Task Multi_value_and_mixed_filters_collapse_onto_one_archive(string requested, string expected)
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         var response = await Client().GetAsync(requested);
 
         Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);

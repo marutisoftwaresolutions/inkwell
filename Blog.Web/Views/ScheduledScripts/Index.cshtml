@@ -12,7 +12,7 @@
     int total   = ViewBag.Total;
     var q = Context.Request.Query["q"].ToString();
 
-    string When(DateTime? utc) => utc is null ? "—" : utc.Value.ToString("yyyy-MM-dd HH:mm") + " UTC";
+    string When(DateTime? utc) => utc is null ? "—" : Dates.DateTime(utc);
     string Pill(ScheduledScript s) => !s.Enabled ? "desk-pill-muted" : s.LastSucceeded == false ? "pill-bad" : s.LastSucceeded == true ? "pill-ok" : "pill-info";
     string PillText(ScheduledScript s) => !s.Enabled ? "Disabled" : s.LastSucceeded == false ? "Last run failed" : s.LastSucceeded == true ? "OK" : "Not run yet";
 }

@@ -118,6 +118,53 @@ public class SettingsViewModel
     [Display(Name = "Bing Webmaster verification code")]
     public string? BingSiteVerification { get; set; }
 
+    [Display(Name = "Let AI assistants connect (MCP)")]
+    public bool McpEnabled { get; set; }
+
+    [Display(Name = "Prepare a newsletter when a post is published")]
+    public bool NewsletterDraftOnPublish { get; set; }
+
+    [Display(Name = "Show share links under posts")]
+    public bool ShareLinksEnabled { get; set; }
+
+    [Display(Name = "Maintenance mode")]
+    public bool MaintenanceModeEnabled { get; set; }
+
+    [Display(Name = "Message on the holding page")]
+    [StringLength(Blog.Core.Services.MaintenanceMode.MaxMessageLength)]
+    public string? MaintenanceMessage { get; set; }
+
+    [Display(Name = "Email me when a reader comments")]
+    public bool CommentNotifyEnabled { get; set; }
+
+    [Display(Name = "Send comment emails to")]
+    public string? CommentNotifyEmails { get; set; }
+
+    [Display(Name = "Contact button")]
+    public string? ContactButtonKind { get; set; }
+
+    [Display(Name = "Number or address")]
+    public string? ContactButtonValue { get; set; }
+
+    [Display(Name = "Button label")]
+    [StringLength(Blog.Core.Services.ContactButton.MaxLabelLength)]
+    public string? ContactButtonLabel { get; set; }
+
+    [Display(Name = "Code for the page head")]
+    public string? CodeInjectionHead { get; set; }
+
+    [Display(Name = "Code for the page foot")]
+    public string? CodeInjectionFoot { get; set; }
+
+    [Display(Name = "Custom CSS")]
+    public string? CustomCss { get; set; }
+
+    [Display(Name = "Wait for cookie consent before loading this code")]
+    public bool CodeInjectionNeedsConsent { get; set; } = true;
+
+    /// <summary>True when the form carried the Custom code tab (only Admins see it), so any other save leaves the code as it was.</summary>
+    public bool CodePosted { get; set; }
+
     [Display(Name = "Enable IndexNow (instant indexing)")]
     public bool IndexNowEnabled { get; set; }
 

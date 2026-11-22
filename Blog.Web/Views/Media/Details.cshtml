@@ -1,7 +1,9 @@
 @model Blog.Core.Domain.Media
 @using Blog.Web.Controllers
 @{
-    ViewData["Title"] = "Image Details";
+    var isImage = Model.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = isImage ? "Image Details" : "File Details";
+    var storedKind = System.IO.Path.GetExtension(Model.Url).TrimStart('.').ToUpperInvariant();
     Layout = "_AdminLayout";
     var display = string.IsNullOrEmpty(Model.OriginalFileName) ? Model.FileName : Model.OriginalFileName;
     ViewData["Description"] = display;
@@ -16,13 +18,31 @@
     }.Where(kv => kv.Value != null));
     var altError = ViewData.ModelState["AltText"]?.Errors.FirstOrDefault()?.ErrorMessage;
     var captionError = ViewData.ModelState["Caption"]?.Errors.FirstOrDefault()?.ErrorMessage;
+    var isSvg = Model.ContentType.Contains("svg", StringComparison.OrdinalIgnoreCase);
+    var canCrop = isImage && !isSvg && Model.Width is > 0 && Model.Height is > 0;
+    var imgW = Model.Width ?? 0;
+    var imgH = Model.Height ?? 0;
 }
 
 @section PageActions {
-    <a href="@backUrl" class="desk-btn desk-btn-outline">Cancel</a>
-    <button type="submit" form="mediaDetails" class="desk-btn desk-btn-primary">Save</button>
+    <a href="@backUrl" class="desk-btn desk-btn-outline">@(isImage ? "Cancel" : "Back to Media")</a>
+    @if (isImage) { <button type="submit" form="mediaDetails" class="desk-btn desk-btn-primary">Save</button> }
 }
 
+@if (!isImage)
+{
+    <div class="max-w-4xl desk-card">
+        <dl class="desk-card-body text-sm grid grid-cols-[auto_1fr] gap-x-3 gap-y-2">
+            <dt class="text-muted-foreground">File</dt><dd class="break-all">@display</dd>
+            <dt class="text-muted-foreground">Kind</dt><dd>@storedKind</dd>
+            <dt class="text-muted-foreground">Size</dt><dd>@((Model.FileSize / 1024.0).ToString("N0")) KB</dd>
+            <dt class="text-muted-foreground">Address</dt><dd class="font-mono break-all">@Model.Url</dd>
+        </dl>
+    </div>
+}
+
+@if (isImage)
+{
 <form id="mediaDetails" method="post" action="/admin/media/details/@Model.Id" data-track-changes class="max-w-4xl space-y-6">
     @Html.AntiForgeryToken()
     <input type="hidden" name="folder" value="@folder" />
@@ -62,3 +82,117 @@
         </div>
     </div>
 </form>
+}
+
+@* Crop and replace are actions, not edits: their own forms, outside the tracked details form. *@
+<div class="max-w-4xl grid gap-6 md:grid-cols-2 mt-8">
+    @if (canCrop)
+    {
+        <section class="desk-card" aria-labelledby="crop-title">
+            <div class="desk-card-header">
+                <h2 id="crop-title" class="desk-card-title">Crop to a copy</h2>
+                <p class="desk-card-description">Saves the chosen area as a new image. This one, and every post that uses it, stays as it is.</p>
+            </div>
+            <form method="post" action="/admin/media/details/@Model.Id/crop" class="desk-card-body space-y-4" id="cropForm" data-image-width="@imgW" data-image-height="@imgH" data-min-side="@Blog.Core.Services.ImageCrop.MinSide">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="folder" value="@folder" />
+                <input type="hidden" name="q" value="@q" />
+                <input type="hidden" name="page" value="@pageNo" />
+                <div class="relative inline-block max-w-full leading-none desk-crop-stage" id="cropStage">
+                    <img src="@Model.Url" alt="" class="max-w-full max-h-64 block" draggable="false" />
+                    <div id="cropBox" class="desk-crop-outline" hidden></div>
+                </div>
+                <div class="flex flex-wrap gap-2" role="group" aria-label="Shapes">
+                    @foreach (var preset in Blog.Core.Services.ImageCrop.Presets)
+                    {
+                        var r = Blog.Core.Services.ImageCrop.Centered(imgW, imgH, preset.RatioWidth, preset.RatioHeight);
+                        <button type="button" class="desk-btn desk-btn-outline desk-btn-sm" data-crop-x="@r.X" data-crop-y="@r.Y" data-crop-w="@r.Width" data-crop-h="@r.Height">@preset.Label</button>
+                    }
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label for="cropX" class="desk-label">From the left (px)</label><input type="number" id="cropX" name="x" value="0" min="0" max="@(imgW - 1)" required class="desk-input" /></div>
+                    <div><label for="cropY" class="desk-label">From the top (px)</label><input type="number" id="cropY" name="y" value="0" min="0" max="@(imgH - 1)" required class="desk-input" /></div>
+                    <div><label for="cropW" class="desk-label">Width (px)</label><input type="number" id="cropW" name="width" value="@imgW" min="@Blog.Core.Services.ImageCrop.MinSide" max="@imgW" required class="desk-input" /></div>
+                    <div><label for="cropH" class="desk-label">Height (px)</label><input type="number" id="cropH" name="height" value="@imgH" min="@Blog.Core.Services.ImageCrop.MinSide" max="@imgH" required class="desk-input" /></div>
+                </div>
+                <p class="desk-hint">Drag across the picture, pick a shape, or type the area. The picture is @imgW × @imgH pixels; the outline shows what will be kept.</p>
+                <button type="submit" class="desk-btn desk-btn-outline">Save cropped copy</button>
+            </form>
+        </section>
+    }
+
+    <section class="desk-card" aria-labelledby="replace-title">
+        <div class="desk-card-header">
+            <h2 id="replace-title" class="desk-card-title">Replace the file</h2>
+            <p class="desk-card-description">Puts a new @(isSvg ? "SVG" : isImage ? "picture" : storedKind + " file") behind the same address, so every post and page that @(isImage ? "uses this image shows the new one" : "links to this file gets the new one").</p>
+        </div>
+        <form method="post" action="/admin/media/details/@Model.Id/replace" enctype="multipart/form-data" class="desk-card-body space-y-4"
+              data-confirm-title="Replace this file?" data-confirm-body="Every post and page that uses this file will get the new one at the same address. The current file is not kept and cannot be brought back.@(isImage ? " Alt text and caption stay as they are." : "")" data-confirm-action="Replace file" data-confirm-tone="danger">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="folder" value="@folder" />
+            <input type="hidden" name="q" value="@q" />
+            <input type="hidden" name="page" value="@pageNo" />
+            <div>
+                <label for="replaceFile" class="desk-label">New file</label>
+                <input type="file" id="replaceFile" name="file" required accept="@(isSvg ? "image/svg+xml" : isImage ? "image/jpeg,image/png,image/gif,image/webp" : "." + storedKind.ToLowerInvariant())" class="desk-input" aria-describedby="replaceHint" />
+                <p id="replaceHint" class="desk-hint">@(isSvg ? "An SVG file" : isImage ? "A JPEG, PNG, GIF or WebP picture" : "Another " + storedKind + " file"), up to @MediaController.MaxUploadMegabytes MB.@(isImage ? " It is stored in the same format as the current file." : "")</p>
+            </div>
+            <button type="submit" class="desk-btn desk-btn-outline">Replace file</button>
+        </form>
+    </section>
+</div>
+
+@if (canCrop)
+{
+    <script>
+        // Crop helper: shape buttons fill the four numbers; the outline follows them. The numbers are what is sent.
+        (function () {
+            var form = document.getElementById('cropForm'), box = document.getElementById('cropBox');
+            if (!form || !box) return;
+            var iw = +form.dataset.imageWidth, ih = +form.dataset.imageHeight;
+            var f = { x: document.getElementById('cropX'), y: document.getElementById('cropY'), w: document.getElementById('cropW'), h: document.getElementById('cropH') };
+            function draw() {
+                var x = Math.max(0, +f.x.value || 0), y = Math.max(0, +f.y.value || 0);
+                var w = Math.min(+f.w.value || 0, iw - x), h = Math.min(+f.h.value || 0, ih - y);
+                if (w <= 0 || h <= 0 || (x === 0 && y === 0 && w === iw && h === ih)) { box.hidden = true; return; }
+                box.hidden = false;
+                box.style.left = (x / iw * 100) + '%'; box.style.top = (y / ih * 100) + '%';
+                box.style.width = (w / iw * 100) + '%'; box.style.height = (h / ih * 100) + '%';
+            }
+            form.querySelectorAll('[data-crop-w]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    f.x.value = b.dataset.cropX; f.y.value = b.dataset.cropY; f.w.value = b.dataset.cropW; f.h.value = b.dataset.cropH;
+                    draw();
+                });
+            });
+            Object.keys(f).forEach(function (k) { f[k].addEventListener('input', draw); });
+
+            // Dragging on the picture sets the same four numbers. Pointer events cover mouse, touch and pen.
+            var stage = document.getElementById('cropStage'), start = null;
+            function at(e) {
+                var r = stage.querySelector('img').getBoundingClientRect();
+                return {
+                    x: Math.round(Math.min(Math.max(e.clientX - r.left, 0), r.width) / r.width * iw),
+                    y: Math.round(Math.min(Math.max(e.clientY - r.top, 0), r.height) / r.height * ih)
+                };
+            }
+            var minSide = +form.dataset.minSide || 16;
+            function drag(e) {
+                if (!start) return;
+                var p = at(e), w = Math.abs(p.x - start.x), h = Math.abs(p.y - start.y);
+                // A click or a tap is not a crop: the numbers already there are left alone until a real area is drawn.
+                if (w < minSide || h < minSide) return;
+                f.x.value = Math.min(start.x, p.x); f.y.value = Math.min(start.y, p.y);
+                f.w.value = w; f.h.value = h;
+                draw();
+            }
+            if (stage) {
+                stage.addEventListener('pointerdown', function (e) { start = at(e); stage.setPointerCapture(e.pointerId); e.preventDefault(); });
+                stage.addEventListener('pointermove', drag);
+                stage.addEventListener('pointerup', function (e) { drag(e); start = null; });
+                stage.addEventListener('pointercancel', function () { start = null; });
+            }
+            draw();
+        })();
+    </script>
+}

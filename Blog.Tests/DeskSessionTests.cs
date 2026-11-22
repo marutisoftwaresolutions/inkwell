@@ -105,7 +105,8 @@ public class DeskSessionTests : IClassFixture<WebApplicationFactory<Program>>
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DBScripts", "init.sql"))) dir = dir.Parent;
         var users = File.ReadAllText(Path.Combine(dir!.FullName, "Blog.Web", "Controllers", "UsersController.cs"));
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(users, @"DeskSessionValidator\.Forget\(").Count);
+        // Disabling, deleting, and (since the 2026-11-13 review) changing a user's role each end that user's sessions.
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(users, @"DeskSessionValidator\.Forget\(").Count);
         Assert.Contains("options.Events.OnValidatePrincipal = DeskSessionValidator.ValidateAsync;",
             File.ReadAllText(Path.Combine(dir.FullName, "Blog.Web", "Program.cs")));
     }

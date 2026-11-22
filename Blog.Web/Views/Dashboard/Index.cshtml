@@ -213,7 +213,7 @@
         <details id="jobs" class="desk-card" open="@(failedJobs.Count > 0)">
             <summary class="desk-card-header flex-row items-baseline justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                 <h2 class="desk-card-title">Scheduled jobs <span class="text-muted-foreground font-normal">(@jobs.Count)</span></h2>
-                <span class="text-xs text-muted-foreground">Running Inkwell @Blog.Web.Services.AppVersion.Current · housekeeping runs inside the app, no external scheduler</span>
+                <span class="text-xs text-muted-foreground">Running Inkwell @Blog.Web.Services.AppVersion.Current on .NET @Blog.Core.Services.RuntimeBaseline.Short(Environment.Version) · housekeeping runs inside the app, no external scheduler</span>
             </summary>
             <div class="table-scroll"><table class="desk-table">
                 <thead>

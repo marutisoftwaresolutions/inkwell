@@ -501,6 +501,17 @@
                             </div>
                         }
                     </div>
+                    @{
+                        var onSite = string.Equals(Model.Settings.FirstOrDefault(s => s.SettingKey == Blog.Core.Services.ReaderColours.SettingKey)?.EffectiveValue, "true", StringComparison.OrdinalIgnoreCase);
+                    }
+                    <div class="pt-1">
+                        <label for="colors-on-site" class="desk-label">Reader colours come from</label>
+                        <select id="colors-on-site" name="settings[@Blog.Core.Services.ReaderColours.SettingKey]" class="desk-select">
+                            <option value="false" selected="@(!onSite)">The Inkwell colour preset</option>
+                            <option value="true" selected="@onSite">The colours above</option>
+                        </select>
+                        <p class="desk-hint">The public site is painted by the Inkwell colour preset. Choose "The colours above" to use your own background, text, link, card and border colours on reader pages in the light scheme; dark mode keeps its own palette. The Desk is not affected.</p>
+                    </div>
                 </div>
 
                 @* Typography *@

@@ -6,7 +6,7 @@ namespace Blog.Tests;
 /// Avatar URLs carry the author's display name as a path segment ("/avatar/Demo Admin"). Encoding it
 /// with <c>WebUtility.UrlEncode</c> turns the space into "+", and IIS request filtering rejects a "+"
 /// in a path (404.11, double escaping) unless the server is reconfigured, so every multi-word author
-/// showed a broken avatar on an IIS host (seen on demo.useinkwell.app, 2026-11-01). Path segments are
+/// showed a broken avatar on an IIS host (seen 2026-11-01). Path segments are
 /// percent-encoded with <c>Uri.EscapeDataString</c>, which writes "%20". This scan keeps it that way.
 /// </summary>
 public class AvatarUrlEncodingTests

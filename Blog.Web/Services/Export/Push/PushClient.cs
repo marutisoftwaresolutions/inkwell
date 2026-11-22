@@ -47,7 +47,8 @@ public interface IPushClient
     Task<RemoteItem> UploadImageAsync(string fileName, string contentType, Stream content, string? alt, string? caption, CancellationToken ct);
 
     /// <summary>The id of a WordPress category or tag with this slug, created when missing. Ghost creates tags inline.</summary>
-    Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct);
+    /// <summary>Finds the term on the target or creates it. <paramref name="parentId"/> is the target's id of the category it belongs under; it is used only when the term is created, so a category the target already has is never moved.</summary>
+    Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct, string? parentId = null);
 }
 
 public interface IPushClientFactory
@@ -288,7 +289,7 @@ internal sealed class WordPressPushClient : PushClientBase, IPushClient
         return new RemoteItem(id, media["source_url"]?.GetValue<string>());
     }
 
-    public async Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct)
+    public async Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct, string? parentId = null)
     {
         await DiscoverAsync(ct);
         var route = "wp/v2/" + term.Taxonomy;
@@ -296,7 +297,9 @@ internal sealed class WordPressPushClient : PushClientBase, IPushClient
         if ((found as JsonArray)?.FirstOrDefault() is JsonNode hit) return hit["id"]!.ToString();
         try
         {
-            var created = await SendAsync(HttpMethod.Post, Api(route), Json(new JsonObject { ["name"] = term.Name, ["slug"] = term.Slug }), ct);
+            var body = new JsonObject { ["name"] = term.Name, ["slug"] = term.Slug };
+            if (term.Taxonomy == "categories" && long.TryParse(parentId, out var parent)) body["parent"] = parent;
+            var created = await SendAsync(HttpMethod.Post, Api(route), Json(body), ct);
             return created!["id"]!.ToString();
         }
         catch (PushException ex) when (ex.StatusCode == 400 && ex.Message.Contains("exists", StringComparison.OrdinalIgnoreCase))
@@ -397,6 +400,6 @@ internal sealed class GhostPushClient : PushClientBase, IPushClient
         return new RemoteItem(url, url);
     }
 
-    public Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct) =>
+    public Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct, string? parentId = null) =>
         throw new NotSupportedException("Ghost creates tags with the post.");
 }

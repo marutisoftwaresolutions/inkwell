@@ -18,6 +18,8 @@ public sealed class DeskShellModel
     public bool IsCloudMode { get; init; }
     public int PendingComments { get; init; }
     public int ReviewQueue { get; init; }
+    /// <summary>Maintenance mode is on: every Desk screen says so, because staff see the site as usual and could forget.</summary>
+    public bool MaintenanceOn { get; init; }
     public IReadOnlyList<DeskNavigation.Item> Items { get; init; } = Array.Empty<DeskNavigation.Item>();
     public IReadOnlyList<DeskNavigation.Command> Commands { get; init; } = Array.Empty<DeskNavigation.Command>();
     public DeskNavigation.Item? Current { get; init; }

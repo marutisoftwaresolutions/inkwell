@@ -6,6 +6,7 @@
 @inject Blog.Core.Interfaces.ICategoryRepository CategoryRepo
 @inject Microsoft.Extensions.Configuration.IConfiguration _rcfg
 @inject Blog.Web.Services.PageViewBeaconService PageViewBeacon
+@inject Blog.Web.Services.GoalRecorder GoalRecorder
 @using System.Security.Claims
 @{
 	Guid contentId = Guid.Empty;
@@ -62,7 +63,13 @@
 	var globalSettings = await SettingsRepo.GetSettingsAsync(brandingId);
 	// Cookie consent (v1.0.8): with the banner on, Google Analytics is not in the page at all until the
 	// reader accepts (inkwell-consent.js loads it). A malformed Measurement ID is never emitted.
-	var consentMode = Blog.Core.Services.CookieConsent.Decide(globalSettings.CookieConsentEnabled, globalSettings.GoogleAnalyticsId);
+	// Custom code (Settings → Custom code): the operator's own CSS and HTML, where the host allows it. While
+	// the banner is on, the HTML is not in the page; it is carried as inert data and added after the reader accepts.
+	var codeAllowed = Blog.Web.Services.HostSwitches.CodeInjectionAllowed(_rcfg, TenantContext);
+	var customCss = codeAllowed ? Blog.Core.Services.CodeInjection.SafeCss(globalSettings.CustomCss) : string.Empty;
+	var codeWaits = codeAllowed && Blog.Core.Services.CodeInjection.WaitsForConsent(globalSettings);
+	var codeLive = codeAllowed && !codeWaits && Blog.Core.Services.CodeInjection.HasHtml(globalSettings);
+	var consentMode = Blog.Core.Services.CookieConsent.Decide(globalSettings.CookieConsentEnabled, globalSettings.GoogleAnalyticsId, codeWaits);
 	var analyticsId = Blog.Core.Services.CookieConsent.IsValidAnalyticsId(globalSettings.GoogleAnalyticsId) ? globalSettings.GoogleAnalyticsId.Trim() : null;
 	var analyticsInHead = analyticsId is not null && consentMode == Blog.Core.Services.CookieConsentMode.Off;
 
@@ -85,6 +92,12 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	@* Names the software, without a version, so technology surveys can count Inkwell sites.
+	   Site:GeneratorTag=false removes it. *@
+	@if (_rcfg.GetValue("Site:GeneratorTag", true))
+	{
+		<meta name="generator" content="Inkwell" />
+	}
 	<title>@brandedTitle</title>
 	<meta name="description" content="@ViewData["Description"]" />
 	@if (!string.IsNullOrEmpty(robotsDirective))
@@ -264,6 +277,11 @@
 	<link rel="stylesheet" href="~/css/inkwell.css" asp-append-version="true" />
 	<!-- Legacy neutral styles (filters, pagination, non-Magazine layouts) -->
 	<link rel="stylesheet" href="~/css/neutral-blog.css" asp-append-version="true" />
+	@* Section blocks (columns, feature grid, call to action …): loaded only by a page that uses them. *@
+	@if (ViewData["HasSections"] is true)
+	{
+		<link rel="stylesheet" href="~/css/inkwell-sections.css" asp-append-version="true" />
+	}
 
 	<!-- Highlight.js + Lucide are loaded on demand (only when the page actually
 	     contains code blocks / lucide icons) so they never block first paint on the
@@ -383,6 +401,20 @@
 	}
 	<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(orgData, orgSchema))</script>
 	<script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(siteData, orgSchema))</script>
+	@* Saved colours on the reader surface (opt-in under Theme → Colours): mapped onto the Inkwell tokens. *@
+	@{ var readerColourCss = Blog.Core.Services.ReaderColours.Css(themeDict); }
+	@if (readerColourCss.Length > 0)
+	{
+		<style id="reader-colours">@Html.Raw(readerColourCss)</style>
+	}
+	@if (customCss.Length > 0)
+	{
+		<style id="site-css">@Html.Raw(customCss)</style>
+	}
+	@if (codeLive && !string.IsNullOrWhiteSpace(globalSettings.CodeInjectionHead))
+	{
+		@Html.Raw(globalSettings.CodeInjectionHead)
+	}
 </head>
 
 @{
@@ -411,7 +443,21 @@
 		@await Component.InvokeAsync("Footer", new { ownerId = brandingId })
 	}
 
-	<partial name="_CookieConsent" model="(consentMode, analyticsId)" />
+	@if (codeWaits)
+	{
+		@* Held code: a JSON string, so nothing in it is parsed or run until inkwell-consent.js adds it after "Accept". *@
+		<script type="application/json" id="ink-held-code">@Html.Raw(Blog.Core.Services.CodeInjection.HeldJson(globalSettings.CodeInjectionHead, globalSettings.CodeInjectionFoot))</script>
+	}
+	<partial name="_CookieConsent" model="(consentMode, analyticsId, codeWaits)" />
+
+	@* Contact button (Settings → Display): one plain link; rendered only when the number or address is valid. *@
+	@{ var contactLink = Blog.Core.Services.ContactButton.Build(globalSettings.ContactButtonKind, globalSettings.ContactButtonValue, globalSettings.ContactButtonLabel); }
+	@if (contactLink is not null)
+	{
+		<a class="ink-contact" href="@contactLink.Href" data-contact="@contactLink.Kind" target="@(contactLink.OpensNewTab ? "_blank" : null)" rel="@(contactLink.OpensNewTab ? "noopener nofollow" : null)" aria-label="@contactLink.Label">
+			<i class="bi @contactLink.Icon" aria-hidden="true"></i><span class="ink-contact__label">@contactLink.Label</span>
+		</a>
+	}
 
 	<!-- Scroll to Top -->
 	<a href="#" id="backToTop" class="back-top fixed py-2 px-3 border border-dashed end-4 bottom-4" style="background: var(--muted); border-color: var(--border); color: var(--muted-foreground);" aria-label="Scroll To Top">
@@ -451,7 +497,13 @@
 	@{ var pageViewToken = PageViewBeacon.TokenFor(Context); }
 	@if (pageViewToken is not null)
 	{
-		<script src="~/js/inkwell-views.js" asp-append-version="true" data-pv="@pageViewToken" defer></script>
+		@* Link-click goals: the links the site watches, when it watches any. Null leaves the attribute out. *@
+		var goalTargets = await GoalRecorder.ClickTargetsJsonAsync(Blog.Web.Services.TrafficRecorder.OwnerOf(Context));
+		<script src="~/js/inkwell-views.js" asp-append-version="true" data-pv="@pageViewToken" data-goals="@goalTargets" defer></script>
+	}
+	@if (codeLive && !string.IsNullOrWhiteSpace(globalSettings.CodeInjectionFoot))
+	{
+		@Html.Raw(globalSettings.CodeInjectionFoot)
 	}
 </body>
 </html>

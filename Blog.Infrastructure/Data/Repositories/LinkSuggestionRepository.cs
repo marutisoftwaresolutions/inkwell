@@ -15,7 +15,7 @@ public class LinkSuggestionRepository : ILinkSuggestionRepository
         using var conn = _ctx.CreateConnection();
 
         var posts = (await conn.QueryAsync<(Guid Id, string Slug, string Title, string Html)>(@"
-            SELECT Id, Slug, Title, ISNULL(Html, '') AS Html
+            SELECT Id, Slug, Title, COALESCE(Html, '') AS Html
               FROM Posts
              WHERE Status = 'Published' AND (@OwnerId IS NULL OR AuthorId = @OwnerId);",
             new { OwnerId = ownerId })).ToList();

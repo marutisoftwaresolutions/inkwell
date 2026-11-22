@@ -140,7 +140,7 @@ public class DockerDeploymentTests
         var di = Read(".dockerignore");
         Assert.Contains("appsettings.json", di);
         Assert.Contains("appsettings.*.json", di);
-        Assert.Contains(".env\n", di);
+        Assert.Contains(".env", di.Split('\n').Select(l => l.Trim()));   // line-based: CRLF or LF checkout
         Assert.Contains("Blog.Web/wwwroot/uploads/**", di);
     }
 

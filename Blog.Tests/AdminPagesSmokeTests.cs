@@ -63,7 +63,7 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
     [InlineData("/admin/calendar?month=not-a-month", "This month")]
     [InlineData("/admin/security", "desk-page-title")] // an empty rule list shows the empty state, not a table
     [InlineData("/admin/audit", "desk-busy")]          // its table renders only once there are entries
-    [InlineData("/admin/errors", "table-scroll")]
+    [InlineData("/admin/errors", "desk-page-title")]   // its table renders only once an error has been logged: on a fresh database that depends on which tests ran first
     [InlineData("/admin/dashboard", "desk-busy")]
     [InlineData("/admin/settings", "data-track-changes")]
     [InlineData("/admin/posts/create", "data-track-changes")]
@@ -86,6 +86,11 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
     [InlineData("/admin/newsletter", "desk-page-title")]
     [InlineData("/admin/newsletter/new", "data-track-changes")]
     [InlineData("/account/security", "Two-factor sign-in")]
+    [InlineData("/account/api-keys", "Create a key")]
+    [InlineData("/admin/newsletter/sender-check", "Sender Check")]
+    [InlineData("/admin/newsletter/welcome", "Save welcome emails")]
+    [InlineData("/admin/media/unused", "Unused Files")]
+    [InlineData("/admin/analytics/goals", "Add a goal")]
     [InlineData("/account/two-factor/setup", "qr-box")]
     [InlineData("/admin/export", "table-scroll")]
     [InlineData("/admin/export?target=Ghost&submitted=true&includeEmails=true", "Universal import")]
@@ -434,7 +439,7 @@ public class AdminPagesSmokeTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     /// <summary>An Admin with every permission claim the Desk policies check.</summary>
-    private sealed class TestAdminAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+    internal sealed class TestAdminAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
     {
         public const string SchemeName = "TestAdminSmoke";
 

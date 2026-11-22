@@ -1,6 +1,8 @@
 @using Blog.Core.Interfaces
 @model PagedResult<Blog.Core.Domain.Post>
 @{
+    // h1 on the home page; h2 when the page already carries its heading (search results, category and tag archives).
+    var heroHeading = (ViewData["PageHasHeading"] as bool? ?? false) ? "h2" : "h1";
     var searchTerm = ViewBag.SearchTerm as string;
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
     var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
@@ -53,7 +55,7 @@ else
                 {
                     <span style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-bottom:var(--sp-4);">@herocat.Name</span>
                 }
-                <h1 style="font-family:var(--serif);font-size:clamp(1.75rem,4vw,3rem);font-weight:700;line-height:1.15;color:#fff;margin:0;">@heroPost.Title</h1>
+                @Html.Raw("<" + heroHeading + @" style=""font-family:var(--serif);font-size:clamp(1.75rem,4vw,3rem);font-weight:700;line-height:1.15;color:#fff;margin:0;"">")@heroPost.Title@Html.Raw("</" + heroHeading + ">")
                 @if (!string.IsNullOrEmpty(heroPost.AuthorName))
                 {
                     <p style="font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.65);margin:var(--sp-4) 0 0;">by @heroPost.AuthorName · @Dates.Medium(heroPost.PublishedAt)</p>

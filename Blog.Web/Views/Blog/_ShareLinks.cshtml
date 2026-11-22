@@ -1,0 +1,24 @@
+@model Blog.Core.Domain.Post
+@* Share links under a post (Settings, Display, "Show share links under posts"). Plain links to each
+   service's own share page: nothing is loaded from them and no third-party script runs here. The two
+   buttons need JavaScript (copy the address, the device's own share sheet) and stay hidden without it. *@
+@{
+    var address = (string?)ViewData["Canonical"] ?? "";
+    var links = Blog.Core.Services.ShareLinks.For(address, Model.Title);
+}
+@if (links.Count > 0)
+{
+    <nav class="ink-share" aria-label="Share this post" data-share data-share-url="@address" data-share-title="@Model.Title">
+        <span class="ink-share__label">Share</span>
+        <ul>
+            <li><button type="button" data-share-copy hidden>Copy link</button></li>
+            <li><button type="button" data-share-native hidden>Share…</button></li>
+            @foreach (var link in links)
+            {
+                <li><a href="@link.Href" rel="noopener nofollow" target="@(link.Key == "email" ? null : "_blank")">@link.Label</a></li>
+            }
+        </ul>
+        <span class="ink-share__status" role="status" aria-live="polite" data-share-status></span>
+    </nav>
+    <script src="~/js/inkwell-share.js" asp-append-version="true" defer></script>
+}

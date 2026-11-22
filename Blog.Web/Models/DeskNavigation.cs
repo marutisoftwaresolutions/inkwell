@@ -19,7 +19,10 @@ public static class DeskNavigation
         string? Action = null,
         bool AdminOnly = false,
         bool HideInCloud = false,
-        string? Keywords = null)
+        string? Keywords = null,
+        // The permission the screen's policy demands (the "Permission" claim). Without it the screen sends the user
+        // back to the dashboard, so the link is not offered.
+        string? Permission = null)
     {
         public bool IsActive(string? controller, string? action) =>
             string.Equals(Controller, controller, StringComparison.OrdinalIgnoreCase)
@@ -55,6 +58,7 @@ public static class DeskNavigation
     private const string IcLink = "<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>";
     private const string IcCrawlers = "<rect x=\"4\" y=\"8\" width=\"16\" height=\"12\" rx=\"2\"/><path d=\"M12 8V4\"/><circle cx=\"12\" cy=\"3\" r=\"1\"/><line x1=\"9\" y1=\"13\" x2=\"9\" y2=\"15\"/><line x1=\"15\" y1=\"13\" x2=\"15\" y2=\"15\"/><path d=\"M2 14h2\"/><path d=\"M20 14h2\"/>";
     private const string IcRedirects = "<polyline points=\"15 14 20 9 15 4\"/><path d=\"M4 20v-7a4 4 0 0 1 4-4h12\"/>";
+    private const string IcApiKeys = "<circle cx=\"7.5\" cy=\"15.5\" r=\"4.5\"/><path d=\"M10.7 12.3 21 2\"/><path d=\"m16 7 3 3\"/>";
     private const string IcSecurity = "<path d=\"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z\"/>";
     private const string IcErrors = "<path d=\"M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"/><line x1=\"12\" y1=\"9\" x2=\"12\" y2=\"13\"/><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"/>";
     private const string IcAudit = "<path d=\"M9 11l3 3L22 4\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>";
@@ -105,11 +109,12 @@ public static class DeskNavigation
         new Item(System, "Export", "/admin/export", "Export", IcExport, AdminOnly: true, HideInCloud: true, Keywords: "wordpress ghost wxr download"),
         new Item(System, "Webhooks", "/admin/webhooks", "Webhooks", IcWebhooks, AdminOnly: true, Keywords: "integrations events"),
 
-        new Item(Settings, "General", "/admin/settings", "Settings", IcSettings, Keywords: "site name seo analytics comments identity"),
-        new Item(Settings, "Theme", "/admin/theme", "ThemeSettings", IcTheme, Keywords: "layout preset colours fonts"),
-        new Item(Settings, "Menus", "/admin/menus", "Menus", IcMenus, Keywords: "navigation footer links"),
+        new Item(Settings, "General", "/admin/settings", "Settings", IcSettings, Keywords: "site name seo analytics comments identity", Permission: "settings.manage"),
+        new Item(Settings, "Theme", "/admin/theme", "ThemeSettings", IcTheme, Keywords: "layout preset colours fonts", Permission: "themes.manage"),
+        new Item(Settings, "Menus", "/admin/menus", "Menus", IcMenus, Keywords: "navigation footer links", Permission: "themes.manage"),
         new Item(Settings, "Users", "/admin/users", "Users", IcUsers, AdminOnly: true, Keywords: "roles permissions invite"),
         new Item(Settings, "Profile", "/account/profile", "Account", IcProfile, Action: "Profile", Keywords: "password avatar two-factor"),
+        new Item(Settings, "API keys", "/account/api-keys", "ApiKeys", IcApiKeys, Keywords: "token mcp assistant script integration"),
     };
 
     public static readonly IReadOnlyList<Command> Commands = new[]
@@ -126,7 +131,8 @@ public static class DeskNavigation
     public static IEnumerable<Item> Visible(ClaimsPrincipal user, bool cloudMode)
     {
         var admin = IsAdmin(user);
-        return Items.Where(i => (!i.AdminOnly || admin) && (!i.HideInCloud || !cloudMode));
+        return Items.Where(i => (!i.AdminOnly || admin) && (!i.HideInCloud || !cloudMode)
+            && (i.Permission is null || user.HasClaim("Permission", i.Permission)));
     }
 
     public static Item? Current(string? controller, string? action) =>

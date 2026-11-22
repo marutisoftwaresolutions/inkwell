@@ -119,6 +119,7 @@ public class CrawlControlTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task The_home_feed_answers_a_filter_combination_with_a_permanent_redirect()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var response = await client.GetAsync("/?category=billing-revenue-cycle&tags=optosoft,ai-diagnostics");
 

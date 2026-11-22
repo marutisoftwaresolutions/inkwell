@@ -226,6 +226,55 @@ public sealed class BackupService
 
     public Stream OpenRead(string name) => File.OpenRead(PathOf(name));
 
+    // ── Checking a backup can be read ───────────────────────────────────────────
+
+    /// <summary>
+    /// Reads a backup end to end without restoring it: the archive opens, the manifest is one this
+    /// version can restore, every table file it lists is present with the row count it states, and the
+    /// media files are all there and decompress. Returns the problems found; empty means the file is
+    /// whole. It proves the file is readable, not that the data in it is what the owner wanted.
+    /// </summary>
+    public IReadOnlyList<string> Verify(string name)
+    {
+        var problems = new List<string>();
+        if (!BackupFormat.IsBackupFileName(name) || !File.Exists(PathOf(name))) return ["The file is no longer in the backups folder."];
+        try
+        {
+            using var zip = ZipFile.OpenRead(PathOf(name));
+            var manifest = ReadManifest(zip);
+            if (manifest is null) return ["The file has no manifest; it is not an Inkwell backup."];
+            if (manifest.RestoreProblem() is { } restoreProblem) problems.Add(restoreProblem);
+
+            foreach (var (table, expected) in manifest.Tables)
+            {
+                var entry = zip.GetEntry(BackupFormat.DataEntry(table));
+                if (entry is null) { problems.Add($"The data for {table} is missing."); continue; }
+                long rows = 0;
+                using (var reader = new StreamReader(entry.Open()))
+                    while (reader.ReadLine() is { } line)
+                        if (line.Length > 0) rows++;
+                if (rows != expected) problems.Add($"{table} holds {rows} rows; the manifest says {expected}.");
+            }
+
+            var media = 0;
+            var buffer = new byte[81920];
+            foreach (var entry in zip.Entries.Where(e => e.FullName.StartsWith(BackupFormat.MediaPrefix, StringComparison.Ordinal) && !e.FullName.EndsWith('/')))
+            {
+                using var s = entry.Open();
+                long read = 0; int n;
+                while ((n = s.Read(buffer, 0, buffer.Length)) > 0) read += n;
+                if (read != entry.Length) problems.Add($"The media file {entry.FullName} is cut short.");
+                media++;
+            }
+            if (media != manifest.MediaFiles) problems.Add($"The archive holds {media} media files; the manifest says {manifest.MediaFiles}.");
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or JsonException)
+        {
+            problems.Add("The archive is damaged and could not be read to the end.");
+        }
+        return problems;
+    }
+
     public bool Delete(string name)
     {
         var path = PathOf(name);

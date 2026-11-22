@@ -1851,6 +1851,30 @@ header:has(> .ink-nav-search), nav:has(> .ink-nav-search) { position: relative; 
 /* =============================================================
    Search results header (Views/Blog/Index.cshtml)
    ============================================================= */
+/* Share links under a post: plain links, tokens only, wraps on a phone. */
+.ink-share { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 32px 0 8px; padding-block: 16px; border-block: 1px solid var(--border); font-family: var(--sans); font-size: var(--fs-sm); color: var(--fg-meta); }
+.ink-share__label { font-weight: 600; color: var(--fg); }
+.ink-share ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.ink-share a, .ink-share button { display: inline-block; padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--link); font: inherit; text-decoration: none; cursor: pointer; }
+.ink-share a:hover, .ink-share button:hover { border-color: var(--link); }
+.ink-share a:focus-visible, .ink-share button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.ink-share [hidden] { display: none; }
+.ink-share__status { flex-basis: 100%; min-height: 1.2em; }
+/* A comment reached by its own link is brought clear of the header and marked. */
+.ink-comment { scroll-margin-top: 96px; }
+.ink-comment:target { outline: 2px solid var(--link); outline-offset: 6px; border-radius: 4px; }
+.ink-comment__meta { display: inline-flex; align-items: baseline; gap: 10px; }
+.ink-comment__meta button { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.ink-comment__meta [hidden] { display: none; }
+/* Nested categories: the way up from a category archive and the categories beneath it. Logical properties, so it mirrors in RTL. */
+.ink-category-trail { max-width: var(--measure-wide, 1100px); margin: 0 auto; padding: 20px var(--gutter, 16px) 0; font-family: var(--sans); font-size: var(--fs-sm); color: var(--fg-meta); }
+.ink-category-trail ol, .ink-category-trail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.ink-category-trail ol li + li::before { content: "/"; margin-inline-end: 10px; color: var(--border); }
+.ink-category-trail ol + ul { margin-block-start: 10px; }
+.ink-category-trail ul a { display: inline-block; padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; }
+.ink-category-trail a { color: var(--link); text-decoration: none; }
+.ink-category-trail a:hover, .ink-category-trail a:focus-visible { text-decoration: underline; }
+.ink-category-trail [aria-current="page"] { color: var(--fg); }
 .ink-search-head { max-width: var(--measure-wide, 1100px); margin: 0 auto; padding: 28px var(--gutter, 16px) 8px; font-family: var(--sans); }
 .ink-search-head h1 { font-family: var(--serif); font-size: var(--fs-h2); line-height: var(--lh-snug); color: var(--fg); margin: 0 0 6px; }
 .ink-search-head p { color: var(--fg-meta); font-size: var(--fs-sm); margin: 0 0 14px; }
@@ -2037,3 +2061,31 @@ header:has(> .ink-nav-search), nav:has(> .ink-nav-search) { position: relative; 
   .ink-journal-grid > aside { position: static !important; }
   .ink-broadsheet-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Contact button (Settings → Display): one fixed link on the start side, clear of "back to top" on the end side ── */
+.ink-contact {
+  position: fixed; inset-inline-start: 16px; bottom: 16px; z-index: 40;
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 48px; padding: 0 18px; border-radius: 999px;
+  background: var(--fg); color: var(--bg); border: 1px solid var(--fg);
+  font: 600 15px/1 var(--sans); text-decoration: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
+}
+.ink-contact:hover { background: var(--link-hover, var(--fg)); border-color: var(--link-hover, var(--fg)); color: var(--bg); }
+.ink-contact:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+.ink-contact .bi { font-size: 20px; line-height: 1; }
+@media (max-width: 640px) {
+  .ink-contact { width: 48px; padding: 0; justify-content: center; }
+  .ink-contact__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media print { .ink-contact { display: none; } }
+
+/* A heading for assistive technology and search engines where the layout shows the same words another way
+   (the site name in the masthead). Kept in the page, removed from view. */
+.ink-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.ink-archive-head__kind { margin: 0 0 4px; font-size: var(--fs-xs, 12px); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-meta); }
+/* The author's optional description of a category or tag: a short introduction under the heading. */
+.ink-archive-head__intro { max-width: 68ch; margin: 10px 0 12px; color: var(--fg-body); font-size: 17px; line-height: 1.6; }
+.ink-archive-head__intro p { margin: 0 0 10px; }
+.ink-archive-head__intro p:last-child { margin-bottom: 0; }
+.ink-archive-head__intro a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }

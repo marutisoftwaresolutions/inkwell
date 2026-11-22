@@ -57,6 +57,36 @@ public class NewsletterAdminController : Controller
         return View(Blog.Web.Models.ListPaging.Apply(this, await _issues.ListAsync(Owner), q, page, i => new[] { i.Subject }));
     }
 
+    /// <summary>
+    /// Reads the sender domain's SPF, DKIM and DMARC records and says whether mailbox providers will accept
+    /// newsletters sent in its name. Started by an admin from this screen, so the DNS lookups (outbound, a
+    /// few seconds at most, failing soft) never run on a reader's request. It changes nothing.
+    /// </summary>
+    [HttpGet("sender-check")]
+    public async Task<IActionResult> SenderCheck([FromServices] IConfiguration config, [FromServices] Blog.Web.Services.DnsTxtLookup dns, CancellationToken ct)
+    {
+        if (_tenant.IsCloudMode) return NotFound();
+        var domain = Blog.Core.Services.MailAuthCheck.DomainOf(config["Smtp:FromEmail"]);
+        ViewBag.Domain = domain;
+        ViewBag.From = config["Smtp:FromEmail"];
+        if (domain is null) return View(new List<Blog.Core.Services.MailAuthCheck.Finding>());
+
+        var selector = Blog.Core.Services.MailAuthCheck.CleanSelector(config["Smtp:DkimSelector"]);
+        var spf = dns.QueryAsync(domain, ct);
+        var dmarc = dns.QueryAsync("_dmarc." + domain, ct);
+        var dkim = selector is null ? Task.FromResult<IReadOnlyList<string>?>(null) : dns.QueryAsync($"{selector}._domainkey.{domain}", ct);
+        await Task.WhenAll(spf, dmarc, dkim);
+
+        var findings = new List<Blog.Core.Services.MailAuthCheck.Finding>
+        {
+            Blog.Core.Services.MailAuthCheck.Spf(spf.Result),
+            Blog.Core.Services.MailAuthCheck.Dkim(selector, dkim.Result),
+            Blog.Core.Services.MailAuthCheck.Dmarc(dmarc.Result),
+        };
+        ViewBag.Verdict = Blog.Core.Services.MailAuthCheck.Verdict(findings);
+        return View(findings);
+    }
+
     [HttpGet("new")]
     public async Task<IActionResult> Create()
     {

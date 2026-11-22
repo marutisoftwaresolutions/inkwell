@@ -174,6 +174,10 @@ public class ApiSecurityTests : IClassFixture<WebApplicationFactory<Program>>
             Assert.Equal(HttpStatusCode.Forbidden, (await Client(contributor).PutAsync($"/api/v1/posts/{ownPost}", Body(new { title = "Changed live" }))).StatusCode);
             await conn.ExecuteAsync("UPDATE Posts SET Status = 'Draft' WHERE Id = @ownPost", new { ownPost });
 
+            // A delete moves the post to Trash (recoverable in the Desk); deleting it again removes it for good.
+            Assert.Equal(HttpStatusCode.OK, (await Client(contributor).DeleteAsync($"/api/v1/posts/{ownPost}")).StatusCode);
+            Assert.Equal("Trashed", await conn.ExecuteScalarAsync<string>("SELECT Status FROM Posts WHERE Id = @ownPost", new { ownPost }));
+            Assert.Equal(1, await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM AuditLogs WHERE Action = 'Post.Trashed' AND EntityId = @id", new { id = ownPost.ToString() }));
             Assert.Equal(HttpStatusCode.OK, (await Client(contributor).DeleteAsync($"/api/v1/posts/{ownPost}")).StatusCode);
             Assert.Equal(0, await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Posts WHERE Id = @ownPost", new { ownPost }));
             Assert.Equal(1, await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM AuditLogs WHERE Action = 'Post.Deleted' AND EntityId = @id", new { id = ownPost.ToString() }));
@@ -285,6 +289,7 @@ public class ApiSecurityTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Registration_is_closed_once_the_site_has_an_account()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         if (!await _factory.Services.CreateScope().ServiceProvider.GetRequiredService<IUserRepository>().AnyUsersExistAsync()) return;
         var client = Client(null);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/account/register")).StatusCode);
@@ -318,6 +323,7 @@ public class ApiSecurityTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task With_the_example_key_the_api_refuses_to_sign_anyone_in()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         using var placeholder = _factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
             c.AddInMemoryCollection(new Dictionary<string, string?> { ["Jwt:Key"] = "REPLACE_WITH_A_RANDOM_64_CHAR_SECRET" })));
         var res = await placeholder.CreateClient().PostAsync("/api/v1/auth/login", Body(new { email = "nobody@example.invalid", password = "x" }));

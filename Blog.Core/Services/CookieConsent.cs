@@ -37,9 +37,10 @@ public static class CookieConsent
     public static bool IsValidAnalyticsId(string? id) =>
         !string.IsNullOrWhiteSpace(id) && AnalyticsIdPattern.IsMatch(id.Trim());
 
-    public static CookieConsentMode Decide(bool bannerEnabled, string? analyticsId)
+    /// <param name="optionalCode">True when the site has custom code that waits for consent: the reader is then asked even with no Analytics id.</param>
+    public static CookieConsentMode Decide(bool bannerEnabled, string? analyticsId, bool optionalCode = false)
     {
         if (!bannerEnabled) return CookieConsentMode.Off;
-        return IsValidAnalyticsId(analyticsId) ? CookieConsentMode.AskForAnalytics : CookieConsentMode.EssentialOnlyNotice;
+        return IsValidAnalyticsId(analyticsId) || optionalCode ? CookieConsentMode.AskForAnalytics : CookieConsentMode.EssentialOnlyNotice;
     }
 }

@@ -24,13 +24,15 @@ public sealed class WebhookPublisher
     private readonly IConfiguration _config;
     private readonly IDataProtector _protector;
     private readonly ILogger<WebhookPublisher> _log;
+    private readonly Blog.Web.Services.Newsletter.PublishNewsletterDrafter _newsletterDraft;
+    private readonly GoalRecorder _goals;
 
     public const string SecretPurpose = "Inkwell.WebhookSecret.v1";
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public WebhookPublisher(IWebhookRepository webhooks, ISettingRepository settings, IUserRepository users, IConfiguration config,
-        IDataProtectionProvider protection, ILogger<WebhookPublisher> log)
+        IDataProtectionProvider protection, ILogger<WebhookPublisher> log, Blog.Web.Services.Newsletter.PublishNewsletterDrafter newsletterDraft, GoalRecorder goals)
     {
         _webhooks = webhooks;
         _settings = settings;
@@ -38,6 +40,8 @@ public sealed class WebhookPublisher
         _config = config;
         _protector = protection.CreateProtector(SecretPurpose);
         _log = log;
+        _newsletterDraft = newsletterDraft;
+        _goals = goals;
     }
 
     // ── Secrets ──────────────────────────────────────────────────────────────
@@ -84,6 +88,10 @@ public sealed class WebhookPublisher
             var eventType = WebhookRules.EventForPostSave(wasLive, isLive);
             if (eventType is null) return;
 
+            // This is the one place every save passes through, so "a post went live" is decided once, here,
+            // for the webhook and for the newsletter draft alike. The drafter never throws.
+            if (eventType == WebhookEvents.PostPublished) await _newsletterDraft.PostWentLiveAsync(after);
+
             await EnqueueAsync(OwnerOf(context), eventType, eventKey: null, BaseUrl(context), baseUrl => new { post = PostData(after, baseUrl) });
         }
         catch (Exception ex) { _log.LogWarning(ex, "Webhook post event not queued (non-fatal)."); }
@@ -92,6 +100,7 @@ public sealed class WebhookPublisher
     /// <summary>A scheduled post reached its time (called by the job). Keyed so it is announced once per schedule.</summary>
     public async Task<int> ScheduledPostReachedAsync(Post post)
     {
+        await _newsletterDraft.PostWentLiveAsync(post);   // once per post: the drafter checks before it creates
         var key = $"{WebhookEvents.PostPublished}:{post.Id:N}:{post.ScheduledAt?.Ticks}";
         return await EnqueueAsync(OwnerOfPost(post), WebhookEvents.PostPublished, key, baseUrl: null,
             baseUrl => new { post = PostData(post, baseUrl) },
@@ -140,6 +149,7 @@ public sealed class WebhookPublisher
     {
         try
         {
+            _goals.Conversion(OwnerOf(context), Blog.Core.Services.Goals.FormSubmitted);   // counted for every site; in memory, never throws
             await EnqueueAsync(OwnerOf(context), WebhookEvents.FormSubmitted, null, BaseUrl(context), baseUrl => new
             {
                 form = new { key = form.FormKey, name = form.Name },
@@ -147,6 +157,24 @@ public sealed class WebhookPublisher
             });
         }
         catch (Exception ex) { _log.LogWarning(ex, "Webhook form event not queued (non-fatal)."); }
+    }
+
+    /// <summary>
+    /// A reader confirmed a subscription, or left the list. These two events exist to keep another system's list in
+    /// step (a mail tool, a CRM), so unlike every other event they carry the email address: that is their whole
+    /// content. Nothing else about the reader is sent, and only a webhook that subscribed to the event gets it.
+    /// </summary>
+    public async Task SubscriberChangedAsync(HttpContext context, Member member, bool confirmed)
+    {
+        try
+        {
+            if (confirmed) _goals.Conversion(OwnerOf(context), Blog.Core.Services.Goals.NewsletterSignup);   // in memory, never throws
+            await EnqueueAsync(OwnerOf(context), confirmed ? WebhookEvents.SubscriberConfirmed : WebhookEvents.SubscriberUnsubscribed, null, BaseUrl(context), _ => new
+            {
+                subscriber = new { id = member.Id, email = member.Email, name = member.Name, status = confirmed ? "confirmed" : "unsubscribed", at = DateTime.UtcNow }
+            });
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Webhook subscriber event not queued (non-fatal)."); }
     }
 
     /// <summary>The body the Desk's "Send test" button sends.</summary>

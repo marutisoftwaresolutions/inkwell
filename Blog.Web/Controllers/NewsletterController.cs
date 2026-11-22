@@ -80,6 +80,16 @@ public class NewsletterController : Controller
             return Fail("reCAPTCHA verification failed. Please try again.");
 
         var existing = await _members.GetByEmailAsync(email);
+        // Someone who left, or whose address once bounced, can join again: they confirm afresh, like anyone new.
+        // (They used to be told a confirmation "was already sent" and could never return.)
+        if (existing is { Status: "unsubscribed" or Blog.Core.Services.SmtpBounce.BouncedStatus })
+        {
+            var token = await _members.RestartAsync(existing.Id);
+            var site = (await _settings.GetSettingsAsync(await GetOwnerIdAsync())).SiteName ?? "Blog";
+            await _email.SendAsync(email, existing.Name ?? email, $"Confirm your subscription to {site}",
+                BuildConfirmEmail(site, $"{Request.Scheme}://{Request.Host}/newsletter/confirm/{token}", existing.Name));
+            return Ok("Almost done! Check your inbox to confirm your subscription.");
+        }
         if (existing != null)
         {
             var dupMsg = existing.Status == "confirmed"
@@ -93,7 +103,9 @@ public class NewsletterController : Controller
             Email = email,
             Name = name?.Trim(),
             Status = "pending",
-            Subscribed = false
+            Subscribed = false,
+            // Which page the form was on (path only), so the owner can see which posts bring subscribers.
+            SourcePath = Blog.Core.Services.SignupSource.FromReferer(Request.Headers.Referer.ToString(), Request.Host.Value)
         };
         await _members.CreateAsync(member);
 
@@ -120,6 +132,7 @@ public class NewsletterController : Controller
             return View("NewsletterResult", new NewsletterResultViewModel("You're already confirmed — welcome!", true));
 
         await _members.ConfirmAsync(member.Id);
+        await HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.Webhooks.WebhookPublisher>().SubscriberChangedAsync(HttpContext, member, confirmed: true);
 
         var ownerId = await GetOwnerIdAsync();
         var siteSettings = await _settings.GetSettingsAsync(ownerId);
@@ -159,7 +172,11 @@ public class NewsletterController : Controller
         var oneClick = Request.HasFormContentType && Request.Form["List-Unsubscribe"] == "One-Click";
         if (member == null)
             return oneClick ? NotFound() : View("NewsletterResult", new NewsletterResultViewModel("This unsubscribe link is not valid.", false));
-        if (member.Status != "unsubscribed") await _members.UnsubscribeAsync(member.Id);
+        if (member.Status != "unsubscribed")
+        {
+            await _members.UnsubscribeAsync(member.Id);
+            await HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.Webhooks.WebhookPublisher>().SubscriberChangedAsync(HttpContext, member, confirmed: false);
+        }
         if (oneClick) return Content("Unsubscribed.", "text/plain");
         return View("NewsletterResult", new NewsletterResultViewModel("You are unsubscribed. You will not get any more emails.", true));
     }

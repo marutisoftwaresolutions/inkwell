@@ -13,7 +13,8 @@
 }
 
 <div class="md:h-[calc(100vh-7.5rem)] flex flex-col">
-    <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full">
+    <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full"
+          data-local-backup="post:new" data-saved-at="0">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" />
         <input type="hidden" name="Plaintext" id="postPlaintext" />
@@ -34,7 +35,7 @@
                 <button type="submit" name="submitAction" value="draft" class="desk-btn desk-btn-outline">
                     Save Draft
                 </button>
-                <span data-dirty-indicator hidden>Unsaved changes</span> <button type="button" id="publishBtn" class="desk-btn desk-btn-primary">
+                <span data-backup-status class="text-xs text-muted-foreground" role="status"></span> <span data-dirty-indicator hidden>Unsaved changes</span> <button type="button" id="publishBtn" class="desk-btn desk-btn-primary">
                     @publishLabel
                 </button>
                 <button type="button" id="settingsToggle" onclick="toggleSettingsPanel()" aria-label="Post settings" aria-expanded="false" aria-controls="settingsPanel" class="md:hidden desk-btn desk-btn-outline desk-btn-icon">
@@ -241,6 +242,15 @@
                     <div class="flex items-center justify-between">
                         <label class="text-sm font-medium">Allow Comments</label>
                         <input type="checkbox" name="AllowComments" value="true" @(Model.AllowComments ? "checked" : "") class="rounded border-input text-primary focus:ring-primary h-5 w-5" />
+                    </div>
+                    <!-- Listing: public, or published but left out of every list -->
+                    <div class="space-y-1">
+                        <label for="post-visibility" class="text-sm font-medium">Listing</label>
+                        <select id="post-visibility" name="Visibility" class="desk-select" aria-describedby="post-visibility-hint">
+                            <option value="public" selected="@(!Blog.Core.Services.PostVisibility.IsUnlisted(Model.Visibility))">Listed everywhere</option>
+                            <option value="unlisted" selected="@Blog.Core.Services.PostVisibility.IsUnlisted(Model.Visibility)">Unlisted: by link only</option>
+                        </select>
+                        <p id="post-visibility-hint" class="text-xs text-muted-foreground">An unlisted post opens for anyone who has its address, but is kept out of the home page, archives, search, the feed and the sitemap, and search engines are asked not to index it. It is not private.</p>
                     </div>
                     <!-- Featured Image -->
                     <div class="pt-4 border-t border-border">
@@ -476,6 +486,7 @@
         <partial name="_MarkdownEditorScripts" />
     }
     <partial name="_QuillEditorScripts" />
+    <script src="~/js/inkwell-autosave.js" asp-append-version="true"></script>
     <script>
         // Global Data
         window.categoriesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.Categories ?? new List<Blog.Core.Domain.Category>()));
@@ -570,6 +581,8 @@
         }
 
         var quill = initQuill('#quill-editor', 'postContent');
+        // Draft recovery (inkwell-autosave.js) reads and restores the body through this handle.
+        window.InkwellQuill = { get: function () { return quill.root.innerHTML; }, set: function (html) { quill.setContents([]); quill.clipboard.dangerouslyPasteHTML(0, html); } };
 
 
         // Auto Slug (Kebab-case)

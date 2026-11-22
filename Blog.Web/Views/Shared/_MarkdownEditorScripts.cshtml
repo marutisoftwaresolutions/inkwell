@@ -82,6 +82,8 @@
     // The Desk's unsaved-changes guard listens for input events on the form; the editor writes through
     // forceSync without firing them, so announce each change.
     mde.codemirror.on('change', function () { textarea.dispatchEvent(new Event('input', { bubbles: true })); });
+    // Draft recovery (inkwell-autosave.js) reads and restores the Markdown through this handle.
+    window.InkwellMarkdown = { get: function () { return mde.value(); }, set: function (v) { mde.value(v); } };
     // Toolbar buttons are icon-only: give each its title as an accessible name.
     document.querySelectorAll('.EasyMDEContainer .editor-toolbar button').forEach(function (b) {
         // Shortcut hints are dropped from the name, but the guide keeps "(opens commonmark.org)": it leaves the Desk.

@@ -20,12 +20,29 @@ public class PostFilter
     public List<string> Tags { get; set; } = new();
     public Guid? AuthorId { get; set; }
     public PostStatus? Status { get; set; }
+    /// <summary>
+    /// A list of published posts leaves unlisted ones out, because that is what every public list wants.
+    /// The Desk sets this to see them too.
+    /// </summary>
+    public bool IncludeUnlisted { get; set; }
+    /// <summary>
+    /// With a search, order by how well each post matches (phrase in the title, words in the title, the
+    /// description, then the body) before date. The reader's search sets it; the Desk keeps newest first.
+    /// </summary>
+    public bool RankBySearch { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
 }
 
 public interface IPostRepository
 {
+    /// <summary>
+    /// Claims the one newsletter draft a post ever gets: true for the first caller, false for every later one,
+    /// and false for a post that does not exist. Atomic, so two publishers cannot both claim it.
+    /// </summary>
+    Task<bool> TryMarkNewsletterDraftedAsync(Guid postId);
+    /// <summary>Gives the claim back when the draft could not be created after all.</summary>
+    Task ClearNewsletterDraftedAsync(Guid postId);
     Task<PagedResult<Post>> GetPostsAsync(PostFilter filter);
     Task<Post?> GetByIdAsync(Guid id, Guid? authorId = null);
 

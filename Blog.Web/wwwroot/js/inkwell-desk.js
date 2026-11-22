@@ -27,6 +27,8 @@
             for (const [k, v] of fd.entries()) if (k !== '__RequestVerificationToken') parts.push(k + '=' + (typeof v === 'string' ? v : '[file]'));
             // contenteditable regions and editors keep their state outside form fields
             form.querySelectorAll('[contenteditable="true"], .ql-editor').forEach(el => parts.push('ce=' + el.innerHTML));
+            // the block builder: which blocks, in what order, with what settings (a divider or an image has no editable text)
+            form.querySelectorAll('.builder-block > .block-content').forEach(el => parts.push('blk=' + el.innerHTML));
             return parts.join('');
         } catch { return ''; }
     }
@@ -357,4 +359,63 @@
     dlg.addEventListener('cancel', e => { e.preventDefault(); close(); });
     dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
     window.InkwellDesk = Object.assign(window.InkwellDesk || {}, { paletteOpen: () => open(null), paletteClose: close });
+})();
+
+/*
+ * Accessible names the markup does not carry.
+ *
+ * 1. A <label> with no "for" that sits directly before its field (the editors' sidebar pattern) is tied to that
+ *    field, so a screen reader announces "URL slug, edit text" and a click on the label focuses the field.
+ * 2. The rich-text toolbar draws icon-only buttons; each gets the name of what it does.
+ * Runs on load and again when the editor or a dialog adds controls.
+ */
+(function () {
+    'use strict';
+    const FIELD = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea';
+    const QUILL = { bold: 'Bold', italic: 'Italic', underline: 'Underline', strike: 'Strikethrough', blockquote: 'Quote', 'code-block': 'Code block',
+        link: 'Link', image: 'Image', video: 'Video', clean: 'Clear formatting', code: 'Inline code', formula: 'Formula' };
+    let seq = 0;
+
+    function named(el) {
+        return el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || (el.id && document.querySelector('label[for="' + CSS.escape(el.id) + '"]')) || el.closest('label');
+    }
+
+    function tieLabels(root) {
+        root.querySelectorAll('label:not([for])').forEach(label => {
+            if (label.querySelector(FIELD)) return;                       // the label wraps its own field
+            let next = label.nextElementSibling;
+            while (next && next.matches('p, small, span') && !next.querySelector(FIELD)) next = next.nextElementSibling;   // a hint between the two
+            if (!next) return;
+            const fields = next.matches(FIELD) ? [next] : [...next.querySelectorAll(FIELD)];
+            if (fields.length !== 1 || named(fields[0])) return;          // none, several (a checkbox group), or already named
+            if (!fields[0].id) fields[0].id = 'desk-field-' + (++seq);
+            label.htmlFor = fields[0].id;
+        });
+    }
+
+    function nameToolbar(root) {
+        root.querySelectorAll('.ql-toolbar button:not([aria-label]), .ql-toolbar .ql-picker:not([aria-label])').forEach(el => {
+            const cls = [...el.classList].find(c => c.startsWith('ql-') && c !== 'ql-picker' && c !== 'ql-active' && c !== 'ql-expanded');
+            if (!cls) return;
+            const key = cls.slice(3), value = el.getAttribute('value');
+            let name = QUILL[key];
+            if (key === 'list') name = value === 'ordered' ? 'Numbered list' : value === 'check' ? 'Checklist' : 'Bulleted list';
+            else if (key === 'header') name = value ? 'Heading ' + value : 'Heading level';
+            else if (key === 'indent') name = value === '-1' ? 'Decrease indent' : 'Increase indent';
+            else if (key === 'align') name = value ? 'Align ' + value : 'Alignment';
+            else if (key === 'script') name = value === 'sub' ? 'Subscript' : 'Superscript';
+            else if (key === 'color') name = 'Text colour';
+            else if (key === 'background') name = 'Highlight colour';
+            else if (key === 'size') name = 'Text size';
+            else if (key === 'font') name = 'Font';
+            else if (key === 'direction') name = 'Text direction';
+            el.setAttribute('aria-label', name || key.replace(/-/g, ' '));
+        });
+    }
+
+    function run() { tieLabels(document); nameToolbar(document); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+    let queued = false;
+    new MutationObserver(() => { if (queued) return; queued = true; setTimeout(() => { queued = false; run(); }, 150); })
+        .observe(document.documentElement, { childList: true, subtree: true });
 })();

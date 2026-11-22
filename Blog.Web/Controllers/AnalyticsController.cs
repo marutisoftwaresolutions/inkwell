@@ -182,6 +182,11 @@ public class AnalyticsController : Controller
             sb.AppendLine("Source,Medium,Views");
             foreach (var s in report.Sources) sb.AppendLine($"\"{s.Source}\",\"{s.Medium}\",{s.Count}");
         }
+        else if (sheet == "ai")
+        {
+            sb.AppendLine("Assistant,Visits");
+            foreach (var a in Blog.Core.Services.AiReferrers.Summarise(report.Sources)) sb.AppendLine($"\"{a.Name}\",{a.Visits}");
+        }
         else if (sheet == "daily")
         {
             sb.AppendLine("Date,Views");
@@ -203,6 +208,8 @@ public class AnalyticsController : Controller
             foreach (var pg in report.TopPages) sb.AppendLine($"\"{pg.Path}\",{pg.Views}");
         }
 
+        // The sheet name goes into the file name, so it is one of the known ones or "pages".
+        if (sheet is not ("sources" or "ai" or "daily" or "referrers" or "countries")) sheet = "pages";
         var fileName = $"analytics-{sheet}-{dateFrom:yyyy-MM-dd}.csv";
         return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", fileName);
     }
@@ -277,6 +284,8 @@ public class AnalyticsController : Controller
             SourceBreakdown = sources,
             TopPages        = topPages,
             TopReferrers    = referrers,
+            AiAssistants    = Blog.Core.Services.AiReferrers.Summarise(sources.Select(s => (s.Source, s.Medium, s.Count)))
+                                  .Select(a => new AiAssistantCount(a.Name, a.Visits)).ToList(),
             Campaigns       = campaigns,
             TopCountries    = countries,
             TopRegions      = regions

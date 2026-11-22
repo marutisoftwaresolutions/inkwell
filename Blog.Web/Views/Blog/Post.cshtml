@@ -34,6 +34,11 @@
 }
 
 @section MetaTags {
+    @* The same post as Markdown, for clients that want the text without the page (AI agents, readers). Not for previews. *@
+    @if (ViewBag.IsPreview != true)
+    {
+        <link rel="alternate" type="text/markdown" href="/@(Model.Slug).md" title="This post as Markdown" />
+    }
     <!-- Open Graph -->
     @{
         var canonical = (string?)ViewData["Canonical"] ?? "";
@@ -136,6 +141,13 @@ else
   // (_TableOfContents / _ReadingProgress); nothing else to build here.
 }());
 </script>
+
+@if ((bool)(ViewBag.ShareLinks ?? false))
+{
+    <div class="max-w-4xl mx-auto px-4">
+        <partial name="_ShareLinks" model="Model" view-data="ViewData" />
+    </div>
+}
 
 <!-- Newsletter Signup -->
 <div class="max-w-4xl mx-auto px-4">

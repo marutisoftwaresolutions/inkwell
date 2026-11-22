@@ -1,0 +1,79 @@
+@model List<Blog.Core.Domain.WelcomeEmail>
+@using Blog.Core.Services
+@{
+    ViewData["Title"] = "Welcome Emails";
+    Layout = "_AdminLayout";
+    ViewData["Description"] = "Up to three emails sent automatically after someone confirms their subscription.";
+    var errors = ViewBag.Errors as Dictionary<string, string> ?? new Dictionary<string, string>();
+    var emailConfigured = ViewBag.EmailConfigured is true;
+    var startedAt = ViewBag.StartedAt as DateTime?;
+    string? Err(int i, string field) => errors.TryGetValue($"{i}:{field}", out var e) ? e : null;
+}
+@section PageActions {
+    <a href="/admin/newsletter" class="desk-btn desk-btn-outline">Back to newsletters</a>
+}
+<div class="max-w-3xl space-y-6">
+    @if (!emailConfigured)
+    {
+        <p class="rounded-lg border p-4 pill-warn text-sm" role="note">Outgoing email is not set up on this server, so welcome emails can be written but will not be sent. Set the <code>Smtp</code> section on the server.</p>
+    }
+    <p class="text-sm text-muted-foreground">
+        Everyone still gets the short "you're subscribed" note the moment they confirm. These follow it, in order, the given number of days later.
+        They go only to people who confirm after you first switch one on@(startedAt is null ? "" : $" (the sequence started {Dates.Medium(startedAt)})"); nobody already on your list receives them, and neither do people you import.
+        Each carries the reader's unsubscribe link.
+    </p>
+
+    <form method="post" action="/admin/newsletter/welcome" class="space-y-6" data-track-changes>
+        @Html.AntiForgeryToken()
+        <p><span data-dirty-indicator hidden>Unsaved changes</span></p>
+        @for (var i = 0; i < Model.Count; i++)
+        {
+            var e = Model[i];
+            var subjectError = Err(i, "subject"); var bodyError = Err(i, "body"); var delayError = Err(i, "delay");
+            <fieldset class="desk-card p-5 space-y-4">
+                <legend class="desk-card-title px-1">Email @(i + 1)</legend>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="hidden" name="emails[@i].Enabled" value="false" />
+                    <input type="checkbox" name="emails[@i].Enabled" value="true" checked="@e.Enabled" class="desk-checkbox" />
+                    <span>Send this email</span>
+                </label>
+                <div class="grid gap-4 sm:grid-cols-[12rem_1fr]">
+                    <div class="space-y-1">
+                        <label for="delay-@i" class="desk-label">Days after confirming</label>
+                        <input id="delay-@i" name="emails[@i].DelayDays" type="number" min="0" max="@WelcomeSequence.MaxDelayDays" value="@e.DelayDays" class="desk-input"
+                               aria-invalid="@(delayError is null ? "false" : "true")" aria-describedby="@(delayError is null ? null : $"delay-{i}-error")" />
+                        @if (delayError is not null) { <p id="delay-@i-error" class="desk-error">@delayError</p> }
+                    </div>
+                    <div class="space-y-1">
+                        <label for="subject-@i" class="desk-label">Subject</label>
+                        <input id="subject-@i" name="emails[@i].Subject" maxlength="@WelcomeSequence.MaxSubjectLength" value="@e.Subject" class="desk-input"
+                               aria-invalid="@(subjectError is null ? "false" : "true")" aria-describedby="@(subjectError is null ? null : $"subject-{i}-error")" />
+                        @if (subjectError is not null) { <p id="subject-@i-error" class="desk-error">@subjectError</p> }
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label for="body-@i" class="desk-label">Message (Markdown)</label>
+                    <textarea id="body-@i" name="emails[@i].BodyMarkdown" rows="7" maxlength="@WelcomeSequence.MaxBodyLength" class="desk-textarea font-mono text-sm"
+                              aria-invalid="@(bodyError is null ? "false" : "true")" aria-describedby="@(bodyError is null ? $"body-{i}-hint" : $"body-{i}-error")">@e.BodyMarkdown</textarea>
+                    @if (bodyError is not null) { <p id="body-@i-error" class="desk-error">@bodyError</p> }
+                    else { <p id="body-@i-hint" class="desk-hint">Plain paragraphs, links as [text](https://…), headings with #. HTML is shown as typed, not sent as markup.</p> }
+                </div>
+            </fieldset>
+        }
+        <div><button type="submit" class="desk-btn desk-btn-primary">Save welcome emails</button></div>
+    </form>
+
+    <div class="desk-card p-5 space-y-3">
+        <h2 class="desk-card-title">Send yourself a test</h2>
+        <p class="text-sm text-muted-foreground">Sends an email as last saved to your own address, marked [Test].</p>
+        <div class="flex flex-wrap gap-2">
+            @for (var i = 0; i < Model.Count; i++)
+            {
+                <form method="post" action="/admin/newsletter/welcome/test/@(i + 1)">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm" disabled="@(!emailConfigured)">Test email @(i + 1)</button>
+                </form>
+            }
+        </div>
+    </div>
+</div>

@@ -28,7 +28,11 @@
     @if (!allRoles.Any())
     {
         <div class="rounded-lg border p-4 mb-6 pill-bad">
-            <p class="text-sm font-medium">Roles and permissions are not seeded yet. <a href="/admin/dashboard/seed" class="underline font-semibold">Seed roles and permissions</a> before assigning roles.</p>
+            <form method="post" action="/admin/dashboard/restore-roles" class="flex flex-wrap items-center gap-3">
+                @Html.AntiForgeryToken()
+                <p class="text-sm font-medium">This site has no roles or permissions, so no one can be given a role.</p>
+                <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm">Restore the default roles</button>
+            </form>
         </div>
     }
 
@@ -241,13 +245,6 @@
         After changing a user's role, they must <strong>log out and back in</strong> for the new permissions to take effect.
     </div>
 
-    <details class="mt-6 text-sm text-muted-foreground">
-        <summary class="cursor-pointer">Development helpers</summary>
-        <div class="mt-2 flex flex-wrap items-center gap-3">
-            <span>Seeds the default roles, permissions and sample content on a fresh install. Not needed on a configured site.</span>
-            <a href="/admin/dashboard/seed" class="desk-btn desk-btn-outline desk-btn-sm">Seed data</a>
-        </div>
-    </details>
 </div>
 
 @section Scripts {

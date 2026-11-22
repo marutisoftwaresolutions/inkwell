@@ -1,6 +1,8 @@
 @using Blog.Core.Interfaces
 @model PagedResult<Blog.Core.Domain.Post>
 @{
+    // h1 on the home page; h2 when the page already carries its heading (search results, category and tag archives).
+    var heroHeading = (ViewData["PageHasHeading"] as bool? ?? false) ? "h2" : "h1";
     var searchTerm = ViewBag.SearchTerm as string;
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
     var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
@@ -49,9 +51,9 @@
                     {
                         <span style="display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--link);margin-bottom:var(--sp-4);">@leadCat.Name</span>
                     }
-                    <h1 style="font-family:var(--serif);font-size:clamp(1.75rem,4vw,2.75rem);font-weight:700;line-height:1.1;margin:0 0 var(--sp-4);">
+                    @Html.Raw("<" + heroHeading + @" style=""font-family:var(--serif);font-size:clamp(1.75rem,4vw,2.75rem);font-weight:700;line-height:1.1;margin:0 0 var(--sp-4);"">")
                         <a href="/@leadPost.Slug" style="color:var(--fg);text-decoration:none;">@leadPost.Title</a>
-                    </h1>
+                    @Html.Raw("</" + heroHeading + ">")
                     @if (!string.IsNullOrEmpty(leadExcerpt))
                     {
                         <p style="font-family:var(--serif);font-size:1.0625rem;line-height:1.65;color:var(--fg-body);margin:0 0 var(--sp-6);border-inline-start:3px solid var(--border);padding-inline-start:var(--sp-6);">@leadExcerpt</p>

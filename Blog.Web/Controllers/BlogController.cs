@@ -110,6 +110,7 @@ public class BlogController : Controller
         var filter = new Blog.Core.Interfaces.PostFilter
         {
             Search = search,
+            RankBySearch = true,   // a reader searching wants the best match first, not the newest
             Status = Blog.Core.Domain.PostStatus.Published,
             AuthorId = ownerId == Guid.Empty ? null : ownerId,
             Page = page, 
@@ -231,9 +232,21 @@ public class BlogController : Controller
         var categoryEntity = await _categories.GetBySlugAsync(slug, ownerId);
         if (categoryEntity is null) return NotFound();
         
+        // A parent's page also lists the posts of the categories beneath it. A lookup failure falls back to the category alone.
+        var archiveSlugs = new List<string> { slug };
+        try
+        {
+            var allCategories = await _categories.GetAllAsync(ownerId);
+            var beneath = Blog.Core.Services.CategoryTree.DescendantIds(allCategories, categoryEntity.Id);
+            archiveSlugs.AddRange(allCategories.Where(c => beneath.Contains(c.Id)).Select(c => c.Slug));
+            ViewBag.CategoryPath = Blog.Core.Services.CategoryTree.Path(allCategories, categoryEntity.Id);
+            ViewBag.Subcategories = allCategories.Where(c => c.ParentId == categoryEntity.Id).OrderBy(c => c.Name).ToList();
+        }
+        catch { /* the archive still renders for the category itself */ }
+
         var posts = await _posts.GetPostsAsync(new PostFilter 
         { 
-            Categories = new List<string> { slug },
+            Categories = archiveSlugs,
             Page = page,
             PageSize = settings.PostsPerPage,
             Status = Blog.Core.Domain.PostStatus.Published,
@@ -252,7 +265,12 @@ public class BlogController : Controller
 
         var categoryName = categoryEntity.Name;
         ViewData["Title"] = $"{categoryName} – {settings.SiteName}";
-        ViewData["Description"] = $"Articles about {categoryName} on {settings.SiteName}.";
+        // The author's description, when there is one, is the meta description and (first page only) the visible
+        // introduction; without one the page is exactly what it was.
+        ViewData["Description"] = Blog.Core.Services.ArchiveIntro.ToMetaDescription(categoryEntity.Description)
+            ?? $"Articles about {categoryName} on {settings.SiteName}.";
+        if (page <= 1) ViewBag.ArchiveIntroHtml = Blog.Core.Services.ArchiveIntro.ToHtml(categoryEntity.Description);
+        ViewBag.ArchiveKind = "Category"; ViewBag.ArchiveHeading = categoryName;   // the page's one h1 (Index.cshtml)
 
         // Category page 1 is indexable; deeper pages are near-duplicates → noindex,follow.
         if (page > 1) ViewData["Robots"] = "noindex,follow";
@@ -297,7 +315,10 @@ public class BlogController : Controller
 
         var tagName = tagEntity.Name;
         ViewData["Title"] = $"{tagName} – {settings.SiteName}";
-        ViewData["Description"] = $"Posts tagged {tagName} on {settings.SiteName}.";
+        ViewData["Description"] = Blog.Core.Services.ArchiveIntro.ToMetaDescription(tagEntity.Description)
+            ?? $"Posts tagged {tagName} on {settings.SiteName}.";
+        if (page <= 1) ViewBag.ArchiveIntroHtml = Blog.Core.Services.ArchiveIntro.ToHtml(tagEntity.Description);
+        ViewBag.ArchiveKind = "Tag"; ViewBag.ArchiveHeading = tagName;             // the page's one h1 (Index.cshtml)
 
         // A thin tag archive is duplicative and stays out of the index, but one with real depth is a
         // legitimate topic page — and the /?tags={slug} equivalents were already ranking (e.g.
@@ -393,6 +414,42 @@ public class BlogController : Controller
     [HttpGet("posts/{slug}")]
     public IActionResult PostRedirect(string slug) => RedirectPermanent($"/{slug}");
 
+    /// <summary>
+    /// A post as Markdown, for clients that want the text without the page around it (AI agents,
+    /// command-line readers): the same address with ".md" added. Published posts only, exactly what a
+    /// reader sees. Marked noindex with the page as its canonical, so search engines keep one copy.
+    /// </summary>
+    [HttpGet("{slug}.md")]
+    public async Task<IActionResult> PostAsMarkdown(string slug)
+    {
+        var post = await _posts.GetBySlugAsync(slug);
+        if (post == null || (post.Status != Blog.Core.Domain.PostStatus.Published && !(post.Status == Blog.Core.Domain.PostStatus.Scheduled && post.ScheduledAt <= DateTime.UtcNow)))
+            return NotFound();
+        Response.Headers["X-Robots-Tag"] = "noindex";
+        return await MarkdownOfAsync(post);
+    }
+
+    private async Task<IActionResult> MarkdownOfAsync(Blog.Core.Domain.Post post)
+    {
+        var canonical = $"{Request.Scheme}://{Request.Host}/{post.Slug}";
+        string? siteName = null;
+        try { siteName = (await _settings.GetSettingsAsync(await GetOwnerUserIdAsync(_users))).SiteName; }
+        catch { /* the text is complete without the site's name */ }
+
+        // Revalidated like the page: unchanged text costs a 304, not a transfer.
+        var etag = Blog.Core.Services.HttpCacheValidation.WeakETag(post.Id, post.UpdatedAt, "md", siteName, typeof(Program).Assembly.GetName().Version?.ToString());
+        var lastModified = Blog.Core.Services.HttpCacheValidation.ToHttpDate(new[] { post.UpdatedAt, post.PublishedAt ?? DateTime.MinValue }.Max());
+        Response.Headers.ETag = etag;
+        Response.Headers.LastModified = lastModified.ToString("R");
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers.Vary = "Accept";
+        Response.Headers.Link = $"<{canonical}>; rel=\"canonical\"";
+        if (Blog.Core.Services.HttpCacheValidation.IsFresh(Request.Headers.IfNoneMatch.ToString(), etag, Request.Headers.IfModifiedSince.ToString(), lastModified))
+            return StatusCode(StatusCodes.Status304NotModified);
+
+        return Content(Blog.Core.Services.PostMarkdown.Build(post, canonical, siteName, post.AuthorName), Blog.Core.Services.PostMarkdown.ContentType);
+    }
+
     [HttpGet("{slug}")]
     public async Task<IActionResult> Post(string slug)
     {
@@ -426,6 +483,12 @@ public class BlogController : Controller
             }
             return NotFound();
         }
+
+        // The same address answers with Markdown when that is what the client asked for; a browser never does.
+        // Vary tells any cache in between that the two forms are different answers.
+        Response.Headers.Vary = "Accept";
+        if (Blog.Core.Services.PostMarkdown.Wanted(Request.Headers.Accept.ToString()))
+            return await MarkdownOfAsync(post);
 
         return await RenderPostAsync(post, ownerId, isPreview: false);
     }
@@ -482,6 +545,7 @@ public class BlogController : Controller
 
         var userSettings = await _settings.GetSettingsAsync(settingsId);
         ViewBag.CommentsEnabled = userSettings.CommentsEnabled && !isPreview;
+        ViewBag.ShareLinks = userSettings.ShareLinksEnabled && !isPreview;   // a private preview is not for passing on
         ViewBag.DisplayTimeZone = userSettings.DisplayTimeZoneId;
         ViewBag.CustomFields = Blog.Core.Services.CustomFields.Visible(userSettings.CustomFields, pages: false, post.CustomFieldsJson, Blog.Web.Services.SiteDates.From(userSettings));
         ViewBag.SiteLogoUrl = userSettings.SiteLogoUrl;
@@ -510,7 +574,10 @@ public class BlogController : Controller
                 post.Id, post.UpdatedAt, post.ViewCount / 100, flatComments.Count, lastComment,
                 string.Join(";", settings.OrderBy(s => s.SettingKey, StringComparer.Ordinal).Select(s => s.SettingKey + "=" + s.EffectiveValue)),
                 userSettings.SiteName, userSettings.SiteLogoUrl, userSettings.SiteLanguage, userSettings.DisplayTimeZoneId,
-                userSettings.CommentsEnabled, userSettings.SocialTwitter,
+                userSettings.CommentsEnabled, userSettings.SocialTwitter, userSettings.ShareLinksEnabled,
+                userSettings.ContactButtonKind, userSettings.ContactButtonValue, userSettings.ContactButtonLabel,
+                userSettings.CodeInjectionHead, userSettings.CodeInjectionFoot, userSettings.CustomCss, userSettings.CodeInjectionNeedsConsent,
+                System.Text.Json.JsonSerializer.Serialize(userSettings.Goals),
                 userSettings.CookieConsentEnabled, userSettings.GoogleAnalyticsId,
                 userSettings.DateLocale, userSettings.DateFormat, userSettings.ClockFormat,
                 System.Text.Json.JsonSerializer.Serialize(userSettings.CustomFields),
@@ -557,6 +624,8 @@ public class BlogController : Controller
                 ViewBag.PostSeriesNav = new Blog.Core.Domain.SeriesNav(postSeries, seriesPosts, idx);
         }
 
+        // An unlisted post is readable by its address but asks not to be indexed (PostVisibility).
+        if (Blog.Core.Services.PostVisibility.IsUnlisted(post.Visibility)) ViewData["Robots"] = "noindex,follow";
         return View(post);
     }
 
@@ -623,8 +692,9 @@ public class BlogController : Controller
         authorName ??= ""; authorEmail ??= ""; content ??= "";
 
         // JavaScript readers get JSON; everyone else gets the respond page, which keeps what they typed.
-        Task<IActionResult> Answer(string message, bool ok, int status = 200, bool expired = false, bool backdate = false) => json
-            ? Task.FromResult<IActionResult>(new JsonResult(new { ok, message, expired }) { StatusCode = status })
+        // "posted" tells the script the comment is already public, so it reloads the page to show it.
+        Task<IActionResult> Answer(string message, bool ok, int status = 200, bool expired = false, bool backdate = false, bool posted = false) => json
+            ? Task.FromResult<IActionResult>(new JsonResult(new { ok, message, expired, posted }) { StatusCode = status })
             : RespondView(post, parentId, message, ok, ok ? "" : authorName, ok ? "" : authorEmail, ok ? "" : content, backdate, status);
 
         // The anti-forgery check every form post gets, done here rather than by attribute so a page served from a cache
@@ -681,13 +751,28 @@ public class BlogController : Controller
                     return await Answer("This comment form has expired. Press the button again to send it.", false, 400, expired: true, backdate: true);
 
                 case Blog.Core.Services.CommentSpamAction.RejectSilently:
-                    // Nothing is stored. The reply is identical to a moderated submission's so the
-                    // sender cannot tell which rule fired; the firewall learns about it instead.
+                    // Nothing is stored. The reply is the one a genuine comment with this text would get on this
+                    // site, so the sender cannot tell which rule fired; the firewall learns about it instead.
                     _log.LogInformation("Comment on {Slug} discarded as spam: {Reason}", slug, verdict.Reason);
                     await _firewall.RegisterCommentSpamAsync(HttpContext, verdict.Reason);
-                    return await Answer("Your comment is awaiting moderation.", true);
+                    var pretend = Blog.Core.Services.CommentHolding.InitialStatus(moderation, content, parentHidden: false);
+                    return await Answer(Blog.Core.Services.CommentHolding.Message(pretend), true,
+                        posted: pretend == Blog.Core.Domain.CommentStatus.Approved);
             }
         }
+
+        // A reply belongs under a comment of this post; anything else is stored as a top-level comment.
+        Blog.Core.Domain.Comment? parent = null;
+        if (parentId is Guid pid)
+        {
+            parent = await _comments.GetByIdAsync(pid);
+            if (parent?.PostId != post.Id) { parent = null; parentId = null; }
+        }
+
+        // "Hold comments for approval" decides whether the comment is public now (CommentHolding): off publishes it
+        // at once unless it carries a link or answers a comment that is itself still waiting.
+        var initial = Blog.Core.Services.CommentHolding.InitialStatus(moderation, content,
+            parentHidden: parent is not null && parent.Status != Blog.Core.Domain.CommentStatus.Approved);
 
         var comment = new Blog.Core.Domain.Comment
         {
@@ -696,13 +781,15 @@ public class BlogController : Controller
             AuthorEmail = authorEmail.Trim(),
             Content = content.Trim(),
             ParentId = parentId,
-            Status = Blog.Core.Domain.CommentStatus.Pending,
+            Status = initial,
             AuthorIp = authorIp
         };
 
         await _comments.CreateAsync(comment);
         await _webhooks.CommentCreatedAsync(HttpContext, comment, post);
-        return await Answer(moderation ? "Your comment is awaiting moderation." : "Comment posted.", true);
+        await HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.CommentNotifier>().NotifyAsync(HttpContext, ownerId, comment, post);
+        return await Answer(Blog.Core.Services.CommentHolding.Message(initial), true,
+            posted: initial == Blog.Core.Domain.CommentStatus.Approved);
     }
 
     [HttpGet("feed")]
@@ -1011,6 +1098,7 @@ public class BlogController : Controller
         sb.AppendLine($"- RSS: {baseUrl}/feed");
         sb.AppendLine($"- Sitemap: {baseUrl}/sitemap.xml");
         sb.AppendLine($"- Full content index: {baseUrl}/llms-full.txt");
+        sb.AppendLine($"- Each post as Markdown: add .md to its address (for example {baseUrl}/a-post.md), or request the post with \"Accept: text/markdown\"");
         sb.AppendLine();
         sb.AppendLine("## Permissions");
         sb.AppendLine();

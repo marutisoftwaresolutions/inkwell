@@ -136,9 +136,10 @@
         if (form.dataset.ikdConfirmed === '1') { delete form.dataset.ikdConfirmed; return; }
 
         const submitter = e.submitter;
-        const src = form.hasAttribute('data-confirm-title') ? form
-                  : (submitter && submitter.hasAttribute && submitter.hasAttribute('data-confirm-title')) ? submitter
-                  : null;
+        // An empty title means "no confirmation": a view that computes the title writes data-confirm-title="" when
+        // none is wanted (Razor keeps an empty data- attribute), and that must not raise a dialog with no words in it.
+        const asks = el => !!el && !!el.getAttribute && (el.getAttribute('data-confirm-title') || '').trim() !== '';
+        const src = asks(form) ? form : asks(submitter) ? submitter : null;
         if (!src) return;
 
         e.preventDefault();

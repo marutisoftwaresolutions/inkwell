@@ -27,6 +27,12 @@
         <p class="rounded-lg border p-4 pill-warn text-sm" role="note">Outgoing email is not set up on this server, so newsletters can be written and previewed but not sent. Set the <code>Smtp</code> settings in <code>appsettings.json</code>.</p>
     }
 
+    @if (emailConfigured)
+    {
+        <p class="text-sm text-muted-foreground">Before a first send, <a class="underline" href="/admin/newsletter/sender-check">check your sender domain</a>: it reads the SPF, DKIM and DMARC records mailbox providers look for.</p>
+        <p class="text-sm text-muted-foreground"><a class="underline" href="/admin/newsletter/welcome">Welcome emails</a> are sent automatically after someone confirms their subscription.</p>
+    }
+
     <partial name="_ListSearch" />
     <div class="desk-card overflow-hidden">
         @if (!Model.Any())

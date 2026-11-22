@@ -12,7 +12,9 @@ public class UserSettings
     // hreflang, og:locale, and schema inLanguage so non-English tenants declare the right language.
     public string SiteLanguage { get; set; } = "en";
     public bool CommentsEnabled { get; set; } = true;
-    public bool CommentsModeration { get; set; } = false;
+    // On unless a site switches it off: a settings record written before this field existed must not start
+    // publishing comments unread (see CommentHolding).
+    public bool CommentsModeration { get; set; } = true;
     public int PostsPerPage { get; set; } = 10;
     public string Theme { get; set; } = "system"; // light, dark, system
     public string SiteLogoUrl { get; set; } = string.Empty;
@@ -49,6 +51,61 @@ public class UserSettings
     // is served at /indexnow/{key}.txt for ownership verification. Empty key = feature inert.
     public bool IndexNowEnabled { get; set; } = false;
     public string IndexNowApiKey { get; set; } = string.Empty;
+
+    // Model Context Protocol endpoint (/mcp) for AI assistants. Stored in the Settings JSON blob (no
+    // schema change). Off by default: until an Admin switches it on the endpoint answers 404, whatever
+    // key is presented. An assistant then works with a personal API key and that key's scopes only.
+    public bool McpEnabled { get; set; } = false;
+
+    // Settings → General → Newsletter. When on, a post going live creates a newsletter DRAFT featuring
+    // it, once per post. Nothing is sent: an Admin still opens the draft and sends it. Stored in the
+    // Settings JSON blob (no schema change). Off by default.
+    public bool NewsletterDraftOnPublish { get; set; } = false;
+
+    // Settings → Display. Share links under each post: plain links to email and a few networks plus
+    // "Copy link"; no third-party script. Stored in the Settings JSON blob (no schema change). Off by
+    // default, so a site that never opens Settings looks as it did.
+    public bool ShareLinksEnabled { get; set; } = false;
+
+    // Settings → General. Maintenance mode: readers get a holding page with status 503 and Retry-After
+    // while signed-in staff see the site. Stored in the Settings JSON blob (no schema change). Off by default.
+    public bool MaintenanceModeEnabled { get; set; } = false;
+    public string MaintenanceMessage { get; set; } = string.Empty;
+
+    // Settings → Comments. Email the moderators when a reader comments. Recipients is a comma/semicolon/
+    // newline-separated list; empty means the post's author. Stored in the Settings JSON blob. Off by default.
+    public bool CommentNotifyEnabled { get; set; } = false;
+    public string CommentNotifyEmails { get; set; } = string.Empty;
+
+    // Settings → Display. A floating contact button on the reader surface: "whatsapp", "phone" or "email"
+    // (empty = no button), the number or address, and an optional label. A plain link; no script.
+    // Stored in the Settings JSON blob (no schema change). Empty by default.
+    public string ContactButtonKind { get; set; } = string.Empty;
+    public string ContactButtonValue { get; set; } = string.Empty;
+    public string ContactButtonLabel { get; set; } = string.Empty;
+
+    // Settings → Custom code (Admin only, audited, and only where the host allows it). HTML added to
+    // every reader page's head and foot, and extra CSS. While the cookie-consent banner is on, the HTML
+    // waits for the reader's consent unless CodeInjectionNeedsConsent is switched off.
+    // Stored in the Settings JSON blob (no schema change). Empty by default.
+    public string CodeInjectionHead { get; set; } = string.Empty;
+    public string CodeInjectionFoot { get; set; } = string.Empty;
+    public string CustomCss { get; set; } = string.Empty;
+    public bool CodeInjectionNeedsConsent { get; set; } = true;
+
+    // Admin → Analytics → Goals: page visits and link clicks the site counts per day (GoalCounts table).
+    // Stored in the Settings JSON blob (no schema change for the list). Empty by default; newsletter
+    // sign-ups and form submissions are counted for every site without an entry here.
+    public List<Goal> Goals { get; set; } = new();
+
+    // Welcome sequence (Admin → Newsletter → Welcome emails): up to three emails sent some days after a
+    // reader confirms. Stored in the Settings JSON blob (no schema change). Empty and off by default.
+    // WelcomeSequenceStartedAt is set the first time a step is switched on: only readers who confirm
+    // after that moment receive the sequence, so switching it on never mails the existing list.
+    // WelcomeSiteUrl is the site address captured at save time, for links in emails the job sends.
+    public List<WelcomeEmail> WelcomeEmails { get; set; } = new();
+    public DateTime? WelcomeSequenceStartedAt { get; set; }
+    public string WelcomeSiteUrl { get; set; } = string.Empty;
 
     // Error notifications — email an alert when a NEW server-error (5xx) signature is detected.
     // Recipients is a comma/semicolon/newline-separated list; degrades to no-op when disabled/empty.

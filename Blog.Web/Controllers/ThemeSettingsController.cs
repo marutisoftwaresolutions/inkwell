@@ -112,7 +112,7 @@ public class ThemeSettingsController : Controller
     //  DEFAULT SEED SETTINGS (Nature & Earth)
     // ══════════════════════════════════════════════════════════════════
 
-    private static List<CustomThemeSetting> GetDefaultSettings() => new()
+    public static List<CustomThemeSetting> GetDefaultSettings() => new()
     {
         new() { SettingGroup = "colors", SettingKey = "background", SettingType = "color", DefaultValue = "#f8f5f0", Label = "Background", Description = "Main page background color" },
         new() { SettingGroup = "colors", SettingKey = "foreground", SettingType = "color", DefaultValue = "#3e2723", Label = "Foreground", Description = "Main text color" },
@@ -137,6 +137,7 @@ public class ThemeSettingsController : Controller
         new() { SettingGroup = "layout", SettingKey = "layout-postcard", SettingType = "select", DefaultValue = "Neutral", Label = "Post Card Style", Description = "Visual style of individual post cards" },
         new() { SettingGroup = "layout", SettingKey = "layout-post", SettingType = "select", DefaultValue = "Neutral", Label = "Single Post Layout", Description = "Layout structure for individual blog posts" },
         new() { SettingGroup = "layout", SettingKey = "layout-page", SettingType = "select", DefaultValue = "Neutral", Label = "Single Page Layout", Description = "Layout structure for static pages" },
+        new() { SettingGroup = "site", SettingKey = Blog.Core.Services.ReaderColours.SettingKey, SettingType = "select", DefaultValue = "false", Label = "Reader colours", Description = "Whether the colours above are applied to the public site, or the Inkwell preset is used as it is" },
         new() { SettingGroup = "inkwell", SettingKey = "inkwell-preset", SettingType = "select", DefaultValue = "cream", Label = "Inkwell Preset", Description = "Color preset for Magazine/Inkwell layout (cream, linen, manuscript, etc.)" },
     };
 

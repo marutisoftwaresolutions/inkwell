@@ -17,6 +17,7 @@ public class AdminRootRedirectTests : IClassFixture<WebApplicationFactory<Progra
     [Fact]
     public async Task Admin_root_redirects_to_dashboard()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var response = await client.GetAsync("/admin");
 

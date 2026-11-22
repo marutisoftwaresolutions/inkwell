@@ -440,7 +440,9 @@ public sealed class ExportPushService
     {
         var item = await _repo.GetOrAddAsync(push.Id, PushItemKind.Term, PushRules.Trim(term.Key, 400)!, term.Name);
         if (item.IsDone && item.RemoteId is not null) return item.RemoteId;
-        var id = await client.EnsureTermAsync(term, ct);
+        // A category under another: the parent is found or created first (once per push, like any term), and its id goes with the child.
+        var parentId = term.Parent is null ? null : await TermAsync(push, client, term.Parent, ct);
+        var id = await client.EnsureTermAsync(term, ct, parentId);
         await _repo.MarkItemAsync(item.Id, PushItemStatus.Created, item.Attempts + 1, DateTime.UtcNow, id, null, null, DateTime.UtcNow);
         return id;
     }

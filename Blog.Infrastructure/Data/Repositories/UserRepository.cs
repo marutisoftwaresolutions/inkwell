@@ -16,6 +16,12 @@ public class UserRepository : IUserRepository
         return await conn.QueryFirstOrDefaultAsync<User>("SELECT * FROM Users WHERE Id = @Id", new { Id = id });
     }
 
+    public async Task SetSessionsValidFromAsync(Guid userId, DateTime utc)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Users SET SessionsValidFrom = @utc WHERE Id = @userId", new { userId, utc });
+    }
+
     public async Task<User?> GetByEmailAsync(string email)
     {
         using var conn = _ctx.CreateConnection();

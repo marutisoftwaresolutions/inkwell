@@ -17,7 +17,7 @@ public class SeriesRepository : ISeriesRepository
                    COUNT(p.Id) as PostCount
             FROM Series s
             LEFT JOIN SeriesPosts sp ON sp.SeriesId = s.Id
-            LEFT JOIN Posts p ON p.Id = sp.PostId AND p.Status = 'Published'
+            LEFT JOIN Posts p ON p.Id = sp.PostId AND p.Status = 'Published' AND (p.Visibility IS NULL OR p.Visibility <> 'unlisted')
             " + (authorId == Guid.Empty ? "" : "WHERE s.AuthorId = @AuthorId ") + @"
             GROUP BY s.Id, s.Title, s.Slug, s.Description, s.AuthorId, s.CreatedAt, s.UpdatedAt
             ORDER BY s.Title";
@@ -54,7 +54,7 @@ public class SeriesRepository : ISeriesRepository
     {
         using var conn = _ctx.CreateConnection();
         await conn.ExecuteAsync(@"
-            UPDATE Series SET Title=@Title, Slug=@Slug, Description=@Description, UpdatedAt=GETUTCDATE()
+            UPDATE Series SET Title=@Title, Slug=@Slug, Description=@Description, UpdatedAt=SYSUTCDATETIME()
             WHERE Id=@Id AND AuthorId=@AuthorId",
             new { series.Title, series.Slug, series.Description, series.Id, series.AuthorId });
     }
@@ -84,7 +84,7 @@ public class SeriesRepository : ISeriesRepository
             INNER JOIN SeriesPosts sp ON sp.PostId = p.Id
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE sp.SeriesId = @SeriesId
-            " + (publishedOnly ? "AND p.Status = 'Published' " : "") + @"
+            " + (publishedOnly ? "AND p.Status = 'Published' AND (p.Visibility IS NULL OR p.Visibility <> 'unlisted') " : "") + @"
             ORDER BY sp.SortOrder, p.PublishedAt";
         return (await conn.QueryAsync<Post>(sql, new { SeriesId = seriesId })).ToList();
     }

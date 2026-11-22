@@ -31,6 +31,43 @@ public class TrafficRecordingTests : IClassFixture<WebApplicationFactory<Program
         _out = output;
     }
 
+    // ── Geo-IP switch ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(null, true)]      // absent: existing installs keep their reports
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    public void Geo_lookup_follows_the_configured_switch(string? value, bool expected)
+    {
+        var settings = new Dictionary<string, string?>();
+        if (value is not null) settings["Analytics:GeoIpLookup"] = value;
+        var config = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+
+        Assert.Equal(expected, TrafficRecorder.GeoLookupEnabled(config));
+    }
+
+    [Fact]
+    public void Switching_geo_off_stops_the_lookup_before_any_address_is_read()
+    {
+        var source = File.ReadAllText(Path.Combine(GeoRepoRoot(), "Blog.Web", "Services", "TrafficRecorder.cs"));
+        var method = source.IndexOf("private async Task ResolveGeoAsync", StringComparison.Ordinal);
+        var guard = source.IndexOf("if (!_geoLookupEnabled) return;", method, StringComparison.Ordinal);
+        var firstAddress = source.IndexOf("views.GroupBy", method, StringComparison.Ordinal);
+
+        Assert.True(method >= 0 && guard > method && guard < firstAddress,
+            "ResolveGeoAsync must return on the switch before it reads a reader address.");
+        Assert.Equal(1, source.Split("ip-api.com/json").Length - 1);   // one outbound call site, behind that guard
+    }
+
+    private static string GeoRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Directory.Build.props")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        return dir!.FullName;
+    }
+
     // ── BoundedBatchBuffer ────────────────────────────────────────────────────
 
     [Fact]

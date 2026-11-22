@@ -92,6 +92,7 @@ public sealed class ResponsiveImageStore
         try
         {
             var file = FileOf(uploadPath)!;
+            ImageGuard.Check(file);   // an oversized picture already on disk gets no copies instead of a huge decode
             using var image = await Image.LoadAsync(file, ct);
             foreach (var width in missing.OrderByDescending(w => w))
             {

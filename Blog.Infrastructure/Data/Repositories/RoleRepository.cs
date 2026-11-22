@@ -67,10 +67,30 @@ public class RoleRepository : IRoleRepository
             new { RoleId = roleId, UserId = userId });
     }
 
+    public async Task<int> AssignMissingAdminRolesAsync()
+    {
+        using var conn = _ctx.CreateConnection();
+        // Repairs sites installed through the setup wizard before it assigned roles: the account says
+        // Admin but had no row here, so permission checks that read the role tables refused it.
+        return await conn.ExecuteAsync(@"
+            INSERT INTO RolesUsers (RoleId, UserId)
+            SELECT r.Id, u.Id
+            FROM Users u
+            JOIN Roles r ON r.Name = N'Admin'
+            WHERE u.Role = N'Admin'
+              AND NOT EXISTS (SELECT 1 FROM RolesUsers ru WHERE ru.UserId = u.Id)");
+    }
+
     public async Task RemoveRoleFromUserAsync(Guid userId)
     {
         using var conn = _ctx.CreateConnection();
         await conn.ExecuteAsync("DELETE FROM RolesUsers WHERE UserId = @UserId", new { UserId = userId });
+    }
+
+    public async Task<List<Permission>> GetAllPermissionsAsync()
+    {
+        using var conn = _ctx.CreateConnection();
+        return (await conn.QueryAsync<Permission>("SELECT * FROM Permissions")).ToList();
     }
 
     public async Task<Guid> CreateRoleAsync(Role role)

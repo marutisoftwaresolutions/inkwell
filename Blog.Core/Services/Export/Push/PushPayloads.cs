@@ -5,7 +5,8 @@ using Blog.Core.Domain;
 namespace Blog.Core.Services.Export.Push;
 
 /// <summary>A term a WordPress push needs: taxonomy (<c>categories</c> or <c>tags</c>), name and slug.</summary>
-public sealed record PushTerm(string Taxonomy, string Name, string Slug)
+/// <param name="Parent">For a category: the category it sits under, which the push creates first. Null for a tag or a top-level category.</param>
+public sealed record PushTerm(string Taxonomy, string Name, string Slug, PushTerm? Parent = null)
 {
     /// <summary>The push item key that records this term's id on the target.</summary>
     public string Key => (Taxonomy == "categories" ? "category:" : "tag:") + Slug;
@@ -51,10 +52,17 @@ public static class PushPayloads
         var terms = new List<PushTerm>();
         var cats = catalog.Categories.ToDictionary(c => c.Id);
         var tags = catalog.Tags.ToDictionary(t => t.Id);
-        foreach (var id in p.CategoryIds) if (cats.TryGetValue(id, out var c)) terms.Add(new PushTerm("categories", c.Name, c.Slug));
+        foreach (var id in p.CategoryIds) if (cats.TryGetValue(id, out var c)) terms.Add(CategoryTerm(c, cats, 0));
         foreach (var id in p.TagIds) if (tags.TryGetValue(id, out var t)) terms.Add(new PushTerm("tags", t.Name, t.Slug));
         foreach (var s in p.Series) terms.Add(new PushTerm("tags", "Series: " + s.Title, "series-" + s.Slug));
         return terms.DistinctBy(t => t.Key).ToList();
+    }
+
+    /// <summary>A category with the categories above it attached. Stops at a missing parent, a loop, or ten levels.</summary>
+    private static PushTerm CategoryTerm(ExportTerm c, IReadOnlyDictionary<Guid, ExportTerm> all, int depth)
+    {
+        var parent = depth < 10 && c.ParentId is Guid p && p != c.Id && all.TryGetValue(p, out var above) ? CategoryTerm(above, all, depth + 1) : null;
+        return new PushTerm("categories", c.Name, c.Slug, parent);
     }
 
     /// <summary>A post's Ghost tags: categories and tags merged by slug, then an internal <c>#series-…</c> tag per series.</summary>

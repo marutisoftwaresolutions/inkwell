@@ -9,6 +9,8 @@ public interface INewsletterRepository
     Task<IReadOnlyList<NewsletterIssue>> ListAsync(Guid ownerId);
     Task<NewsletterIssue?> GetAsync(Guid id, Guid ownerId);
     Task CreateAsync(NewsletterIssue issue);
+    /// <summary>True when any issue of this owner, in any state, already features the post.</summary>
+    Task<bool> HasIssueForPostAsync(Guid ownerId, Guid postId);
     /// <summary>Saves subject, preheader, intro and posts; only while the issue is a draft. False otherwise.</summary>
     Task<bool> UpdateDraftAsync(NewsletterIssue issue);
     /// <summary>Deletes a draft. Queued and sent issues are history and cannot be deleted.</summary>
@@ -31,6 +33,8 @@ public interface INewsletterRepository
     Task<int> ExpandRecipientsAsync(Guid issueId, DateTime nowUtc);
     Task<IReadOnlyList<NewsletterDelivery>> GetDueAsync(Guid issueId, DateTime nowUtc, int take);
     Task MarkDeliveryAsync(long deliveryId, string status, int attempts, DateTime nextAttemptAt, DateTime? sentAt, string? error);
+    /// <summary>A mail server refused this address for good: it stops receiving newsletters. Only a confirmed member is changed.</summary>
+    Task MarkMemberBouncedAsync(Guid memberId);
     /// <summary>When nothing is Pending: counts recorded, status Sent, FinishedAt set. Returns the finished issue, else null.</summary>
     Task<NewsletterIssue?> FinishIfDoneAsync(Guid issueId, DateTime nowUtc);
 }

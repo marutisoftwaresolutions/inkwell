@@ -456,6 +456,53 @@ public class MigrationService
                     CREATE INDEX IX_ScheduledScripts_Due ON ScheduledScripts (Enabled, NextRunAt);
                 END
 
+                -- API keys, Profile → API keys (DBScripts/2026-11-12_create-apikeys-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ApiKeys')
+                BEGIN
+                    CREATE TABLE ApiKeys (
+                        Id         UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        UserId     UNIQUEIDENTIFIER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                        Name       NVARCHAR(60)     NOT NULL,
+                        Prefix     NVARCHAR(16)     NOT NULL,
+                        KeyHash    NVARCHAR(64)     NOT NULL,
+                        Scopes     NVARCHAR(200)    NOT NULL,
+                        CreatedAt  DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+                        ExpiresAt  DATETIME2        NULL,
+                        LastUsedAt DATETIME2        NULL,
+                        RevokedAt  DATETIME2        NULL
+                    );
+                    CREATE UNIQUE INDEX UX_ApiKeys_KeyHash ON ApiKeys (KeyHash);
+                    CREATE INDEX IX_ApiKeys_User_CreatedAt ON ApiKeys (UserId, CreatedAt DESC);
+                END
+
+                -- Notes on a post, Desk only (DBScripts/2026-11-12_create-postnotes-table.sql)
+                -- Goal counters (DBScripts/2026-11-13_create-goalcounts-table.sql)
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'GoalCounts')
+                BEGIN
+                    CREATE TABLE GoalCounts (
+                        OwnerId UNIQUEIDENTIFIER NOT NULL,
+                        Day     DATE             NOT NULL,
+                        GoalKey NVARCHAR(40)     NOT NULL,
+                        Hits    INT              NOT NULL CONSTRAINT DF_GoalCounts_Hits DEFAULT 0,
+                        CONSTRAINT PK_GoalCounts PRIMARY KEY (OwnerId, Day, GoalKey)
+                    );
+                END
+
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PostNotes')
+                BEGIN
+                    CREATE TABLE PostNotes (
+                        Id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                        PostId         UNIQUEIDENTIFIER NOT NULL REFERENCES Posts(Id) ON DELETE CASCADE,
+                        UserId         UNIQUEIDENTIFIER NOT NULL,
+                        UserName       NVARCHAR(200)    NOT NULL,
+                        Body           NVARCHAR(2000)   NOT NULL,
+                        CreatedAt      DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+                        ResolvedAt     DATETIME2        NULL,
+                        ResolvedByName NVARCHAR(200)    NULL
+                    );
+                    CREATE INDEX IX_PostNotes_Post ON PostNotes (PostId, CreatedAt);
+                END
+
                 -- Job controls: pause and interval override per built-in job (DBScripts/2026-11-01_add-job-controls-to-jobs.sql, ADR-0040)
                 IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Jobs') AND COL_LENGTH('Jobs', 'Paused') IS NULL
                 BEGIN
@@ -644,6 +691,24 @@ public class MigrationService
                 IF COL_LENGTH('Users', 'TwoFactorEnabledAt') IS NULL ALTER TABLE Users ADD TwoFactorEnabledAt DATETIME2 NULL;
                 IF COL_LENGTH('Users', 'TwoFactorRecoveryHashes') IS NULL ALTER TABLE Users ADD TwoFactorRecoveryHashes NVARCHAR(MAX) NULL;
                 IF COL_LENGTH('Users', 'TwoFactorLastStep') IS NULL ALTER TABLE Users ADD TwoFactorLastStep BIGINT NULL;
+                -- Sign out everywhere (DBScripts/2026-11-12_add-sessions-valid-from-to-users.sql)
+                IF COL_LENGTH('Users', 'SessionsValidFrom') IS NULL ALTER TABLE Users ADD SessionsValidFrom DATETIME2 NULL;
+                -- Welcome sequence progress (DBScripts/2026-11-12_add-welcome-sequence.sql)
+                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Members') AND COL_LENGTH('Members', 'WelcomeStepsSent') IS NULL
+                    ALTER TABLE Members ADD WelcomeStepsSent INT NOT NULL CONSTRAINT DF_Members_WelcomeStepsSent DEFAULT 0;
+                -- Sign-up page (DBScripts/2026-11-12_add-source-path-to-members.sql)
+                IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Members') AND COL_LENGTH('Members', 'SourcePath') IS NULL
+                    ALTER TABLE Members ADD SourcePath NVARCHAR(200) NULL;
+
+                -- Newsletter draft prepared once per post (DBScripts/2026-11-13_add-newsletter-drafted-at-to-posts.sql)
+                IF COL_LENGTH('Posts', 'NewsletterDraftedAt') IS NULL ALTER TABLE Posts ADD NewsletterDraftedAt DATETIME2 NULL;
+
+                -- Nested categories (DBScripts/2026-11-13_add-parent-to-categories.sql)
+                IF COL_LENGTH('Categories', 'ParentId') IS NULL ALTER TABLE Categories ADD ParentId UNIQUEIDENTIFIER NULL;
+
+                -- Category and tag descriptions (DBScripts/2026-11-21_add-description-to-categories-and-tags.sql)
+                IF COL_LENGTH('Categories', 'Description') IS NULL ALTER TABLE Categories ADD Description NVARCHAR(600) NULL;
+                IF COL_LENGTH('Tags', 'Description') IS NULL ALTER TABLE Tags ADD Description NVARCHAR(600) NULL;
 
                 -- Markdown authoring (DBScripts/2026-10-05_add-markdown-to-posts.sql, ADR-0022)
                 IF COL_LENGTH('Posts', 'Markdown') IS NULL ALTER TABLE Posts ADD Markdown NVARCHAR(MAX) NULL;
@@ -652,6 +717,9 @@ public class MigrationService
                 IF NOT EXISTS (SELECT 1 FROM sys.default_constraints dc JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
                                WHERE dc.parent_object_id = OBJECT_ID('Posts') AND c.name = 'ViewCount')
                     ALTER TABLE Posts ADD CONSTRAINT DF_Posts_ViewCount DEFAULT 0 FOR ViewCount;
+                -- Scheduled posts carry their publish date (DBScripts/2026-11-15_set-publish-date-on-scheduled-posts.sql).
+                IF EXISTS (SELECT 1 FROM Posts WHERE Status = 'Scheduled' AND PublishedAt IS NULL AND ScheduledAt IS NOT NULL)
+                    UPDATE Posts SET PublishedAt = ScheduledAt WHERE Status = 'Scheduled' AND PublishedAt IS NULL AND ScheduledAt IS NOT NULL;
                 IF COL_LENGTH('Posts', 'EditorMode') IS NULL ALTER TABLE Posts ADD EditorMode NVARCHAR(20) NOT NULL CONSTRAINT DF_Posts_EditorMode DEFAULT 'rich' WITH VALUES;
 
                 -- Custom fields (DBScripts/2026-10-05_add-custom-fields-to-posts-and-pages.sql, ADR-0025)

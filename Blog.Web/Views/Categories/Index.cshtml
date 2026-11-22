@@ -2,15 +2,19 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Categories";
-    ViewData["Description"] = "Group posts by subject. Each category gets its own public page at /category/{slug}.";
+    ViewData["Description"] = "Group posts by subject. Each category gets its own public page at /category/{slug}. A category can sit under another; the parent's page then lists the posts of both. A description gives that page an introduction and its search result text.";
     var q = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string ?? "";
+    var depths = ViewBag.Depths as Dictionary<Guid, int> ?? new Dictionary<Guid, int>();
+    var everyCategory = ViewBag.AllCategories as List<Blog.Core.Services.CategoryTree.Node> ?? new List<Blog.Core.Services.CategoryTree.Node>();
+    var flat = everyCategory.Select(n => n.Category).ToList();
+    var listPage = ViewData[Blog.Web.Models.ListPaging.PageKey] as int? ?? 1;
 }
 
 <div class="flex flex-col gap-6">
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- List -->
-        <div class="md:col-span-2 space-y-4">
+        <div class="md:col-span-2 space-y-4 min-w-0">
             <partial name="_ListSearch" />
             <div class="desk-card overflow-hidden">
                 @if (!Model.Any())
@@ -34,18 +38,40 @@
                     <thead>
                         <tr>
                             <th>Name</th>
-                            <th>Slug</th>
+                            <th class="hidden sm:table-cell">Slug</th>
+                            <th>Under</th>
+                            <th>Description</th>
                             <th class="w-[100px]"><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var category in Model)
                         {
+                            var depth = depths.TryGetValue(category.Id, out var d) ? d : 0;
                             <tr>
-                                <td class="font-medium">@category.Name</td>
-                                <td class="text-muted-foreground">@category.Slug</td>
+                                <td class="font-medium">@if (depth > 0) { <span aria-hidden="true" class="text-muted-foreground">@(new string('\u2014', depth)) </span> }@category.Name</td>
+                                <td class="text-muted-foreground hidden sm:table-cell">@category.Slug</td>
                                 <td>
-                                    <form method="post" action="/admin/categories/delete/@category.Id" class="desk-row-actions" data-confirm-title="Delete this category?" data-confirm-body="“@category.Name” is removed and /category/@category.Slug will return 404. Posts filed under it are kept and keep their other categories and tags." data-confirm-action="Delete category" data-confirm-tone="danger">
+                                    <form method="post" action="/admin/categories/move/@category.Id" class="flex items-center gap-2">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="q" value="@q" />
+                                        <input type="hidden" name="page" value="@listPage" />
+                                        <select name="parentId" aria-label="Category that “@category.Name” sits under" class="desk-select desk-select-sm desk-parent-select">
+                                            <option value="">Top level</option>
+                                            @foreach (var option in everyCategory)
+                                            {
+                                                if (option.Category.Id == category.Id || !Blog.Core.Services.CategoryTree.CanPlaceUnder(flat, category.Id, option.Category.Id)) { continue; }
+                                                <option value="@option.Category.Id" selected="@(category.ParentId == option.Category.Id)">@(new string('\u2014', option.Depth)) @option.Category.Name</option>
+                                            }
+                                        </select>
+                                        <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm" aria-label="Move “@category.Name”">Move</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <a href="/admin/categories/describe/@category.Id?q=@Uri.EscapeDataString(q)&page=@listPage" class="desk-btn desk-btn-link desk-btn-sm" aria-label="@(string.IsNullOrWhiteSpace(category.Description) ? "Add" : "Edit") description for “@category.Name”">@(string.IsNullOrWhiteSpace(category.Description) ? "Add" : "Edit")</a>
+                                </td>
+                                <td>
+                                    <form method="post" action="/admin/categories/delete/@category.Id" class="desk-row-actions" data-confirm-title="Delete this category?" data-confirm-body="“@category.Name” is removed and /category/@category.Slug will return 404. Posts filed under it are kept and keep their other categories and tags. Categories beneath it move up one level." data-confirm-action="Delete category" data-confirm-tone="danger">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" aria-label="Delete category “@category.Name”" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm text-destructive hover:text-destructive hover:bg-destructive/10">
                                             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -76,6 +102,18 @@
                     <div>
                         <label for="catSlug" class="desk-label">Slug</label>
                         <input type="text" name="slug" id="catSlug" class="desk-input" placeholder="e.g. technology (optional)" />
+                    </div>
+                    <div>
+                        <label for="catParent" class="desk-label">Under</label>
+                        <select name="parentId" id="catParent" class="desk-select" aria-describedby="catParentHint">
+                            <option value="">Top level</option>
+                            @foreach (var option in everyCategory)
+                            {
+                                if (!Blog.Core.Services.CategoryTree.CanPlaceUnder(flat, Guid.Empty, option.Category.Id)) { continue; }
+                                <option value="@option.Category.Id">@(new string('\u2014', option.Depth)) @option.Category.Name</option>
+                            }
+                        </select>
+                        <p id="catParentHint" class="desk-hint">Optional. The parent's public page also lists this category's posts.</p>
                     </div>
                     <button type="submit" class="desk-btn desk-btn-primary w-full">
                         Add category

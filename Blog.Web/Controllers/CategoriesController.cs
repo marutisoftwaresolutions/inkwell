@@ -26,12 +26,16 @@ public class CategoriesController : Controller
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var categories = await _categories.GetAllAsync(userId);
         ViewData["ListSearchPlaceholder"] = "Search categories";
-        return View(Blog.Web.Models.ListPaging.Apply(this, categories, q, page, c => new[] { c.Name, c.Slug }));
+        // Parents before their children; the view indents by depth and offers every category as a parent.
+        var ordered = Blog.Core.Services.CategoryTree.Order(categories);
+        ViewBag.Depths = ordered.ToDictionary(n => n.Category.Id, n => n.Depth);
+        ViewBag.AllCategories = ordered;
+        return View(Blog.Web.Models.ListPaging.Apply(this, ordered.Select(n => n.Category).ToList(), q, page, c => new[] { c.Name, c.Slug }));
     }
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string name, string slug)
+    public async Task<IActionResult> Create(string name, string slug, Guid? parentId)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -51,17 +55,90 @@ public class CategoriesController : Controller
             return RedirectToAction("Index");
         }
 
+        if (parentId is not null && !Blog.Core.Services.CategoryTree.CanPlaceUnder(await _categories.GetAllAsync(userId), Guid.Empty, parentId))
+        {
+            TempData["Error"] = $"Choose a parent from the list. Categories can be nested {Blog.Core.Services.CategoryTree.MaxDepth} levels deep.";
+            return RedirectToAction("Index");
+        }
+
         var category = new Category
         {
             Name = name,
             Slug = slug,
-            AuthorId = userId
+            AuthorId = userId,
+            ParentId = parentId
         };
 
         await _categories.CreateAsync(category);
         await _audit.LogAsync(AuditActions.CategoryCreated, "Category", null, name);
         TempData["Success"] = "Category created.";
         return RedirectToAction("Index");
+    }
+
+    /// <summary>Places a category under another one, or back at the top level.</summary>
+    [HttpPost("move/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Move(Guid id, Guid? parentId, string? q, int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var all = await _categories.GetAllAsync(userId);
+        var category = all.FirstOrDefault(c => c.Id == id);
+        if (category is null) return NotFound();
+
+        if (!Blog.Core.Services.CategoryTree.CanPlaceUnder(all, id, parentId))
+        {
+            TempData["Error"] = $"“{category.Name}” cannot go there: a category cannot sit under itself or under one of its own subcategories, and categories nest {Blog.Core.Services.CategoryTree.MaxDepth} levels deep at most.";
+            return RedirectToAction("Index", new { q, page });
+        }
+        if (category.ParentId != parentId)
+        {
+            await _categories.SetParentAsync(id, userId, parentId);
+            var under = parentId is Guid p ? all.First(c => c.Id == p).Name : null;
+            await _audit.LogAsync(AuditActions.CategoryMoved, "Category", id.ToString(), category.Name,
+                newValues: under is null ? "Moved to the top level" : $"Moved under {under}");
+            TempData["Success"] = under is null ? "Category moved to the top level." : $"Category moved under “{under}”.";
+        }
+        return RedirectToAction("Index", new { q, page });
+    }
+
+    /// <summary>The description editor for one category: shown on /category/{slug} and used as its meta description.</summary>
+    [HttpGet("describe/{id}")]
+    public async Task<IActionResult> Describe(Guid id, string? q, int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var category = await _categories.GetByIdAsync(id, userId);
+        if (category is null) return NotFound();
+        return View("~/Views/Shared/ArchiveDescription.cshtml", new Blog.Web.Models.ArchiveDescriptionModel(
+            "Category", category.Id, category.Name, $"/category/{category.Slug}", category.Description,
+            $"/admin/categories/describe/{category.Id}", "/admin/categories", q, page));
+    }
+
+    [HttpPost("describe/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Describe(Guid id, string? description, string? q, int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var category = await _categories.GetByIdAsync(id, userId);
+        if (category is null) return NotFound();
+
+        var error = Blog.Core.Services.ArchiveIntro.Validate(description);
+        if (error is not null)
+        {
+            ViewData["FieldError"] = error;
+            return View("~/Views/Shared/ArchiveDescription.cshtml", new Blog.Web.Models.ArchiveDescriptionModel(
+                "Category", category.Id, category.Name, $"/category/{category.Slug}", description,
+                $"/admin/categories/describe/{category.Id}", "/admin/categories", q, page));
+        }
+
+        var clean = Blog.Core.Services.ArchiveIntro.Normalize(description);
+        if (clean != category.Description)
+        {
+            await _categories.SetDescriptionAsync(id, userId, clean);
+            await _audit.LogAsync(AuditActions.CategoryUpdated, "Category", id.ToString(), category.Name,
+                oldValues: category.Description, newValues: clean ?? "Description removed");
+        }
+        TempData["Success"] = clean is null ? "Category description removed." : "Category description saved.";
+        return RedirectToAction("Index", new { q, page });
     }
 
     [HttpPost("delete/{id}")]

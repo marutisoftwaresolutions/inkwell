@@ -48,8 +48,24 @@ public class ImageProcessingService : IImageProcessingService
         await input.CopyToAsync(buffer);
         var bytes = buffer.ToArray();
 
-        var ext = Path.GetExtension(originalFileName).ToLowerInvariant();
-        if (string.IsNullOrEmpty(ext)) ext = ".bin";
+        // The stored extension follows the declared type, never the file name alone: "page.html" sent as
+        // a PDF is stored as .pdf, and an unknown type as .bin, so nothing uploaded is served as a page.
+        var ext = Blog.Core.Services.UploadFileTypes.SafeExtension(originalFileName, mime);
+
+        // An SVG is a document that can carry script; store only the sanitised drawing.
+        if (Blog.Core.Services.SvgSanitizer.IsSvg(originalFileName, mime) || ext == ".svg")
+        {
+            bytes = Blog.Core.Services.SvgSanitizer.Sanitize(bytes)
+                ?? throw new InvalidDataException("The SVG file could not be read as a plain SVG image.");
+            ext = ".svg";
+            mime = "image/svg+xml";
+        }
+        // The file size limit does not bound the decoded picture; refuse an oversized one before it is stored or decoded.
+        if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) && ext != ".svg") ImageGuard.Check(bytes);
+        // A file that only claims to be a picture (text renamed to .png) is not stored under a picture's name and type.
+        if ((RasterMimes.Contains(mime) || string.Equals(mime, "image/webp", StringComparison.OrdinalIgnoreCase)) && !ImageGuard.IsPicture(bytes))
+            throw new NotAPictureException();
+
         var baseName = Guid.NewGuid().ToString("N");
         int? width = null, height = null;
         var fileName = baseName + ext;

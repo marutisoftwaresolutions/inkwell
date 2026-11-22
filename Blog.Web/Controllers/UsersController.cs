@@ -51,6 +51,9 @@ public class UsersController : Controller
     }
 
     [HttpPost("invite")]
+    // Admin only, enforced here and not just by the view hiding the form: an Author who posted this by hand could
+    // otherwise create an Admin, promote themselves or disable the owner.
+    [Authorize(Policy = "AdminOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Invite(string displayName, string email, string? password, string roleName)
     {
@@ -130,6 +133,7 @@ public class UsersController : Controller
     }
 
     [HttpPost("update-role")]
+    [Authorize(Policy = "AdminOnly")]   // see Invite
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateRole(Guid userId, string roleName)
     {
@@ -153,12 +157,21 @@ public class UsersController : Controller
             oldValues: $"{{\"role\":\"{oldRole}\"}}",
             newValues: $"{{\"role\":\"{roleName}\"}}");
 
+        // A sign-in carries the role and permissions it was made with. End this user's sessions so the old role
+        // cannot be used for the rest of an eight-hour session; they sign in again and get the new one.
+        if (!string.Equals(oldRole, roleName, StringComparison.OrdinalIgnoreCase))
+        {
+            await _users.SetSessionsValidFromAsync(userId, Blog.Web.Services.DeskSessionValidator.CutOffNow());
+            Blog.Web.Services.DeskSessionValidator.Forget(HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), userId);
+        }
+
         TempData["Success"] = $"Role for {user.DisplayName ?? user.Email} updated to {roleName}.";
-        TempData["Warning"] = "If the user is currently logged in, they must log out and back in for new permissions to apply.";
+        TempData["Warning"] = "They have been signed out everywhere and will sign in again with the new role.";
         return RedirectToAction("Index");
     }
 
     [HttpPost("toggle-active")]
+    [Authorize(Policy = "AdminOnly")]   // see Invite
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleActive(Guid userId)
     {

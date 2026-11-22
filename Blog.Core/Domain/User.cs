@@ -30,6 +30,8 @@ public class User
     public string? LicenseNumber { get; set; } // e.g. "CA-OD-12345"
 
     public bool IsActive { get; set; } = true;
+    /// <summary>A sign-in (Desk cookie or API token) issued before this moment is refused. Null means no cut-off.</summary>
+    public DateTime? SessionsValidFrom { get; set; }
     public DateTime? LastLogin { get; set; }
     /// <summary>When the user turned on two-factor sign-in; null when it is off (ADR-0021). The secret is never on this type.</summary>
     public DateTime? TwoFactorEnabledAt { get; set; }

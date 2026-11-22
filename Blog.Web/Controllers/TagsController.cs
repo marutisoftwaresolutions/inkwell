@@ -65,6 +65,46 @@ public class TagsController : Controller
         return RedirectToAction("Index");
     }
 
+    /// <summary>The description editor for one tag: shown on /tag/{slug} and used as its meta description.</summary>
+    [HttpGet("describe/{id}")]
+    public async Task<IActionResult> Describe(Guid id, string? q, int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tag = await _tags.GetByIdAsync(id, userId);
+        if (tag is null) return NotFound();
+        return View("~/Views/Shared/ArchiveDescription.cshtml", new Blog.Web.Models.ArchiveDescriptionModel(
+            "Tag", tag.Id, tag.Name, $"/tag/{tag.Slug}", tag.Description,
+            $"/admin/tags/describe/{tag.Id}", "/admin/tags", q, page));
+    }
+
+    [HttpPost("describe/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Describe(Guid id, string? description, string? q, int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tag = await _tags.GetByIdAsync(id, userId);
+        if (tag is null) return NotFound();
+
+        var error = Blog.Core.Services.ArchiveIntro.Validate(description);
+        if (error is not null)
+        {
+            ViewData["FieldError"] = error;
+            return View("~/Views/Shared/ArchiveDescription.cshtml", new Blog.Web.Models.ArchiveDescriptionModel(
+                "Tag", tag.Id, tag.Name, $"/tag/{tag.Slug}", description,
+                $"/admin/tags/describe/{tag.Id}", "/admin/tags", q, page));
+        }
+
+        var clean = Blog.Core.Services.ArchiveIntro.Normalize(description);
+        if (clean != tag.Description)
+        {
+            await _tags.SetDescriptionAsync(id, userId, clean);
+            await _audit.LogAsync(AuditActions.TagUpdated, "Tag", id.ToString(), tag.Name,
+                oldValues: tag.Description, newValues: clean ?? "Description removed");
+        }
+        TempData["Success"] = clean is null ? "Tag description removed." : "Tag description saved.";
+        return RedirectToAction("Index", new { q, page });
+    }
+
     [HttpPost("delete/{id}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(Guid id)

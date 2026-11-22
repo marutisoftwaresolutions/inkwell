@@ -34,6 +34,20 @@ public class MiscApiController : ControllerBase
         _tenantContext = tenantContext;
     }
 
+    /// <summary>The API described as an OpenAPI 3.1 document, for client generators and API explorers. Public: it lists routes, never data.</summary>
+    [HttpGet("openapi.json")]
+    public IActionResult OpenApi()
+    {
+        var version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Program).Assembly)
+            ?.InformationalVersion.Split('+')[0] ?? "1";
+        // The server address is the configured canonical host, or none: the Host header is whatever a caller sent,
+        // and a cached copy naming a made-up host would send generated clients, and their keys, there.
+        var canonical = HttpContext.RequestServices.GetRequiredService<IConfiguration>()["CanonicalHost"];
+        var server = string.IsNullOrWhiteSpace(canonical) ? "" : "https://" + canonical.Trim().TrimEnd('/');
+        Response.Headers.CacheControl = "public, max-age=3600";
+        return Content(Blog.Core.Services.ApiDescription.BuildOpenApi(server, version), "application/json");
+    }
+
     [HttpGet("categories")]
     public async Task<IActionResult> GetCategories()
     {
@@ -103,6 +117,9 @@ public class MiscApiController : ControllerBase
     [Authorize(AuthenticationSchemes = Bearer)]
     public async Task<IActionResult> UpdateMe([FromBody] UpdateMeRequest req)
     {
+        // A key is for content. The account's own details change only from a signed-in session.
+        if (Blog.Web.Services.ApiKeyAuthenticator.IsKeyCaller(User))
+            return StatusCode(StatusCodes.Status403Forbidden, new { statusCode = 403, error = "An API key cannot change account details. Sign in to edit your profile." });
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var user = await _users.GetByIdAsync(userId);
         if (user == null) return NotFound();

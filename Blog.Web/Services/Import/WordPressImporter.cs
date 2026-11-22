@@ -39,8 +39,21 @@ public class WordPressImporter : IContentImporter
         // Pass A — collect the attachment id→URL map and author definitions (both needed before posts).
         var attachmentUrls = new Dictionary<string, string>();
         var authors = new List<ParsedAuthor>();
-        foreach (var el in StreamElements(filePath, "item", "author"))
+        // The channel lists every category with the category it sits under (wp:category_parent, by slug).
+        var categoryParents = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var categoryNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var el in StreamElements(filePath, "item", "author", "category"))
         {
+            if (string.Equals(el.Name.LocalName, "category", StringComparison.OrdinalIgnoreCase))
+            {
+                var nicename = Val(el, "category_nicename");
+                if (string.IsNullOrWhiteSpace(nicename)) continue;
+                categoryNames[nicename!] = Val(el, "cat_name") ?? nicename!;
+                var parentSlug = Val(el, "category_parent");
+                if (!string.IsNullOrWhiteSpace(parentSlug) && !string.Equals(parentSlug, nicename, StringComparison.OrdinalIgnoreCase))
+                    categoryParents[nicename!] = parentSlug!.Trim();
+                continue;
+            }
             if (string.Equals(el.Name.LocalName, "author", StringComparison.OrdinalIgnoreCase))
             {
                 var login = Val(el, "author_login");
@@ -99,13 +112,27 @@ public class WordPressImporter : IContentImporter
                 if (isTag) tags.Add(slug!); else if (domain.Equals("category", StringComparison.OrdinalIgnoreCase)) cats.Add(slug!);
 
                 var key = (isTag ? "t:" : "c:") + slug;
-                if (seenTerms.Add(key))
-                    yield return new ParsedRecord
-                    {
-                        Type = isTag ? ImportItemType.Tag : ImportItemType.Category,
-                        Ordinal = isTag ? 2 : 1, SourceId = slug!, Title = name,
-                        Payload = new ParsedTerm { Name = name!, Slug = slug!, IsTag = isTag }
-                    };
+                if (isTag)
+                {
+                    if (seenTerms.Add(key))
+                        yield return new ParsedRecord
+                        {
+                            Type = ImportItemType.Tag, Ordinal = 2, SourceId = slug!, Title = name,
+                            Payload = new ParsedTerm { Name = name!, Slug = slug!, IsTag = true }
+                        };
+                    continue;
+                }
+                if (!domain.Equals("category", StringComparison.OrdinalIgnoreCase)) continue;
+
+                // A category brings the categories above it along, parents first, so the tree can be rebuilt
+                // even when no imported post is filed under the parent itself.
+                foreach (var (termSlug, termName) in WithAncestors(slug!, name!, categoryParents, categoryNames))
+                    if (seenTerms.Add("c:" + termSlug))
+                        yield return new ParsedRecord
+                        {
+                            Type = ImportItemType.Category, Ordinal = 1, SourceId = termSlug, Title = termName,
+                            Payload = new ParsedTerm { Name = termName, Slug = termSlug, IsTag = false, ParentSlug = categoryParents.GetValueOrDefault(termSlug) }
+                        };
             }
 
             var postId = Val(el, "post_id") ?? Guid.NewGuid().ToString();
@@ -173,6 +200,22 @@ public class WordPressImporter : IContentImporter
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>A category and the categories above it, topmost first. Stops at a missing parent, a loop, or ten levels.</summary>
+    public static List<(string Slug, string Name)> WithAncestors(string slug, string name,
+        IReadOnlyDictionary<string, string> parents, IReadOnlyDictionary<string, string> names)
+    {
+        var chain = new List<(string Slug, string Name)> { (slug, name) };
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { slug };
+        var at = slug;
+        while (chain.Count < 10 && parents.TryGetValue(at, out var parent) && seen.Add(parent))
+        {
+            chain.Add((parent, names.TryGetValue(parent, out var parentName) ? parentName : parent));
+            at = parent;
+        }
+        chain.Reverse();
+        return chain;
+    }
 
     private static IEnumerable<XElement> StreamElements(string filePath, params string[] localNames)
     {

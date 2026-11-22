@@ -332,8 +332,15 @@ textarea.form-control {
 }
 
 
+/* ── Desk: the area a crop will keep (Media → Details), and the parent picker in the Categories list ── */
+.desk-crop-outline { position: absolute; border: 2px solid var(--primary); box-shadow: 0 0 0 1px var(--background); background: color-mix(in srgb, var(--primary) 12%, transparent); pointer-events: none; }
+.desk-crop-outline[hidden] { display: none; }
+.desk-parent-select { min-width: 9rem; }
+.desk-crop-stage { touch-action: pan-y; cursor: crosshair; user-select: none; }
+
 /* ── Desk: tables scroll sideways instead of clipping the Actions column ─────────── */
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+/* position: relative keeps visually-hidden labels (absolutely positioned) inside the scroller, so a wide table never widens the page. */
+.table-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 .table-scroll > table { min-width: 100%; }
 @media (max-width: 767px) {
   /* First column stays put while the rest scrolls, so the row identity is always visible. */
@@ -367,6 +374,8 @@ textarea.form-control {
   color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
   background: color-mix(in srgb, var(--warning) 14%, transparent);
 }
+/* The pill carries the hidden attribute until something changes. Display rules (this one, .flex, .desk-pill) outrank that attribute, so say it outright. */
+[data-dirty-indicator][hidden] { display: none !important; }
 [data-dirty-indicator]::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }
 
 /* ── Desk: status tokens and tone/pill utilities (both colour schemes) ───────────── */
@@ -609,3 +618,17 @@ html .editor-preview pre, html .editor-preview-side pre { padding: .8em 1em; bor
 .cal-published { border-left: 3px solid var(--success); }
 .cal-scheduled { border-left: 3px solid var(--info); }
 .cal-planned   { border-left: 3px dashed var(--warning); }
+
+/* Setup wizard: the "Start with" choice (starter sites). */
+.setup-card fieldset.form-group { border: 0; padding: 0; margin: 0 0 1.25rem; text-align: left; }
+.setup-card fieldset.form-group legend { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; padding: 0; }
+.setup-card .field-help { font-size: 0.8rem; opacity: 0.8; margin: 0 0 0.6rem; line-height: 1.5; }
+.setup-card .starter-option { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.55rem 0.7rem; border: 1px solid var(--color-border, var(--border)); border-radius: 6px; margin-bottom: 0.4rem; cursor: pointer; font-weight: 400; font-size: 0.875rem; line-height: 1.45; }
+.setup-card .starter-option input { margin-top: 0.2rem; flex: none; }
+.setup-card .starter-option:has(input:checked) { border-color: currentColor; }
+.setup-card .starter-option:focus-within { outline: 2px solid currentColor; outline-offset: 1px; }
+.setup-card .starter-option strong { display: block; }
+
+/* Maintenance-mode notice above every Desk page title (tokens only, so both schemes apply). */
+.desk-maintenance { margin: 0 0 1rem; padding: .625rem .875rem; border: 1px solid var(--warning); border-radius: .5rem; font-size: .875rem; line-height: 1.5; color: var(--foreground); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.desk-maintenance a { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; color: inherit; white-space: nowrap; }

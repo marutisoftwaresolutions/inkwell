@@ -112,6 +112,20 @@ public class SettingsController : Controller
             BingSiteVerification = globalSettings.BingSiteVerification,
             IndexNowEnabled = globalSettings.IndexNowEnabled,
             IndexNowApiKey = globalSettings.IndexNowApiKey,
+            McpEnabled = globalSettings.McpEnabled,
+            NewsletterDraftOnPublish = globalSettings.NewsletterDraftOnPublish,
+            ShareLinksEnabled = globalSettings.ShareLinksEnabled,
+            MaintenanceModeEnabled = globalSettings.MaintenanceModeEnabled,
+            MaintenanceMessage = globalSettings.MaintenanceMessage,
+            CommentNotifyEnabled = globalSettings.CommentNotifyEnabled,
+            CommentNotifyEmails = globalSettings.CommentNotifyEmails,
+            ContactButtonKind = Blog.Core.Services.ContactButton.NormalizeKind(globalSettings.ContactButtonKind),
+            ContactButtonValue = globalSettings.ContactButtonValue,
+            ContactButtonLabel = globalSettings.ContactButtonLabel,
+            CodeInjectionHead = globalSettings.CodeInjectionHead,
+            CodeInjectionFoot = globalSettings.CodeInjectionFoot,
+            CustomCss = globalSettings.CustomCss,
+            CodeInjectionNeedsConsent = globalSettings.CodeInjectionNeedsConsent,
             ErrorNotificationsEnabled = globalSettings.ErrorNotificationsEnabled,
             ErrorNotificationEmails = globalSettings.ErrorNotificationEmails,
             SocialTwitter = globalSettings.SocialTwitter,
@@ -180,7 +194,53 @@ public class SettingsController : Controller
         var country = (model.Country ?? "").Trim().ToUpperInvariant();
         if (!await HttpContext.RequestServices.GetRequiredService<Blog.Web.Services.DateSettingsCatalog>().IsKnownCountryAsync(country))
             ModelState.AddModelError(nameof(model.Country), "Pick a country from the list, or leave it unset.");
+
+        // Contact button, comment emails and custom code are checked before anything is stored, so a
+        // typo comes back to its field instead of producing a dead link or a notice that never arrives.
+        var config = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+        var contactKind = Blog.Core.Services.ContactButton.NormalizeKind(model.ContactButtonKind);
+        if (Blog.Core.Services.ContactButton.Validate(contactKind, model.ContactButtonValue) is { } contactError)
+            ModelState.AddModelError(nameof(model.ContactButtonValue), contactError);
+        var notifyEntries = (model.CommentNotifyEmails ?? "")
+            .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (notifyEntries.Any(a => !Blog.Core.Services.CommentNotice.LooksLikeAddress(a)))
+            ModelState.AddModelError(nameof(model.CommentNotifyEmails), "One of these is not an email address. Separate addresses with commas.");
+        else if (notifyEntries.Length > Blog.Core.Services.CommentNotice.MaxRecipients)
+            ModelState.AddModelError(nameof(model.CommentNotifyEmails), $"Enter at most {Blog.Core.Services.CommentNotice.MaxRecipients} addresses.");
+        // Only an Admin changes custom code, and only where the host allows it; anyone else's save leaves it as it was.
+        var codeEditable = model.CodePosted && User.IsInRole("Admin") && HostSwitches.CodeInjectionAllowed(config, _tenantContext);
+        if (codeEditable)
+        {
+            var limit = Blog.Core.Services.CodeInjection.MaxLength.ToString("N0");
+            if (Blog.Core.Services.CodeInjection.TooLong(model.CodeInjectionHead))
+                ModelState.AddModelError(nameof(model.CodeInjectionHead), $"The head code is longer than {limit} characters. Shorten it, or load it from a file.");
+            if (Blog.Core.Services.CodeInjection.TooLong(model.CodeInjectionFoot))
+                ModelState.AddModelError(nameof(model.CodeInjectionFoot), $"The foot code is longer than {limit} characters. Shorten it, or load it from a file.");
+            if (Blog.Core.Services.CodeInjection.TooLong(model.CustomCss))
+                ModelState.AddModelError(nameof(model.CustomCss), $"The CSS is longer than {limit} characters. Shorten it.");
+        }
         if (!ModelState.IsValid) return View("Index", model);
+
+        globalSettings.ContactButtonKind = contactKind;
+        globalSettings.ContactButtonValue = contactKind.Length == 0 ? string.Empty : (model.ContactButtonValue ?? string.Empty).Trim();
+        globalSettings.ContactButtonLabel = Blog.Core.Services.ContactButton.CleanLabel(model.ContactButtonLabel);
+        globalSettings.CommentNotifyEnabled = model.CommentNotifyEnabled;
+        globalSettings.CommentNotifyEmails = string.Join(", ", notifyEntries);
+        var maintenanceBefore = globalSettings.MaintenanceModeEnabled;
+        if (HostSwitches.MaintenanceModeAllowed(config))
+        {
+            globalSettings.MaintenanceModeEnabled = model.MaintenanceModeEnabled;
+            globalSettings.MaintenanceMessage = Blog.Core.Services.MaintenanceMode.CleanMessage(model.MaintenanceMessage);
+        }
+        string? codeBefore = null;
+        if (codeEditable)
+        {
+            codeBefore = Blog.Core.Services.CodeInjection.AuditSnapshot(globalSettings);
+            globalSettings.CodeInjectionHead = Blog.Core.Services.CodeInjection.Clean(model.CodeInjectionHead);
+            globalSettings.CodeInjectionFoot = Blog.Core.Services.CodeInjection.Clean(model.CodeInjectionFoot);
+            globalSettings.CustomCss = Blog.Core.Services.CodeInjection.Clean(model.CustomCss);
+            globalSettings.CodeInjectionNeedsConsent = model.CodeInjectionNeedsConsent;
+        }
         globalSettings.DisplayTimeZoneId = tz;
         globalSettings.Country = country;
         globalSettings.DateLocale = dateLocale;
@@ -226,6 +286,9 @@ public class SettingsController : Controller
         // IndexNow: keep only valid key chars (a-z A-Z 0-9 and dash, per the IndexNow spec).
         // Auto-generate a compliant 32-char key when enabling without one, so the operator never
         // has to hand-craft it. Clearing the key disables discovery even if the box stays checked.
+        globalSettings.McpEnabled = model.McpEnabled;
+        globalSettings.NewsletterDraftOnPublish = model.NewsletterDraftOnPublish;
+        globalSettings.ShareLinksEnabled = model.ShareLinksEnabled;
         globalSettings.IndexNowEnabled = model.IndexNowEnabled;
         var indexNowKey = new string((model.IndexNowApiKey ?? string.Empty).Trim()
             .Where(c => char.IsLetterOrDigit(c) || c == '-').ToArray());
@@ -293,6 +356,17 @@ public class SettingsController : Controller
 
         await _settings.SaveSettingsAsync(targetId, globalSettings);
         await _audit.LogAsync(AuditActions.SettingsUpdated, "Settings", targetId.ToString(), "Site Settings");
+        // The holding page follows the switch at once on this instance (another instance follows within half a minute).
+        HttpContext.RequestServices.GetRequiredService<MaintenanceGate>().Forget();
+        if (maintenanceBefore != globalSettings.MaintenanceModeEnabled)
+            await _audit.LogAsync(globalSettings.MaintenanceModeEnabled ? AuditActions.SettingsMaintenanceOn : AuditActions.SettingsMaintenanceOff,
+                "Settings", targetId.ToString(), globalSettings.MaintenanceModeEnabled ? "Maintenance mode on: readers see the holding page" : "Maintenance mode off: the site is open");
+        if (codeBefore is not null)
+        {
+            var codeAfter = Blog.Core.Services.CodeInjection.AuditSnapshot(globalSettings);
+            if (codeAfter != codeBefore)
+                await _audit.LogAsync(AuditActions.SettingsSiteCodeChanged, "Settings", targetId.ToString(), "Custom code and CSS", oldValues: codeBefore, newValues: codeAfter);
+        }
         if (nowConfigured && (!wasConfigured || !string.IsNullOrWhiteSpace(model.SearchConsoleServiceAccountJson)))
             await _audit.LogAsync(AuditActions.SettingsSearchConsoleConnected, "Settings", targetId.ToString(),
                 $"{globalSettings.SearchConsoleProperty} as {globalSettings.SearchConsoleClientEmail}");

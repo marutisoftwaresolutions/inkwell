@@ -13,12 +13,12 @@ public class CategoryRepository : ICategoryRepository
     {
         using var conn = _ctx.CreateConnection();
         var sql = @"
-            SELECT c.Id, c.Name, c.Slug, c.AuthorId, COUNT(pc.PostId) as PostCount
+            SELECT c.Id, c.Name, c.Slug, c.AuthorId, c.ParentId, c.Description, COUNT(p.Id) as PostCount
             FROM Categories c
             LEFT JOIN PostCategories pc ON pc.CategoryId = c.Id
-            LEFT JOIN Posts p ON p.Id = pc.PostId AND p.Status = 'Published'
+            LEFT JOIN Posts p ON p.Id = pc.PostId AND p.Status = 'Published' AND (p.Visibility IS NULL OR p.Visibility <> 'unlisted')
             " + (authorId == Guid.Empty ? "" : "WHERE c.AuthorId = @AuthorId ") + @"
-            GROUP BY c.Id, c.Name, c.Slug, c.AuthorId
+            GROUP BY c.Id, c.Name, c.Slug, c.AuthorId, c.ParentId, c.Description
             ORDER BY c.Name";
         return (await conn.QueryAsync<Category>(sql, new { AuthorId = authorId })).ToList();
     }
@@ -31,12 +31,12 @@ public class CategoryRepository : ICategoryRepository
     {
         using var conn = _ctx.CreateConnection();
         var sql = @"
-            SELECT c.Id, c.Name, c.Slug, c.AuthorId, COUNT(p.Id) as PostCount
+            SELECT c.Id, c.Name, c.Slug, c.AuthorId, c.ParentId, c.Description, COUNT(p.Id) as PostCount
             FROM Categories c
             INNER JOIN PostCategories pc ON pc.CategoryId = c.Id
-            INNER JOIN Posts p ON p.Id = pc.PostId AND p.Status = 'Published'
+            INNER JOIN Posts p ON p.Id = pc.PostId AND p.Status = 'Published' AND (p.Visibility IS NULL OR p.Visibility <> 'unlisted')
             " + (authorId == Guid.Empty ? "" : "WHERE c.AuthorId = @AuthorId ") + @"
-            GROUP BY c.Id, c.Name, c.Slug, c.AuthorId
+            GROUP BY c.Id, c.Name, c.Slug, c.AuthorId, c.ParentId, c.Description
             ORDER BY c.Name";
         return (await conn.QueryAsync<Category>(sql, new { AuthorId = authorId })).ToList();
     }
@@ -60,10 +60,10 @@ public class CategoryRepository : ICategoryRepository
         using var conn = _ctx.CreateConnection();
         if (category.Id == Guid.Empty) category.Id = Guid.NewGuid();
         return await conn.ExecuteScalarAsync<Guid>(@"
-            INSERT INTO Categories (Id, Name, Slug, AuthorId)
+            INSERT INTO Categories (Id, Name, Slug, AuthorId, ParentId)
             OUTPUT INSERTED.Id
-            VALUES (@Id, @Name, @Slug, @AuthorId)",
-            new { category.Id, category.Name, category.Slug, category.AuthorId });
+            VALUES (@Id, @Name, @Slug, @AuthorId, @ParentId)",
+            new { category.Id, category.Name, category.Slug, category.AuthorId, category.ParentId });
     }
 
     public async Task UpdateAsync(Category category)
@@ -74,10 +74,27 @@ public class CategoryRepository : ICategoryRepository
             new { category.Name, category.Slug, category.Id, category.AuthorId });
     }
 
+    public async Task SetParentAsync(Guid id, Guid authorId, Guid? parentId)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Categories SET ParentId = @parentId WHERE Id = @id AND AuthorId = @authorId", new { id, authorId, parentId });
+    }
+
+    public async Task SetDescriptionAsync(Guid id, Guid authorId, string? description)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Categories SET Description = @description WHERE Id = @id AND AuthorId = @authorId", new { id, authorId, description });
+    }
+
     public async Task DeleteAsync(Guid id, Guid authorId)
     {
         using var conn = _ctx.CreateConnection();
-        await conn.ExecuteAsync("DELETE FROM Categories WHERE Id = @Id AND AuthorId = @AuthorId", new { Id = id, AuthorId = authorId });
+        // The categories beneath it move up to where it was, so none is left pointing at a category that is gone.
+        await conn.ExecuteAsync(@"
+            UPDATE child SET child.ParentId = gone.ParentId
+            FROM Categories child INNER JOIN Categories gone ON gone.Id = child.ParentId
+            WHERE gone.Id = @Id AND gone.AuthorId = @AuthorId;
+            DELETE FROM Categories WHERE Id = @Id AND AuthorId = @AuthorId;", new { Id = id, AuthorId = authorId });
     }
 
     public async Task<bool> SlugExistsAsync(string slug, Guid authorId, Guid? excludeId = null)

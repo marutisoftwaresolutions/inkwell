@@ -79,7 +79,7 @@ public class ErrorLogRepository : IErrorLogRepository
         var row = await conn.QuerySingleAsync<ErrorStats>(@"
             SELECT
                 COUNT(1)                                                         AS TotalGroups,
-                ISNULL(SUM(OccurrenceCount), 0)                                  AS TotalOccurrences,
+                COALESCE(SUM(OccurrenceCount), 0)                                  AS TotalOccurrences,
                 SUM(CASE WHEN StatusCode = 404 THEN 1 ELSE 0 END)                AS NotFoundGroups,
                 SUM(CASE WHEN StatusCode >= 500 THEN 1 ELSE 0 END)               AS ServerErrorGroups
             FROM ErrorLogs;");

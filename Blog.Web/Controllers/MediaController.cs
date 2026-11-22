@@ -94,6 +94,30 @@ public class MediaController : Controller
         return View(items);
     }
 
+    /// <summary>How many files the unused report lists at most; it says so when it reaches the limit.</summary>
+    public const int UnusedReportSize = 200;
+
+    /// <summary>
+    /// Files nothing on the site points at, so the library can be tidied. A file is listed only when it is in no
+    /// post, page, site setting, theme setting or profile photo. It cannot know about links from other sites or
+    /// from newsletters already sent, and says so. Read-only: deleting is the library's own delete, one file at a time.
+    /// </summary>
+    [HttpGet("unused")]
+    public async Task<IActionResult> Unused()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        List<Media> items;
+        try { items = await _media.GetUnusedAsync(userId, UnusedReportSize); }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unused media report failed");
+            TempData["Error"] = "The report took too long on this library. Nothing was changed.";
+            return RedirectToAction(nameof(Index));
+        }
+        ViewBag.Limit = UnusedReportSize;
+        return View(items);
+    }
+
     [HttpPost("upload")]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600, ValueLengthLimit = 104857600)]
@@ -114,7 +138,8 @@ public class MediaController : Controller
 
             // Save under wwwroot/uploads/{folder}/{yyyy-MM}. Raster images are auto-converted to WebP
             // (with dimensions captured) by the shared IImageProcessingService — the same code path the
-            // content importer uses. Non-image types and SVG/WebP pass through unchanged.
+            // content importer uses. SVG is sanitised (SvgSanitizer); other non-raster types pass through, stored
+            // under the extension that belongs to their declared type (UploadFileTypes).
             var safeFolder = NormalizeFolder(folder, "images");
             var relativeMonthDir = DateTime.UtcNow.ToString("yyyy-MM");
             var subdir = $"{safeFolder}/{relativeMonthDir}";
@@ -150,6 +175,18 @@ public class MediaController : Controller
             await _audit.LogAsync(AuditActions.MediaUploaded, "Media", media.Id.ToString(), file.FileName);
             return Ok(new { id = media.Id, url = media.Url, fileName = media.FileName });
         }
+        catch (ImageTooLargeException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (NotAPictureException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidDataException)
+        {
+            return BadRequest(new { error = "That SVG could not be read. Export it as a plain SVG and try again, or upload a PNG." });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Media upload failed");
@@ -160,7 +197,7 @@ public class MediaController : Controller
 
     [HttpPost("delete/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id, [FromForm] string? folder, [FromForm] string? q, [FromForm] int page = 1)
+    public async Task<IActionResult> Delete(Guid id, [FromForm] string? folder, [FromForm] string? q, [FromForm] int page = 1, [FromForm] string? returnTo = null)
     {
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
@@ -204,6 +241,9 @@ public class MediaController : Controller
         }
         TempData["Success"] = "File deleted.";
 
+        // Someone clearing the unused-files report stays on the report.
+        if (returnTo == "unused") return RedirectToAction(nameof(Unused));
+
         // Back to the same folder tab, search and page the user deleted from.
         var folderKey = NormalizeFolder(folder);
         return RedirectToAction("Index", new
@@ -223,7 +263,7 @@ public class MediaController : Controller
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var item = await _media.GetByIdAsync(id, userId);
-        if (item == null || !item.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        if (item == null) return NotFound();   // images get alt text, caption, crop and replace; other files get replace
         ViewData["MediaFolder"] = NormalizeFolder(folder);
         ViewData["MediaQuery"] = q;
         ViewData["MediaPage"] = page;
@@ -269,6 +309,225 @@ public class MediaController : Controller
             q = string.IsNullOrWhiteSpace(q) ? null : q.Trim(),
             page = page > 1 ? page : (int?)null
         });
+    }
+
+    // ── Crop and replace ───────────────────────────────────────────────────
+
+    private static readonly HashSet<string> RasterExtensions = new(StringComparer.OrdinalIgnoreCase) { ".webp", ".jpg", ".jpeg", ".png", ".gif" };
+    private static readonly HashSet<string> RasterUploadMimes = new(StringComparer.OrdinalIgnoreCase) { "image/jpeg", "image/png", "image/gif", "image/webp" };
+
+    private IActionResult BackToDetails(Guid id, string? folder, string? q, int page)
+    {
+        var folderKey = NormalizeFolder(folder);
+        return RedirectToAction(nameof(Details), new
+        {
+            id,
+            folder = folderKey.Length > 0 ? folderKey : null,
+            q = string.IsNullOrWhiteSpace(q) ? null : q.Trim(),
+            page = page > 1 ? page : (int?)null
+        });
+    }
+
+    /// <summary>The folder under uploads a file sits in ("images/2026-11"), so a cropped copy lands beside its original.</summary>
+    private static string SubdirOf(string url)
+    {
+        const string prefix = "/uploads/";
+        var slash = url.LastIndexOf('/');
+        var dir = url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && slash > prefix.Length ? url[prefix.Length..slash] : "";
+        return dir.Length > 0 && !dir.Contains("..", StringComparison.Ordinal) ? dir : "images/" + DateTime.UtcNow.ToString("yyyy-MM");
+    }
+
+    /// <summary>
+    /// Cuts a rectangle out of an image and saves it as a NEW library file. The original and every post
+    /// that uses it are untouched, so a crop can never change what readers already see.
+    /// </summary>
+    [HttpPost("details/{id:guid}/crop")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Crop(Guid id, [FromForm] int x, [FromForm] int y, [FromForm] int width, [FromForm] int height,
+        [FromForm] string? folder, [FromForm] string? q, [FromForm] int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var item = await _media.GetByIdAsync(id, userId);
+        if (item == null) return NotFound();
+
+        var source = _responsive.FileOf(item.Url);
+        if (source is null || !System.IO.File.Exists(source) || !RasterExtensions.Contains(Path.GetExtension(source)))
+        {
+            TempData["Error"] = "This file cannot be cropped. Cropping works on JPEG, PNG, GIF and WebP pictures stored in the library.";
+            return BackToDetails(id, folder, q, page);
+        }
+
+        try
+        {
+            ImageGuard.Check(source);
+            using var image = await SixLabors.ImageSharp.Image.LoadAsync(source);
+            if (Blog.Core.Services.ImageCrop.Clamp(image.Width, image.Height, x, y, width, height) is not { } rect)
+            {
+                TempData["Error"] = $"Choose an area inside the picture, at least {Blog.Core.Services.ImageCrop.MinSide} pixels on each side and smaller than the whole picture ({image.Width} × {image.Height}).";
+                return BackToDetails(id, folder, q, page);
+            }
+
+            SixLabors.ImageSharp.Processing.ProcessingExtensions.Mutate(image, c =>
+                SixLabors.ImageSharp.Processing.CropExtensions.Crop(c, new SixLabors.ImageSharp.Rectangle(rect.X, rect.Y, rect.Width, rect.Height)));
+
+            // Through the same pipeline as an upload: stored as WebP, dimensions captured, responsive copies made.
+            using var png = new MemoryStream();
+            await SixLabors.ImageSharp.ImageExtensions.SaveAsPngAsync(image, png);
+            png.Position = 0;
+            var originalName = string.IsNullOrEmpty(item.OriginalFileName) ? item.FileName : item.OriginalFileName;
+            var copyName = Path.GetFileNameWithoutExtension(originalName) + $" (cropped {rect.Width}x{rect.Height}).png";
+            var saved = await _imageProcessing.SaveImageAsync(png, copyName, "image/png", SubdirOf(item.Url), convertToWebp: true);
+            await _responsive.EnsureVariantsAsync(saved.RelativeUrl, CancellationToken.None);
+
+            var copy = new Media
+            {
+                FileName = saved.FileName,
+                OriginalFileName = Path.ChangeExtension(copyName, Path.GetExtension(saved.FileName)),
+                FilePath = saved.RelativeUrl,
+                Url = saved.RelativeUrl,
+                ContentType = saved.ContentType,
+                FileSize = saved.FileSize,
+                Width = saved.Width ?? rect.Width,
+                Height = saved.Height ?? rect.Height,
+                UploadedBy = userId,
+            };
+            copy.Id = await _media.CreateAsync(copy);
+            if (item.AltText is not null || item.Caption is not null)
+                await _media.UpdateDetailsAsync(copy.Id, userId, item.AltText, item.Caption);
+
+            await _audit.LogAsync(AuditActions.MediaUploaded, "Media", copy.Id.ToString(), copy.OriginalFileName,
+                newValues: $"Cropped from {originalName}: {rect.Width} × {rect.Height} at {rect.X}, {rect.Y}");
+            TempData["Success"] = "Cropped copy saved. The original is unchanged.";
+            return BackToDetails(copy.Id, folder, q, 1);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Crop failed for media {Id}", id);
+            TempData["Error"] = ex is ImageTooLargeException ? ex.Message + " Nothing was cropped." : "The picture could not be read, so nothing was cropped.";
+            return BackToDetails(id, folder, q, page);
+        }
+    }
+
+    /// <summary>
+    /// Puts a new file behind an existing library entry. The address stays the same, so every post and
+    /// page that uses the image shows the new one. The new file must be the same kind (a picture for a
+    /// picture, an SVG for an SVG) because the address carries the type. The old file is not kept.
+    /// </summary>
+    [HttpPost("details/{id:guid}/replace")]
+    [RequestSizeLimit(MaxUploadBytes + 1024 * 1024)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Replace(Guid id, [FromForm] IFormFile? file, [FromForm] string? folder, [FromForm] string? q, [FromForm] int page = 1)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var item = await _media.GetByIdAsync(id, userId);
+        if (item == null) return NotFound();
+
+        if (file == null || file.Length == 0) { TempData["Error"] = "Choose the new file first."; return BackToDetails(id, folder, q, page); }
+        if (file.Length > MaxUploadBytes) { TempData["Error"] = $"The file is larger than {MaxUploadMegabytes} MB."; return BackToDetails(id, folder, q, page); }
+
+        var target = _responsive.FileOf(item.Url);
+        if (target is null || !System.IO.File.Exists(target))
+        {
+            TempData["Error"] = "The stored file could not be found, so it cannot be replaced. Upload the new file as a new image instead.";
+            return BackToDetails(id, folder, q, page);
+        }
+
+        var ext = Path.GetExtension(target);
+        var isSvgTarget = ext.Equals(".svg", StringComparison.OrdinalIgnoreCase);
+        var temp = target + "." + Guid.NewGuid().ToString("N")[..8] + ".replacing";   // unique: two replaces of one file never share it
+        var moved = false;
+        try
+        {
+            int? width = null, height = null;
+            if (isSvgTarget)
+            {
+                if (!Blog.Core.Services.SvgSanitizer.IsSvg(file.FileName, file.ContentType))
+                {
+                    TempData["Error"] = "This file is an SVG, so replace it with another SVG. To use a photo instead, upload it as a new image.";
+                    return BackToDetails(id, folder, q, page);
+                }
+                using var buffer = new MemoryStream();
+                await file.CopyToAsync(buffer);
+                var clean = Blog.Core.Services.SvgSanitizer.Sanitize(buffer.ToArray());
+                if (clean is null)
+                {
+                    TempData["Error"] = "That SVG could not be read. Export it as a plain SVG and try again.";
+                    return BackToDetails(id, folder, q, page);
+                }
+                await System.IO.File.WriteAllBytesAsync(temp, clean);
+            }
+            else if (RasterExtensions.Contains(ext) && RasterUploadMimes.Contains(file.ContentType))
+            {
+                // Decoded and re-encoded in the stored file's own format, so the address and its type stay true.
+                using var incoming = new MemoryStream();
+                await file.CopyToAsync(incoming);
+                var incomingBytes = incoming.ToArray();
+                ImageGuard.Check(incomingBytes);
+                using var image = SixLabors.ImageSharp.Image.Load(incomingBytes);
+                width = image.Width; height = image.Height;
+                await using var output = System.IO.File.Create(temp);
+                var formats = image.Configuration.ImageFormatsManager;
+                if (!formats.TryFindFormatByFileExtension(ext.TrimStart('.'), out var format)) throw new InvalidDataException("No encoder for " + ext);
+                await image.SaveAsync(output, formats.GetEncoder(format));
+            }
+            else if (RasterExtensions.Contains(ext))
+            {
+                TempData["Error"] = "Replace this picture with a JPEG, PNG, GIF or WebP file. To change the kind of file, upload it as a new one.";
+                return BackToDetails(id, folder, q, page);
+            }
+            else if (AllowedMimes.Contains(file.ContentType)
+                     && string.Equals(Blog.Core.Services.UploadFileTypes.SafeExtension(file.FileName, file.ContentType), ext, StringComparison.OrdinalIgnoreCase))
+            {
+                // A document or a video: the new file must be the same kind, judged by its declared type as on upload,
+                // because the address ends in that type. Stored as sent.
+                await using var output = System.IO.File.Create(temp);
+                await file.CopyToAsync(output);
+            }
+            else
+            {
+                TempData["Error"] = $"This file is a {ext.TrimStart('.').ToUpperInvariant()} file, so replace it with another one of the same kind. To change the kind of file, upload it as a new one.";
+                return BackToDetails(id, folder, q, page);
+            }
+
+            System.IO.File.Move(temp, target, overwrite: true);
+            moved = true;
+
+            // From here the file HAS changed, so it is audited first; the tidying after it may fail without undoing that.
+            var before = new { item.FileSize, item.Width, item.Height };
+            var size = new FileInfo(target).Length;
+            await _audit.LogAsync(AuditActions.MediaUpdated, "Media", id.ToString(), item.FileName,
+                oldValues: System.Text.Json.JsonSerializer.Serialize(before),
+                newValues: System.Text.Json.JsonSerializer.Serialize(new { FileSize = size, Width = width, Height = height, ReplacedWith = Path.GetFileName(file.FileName) }));
+            TempData["Success"] = "File replaced. Pages that use it now point at the new file; a browser that has the old one saved may need a refresh.";
+
+            // The narrower copies were made from the old picture: remove them and make new ones.
+            foreach (var w in Blog.Core.Services.ResponsiveImages.VariantWidths)
+                if (_responsive.FileOf(Blog.Core.Services.ResponsiveImages.VariantPath(item.Url, w)) is { } copy && System.IO.File.Exists(copy))
+                    try { System.IO.File.Delete(copy); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Responsive copy {Copy} could not be deleted.", copy); }
+            _responsive.Forget(item.Url);
+            await _responsive.EnsureVariantsAsync(item.Url, CancellationToken.None);
+            await _media.UpdateFileAsync(id, userId, size, width, height);
+        }
+        catch (ImageTooLargeException ex)
+        {
+            TempData["Error"] = ex.Message + " Nothing was replaced.";
+        }
+        catch (SixLabors.ImageSharp.UnknownImageFormatException)
+        {
+            TempData["Error"] = "That file is not a picture this site can read. Nothing was replaced.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Replace failed for media {Id}", id);
+            if (moved) TempData["Warning"] = "The file was replaced, but its details could not be refreshed. Open it again in a moment; if the size shown is still the old one, replace it once more.";
+            else TempData["Error"] = "The new file could not be stored, so the old one is still in place.";
+        }
+        finally
+        {
+            try { if (System.IO.File.Exists(temp)) System.IO.File.Delete(temp); } catch { /* a leftover temp file is harmless */ }
+        }
+        return BackToDetails(id, folder, q, page);
     }
 
     [HttpGet("api")]

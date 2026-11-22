@@ -1,11 +1,11 @@
 -- =============================================================================
 -- init.sql  —  Inkwell Complete Database Schema
--- Version : 1.0.9 (2026-10-25)
+-- Version : 1.1.0 (2026-11-22)
 -- Target  : SQL Server 2019+ / Azure SQL
 -- Usage   : Run once on a fresh database. Every block is idempotent (IF NOT
 --           EXISTS) so it is safe to re-run against an existing database.
--- Note    : MigrationService.cs also applies this schema on startup, so a
---           manual run is optional for self-hosted installs.
+-- Note    : The app applies this same file on first start when the database is
+--           empty, so a manual run is optional for self-hosted installs.
 -- =============================================================================
 
 PRINT '==========================================================';
@@ -1227,6 +1227,49 @@ BEGIN
     PRINT '  [+] Users.TwoFactorLastStep added.';
 END
 
+-- Users: sign-ins made before this moment are refused ("Sign out everywhere", password change).
+IF COL_LENGTH('Users', 'SessionsValidFrom') IS NULL
+BEGIN
+    ALTER TABLE Users ADD SessionsValidFrom DATETIME2 NULL;
+    PRINT '  [+] Users.SessionsValidFrom added.';
+END
+
+-- Members: how many welcome-sequence emails this subscriber has been sent (DBScripts/2026-11-12_add-welcome-sequence.sql).
+IF COL_LENGTH('Members', 'WelcomeStepsSent') IS NULL
+BEGIN
+    ALTER TABLE Members ADD WelcomeStepsSent INT NOT NULL CONSTRAINT DF_Members_WelcomeStepsSent DEFAULT 0;
+    PRINT '  [+] Members.WelcomeStepsSent added.';
+END
+
+-- Members: the page a sign-up came from (DBScripts/2026-11-12_add-source-path-to-members.sql).
+IF COL_LENGTH('Members', 'SourcePath') IS NULL
+BEGIN
+    ALTER TABLE Members ADD SourcePath NVARCHAR(200) NULL;
+    PRINT '  [+] Members.SourcePath added.';
+END
+
+-- Categories: a category can sit under another (DBScripts/2026-11-13_add-parent-to-categories.sql).
+-- Kept before the description below: columns are added in the order an upgraded install received them,
+-- so a fresh database and an upgraded one have the same column order.
+IF COL_LENGTH('Categories', 'ParentId') IS NULL
+BEGIN
+    ALTER TABLE Categories ADD ParentId UNIQUEIDENTIFIER NULL;
+    PRINT '  [+] Categories.ParentId added.';
+END
+
+-- Categories and Tags: optional description shown on the archive page and used as its meta
+-- description (DBScripts/2026-11-21_add-description-to-categories-and-tags.sql).
+IF COL_LENGTH('Categories', 'Description') IS NULL
+BEGIN
+    ALTER TABLE Categories ADD Description NVARCHAR(600) NULL;
+    PRINT '  [+] Categories.Description added.';
+END
+IF COL_LENGTH('Tags', 'Description') IS NULL
+BEGIN
+    ALTER TABLE Tags ADD Description NVARCHAR(600) NULL;
+    PRINT '  [+] Tags.Description added.';
+END
+
 -- Posts Markdown authoring (DBScripts/2026-10-05_add-markdown-to-posts.sql, ADR-0022).
 IF COL_LENGTH('Posts', 'Markdown') IS NULL
 BEGIN
@@ -1244,6 +1287,13 @@ IF COL_LENGTH('Posts', 'CustomFieldsJson') IS NULL
 BEGIN
     ALTER TABLE Posts ADD CustomFieldsJson NVARCHAR(MAX) NULL;
     PRINT '  [+] Posts.CustomFieldsJson added.';
+END
+-- Posts: when a newsletter draft was prepared for the post (DBScripts/2026-11-13_add-newsletter-drafted-at-to-posts.sql).
+-- Added after the columns above, in the order an upgraded install received them.
+IF COL_LENGTH('Posts', 'NewsletterDraftedAt') IS NULL
+BEGIN
+    ALTER TABLE Posts ADD NewsletterDraftedAt DATETIME2 NULL;
+    PRINT '  [+] Posts.NewsletterDraftedAt added.';
 END
 IF COL_LENGTH('Pages', 'CustomFieldsJson') IS NULL
 BEGIN
@@ -3074,6 +3124,71 @@ BEGIN
 END
 ELSE
     PRINT '  [=] ScheduledScripts already exists — skipped.';
+
+-- =============================================================================
+-- 44. ApiKeys  —  long-lived API credentials a Desk user creates for a script or an
+--     AI assistant (Profile → API keys). Hash only; the key is shown once.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ApiKeys')
+BEGIN
+    CREATE TABLE ApiKeys (
+        Id         UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        UserId     UNIQUEIDENTIFIER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+        Name       NVARCHAR(60)     NOT NULL,
+        Prefix     NVARCHAR(16)     NOT NULL,
+        KeyHash    NVARCHAR(64)     NOT NULL,
+        Scopes     NVARCHAR(200)    NOT NULL,
+        CreatedAt  DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        ExpiresAt  DATETIME2        NULL,
+        LastUsedAt DATETIME2        NULL,
+        RevokedAt  DATETIME2        NULL
+    );
+    CREATE UNIQUE INDEX UX_ApiKeys_KeyHash ON ApiKeys (KeyHash);
+    CREATE INDEX IX_ApiKeys_User_CreatedAt ON ApiKeys (UserId, CreatedAt DESC);
+    PRINT '  [+] ApiKeys table + indexes created.';
+END
+ELSE
+    PRINT '  [=] ApiKeys already exists — skipped.';
+
+-- =============================================================================
+-- 45. PostNotes  —  notes the people working on a post leave for each other in the
+--     Desk (open until resolved). Never shown to readers.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'PostNotes')
+BEGIN
+    CREATE TABLE PostNotes (
+        Id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        PostId         UNIQUEIDENTIFIER NOT NULL REFERENCES Posts(Id) ON DELETE CASCADE,
+        UserId         UNIQUEIDENTIFIER NOT NULL,
+        UserName       NVARCHAR(200)    NOT NULL,
+        Body           NVARCHAR(2000)   NOT NULL,
+        CreatedAt      DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        ResolvedAt     DATETIME2        NULL,
+        ResolvedByName NVARCHAR(200)    NULL
+    );
+    CREATE INDEX IX_PostNotes_Post ON PostNotes (PostId, CreatedAt);
+    PRINT '  [+] PostNotes table + index created.';
+END
+ELSE
+    PRINT '  [=] PostNotes already exists — skipped.';
+
+-- =============================================================================
+-- 46. GoalCounts  —  daily counters behind Admin → Analytics → Goals. Numbers only:
+--     no reader is identified by a row. The goals are a list in the settings blob.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'GoalCounts')
+BEGIN
+    CREATE TABLE GoalCounts (
+        OwnerId UNIQUEIDENTIFIER NOT NULL,
+        Day     DATE             NOT NULL,
+        GoalKey NVARCHAR(40)     NOT NULL,
+        Hits    INT              NOT NULL CONSTRAINT DF_GoalCounts_Hits DEFAULT 0,
+        CONSTRAINT PK_GoalCounts PRIMARY KEY (OwnerId, Day, GoalKey)
+    );
+    PRINT '  [+] GoalCounts table created.';
+END
+ELSE
+    PRINT '  [=] GoalCounts already exists — skipped.';
 
 PRINT '';
 PRINT '==========================================================';

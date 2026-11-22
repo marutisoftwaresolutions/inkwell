@@ -73,6 +73,10 @@ else if (ViewData["JustFinished"] is true)
                     <td>
                         <div class="desk-row-actions">
                             <a href="/admin/backups/download/@f.Name" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="Download backup from @Dates.DateTime(f.CreatedAtUtc)">Download</a>
+                            <form method="post" action="/admin/backups/check/@f.Name">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="desk-btn desk-btn-ghost desk-btn-sm" aria-label="Check backup from @Dates.DateTime(f.CreatedAtUtc)">Check</button>
+                            </form>
                             <form method="post" action="/admin/backups/delete/@f.Name"
                                   data-confirm-title="Delete this backup?"
                                   data-confirm-body="The file @f.Name is deleted from the server. Keep a downloaded copy if you may need it. The site itself is untouched."

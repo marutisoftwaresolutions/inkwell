@@ -60,6 +60,7 @@ public static class BackupFormat
         new BackupTable("Media",          BackupTableRole.Content, "media library rows (files travel under media/)"),
         new BackupTable("Revisions",      BackupTableRole.Content, "revision history"),
         new BackupTable("Comments",       BackupTableRole.Content, "comments"),
+        new BackupTable("PostNotes",      BackupTableRole.Content, "notes on posts, Desk only"),
         // Audience
         new BackupTable("Members",           BackupTableRole.Content, "subscribers"),
         new BackupTable("Labels",            BackupTableRole.Content, "subscriber labels"),
@@ -75,12 +76,15 @@ public static class BackupFormat
         // Analytics
         new BackupTable("PageViews", BackupTableRole.Optional, "reader analytics; can run to millions of rows"),
         new BackupTable("PageViewDaily", BackupTableRole.Optional, "daily summary behind Analytics; the only history once raw views are pruned"),
+        new BackupTable("GoalCounts", BackupTableRole.Optional, "daily goal counters behind Analytics → Goals"),
         // Never
         new BackupTable("CrawlerVisits",       BackupTableRole.Excluded, "bot traffic log, pruned by retention"),
         new BackupTable("CrawlerVisitDaily",   BackupTableRole.Excluded, "daily summary of CrawlerVisits, rebuilt by the crawler-visit-rollup job"),
         new BackupTable("ErrorLogs",           BackupTableRole.Excluded, "diagnostics for this server"),
         new BackupTable("Jobs",                BackupTableRole.Excluded, "scheduler ledger for this server"),
+        new BackupTable("ScheduledScripts",    BackupTableRole.Excluded, "schedules for script files on this server; pinned ones are re-asserted from configuration"),
         new BackupTable("PasswordResetTokens", BackupTableRole.Excluded, "short-lived secrets"),
+        new BackupTable("ApiKeys",             BackupTableRole.Excluded, "credentials for this server; create new keys after a restore"),
         new BackupTable("SearchPerformance",   BackupTableRole.Excluded, "re-fetched from Search Console"),
         new BackupTable("WebhookDeliveries",   BackupTableRole.Excluded, "delivery log; replaying it would re-send events"),
         new BackupTable("ImportJobs",          BackupTableRole.Excluded, "import staging"),

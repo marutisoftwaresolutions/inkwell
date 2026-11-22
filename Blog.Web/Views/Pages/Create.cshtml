@@ -10,7 +10,8 @@
 }
 
 <div class="md:h-[calc(100vh-7.5rem)] flex flex-col" id="pageBuilderApp">
-    <form method="post" action="/admin/pages/create" id="pageForm" data-track-changes class="flex-1 flex flex-col h-full">
+    <form method="post" action="/admin/pages/create" id="pageForm" data-track-changes class="flex-1 flex flex-col h-full"
+          data-local-backup="page:new" data-saved-at="0">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Content" id="pageContent" />
         <input type="hidden" name="EditorMode" value="@Model.EditorMode" />
@@ -26,6 +27,7 @@
                        class="text-xl font-bold bg-transparent focus:outline-none placeholder:text-muted-foreground/40 min-w-0 flex-1 sm:flex-none sm:w-64 border-b border-transparent focus:border-primary transition-colors" />
             </div>
             <div class="flex items-center gap-2 shrink-0">
+                <span data-backup-status class="text-xs text-muted-foreground" role="status"></span>
                 <span data-dirty-indicator hidden>Unsaved changes</span>
                 <a href="/admin/pages/create?mode=@(Model.IsMarkdown ? "rich" : "markdown")" data-editor-switch class="hidden md:inline-flex px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">@(Model.IsMarkdown ? "Use the visual editor" : "Write in Markdown")</a>
                 <button type="submit" name="action" value="draft" class="desk-btn desk-btn-outline desk-btn-sm">Save Draft</button>
@@ -41,7 +43,7 @@
         <div class="flex-1 flex gap-0 overflow-hidden rounded-xl border border-border shadow-sm">
 
             <!-- LEFT: Component Palette -->
-            @{ ViewData["BuilderForms"] = true; ViewData["PaletteHidden"] = Model.IsMarkdown; }
+            @{ ViewData["BuilderForms"] = true; ViewData["BuilderSections"] = true; ViewData["PaletteHidden"] = Model.IsMarkdown; }
             <partial name="_BuilderPalette" />
 
             <!-- CENTER: Canvas, or the Markdown source (ADR-0022) -->
@@ -218,6 +220,7 @@
 <script>window.pagePublishBody = @Json.Serialize("This will make your page publicly visible.");</script>
 
 <link rel="stylesheet" href="~/css/inkwell-builder.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/inkwell-sections.css" asp-append-version="true" />
 
 @section Scripts {
     <partial name="_EditorSwitchGuard" />
@@ -226,6 +229,8 @@
         <partial name="_MarkdownEditorScripts" />
     }
 <script src="~/js/inkwell-builder.js" asp-append-version="true"></script>
+<script src="~/js/inkwell-sections.js" asp-append-version="true"></script>
+<script src="~/js/inkwell-autosave.js" asp-append-version="true"></script>
 <script>
 (function() {
     // The block builder is shared with the post editor (wwwroot/js/inkwell-builder.js); this page adds its own slug, title and publish steps.

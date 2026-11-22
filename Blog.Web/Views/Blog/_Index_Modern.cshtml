@@ -1,6 +1,8 @@
 @using Blog.Core.Interfaces
 @model PagedResult<Blog.Core.Domain.Post>
 @{
+    // h1 on the home page; h2 when the page already carries its heading (search results, category and tag archives).
+    var heroHeading = (ViewData["PageHasHeading"] as bool? ?? false) ? "h2" : "h1";
     var searchTerm = ViewBag.SearchTerm as string;
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
     var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
@@ -39,9 +41,9 @@
                         @heroPost.Categories.First().Name
                     </span>
                 }
-                <h1 class="text-3xl md:text-6xl font-black text-white leading-tight mb-4" style="text-shadow: 0 2px 20px rgba(0,0,0,0.5);">
+                @Html.Raw("<" + heroHeading + @" class=""text-3xl md:text-6xl font-black text-white leading-tight mb-4"" style=""text-shadow: 0 2px 20px rgba(0,0,0,0.5);"">")
                     @heroPost.Title
-                </h1>
+                @Html.Raw("</" + heroHeading + ">")
                 @if (!string.IsNullOrEmpty(heroPost.MetaDescription))
                 {
                     <p class="text-white/70 text-lg mb-6 max-w-2xl line-clamp-2">@heroPost.MetaDescription</p>

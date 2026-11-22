@@ -225,6 +225,39 @@ public class ExportPushTests : IDisposable
     }
 
     [Fact]
+    public void A_category_is_pushed_with_the_categories_above_it_and_never_in_a_circle()
+    {
+        var root = Guid.NewGuid(); var mid = Guid.NewGuid(); var leaf = Guid.NewGuid(); var a = Guid.NewGuid(); var b = Guid.NewGuid();
+        var catalog = new ExportCatalog(
+            new[]
+            {
+                new ExportTerm(root, "Running a practice", "running-a-practice"), new ExportTerm(mid, "Front desk", "front-desk", root),
+                new ExportTerm(leaf, "Appointments", "appointments", mid),
+                new ExportTerm(a, "A", "a", b), new ExportTerm(b, "B", "b", a),                 // a loop written straight into the database
+            },
+            Array.Empty<ExportTerm>(), Array.Empty<ExportAuthor>(), new Dictionary<string, (string?, string?)>());
+
+        var term = PushPayloads.WordPressTerms(new ExportPost { CategoryIds = new[] { leaf } }, catalog).Single();
+        Assert.Equal("appointments", term.Slug);
+        Assert.Equal("front-desk", term.Parent!.Slug);
+        Assert.Equal("running-a-practice", term.Parent.Parent!.Slug);
+        Assert.Null(term.Parent.Parent.Parent);
+        Assert.Equal("category:appointments", term.Key);                                        // the key is the term's own, whatever sits above it
+
+        var looped = PushPayloads.WordPressTerms(new ExportPost { CategoryIds = new[] { a } }, catalog).Single();
+        var depth = 0; for (var t = looped; t is not null; t = t.Parent) depth++;
+        Assert.InRange(depth, 2, 11);                                                           // ends
+
+        // The client sends the parent only when it creates a category, and the service resolves the parent first.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Directory.Build.props"))) dir = dir.Parent;
+        var client = File.ReadAllText(Path.Combine(dir!.FullName, "Blog.Web", "Services", "Export", "Push", "PushClient.cs"));
+        Assert.Contains("if (term.Taxonomy == \"categories\" && long.TryParse(parentId, out var parent)) body[\"parent\"] = parent;", client);
+        var service = File.ReadAllText(Path.Combine(dir.FullName, "Blog.Web", "Services", "Export", "Push", "ExportPushService.cs"));
+        Assert.Contains("term.Parent is null ? null : await TermAsync(push, client, term.Parent, ct)", service);
+    }
+
+    [Fact]
     public void Ghost_tags_merge_categories_and_tags_by_slug_and_mark_series_internal()
     {
         var tags = PushPayloads.GhostTags(Post(), Catalog());
@@ -650,7 +683,7 @@ public class ExportPushTests : IDisposable
             return Task.FromResult(new RemoteItem(_ghost ? url : _t.MediaId, url));
         }
 
-        public Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct)
+        public Task<string> EnsureTermAsync(PushTerm term, CancellationToken ct, string? parentId = null)
         {
             _t.Terms.Add(term.Taxonomy + ":" + term.Slug);
             return Task.FromResult(_t.NextId());

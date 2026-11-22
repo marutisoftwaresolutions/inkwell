@@ -1,0 +1,12 @@
+-- DBScripts/2026-11-15_comments-moderation-takes-effect.sql
+-- Change: UserSettings.CommentsModeration ("Hold comments for approval") now decides whether a reader's comment
+--         is stored as Approved or Pending. Before, every comment was stored as Pending whatever the setting said.
+--         The default for a settings record that does not carry the field changed from false to true, so a record
+--         written before the field existed keeps holding comments.
+-- Schema impact: NONE. The value lives in Settings.JsonPayload; no column, index or constraint changes.
+-- Action required: None for the database. Before upgrading a live site, check Settings -> Comments: a site that
+--         has "Hold comments for approval" unticked will publish comments at once after the upgrade (a comment with
+--         a link, or a reply to a comment still waiting, is held all the same).
+--         To see which sites have it off:
+--           SELECT UserId FROM Settings WHERE JSON_VALUE(JsonPayload, '$.CommentsModeration') = 'false';
+PRINT 'No schema migration required for this change.';

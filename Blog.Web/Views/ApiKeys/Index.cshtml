@@ -1,0 +1,109 @@
+@model List<Blog.Core.Domain.ApiKey>
+@using Blog.Core.Services
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "API Keys";
+    ViewData["Description"] = "Let a script or an AI assistant work in your name, with only the access you choose.";
+    var offered = (IReadOnlyList<(string Scope, string Label, string Meaning)>)ViewBag.Offered;
+    var now = DateTime.UtcNow;
+    var fieldError = (TempData["FieldError"] as string)?.Split('|', 2);
+    var nameError = fieldError is { Length: 2 } && fieldError[0] == "key-name" ? fieldError[1] : null;
+    string Status(Blog.Core.Domain.ApiKey k) => k.RevokedAt is not null ? "Revoked" : k.ExpiresAt is not null && k.ExpiresAt <= now ? "Expired" : "Active";
+    string Pill(Blog.Core.Domain.ApiKey k) => k.RevokedAt is not null ? "desk-pill-muted" : k.ExpiresAt is not null && k.ExpiresAt <= now ? "pill-warn" : "pill-ok";
+}
+<div class="max-w-4xl flex flex-col gap-6">
+    <form method="post" action="/account/api-keys" class="desk-card p-5 flex flex-col gap-4">
+        @Html.AntiForgeryToken()
+        <h2 class="desk-card-title">Create a key</h2>
+        <p class="text-sm text-muted-foreground">
+            A key acts as you and can never do more than your own account may. It cannot change settings, themes, users or media,
+            and it stops working the moment your account is disabled. You see the key once, straight after creating it.
+        </p>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="space-y-1">
+                <label for="key-name" class="desk-label">Name</label>
+                <input id="key-name" name="name" maxlength="60" required class="desk-input" placeholder="Claude Desktop"
+                       autofocus="@(nameError is not null)" aria-invalid="@(nameError is null ? "false" : "true")"
+                       aria-describedby="@(nameError is null ? "key-name-hint" : "key-name-error")" />
+                @if (nameError is not null) { <p id="key-name-error" class="desk-error">@nameError</p> }
+                else { <p id="key-name-hint" class="desk-hint">What uses this key. It appears in the audit trail beside every change the key makes.</p> }
+            </div>
+            <div class="space-y-1">
+                <label for="key-days" class="desk-label">Expires after</label>
+                <select id="key-days" name="days" class="desk-select">
+                    @foreach (var (days, label) in Blog.Web.Controllers.ApiKeysController.Lifetimes)
+                    {
+                        <option value="@days" selected="@(days == 90)">@label</option>
+                    }
+                </select>
+                <p class="desk-hint">A key that expires limits the harm if it leaks.</p>
+            </div>
+        </div>
+        <fieldset class="space-y-2">
+            <legend class="desk-label">What the key may do</legend>
+            @foreach (var (scope, label, meaning) in offered)
+            {
+                var isRead = scope == ApiKeyFormat.Read;
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" name="scopes" value="@scope" class="desk-checkbox mt-0.5" checked="@isRead" disabled="@isRead" />
+                    <span><span class="font-medium text-foreground">@label</span> <span class="text-muted-foreground">@meaning</span></span>
+                </label>
+            }
+            <p class="desk-hint">Reading is always included. Leave the rest unticked for a read-only key.</p>
+        </fieldset>
+        <div><button type="submit" class="desk-btn desk-btn-primary">Create key</button></div>
+    </form>
+
+    <div class="desk-card">
+        <div class="desk-card-header"><h2 class="desk-card-title">Your keys</h2></div>
+        @if (Model.Count == 0)
+        {
+            ViewData["EmptyTitle"] = "No keys yet";
+            ViewData["EmptyHint"] = "Create one above when a script or an assistant needs to read or draft content for you.";
+            <partial name="_EmptyState" />
+        }
+        else
+        {
+            <div class="table-scroll"><table class="desk-table">
+                    <thead>
+                        <tr><th>Name</th><th>Key starts</th><th>May</th><th>Created</th><th>Last used</th><th>Expires</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var k in Model)
+                        {
+                            var usable = k.IsUsable(now);
+                            <tr>
+                                <td class="font-medium text-foreground">@k.Name</td>
+                                <td class="font-mono text-xs">@(ApiKeyFormat.Marker + k.Prefix)…</td>
+                                <td class="text-xs">@string.Join(", ", ApiKeyFormat.ParseScopes(k.Scopes))</td>
+                                <td class="text-xs whitespace-nowrap">@Dates.Medium(k.CreatedAt)</td>
+                                <td class="text-xs whitespace-nowrap">@(k.LastUsedAt is null ? "Never" : Dates.DateTime(k.LastUsedAt))</td>
+                                <td class="text-xs whitespace-nowrap">@(k.ExpiresAt is null ? "Never" : Dates.Medium(k.ExpiresAt))</td>
+                                <td><span class="desk-pill @Pill(k)">@Status(k)</span></td>
+                                <td class="text-right">
+                                    @if (usable)
+                                    {
+                                        <form method="post" action="/account/api-keys/@k.Id/revoke"
+                                              data-confirm-title="Revoke this key?"
+                                              data-confirm-body="“@k.Name” stops working straight away and cannot be restored. Whatever uses it will be refused until you give it a new key. Content the key created is untouched."
+                                              data-confirm-action="Revoke key" data-confirm-tone="danger">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="desk-btn desk-btn-danger-outline desk-btn-sm" aria-label="Revoke key @k.Name">Revoke</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="desk-card p-5 flex flex-col gap-2">
+        <h2 class="desk-card-title">Using a key</h2>
+        <p class="text-sm text-muted-foreground">Send it as a bearer token to the REST API, or give it to an assistant that speaks the Model Context Protocol:</p>
+        <pre class="text-xs bg-muted rounded-md p-3 overflow-x-auto"><code>Authorization: Bearer ink_…</code></pre>
+        <p class="text-sm text-muted-foreground">REST API: <code>/api/v1</code>. Assistants (MCP): <code>/mcp</code>, once an Admin has switched it on under Settings.</p>
+    </div>
+</div>

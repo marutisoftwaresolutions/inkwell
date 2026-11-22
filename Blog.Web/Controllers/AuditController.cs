@@ -28,9 +28,11 @@ public class AuditController : Controller
         return Task.FromResult(Guid.Empty);
     }
 
+    // "action" is read from the query string only. Left to default binding it takes the route's own action name
+    // ("Index"), which filtered the list to an action that does not exist: the screen opened empty.
     [HttpGet("")]
     public async Task<IActionResult> Index(
-        string? entityType, string? action, string? userId,
+        string? entityType, [FromQuery(Name = "action")] string? action, string? userId,
         string? from, string? to, int page = 1)
     {
         var ownerId = await GetOwnerIdAsync();
@@ -80,7 +82,7 @@ public class AuditController : Controller
 
     [HttpGet("export/csv")]
     public async Task<IActionResult> ExportCsv(
-        string? entityType, string? action, string? userId,
+        string? entityType, [FromQuery(Name = "action")] string? action, string? userId,
         string? from, string? to)
     {
         var ownerId = await GetOwnerIdAsync();

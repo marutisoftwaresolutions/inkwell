@@ -15,8 +15,56 @@
     {
         "confirmed"    => "pill-ok",
         "pending"      => "pill-warn",
+        "bounced"      => "pill-bad",
         _              => "desk-pill-muted"
     };
+}
+
+@section PageActions {
+    <a href="/admin/subscribers/export" class="desk-btn desk-btn-outline">Export confirmed (CSV)</a>
+}
+
+<details class="desk-card mb-5">
+    <summary class="desk-card-header cursor-pointer"><h2 class="desk-card-title">Import subscribers from a CSV file</h2></summary>
+    <form method="post" action="/admin/subscribers/import" enctype="multipart/form-data" class="p-5 flex flex-col gap-4"
+          data-confirm-title="Import these subscribers?"
+          data-confirm-body="Everyone in the file who is not already on your list is added as a confirmed subscriber and will receive your next newsletter. They get no confirmation email. People who unsubscribed stay unsubscribed."
+          data-confirm-action="Import subscribers" data-confirm-tone="warning">
+        @Html.AntiForgeryToken()
+        <p class="text-sm text-muted-foreground">For moving a list from another newsletter tool. The file needs one email address per row, in a column named <code>email</code> or as the first column; a <code>name</code> column is optional. Up to @Blog.Core.Services.SubscriberCsv.MaxRows rows and 1 MB.</p>
+        <div class="space-y-1">
+            <label for="import-file" class="desk-label">CSV file</label>
+            <input id="import-file" type="file" name="file" accept=".csv,text/csv" required class="desk-input" />
+        </div>
+        <label class="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="consent" value="true" required class="desk-checkbox mt-0.5" />
+            <span>Every person in this file asked to receive email from me. <span class="text-muted-foreground">Sending to people who did not ask breaks anti-spam law in most countries and gets a sender blocked. Your statement is recorded in the audit trail.</span></span>
+        </label>
+        <div><button type="submit" class="desk-btn desk-btn-primary">Import subscribers</button></div>
+    </form>
+</details>
+
+@{
+    var topPages = ViewBag.TopSignupPages as List<(string Path, int Subscribers)>;
+}
+@if (topPages is { Count: > 0 })
+{
+    <div class="desk-card mb-5">
+        <div class="desk-card-header"><h2 class="desk-card-title">Pages that brought subscribers</h2></div>
+        <div class="table-scroll"><table class="desk-table">
+            <thead><tr><th>Page</th><th class="text-right">Confirmed subscribers</th></tr></thead>
+            <tbody>
+                @foreach (var (path, count) in topPages)
+                {
+                    <tr>
+                        <td><a href="@path" target="_blank" rel="noopener" class="underline underline-offset-2">@path<span class="sr-only"> (opens in a new tab)</span></a></td>
+                        <td class="text-right">@count</td>
+                    </tr>
+                }
+            </tbody>
+        </table></div>
+        <p class="desk-hint px-5 pb-4">Counted from where the sign-up form was sent. People who joined before this was recorded, or were imported, are not counted.</p>
+    </div>
 }
 
 <nav class="desk-tabs mb-5" aria-label="Filter by status">
@@ -24,6 +72,7 @@
     <a href="/admin/subscribers?status=confirmed" class="desk-tab" aria-current="@TabCurrent("confirmed")">Confirmed</a>
     <a href="/admin/subscribers?status=pending" class="desk-tab" aria-current="@TabCurrent("pending")">Pending</a>
     <a href="/admin/subscribers?status=unsubscribed" class="desk-tab" aria-current="@TabCurrent("unsubscribed")">Unsubscribed</a>
+    <a href="/admin/subscribers?status=bounced" class="desk-tab" aria-current="@TabCurrent("bounced")" title="Addresses a mail server refused for good; they receive nothing until they subscribe again">Bounced</a>
 </nav>
 
 <div class="desk-card overflow-hidden">

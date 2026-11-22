@@ -37,6 +37,15 @@ public class NewsletterRepository : INewsletterRepository
             VALUES (@Id, @OwnerId, @Subject, @Preheader, @IntroMarkdown, @PostIds, 'Draft', @CreatedBy, SYSUTCDATETIME(), SYSUTCDATETIME())", i);
     }
 
+    public async Task<bool> HasIssueForPostAsync(Guid ownerId, Guid postId)
+    {
+        using var conn = _ctx.CreateConnection();
+        // PostIds is a comma-separated list of ids; an id is 36 fixed characters, so a plain match cannot hit a different post.
+        return await conn.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM NewsletterIssues WHERE OwnerId = @ownerId AND PostIds LIKE @needle",
+            new { ownerId, needle = "%" + postId.ToString() + "%" }) > 0;
+    }
+
     public async Task<bool> UpdateDraftAsync(NewsletterIssue i)
     {
         using var conn = _ctx.CreateConnection();
@@ -140,6 +149,12 @@ public class NewsletterRepository : INewsletterRepository
         await conn.ExecuteAsync(@"
             UPDATE NewsletterDeliveries SET Status = @status, Attempts = @attempts, NextAttemptAt = @nextAttemptAt, SentAt = @sentAt, Error = @error
             WHERE Id = @deliveryId AND Status = 'Pending'", new { deliveryId, status, attempts, nextAttemptAt, sentAt, error });
+    }
+
+    public async Task MarkMemberBouncedAsync(Guid memberId)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Members SET Status = 'bounced', Subscribed = 0 WHERE Id = @memberId AND Status = 'confirmed'", new { memberId });
     }
 
     public async Task<NewsletterIssue?> FinishIfDoneAsync(Guid issueId, DateTime nowUtc)

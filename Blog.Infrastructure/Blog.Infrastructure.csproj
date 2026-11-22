@@ -21,6 +21,8 @@
     <EmbeddedResource Include="Migrations\*.sql" />
     <!-- One source for the reference catalogs (ADR-0027): MigrationService seeds from the dated script itself. -->
     <EmbeddedResource Include="..\DBScripts\2026-10-05_create-and-seed-countries-timezones-date-locales.sql" LogicalName="Blog.Infrastructure.ReferenceData.sql" />
+    <!-- The complete schema, applied by DatabaseBootstrapper when the database is empty (first run). -->
+    <EmbeddedResource Include="..\DBScripts\init.sql" LogicalName="Blog.Infrastructure.Init.sql" />
   </ItemGroup>
 
 </Project>

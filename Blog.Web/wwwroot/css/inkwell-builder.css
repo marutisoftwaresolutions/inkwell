@@ -36,3 +36,24 @@
 .comp-form { border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem 1rem; text-align: center; color: var(--muted-foreground); background: var(--muted); }
 .comp-form::before { content: "Form: " attr(data-form-name); font-weight: 600; color: var(--foreground); }
 .comp-form::after { content: "Readers see the real form here."; display: block; font-size: .8rem; margin-top: .25rem; }
+
+/* Callout and toggle blocks. Colour from tokens only; the callout's kind is also written out as a word. */
+.comp-callout { border: 1px solid var(--border); border-inline-start-width: 4px; border-radius: var(--radius, 4px); background: var(--surface, var(--card)); padding: 0.9rem 1.1rem; margin: 1.5rem 0; }
+.comp-callout > p { margin: 0; color: var(--fg-body, var(--foreground)); }
+.comp-callout::before { display: block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-meta, var(--muted-foreground)); margin-bottom: 0.3rem; content: "Note"; }
+.comp-callout[data-kind="tip"]::before { content: "Tip"; }
+.comp-callout[data-kind="warning"]::before { content: "Warning"; }
+.comp-callout[data-kind="warning"] { border-inline-start-color: var(--fg, var(--foreground)); }
+/* Bookmark block: a link shown as a card. Text only, colour from tokens, logical properties for RTL. */
+a.comp-bookmark { display: block; border: 1px solid var(--border); border-radius: var(--radius, 4px); background: var(--surface, var(--card)); padding: 0.9rem 1.1rem; margin: 1.5rem 0; text-decoration: none; color: inherit; }
+a.comp-bookmark:hover, a.comp-bookmark:focus-visible { border-color: var(--link, var(--primary)); }
+a.comp-bookmark:focus-visible { outline: 2px solid var(--link, currentColor); outline-offset: 2px; }
+.comp-bookmark > span { display: block; }
+.comp-bookmark-title { font-weight: 600; color: var(--fg, var(--foreground)); }
+.comp-bookmark-text { margin-block-start: 0.25rem; font-size: 0.9375rem; color: var(--fg-body, var(--foreground)); }
+.comp-bookmark-site { margin-block-start: 0.5rem; font-size: 0.8125rem; color: var(--fg-meta, var(--muted-foreground)); }
+.comp-toggle { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.75rem 0; margin: 1.25rem 0; }
+.comp-toggle + .comp-toggle { border-top: 0; margin-top: -1.25rem; }
+.comp-toggle > summary { cursor: pointer; font-weight: 600; color: var(--fg, var(--foreground)); }
+.comp-toggle > summary:focus-visible { outline: 2px solid var(--link, currentColor); outline-offset: 2px; }
+.comp-toggle > p { margin: 0.6rem 0 0; color: var(--fg-body, var(--foreground)); }

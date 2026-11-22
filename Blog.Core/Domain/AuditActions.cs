@@ -16,12 +16,20 @@ public static class AuditActions
     public const string PostChangesRequested   = "Post.ChangesRequested";
     public const string PostApproved           = "Post.Approved";
     public const string PostDeleted    = "Post.Deleted";
+    public const string PostTrashed    = "Post.Trashed";
+    public const string PostRestored   = "Post.Restored";
+    /// <summary>A draft copy of a post was made (the entry names the copy and the original).</summary>
+    public const string PostDuplicated = "Post.Duplicated";
+    public const string PostNoteAdded    = "Post.NoteAdded";
+    public const string PostNoteResolved = "Post.NoteResolved";
 
     /// <summary>Content put back from a stored revision (payload names the revision number).</summary>
     public const string PostRevisionRestored = "Post.RevisionRestored";
 
     // Pages
     public const string PageCreated    = "Page.Created";
+    /// <summary>A draft copy of a page was made.</summary>
+    public const string PageDuplicated = "Page.Duplicated";
     public const string PageUpdated    = "Page.Updated";
     public const string PageDeleted    = "Page.Deleted";
     public const string PageRevisionRestored = "Page.RevisionRestored";
@@ -44,6 +52,7 @@ public static class AuditActions
     public const string UserInvited      = "User.Invited";
     public const string UserDeleted      = "User.Deleted";
     public const string UserRoleChanged  = "User.RoleChanged";
+    public const string RoleDefaultsRestored = "Role.DefaultsRestored";
     public const string UserToggled      = "User.ActiveToggled";
     public const string UserProfileUpdated = "User.ProfileUpdated";
 
@@ -66,6 +75,11 @@ public static class AuditActions
 
     // Settings
     public const string SettingsUpdated = "Settings.Updated";
+    /// <summary>Maintenance mode was switched on: readers see the holding page.</summary>
+    public const string SettingsMaintenanceOn  = "Settings.MaintenanceModeOn";
+    public const string SettingsMaintenanceOff = "Settings.MaintenanceModeOff";
+    /// <summary>The site's custom code or CSS changed (the entry carries the text before and after).</summary>
+    public const string SettingsSiteCodeChanged = "Settings.SiteCodeChanged";
     /// <summary>A Search Console property was connected (payload names the property and service account, never the key).</summary>
     public const string SettingsSearchConsoleConnected    = "Settings.SearchConsoleConnected";
     public const string SettingsSearchConsoleDisconnected = "Settings.SearchConsoleDisconnected";
@@ -78,8 +92,15 @@ public static class AuditActions
     // Taxonomy
     public const string CategoryCreated = "Category.Created";
     public const string CategoryDeleted = "Category.Deleted";
+    public const string CategoryMoved   = "Category.Moved";
+    public const string CategoryUpdated = "Category.Updated";
+
+    // Analytics goals
+    public const string GoalAdded   = "Goal.Added";
+    public const string GoalDeleted = "Goal.Deleted";
     public const string TagCreated      = "Tag.Created";
     public const string TagDeleted      = "Tag.Deleted";
+    public const string TagUpdated      = "Tag.Updated";
     public const string SeriesCreated      = "Series.Created";
     public const string SeriesUpdated      = "Series.Updated";
     public const string SeriesDeleted      = "Series.Deleted";
@@ -93,8 +114,10 @@ public static class AuditActions
     public const string NewsletterQueued    = "Newsletter.Queued";
     public const string NewsletterCancelled = "Newsletter.Cancelled";
     public const string NewsletterTestSent  = "Newsletter.TestSent";
+    public const string NewsletterWelcomeUpdated = "Newsletter.WelcomeUpdated";
     public const string SubscriberDeleted   = "Subscriber.Deleted";
     public const string SubscriberExported  = "Subscriber.Exported";
+    public const string SubscriberImported  = "Subscriber.Imported";
 
     // Import (WordPress / Ghost migration)
     public const string ImportStarted   = "Import.Started";
@@ -130,6 +153,7 @@ public static class AuditActions
     public const string BackupCreated    = "Backup.Created";
     public const string BackupDownloaded = "Backup.Downloaded";
     public const string BackupDeleted    = "Backup.Deleted";
+    public const string BackupChecked    = "Backup.Checked";
     public const string BackupRestored   = "Backup.Restored";
 
     // Content export to WordPress / Ghost (target, options and counts only; never content or credentials)
@@ -159,6 +183,13 @@ public static class AuditActions
     public const string ScheduledScriptDisabled = "ScheduledScript.Disabled";
     public const string ScheduledScriptRan      = "ScheduledScript.Ran";
     public const string ScheduledScriptFailed   = "ScheduledScript.Failed";
+
+    // "Sign out everywhere" on the security page
+    public const string AuthSessionsEnded = "Auth.SessionsEnded";
+
+    // API keys, Profile → API keys
+    public const string ApiKeyCreated = "ApiKey.Created";
+    public const string ApiKeyRevoked = "ApiKey.Revoked";
 
     // Built-in job controls from Admin → Dashboard (ADR-0040)
     public const string JobPaused          = "Job.Paused";

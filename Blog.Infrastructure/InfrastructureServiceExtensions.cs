@@ -12,6 +12,7 @@ public static class InfrastructureServiceExtensions
     {
         var context = new DapperContext(connectionString);
         services.AddSingleton(context);
+        services.AddSingleton(sp => new DatabaseBootstrapper(connectionString, sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DatabaseBootstrapper>>()));
         services.AddSingleton<MigrationService>();
         services.AddSingleton<BackupDataStore>();
 
@@ -46,12 +47,14 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IFormRepository, FormRepository>();               // contact forms (ADR-0030)
         services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
         services.AddScoped<IScheduledScriptRepository, ScheduledScriptRepository>();   // Admin → Scheduled scripts (ADR-0039)
+        services.AddScoped<IApiKeyRepository, ApiKeyRepository>();   // Profile → API keys
+        services.AddScoped<IPostNoteRepository, PostNoteRepository>();   // notes on a post, Desk only
+        services.AddScoped<IGoalCountRepository, GoalCountRepository>();   // Admin → Analytics → Goals
         services.AddScoped<ISearchPerformanceRepository, SearchPerformanceRepository>();
         services.AddScoped<IWebhookRepository, WebhookRepository>();
         services.AddScoped<IMenuRepository, MenuRepository>();
         services.AddScoped<Blog.Core.Services.AuthService>();
         services.AddScoped<ApplicationDbSeeder>();
-        services.AddScoped<OptometryTaxonomySeeder>();
 
         // Register Dapper Type Handlers
         Dapper.SqlMapper.AddTypeHandler(new SqlGuidHandler());

@@ -13,11 +13,11 @@ public class TagRepository : ITagRepository
     {
         using var conn = _ctx.CreateConnection();
         var sql = @"
-            SELECT t.Id, t.Name, t.Slug, t.AuthorId, COUNT(pt.PostId) as PostCount
+            SELECT t.Id, t.Name, t.Slug, t.AuthorId, t.Description, COUNT(pt.PostId) as PostCount
             FROM Tags t
             LEFT JOIN PostTags pt ON pt.TagId = t.Id
             " + (authorId == Guid.Empty ? "" : "WHERE t.AuthorId = @AuthorId ") + @"
-            GROUP BY t.Id, t.Name, t.Slug, t.AuthorId
+            GROUP BY t.Id, t.Name, t.Slug, t.AuthorId, t.Description
             ORDER BY t.Name";
         return (await conn.QueryAsync<Tag>(sql, new { AuthorId = authorId })).ToList();
     }
@@ -32,12 +32,12 @@ public class TagRepository : ITagRepository
     {
         using var conn = _ctx.CreateConnection();
         var sql = @"
-            SELECT t.Id, t.Name, t.Slug, t.AuthorId, COUNT(p.Id) as PostCount
+            SELECT t.Id, t.Name, t.Slug, t.AuthorId, t.Description, COUNT(p.Id) as PostCount
             FROM Tags t
             INNER JOIN PostTags pt ON pt.TagId = t.Id
-            INNER JOIN Posts p ON p.Id = pt.PostId AND p.Status = 'Published'
+            INNER JOIN Posts p ON p.Id = pt.PostId AND p.Status = 'Published' AND (p.Visibility IS NULL OR p.Visibility <> 'unlisted')
             " + (authorId == Guid.Empty ? "" : "WHERE t.AuthorId = @AuthorId ") + @"
-            GROUP BY t.Id, t.Name, t.Slug, t.AuthorId
+            GROUP BY t.Id, t.Name, t.Slug, t.AuthorId, t.Description
             ORDER BY t.Name";
         return (await conn.QueryAsync<Tag>(sql, new { AuthorId = authorId })).ToList();
     }
@@ -80,6 +80,12 @@ public class TagRepository : ITagRepository
             OUTPUT INSERTED.Id 
             VALUES (@Id, @Name, @Slug, @AuthorId)",
             new { tag.Id, tag.Name, tag.Slug, tag.AuthorId });
+    }
+
+    public async Task SetDescriptionAsync(Guid id, Guid authorId, string? description)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Tags SET Description = @description WHERE Id = @id AND AuthorId = @authorId", new { id, authorId, description });
     }
 
     public async Task DeleteAsync(Guid id, Guid authorId)

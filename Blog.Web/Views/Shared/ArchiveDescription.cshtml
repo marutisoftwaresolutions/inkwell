@@ -1,0 +1,72 @@
+@model Blog.Web.Models.ArchiveDescriptionModel
+@{
+    Layout = "_AdminLayout";
+    var kindLower = Model.Kind.ToLowerInvariant();
+    ViewData["Title"] = $"{Model.Kind} Description";
+    ViewData["Description"] = $"The introduction readers see at the top of {Model.PublicPath}, and the text search engines show for that page.";
+    var fieldError = ViewData["FieldError"] as string;
+    var max = Blog.Core.Services.ArchiveIntro.MaxLength;
+    var backHref = Model.BackHref + (string.IsNullOrEmpty(Model.Query) && Model.Page <= 1
+        ? ""
+        : $"?q={Uri.EscapeDataString(Model.Query ?? "")}&page={Model.Page}");
+    var preview = Blog.Core.Services.ArchiveIntro.ToHtml(Model.Description);
+    var meta = Blog.Core.Services.ArchiveIntro.ToMetaDescription(Model.Description);
+}
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="md:col-span-2 min-w-0">
+        <form method="post" action="@Model.PostAction" data-track-changes class="desk-card">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="q" value="@Model.Query" />
+            <input type="hidden" name="page" value="@Model.Page" />
+            <div class="desk-card-header">
+                <h2 class="desk-card-title">@Model.Name</h2>
+                <p class="desk-card-description"><a class="desk-btn-link" href="@Model.PublicPath" target="_blank" rel="noopener">@Model.PublicPath</a></p>
+            </div>
+            <div class="desk-card-body space-y-2">
+                <label for="archiveDescription" class="desk-label">Description</label>
+                <textarea id="archiveDescription" name="description" rows="7" maxlength="@max" class="desk-textarea"
+                          aria-describedby="archiveDescriptionHint@(fieldError is null ? "" : " archiveDescriptionError")"
+                          aria-invalid="@(fieldError is null ? "false" : "true")"
+                          placeholder="One or two short paragraphs on what readers will find here.">@Model.Description</textarea>
+                @if (fieldError is not null)
+                {
+                    <p id="archiveDescriptionError" class="desk-error">@fieldError</p>
+                }
+                <p id="archiveDescriptionHint" class="desk-hint">
+                    Plain text, up to @max characters. Leave a blank line to start a new paragraph. To link to an article, write
+                    <code>[link text](/article-slug)</code>; a full address must start with <code>https://</code>.
+                    Leave the box empty to show no description.
+                </p>
+            </div>
+            <div class="desk-card-footer flex items-center gap-3">
+                <span data-dirty-indicator hidden class="text-xs text-muted-foreground mr-auto">Unsaved changes</span>
+                <a href="@backHref" class="desk-btn desk-btn-outline ml-auto">Cancel</a>
+                <button type="submit" class="desk-btn desk-btn-primary">Save description</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="md:col-span-1 space-y-6">
+        <div class="desk-card">
+            <div class="desk-card-header">
+                <h2 class="desk-card-title">As saved</h2>
+                <p class="desk-card-description">How the saved description appears on the page. Save to refresh.</p>
+            </div>
+            <div class="desk-card-body space-y-3 text-sm">
+                @if (string.IsNullOrEmpty(preview))
+                {
+                    <p class="text-muted-foreground">No description yet. The @kindLower page shows its name and its articles only.</p>
+                }
+                else
+                {
+                    <div class="space-y-2">@Html.Raw(preview)</div>
+                    <div>
+                        <p class="desk-label">Search result text</p>
+                        <p class="text-muted-foreground">@meta</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

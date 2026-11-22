@@ -14,7 +14,7 @@ public sealed class FormRepository : IFormRepository
     {
         using var conn = _ctx.CreateConnection();
         return (await conn.QueryAsync<ContactForm>(@"
-            SELECT f.*, ISNULL(s.Total, 0) AS SubmissionCount, ISNULL(s.Unread, 0) AS UnreadCount, s.LastAt AS LastSubmissionAt
+            SELECT f.*, COALESCE(s.Total, 0) AS SubmissionCount, COALESCE(s.Unread, 0) AS UnreadCount, s.LastAt AS LastSubmissionAt
             FROM Forms f
             OUTER APPLY (SELECT COUNT(*) AS Total, SUM(CASE WHEN ReadAt IS NULL THEN 1 ELSE 0 END) AS Unread, MAX(CreatedAt) AS LastAt
                          FROM FormSubmissions WHERE FormId = f.Id) s

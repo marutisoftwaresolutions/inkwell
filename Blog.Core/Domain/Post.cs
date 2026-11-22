@@ -158,6 +158,11 @@ public enum PostStatus
     InReview,
     /// <summary>Returned by an Editor or Admin with a note (<see cref="Post.ReviewNote"/>).</summary>
     NeedsChanges,
+    /// <summary>
+    /// Deleted in the Desk but still recoverable (Posts → Trash). Readers never see it, like every status
+    /// that is not Published or Scheduled. Restoring makes it a draft; deleting it from Trash is permanent.
+    /// </summary>
+    Trashed,
 }
 
 public record FaqItem(string Question, string Answer);

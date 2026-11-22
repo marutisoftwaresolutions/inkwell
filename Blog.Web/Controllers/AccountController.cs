@@ -1,3 +1,4 @@
+using Blog.Core.Services;
 using Blog.Core.Domain;
 using Blog.Core.Interfaces;
 using Blog.Web.Services;
@@ -96,9 +97,21 @@ public class AccountController : Controller
             return View();
         }
 
+        // Guessing one account from many addresses: after SignInThrottle.MaxFailures wrong passwords the account
+        // waits, whatever the address. Addresses on the firewall allowlist (the operator's own) are never made to wait.
+        var throttle = HttpContext.RequestServices.GetRequiredService<SignInThrottle>();
+        var exempt = await _firewall.IsAllowlistedAsync(HttpContext);
+        if (!exempt && throttle.LockedFor(email, DateTime.UtcNow) is { } wait)
+        {
+            await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", null, email, newValues: "Refused: too many wrong passwords");
+            ViewBag.Error = $"Too many wrong passwords for this account. Try again in {SignInThrottle.MinutesToWait(wait)} minutes, or use \"Forgot your password?\" below.";
+            return View();
+        }
+
         var user = await _users.GetByEmailAsync(email);
         if (user == null || !VerifyPassword(password, user.PasswordHash))
         {
+            if (!exempt) throttle.RecordFailure(email, DateTime.UtcNow);
             await _audit.LogAsync(AuditActions.AuthLoginFailed, "Auth", null, email);
             // A rejected sign-in returns 200, so the firewall cannot see it from the status code —
             // report it explicitly so credential-stuffing runs block themselves.
@@ -106,6 +119,8 @@ public class AccountController : Controller
             ViewBag.Error = "That email and password don't match.";
             return View();
         }
+
+        throttle.Clear(email);
 
         if (!user.IsActive)
         {
@@ -405,11 +420,19 @@ public class AccountController : Controller
         user.PasswordHash = _auth.HashPassword(password!);
         user.UpdatedAt = DateTime.UtcNow;
         await _users.UpdateAsync(user);
+        // A reset ends every sign-in made with the old password and lifts any wait on the account.
+        await _users.SetSessionsValidFromAsync(user.Id, DeskSessionValidator.CutOffNow());
+        DeskSessionValidator.Forget(HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), user.Id);
+        HttpContext.RequestServices.GetRequiredService<SignInThrottle>().Clear(user.Email);
+        // Whoever knew the old password could have made an API key; a reset must not leave one behind.
+        var keysRevoked = await HttpContext.RequestServices.GetRequiredService<Blog.Core.Interfaces.IApiKeyRepository>().RevokeAllForUserAsync(user.Id, DateTime.UtcNow);
         await _resets.MarkUsedAsync(row.Id);
         await _resets.InvalidateForUserAsync(user.Id);
         await _audit.LogAsync(AuditActions.AuthPasswordReset, "Auth", user.Id.ToString(), user.Email);
 
-        TempData["Success"] = "Your password has been changed. Sign in with the new one.";
+        TempData["Success"] = keysRevoked > 0
+            ? $"Your password has been changed and your {keysRevoked} API key{(keysRevoked == 1 ? " was" : "s were")} revoked. Sign in with the new password and create new keys under Profile, API keys."
+            : "Your password has been changed. Sign in with the new one.";
         return RedirectToAction("Login");
     }
 
@@ -483,26 +506,49 @@ public class AccountController : Controller
         }
         else if (avatarFile != null && avatarFile.Length > 0)
         {
-            RemoveOldAvatarFile(user.AvatarUrl);
+            // Every signed-in account reaches this action, so the file is trusted for nothing: it must
+            // decode as a picture, and what is stored is a re-encoded WebP under a name we choose. The
+            // uploaded name and bytes never reach the web root (they used to, whatever the file type).
+            if (avatarFile.Length > MaxAvatarBytes)
+            {
+                ViewBag.Error = "The photo is larger than 2 MB. Choose a smaller picture.";
+                return View(user);
+            }
+
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "avatars");
-            if (!Directory.Exists(uploadsFolder))
+            Directory.CreateDirectory(uploadsFolder);
+            var uniqueFileName = Guid.NewGuid().ToString("N") + ".webp";
+            try
             {
-                Directory.CreateDirectory(uploadsFolder);
+                await using var input = avatarFile.OpenReadStream();
+                using var image = await SixLabors.ImageSharp.Image.LoadAsync(input);
+                if (image.Width > 512 || image.Height > 512)
+                    SixLabors.ImageSharp.Processing.ProcessingExtensions.Mutate(image, x =>
+                        SixLabors.ImageSharp.Processing.ResizeExtensions.Resize(x, new SixLabors.ImageSharp.Processing.ResizeOptions
+                        {
+                            Mode = SixLabors.ImageSharp.Processing.ResizeMode.Max,
+                            Size = new SixLabors.ImageSharp.Size(512, 512),
+                        }));
+                await SixLabors.ImageSharp.ImageExtensions.SaveAsWebpAsync(image, Path.Combine(uploadsFolder, uniqueFileName));
+            }
+            catch (Exception ex) when (ex is SixLabors.ImageSharp.UnknownImageFormatException or SixLabors.ImageSharp.InvalidImageContentException or NotSupportedException)
+            {
+                ViewBag.Error = "That file is not a picture Inkwell can read. Upload a JPEG, PNG, GIF or WebP image.";
+                return View(user);
             }
 
-            var uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(avatarFile.FileName);
-            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            using (var fileStream = new FileStream(filePath, FileMode.Create))
-            {
-                await avatarFile.CopyToAsync(fileStream);
-            }
-
+            RemoveOldAvatarFile(user.AvatarUrl);
             user.AvatarUrl = "/uploads/avatars/" + uniqueFileName;
         }
         else if (avatarUrl != null)
         {
-            RemoveOldAvatarFile(user.AvatarUrl);
+            // A typed address is shown in an <img>; accept only a web address or one of our own uploads.
+            if (avatarUrl.Length > 0 && !IsSafeAvatarUrl(avatarUrl))
+            {
+                ViewBag.Error = "The photo address must start with https:// or be a file from the media library.";
+                return View(user);
+            }
+            if (!string.Equals(avatarUrl, user.AvatarUrl, StringComparison.Ordinal)) RemoveOldAvatarFile(user.AvatarUrl);   // unchanged address: keep its file
             user.AvatarUrl = avatarUrl;
         }
 
@@ -517,7 +563,10 @@ public class AccountController : Controller
         }
 
         await _users.UpdateAsync(user);
-        
+
+        // A new password ends every other sign-in made with the old one; this session is renewed just below.
+        if (!string.IsNullOrWhiteSpace(newPassword)) await EndOtherSessionsAsync(user.Id);
+
         // Refresh cookie claims if name/email changed
         await SignInUser(user);
 
@@ -527,12 +576,47 @@ public class AccountController : Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>Signs this account out on every other device and ends its API sign-in tokens; this browser stays signed in.</summary>
+    [HttpPost("sign-out-everywhere")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SignOutEverywhere()
+    {
+        var idString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (idString == null || !Guid.TryParse(idString, out var id)) return RedirectToAction("Login");
+        var user = await _users.GetByIdAsync(id);
+        if (user == null) return RedirectToAction("Login");
+
+        await EndOtherSessionsAsync(id);
+        await SignInUser(user);
+        await _audit.LogAsync(AuditActions.AuthSessionsEnded, "Auth", id.ToString(), user.Email);
+        TempData["Success"] = "Signed out everywhere else. This browser is still signed in. API keys are not affected; revoke those under API keys.";
+        return Redirect("/account/security");
+    }
+
+    private async Task EndOtherSessionsAsync(Guid userId)
+    {
+        await _users.SetSessionsValidFromAsync(userId, DeskSessionValidator.CutOffNow());
+        DeskSessionValidator.Forget(HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), userId);
+    }
+
+    private const long MaxAvatarBytes = 2 * 1024 * 1024;
+
+    /// <summary>A web address, a generated avatar, or a file under our own uploads; never a path that climbs out.</summary>
+    public static bool IsSafeAvatarUrl(string url) =>
+        !url.Contains("..") && !url.Contains('\\') &&!url.Any(char.IsControl)
+        && (url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || url.StartsWith("/uploads/", StringComparison.Ordinal) || url.StartsWith("/avatar/", StringComparison.Ordinal));
+
     private void RemoveOldAvatarFile(string? currentAvatarUrl)
     {
         if (string.IsNullOrEmpty(currentAvatarUrl) || !currentAvatarUrl.StartsWith("/uploads/avatars/"))
             return;
 
-        var fileName = currentAvatarUrl.Substring("/uploads/avatars/".Length);
+        // Only a bare file name inside the avatars folder: the stored address was once free text, and
+        // "../" in it would have deleted a file anywhere under the application.
+        var fileName = Path.GetFileName(currentAvatarUrl.Substring("/uploads/avatars/".Length));
+        if (string.IsNullOrEmpty(fileName) || currentAvatarUrl.Contains("..")) return;
         var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "avatars", fileName);
 
         if (System.IO.File.Exists(filePath))

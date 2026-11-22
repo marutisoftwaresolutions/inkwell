@@ -160,9 +160,9 @@ public class BackupRestoreTests
     {
         var src = File.ReadAllText(Path.Combine(RepoRoot(), "Blog.Web", "Controllers", "BackupsController.cs"));
         Assert.Contains("[Authorize(Policy = \"AdminOnly\")]", src);
-        Assert.Equal(2, Regex.Matches(src, @"\[ValidateAntiForgeryToken\]").Count);
-        foreach (var a in new[] { "BackupRequested", "BackupDownloaded", "BackupDeleted" }) Assert.Contains("AuditActions." + a, src);
-        Assert.Equal(5, Regex.Matches(src, @"if \(Unavailable\) return NotFound\(\);").Count);
+        Assert.Equal(3, Regex.Matches(src, @"\[ValidateAntiForgeryToken\]").Count);
+        foreach (var a in new[] { "BackupRequested", "BackupDownloaded", "BackupDeleted", "BackupChecked" }) Assert.Contains("AuditActions." + a, src);
+        Assert.Equal(6, Regex.Matches(src, @"if \(Unavailable\) return NotFound\(\);").Count);
 
         var job = File.ReadAllText(Path.Combine(RepoRoot(), "Blog.Web", "Services", "Jobs", "BackupJob.cs"));
         Assert.Contains("AuditActions.BackupCreated", job);

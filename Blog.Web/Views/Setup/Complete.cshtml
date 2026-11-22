@@ -10,6 +10,14 @@
         </div>
         <h1 class="setup-title">Setup complete</h1>
         <p class="setup-subtitle">Your blog is live. Open the Desk — the admin area — to write the first post, or view the site as readers will see it.</p>
+        @if (TempData["StarterPages"] is int starterPages)
+        {
+            <p class="setup-subtitle">Your starter added @starterPages @(starterPages == 1 ? "page" : "pages"). Their text is placeholder text: open Pages in the Desk to write your own, or unpublish any you do not need.</p>
+        }
+        @if (TempData["StarterFailed"] is true)
+        {
+            <p class="setup-subtitle">The starter pages could not be added. The site itself is ready; you can create pages yourself under Pages.</p>
+        }
         <a href="/admin/dashboard" class="btn btn-primary btn-lg">Open the Desk</a>
         <a href="/" class="btn btn-ghost">View your blog</a>
     </div>

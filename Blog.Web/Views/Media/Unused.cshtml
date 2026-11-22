@@ -1,0 +1,66 @@
+@model List<Blog.Core.Domain.Media>
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Unused Files";
+    ViewData["Description"] = "Files in your library that nothing on the site points at.";
+    int limit = ViewBag.Limit;
+    string Size(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024d:0.#} MB" : $"{Math.Max(1, bytes / 1024)} KB";
+}
+@section PageActions {
+    <a href="/admin/media" class="desk-btn desk-btn-outline">Back to the library</a>
+}
+<div class="max-w-5xl space-y-5">
+    <p class="text-sm text-muted-foreground">
+        A file is listed here when it is in no post or page (body, feature and social images), no site setting, no theme setting and no profile photo.
+        Inkwell cannot see a link from another website or from a newsletter that was already sent, so keep anything you shared that way.
+        Deleting a file is permanent.
+    </p>
+    <div class="desk-card overflow-hidden">
+        @if (Model.Count == 0)
+        {
+            ViewData["EmptyTitle"] = "No unused files";
+            ViewData["EmptyHint"] = "Everything in your library is used somewhere on the site.";
+            <partial name="_EmptyState" />
+        }
+        else
+        {
+            <div class="table-scroll"><table class="desk-table">
+                <thead><tr><th>File</th><th class="hidden sm:table-cell">Type</th><th>Size</th><th class="hidden md:table-cell">Uploaded</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        var name = string.IsNullOrWhiteSpace(item.OriginalFileName) ? item.FileName : item.OriginalFileName;
+                        <tr>
+                            <td>
+                                <div class="flex items-center gap-3 min-w-0 max-w-[10rem] sm:max-w-xs">
+                                    @if ((item.ContentType ?? "").StartsWith("image/"))
+                                    {
+                                        <img src="@item.Url" alt="" width="40" height="40" loading="lazy" class="w-10 h-10 rounded object-cover border border-border flex-none" />
+                                    }
+                                    <a href="/admin/media/details/@item.Id" class="font-medium text-foreground underline-offset-2 hover:underline truncate">@name</a>
+                                </div>
+                            </td>
+                            <td class="text-xs text-muted-foreground hidden sm:table-cell">@item.ContentType</td>
+                            <td class="text-xs text-muted-foreground whitespace-nowrap">@Size(item.FileSize)</td>
+                            <td class="text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">@Dates.Medium(item.CreatedAt)</td>
+                            <td class="text-right">
+                                <form method="post" action="/admin/media/delete/@item.Id" class="inline"
+                                      data-confirm-title="Delete this file?"
+                                      data-confirm-body="“@name” is removed from the server for good. Nothing on this site uses it, but a link from another site or an old newsletter would stop working."
+                                      data-confirm-action="Delete file" data-confirm-tone="danger">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnTo" value="unused" />
+                                    <button type="submit" class="desk-btn desk-btn-danger-outline desk-btn-sm" aria-label="Delete @name">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+    </div>
+    @if (Model.Count >= limit)
+    {
+        <p class="text-sm text-muted-foreground">Showing the oldest @limit. Delete some and open the report again to see more.</p>
+    }
+</div>

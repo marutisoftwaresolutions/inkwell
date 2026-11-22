@@ -58,6 +58,14 @@ public class MediaRepository : IMediaRepository
             new { Id = id, UploadedBy = uploadedBy, AltText = altText, Caption = caption }) > 0;
     }
 
+    public async Task<bool> UpdateFileAsync(Guid id, Guid uploadedBy, long fileSize, int? width, int? height)
+    {
+        using var conn = _ctx.CreateConnection();
+        return await conn.ExecuteAsync(
+            "UPDATE Media SET FileSize = @fileSize, Width = @width, Height = @height WHERE Id = @id AND UploadedBy = @uploadedBy",
+            new { id, uploadedBy, fileSize, width, height }) > 0;
+    }
+
     public async Task<int> GetTotalCountAsync(Guid? uploadedBy = null)
     {
         using var conn = _ctx.CreateConnection();
@@ -83,6 +91,31 @@ public class MediaRepository : IMediaRepository
         return await conn.ExecuteScalarAsync<int>(
             $"SELECT COUNT(*) FROM Media WHERE {SearchWhere(q, folder)}",
             new { UploadedBy = uploadedBy, Like = LikePattern(q) });
+    }
+
+    public async Task<List<Media>> GetUnusedAsync(Guid uploadedBy, int take)
+    {
+        using var conn = _ctx.CreateConnection();
+        // One pass in the database. The file's address is matched as text wherever an address can be stored;
+        // the pattern escapes LIKE wildcards. Runs only when an admin opens the report, never on a reader's request.
+        const string sql = @"
+            WITH m AS (
+                SELECT TOP (5000) *, '%' + REPLACE(REPLACE(REPLACE(Url, '[', '\['), '%', '\%'), '_', '\_') + '%' AS Pattern
+                FROM Media WHERE UploadedBy = @uploadedBy AND Url IS NOT NULL AND LEN(Url) > 0
+                ORDER BY CreatedAt
+            )
+            SELECT TOP (@take) m.Id, m.FileName, m.OriginalFileName, m.FilePath, m.Url, m.ContentType, m.FileSize, m.Width, m.Height,
+                   m.AltText, m.Caption, m.UploadedBy, m.CreatedAt
+            FROM m
+            WHERE NOT EXISTS (SELECT 1 FROM Posts p WHERE p.FeatureImage = m.Url OR p.OgImage = m.Url OR p.TwitterImage = m.Url
+                                 OR p.Html LIKE m.Pattern ESCAPE '\' OR p.RoundupJson LIKE m.Pattern ESCAPE '\' OR p.Markdown LIKE m.Pattern ESCAPE '\')
+              AND NOT EXISTS (SELECT 1 FROM Pages g WHERE g.FeaturedImageId = m.Id OR g.OgImage = m.Url OR g.TwitterImage = m.Url
+                                 OR g.Content LIKE m.Pattern ESCAPE '\' OR g.Markdown LIKE m.Pattern ESCAPE '\')
+              AND NOT EXISTS (SELECT 1 FROM Settings s WHERE s.JsonPayload LIKE m.Pattern ESCAPE '\')
+              AND NOT EXISTS (SELECT 1 FROM CustomThemeSettings t WHERE t.SettingValue LIKE m.Pattern ESCAPE '\')
+              AND NOT EXISTS (SELECT 1 FROM Users u WHERE u.AvatarUrl = m.Url OR u.ProfileImage = m.Url)
+            ORDER BY m.CreatedAt";
+        return (await conn.QueryAsync<Media>(new CommandDefinition(sql, new { uploadedBy, take }, commandTimeout: 60))).ToList();
     }
 
     public async Task<Dictionary<Guid, List<MediaReference>>> FindReferencesAsync(IReadOnlyCollection<Media> items)

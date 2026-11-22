@@ -24,21 +24,21 @@ public class ContentHealthRepository : IContentHealthRepository
         // attributes and so has a constant length.
         var rows = await conn.QueryAsync<ContentHealthItem>(@"
             SELECT Id, Title, Slug, PublishedAt, UpdatedAt, LastVerifiedAt, NextReviewAt,
-                   CASE WHEN LEN(ISNULL(KeyFactsJson, '')) > 10 THEN 1 ELSE 0 END AS HasKeyFacts,
-                   CASE WHEN LEN(ISNULL(FaqJson, ''))      > 10 THEN 1 ELSE 0 END AS HasFaq,
-                   LEN(ISNULL(MetaDescription, ''))                                AS MetaLength,
-                   ISNULL(MetaDescription, '')                                     AS MetaDescription,
-                   ISNULL(AnswerCapsule, '')                                       AS AnswerCapsule,
-                   ISNULL(KeyFactsJson, '')                                        AS KeyFactsJson,
-                   ISNULL(FaqJson, '')                                             AS FaqJson,
-                   CASE WHEN LEN(ISNULL(FeatureImage, '')) > 0 THEN 1 ELSE 0 END   AS HasFeatureImage,
-                   (LEN(REPLACE(LOWER(ISNULL(Html, '')), '</h2>', '123456')) - LEN(ISNULL(Html, ''))) AS H2Count,
-                   (LEN(REPLACE(LOWER(ISNULL(Html, '')), 'href=""/', '123456789')) - LEN(ISNULL(Html, ''))) / 2 AS InternalLinks,
-                   LEN(ISNULL(Html, ''))                                           AS HtmlLength
+                   CASE WHEN LEN(COALESCE(KeyFactsJson, '')) > 10 THEN 1 ELSE 0 END AS HasKeyFacts,
+                   CASE WHEN LEN(COALESCE(FaqJson, ''))      > 10 THEN 1 ELSE 0 END AS HasFaq,
+                   LEN(COALESCE(MetaDescription, ''))                                AS MetaLength,
+                   COALESCE(MetaDescription, '')                                     AS MetaDescription,
+                   COALESCE(AnswerCapsule, '')                                       AS AnswerCapsule,
+                   COALESCE(KeyFactsJson, '')                                        AS KeyFactsJson,
+                   COALESCE(FaqJson, '')                                             AS FaqJson,
+                   CASE WHEN LEN(COALESCE(FeatureImage, '')) > 0 THEN 1 ELSE 0 END   AS HasFeatureImage,
+                   (LEN(REPLACE(LOWER(COALESCE(Html, '')), '</h2>', '123456')) - LEN(COALESCE(Html, ''))) AS H2Count,
+                   (LEN(REPLACE(LOWER(COALESCE(Html, '')), 'href=""/', '123456789')) - LEN(COALESCE(Html, ''))) / 2 AS InternalLinks,
+                   LEN(COALESCE(Html, ''))                                           AS HtmlLength
               FROM Posts
              WHERE Status = 'Published'
                AND (@OwnerId IS NULL OR AuthorId = @OwnerId)
-             ORDER BY ISNULL(NextReviewAt, '9999-12-31') ASC, PublishedAt DESC;",
+             ORDER BY COALESCE(NextReviewAt, '9999-12-31') ASC, PublishedAt DESC;",
             new { OwnerId = ownerId });
 
         return rows.ToList();
@@ -48,7 +48,7 @@ public class ContentHealthRepository : IContentHealthRepository
     {
         using var conn = _ctx.CreateConnection();
         var rows = await conn.QueryAsync<(Guid Id, string Html)>(@"
-            SELECT Id, ISNULL(Html, '') AS Html
+            SELECT Id, COALESCE(Html, '') AS Html
               FROM Posts
              WHERE Status = 'Published'
                AND (@OwnerId IS NULL OR AuthorId = @OwnerId);", new { OwnerId = ownerId });

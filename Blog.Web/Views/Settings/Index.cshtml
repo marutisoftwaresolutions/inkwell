@@ -1,6 +1,11 @@
 @using Blog.Web.Models
 @model SettingsViewModel
+@inject Microsoft.Extensions.Configuration.IConfiguration HostConfig
+@inject Blog.Core.Interfaces.ITenantContext HostTenant
 @{
+    // Host switches: a shared or public install can remove maintenance mode and custom code from this screen.
+    var maintenanceAllowed = Blog.Web.Services.HostSwitches.MaintenanceModeAllowed(HostConfig);
+    var codeTab = User.IsInRole("Admin") && Blog.Web.Services.HostSwitches.CodeInjectionAllowed(HostConfig, HostTenant);
     Layout = "_AdminLayout";
     ViewData["Title"] = "Settings";
     ViewData["Description"] = "How your site presents itself, what readers can do, and how search engines and answer engines see it. Changes on every tab are saved together with the Save changes button at the bottom.";
@@ -40,6 +45,7 @@
                 <a href="#s-general">General</a> <a href="#s-display">Display</a> <a href="#s-comments">Comments</a>
                 <a href="#s-analytics">Search &amp; analytics</a> <a href="#s-housekeeping">Notifications &amp; housekeeping</a>
                 <a href="#s-social">Social</a> <a href="#s-identity">Identity</a> <a href="#s-fields">Custom fields</a>
+                @if (codeTab) { <a href="#s-code">Custom code</a> }
             </noscript>
         </nav>
 
@@ -120,6 +126,31 @@
                     </div>
                     <p class="@helpCls">Wide hero/banner image at the top of the home page in layouts that show one (recommended 1500 × 500 px). Also the fallback social preview image for pages without their own.</p>
                 </div>
+                <div class="flex items-start space-x-3 border-t border-border pt-6">
+                    <input asp-for="NewsletterDraftOnPublish" type="checkbox" class="@checkCls" />
+                    <div class="grid gap-1.5 leading-none">
+                        <label asp-for="NewsletterDraftOnPublish" class="@labelCls">Prepare a newsletter when a post is published</label>
+                        <p class="text-sm text-muted-foreground">Each post that goes live gets a newsletter draft featuring it, waiting under <a href="/admin/newsletter" class="underline">Admin → Newsletter</a>. Nothing is emailed until an Admin opens the draft and sends it. Unlisted posts are left out.</p>
+                    </div>
+                </div>
+                @if (maintenanceAllowed)
+                {
+                    <div class="space-y-4 border-t border-border pt-6">
+                        <div class="flex items-start space-x-3">
+                            <input asp-for="MaintenanceModeEnabled" type="checkbox" class="@checkCls" aria-describedby="maintenance-help" />
+                            <div class="grid gap-1.5 leading-none">
+                                <label asp-for="MaintenanceModeEnabled" class="@labelCls">Maintenance mode</label>
+                                <p id="maintenance-help" class="text-sm text-muted-foreground">Visitors see a short holding page instead of the site; anyone signed in to the Desk sees the site as usual, so you can check your work. Search engines are told the pause is temporary (status 503 with Retry-After), so nothing is dropped from their index for a short break; do not leave it on for days. The feed, sitemap and comment form pause too. Sign-in, the Desk, the API and links in emails already sent keep working.</p>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label asp-for="MaintenanceMessage" class="@labelCls"></label>
+                            <input asp-for="MaintenanceMessage" class="@inputCls" maxlength="@Blog.Core.Services.MaintenanceMode.MaxMessageLength" placeholder="@Blog.Core.Services.MaintenanceMode.DefaultMessage" />
+                            <p class="@helpCls">One or two plain sentences. Left blank, the page says: “@Blog.Core.Services.MaintenanceMode.DefaultMessage”</p>
+                            <span asp-validation-for="MaintenanceMessage" class="@errCls"></span>
+                        </div>
+                    </div>
+                }
             </section>
 
             @* ────────────────────────────── Display ────────────────────────────── *@
@@ -129,6 +160,40 @@
                     <h2 class="desk-card-title">Display</h2>
                     <p class="@helpCls mt-1">How lists, dates and times, and colours are shown. Layouts, presets and fonts live under <a href="/admin/theme" class="underline">Theme</a>.</p>
                 </header>
+                <div class="flex items-start space-x-3">
+                    <input asp-for="ShareLinksEnabled" type="checkbox" class="@checkCls" />
+                    <div class="grid gap-1.5 leading-none">
+                        <label asp-for="ShareLinksEnabled" class="@labelCls">Show share links under posts</label>
+                        <p class="text-sm text-muted-foreground">Adds "Copy link", email, LinkedIn, Bluesky, X, Facebook and WhatsApp links under each post. They are ordinary links: nothing is loaded from those services and no script of theirs runs on your site.</p>
+                    </div>
+                </div>
+                <fieldset class="space-y-3 border-t border-border pt-6">
+                    <legend class="text-sm font-semibold text-foreground">Contact button</legend>
+                    <p class="@helpCls">A small button fixed to the corner of every page that opens WhatsApp, a phone call or an email to you. It is an ordinary link: nothing is loaded from WhatsApp or anyone else.</p>
+                    <div class="grid gap-6 md:grid-cols-3">
+                        <div class="space-y-2">
+                            <label asp-for="ContactButtonKind" class="@labelCls">Opens</label>
+                            <select asp-for="ContactButtonKind" class="@selectCls">
+                                <option value="">No button</option>
+                                <option value="whatsapp">WhatsApp chat</option>
+                                <option value="phone">Phone call</option>
+                                <option value="email">Email</option>
+                            </select>
+                        </div>
+                        <div class="space-y-2">
+                            <label asp-for="ContactButtonValue" class="@labelCls"></label>
+                            <input asp-for="ContactButtonValue" class="@inputCls" maxlength="254" placeholder="+44 20 7946 0958" aria-describedby="contact-value-help" />
+                            <p id="contact-value-help" class="@helpCls">A number in international form with the country code, or one email address.</p>
+                            <span asp-validation-for="ContactButtonValue" class="@errCls"></span>
+                        </div>
+                        <div class="space-y-2">
+                            <label asp-for="ContactButtonLabel" class="@labelCls"></label>
+                            <input asp-for="ContactButtonLabel" class="@inputCls" maxlength="@Blog.Core.Services.ContactButton.MaxLabelLength" placeholder="Chat on WhatsApp" />
+                            <p class="@helpCls">Optional. Shown beside the icon on wide screens and read out by screen readers.</p>
+                            <span asp-validation-for="ContactButtonLabel" class="@errCls"></span>
+                        </div>
+                    </div>
+                </fieldset>
                 <div class="grid gap-6 md:grid-cols-2">
                     <div class="space-y-2">
                         <label asp-for="PostsPerPage" class="@labelCls"></label>
@@ -168,8 +233,21 @@
                         <input asp-for="CommentsModeration" type="checkbox" class="@checkCls" />
                         <div class="grid gap-1.5 leading-none">
                             <label asp-for="CommentsModeration" class="@labelCls">Hold comments for approval</label>
-                            <p class="text-sm text-muted-foreground">New comments wait in <a href="/admin/comments" class="underline">Admin → Comments</a> until approved. Off means they appear immediately.</p>
+                            <p class="text-sm text-muted-foreground">New comments wait in <a href="/admin/comments" class="underline">Admin → Comments</a> until approved. Off means a comment that passes the spam filter appears at once; one that carries a link, or that replies to a comment still waiting, is held all the same.</p>
                         </div>
+                    </div>
+                    <div class="flex items-start space-x-3 border-t border-border pt-5">
+                        <input asp-for="CommentNotifyEnabled" type="checkbox" class="@checkCls" aria-describedby="comment-notify-help" />
+                        <div class="grid gap-1.5 leading-none">
+                            <label asp-for="CommentNotifyEnabled" class="@labelCls">Email me when a reader comments</label>
+                            <p id="comment-notify-help" class="text-sm text-muted-foreground">Sends a short email with the comment and a link to <a href="/admin/comments" class="underline">Admin → Comments</a>, so a comment does not wait until someone happens to look. At most @Blog.Core.Services.CommentNotice.MaxPerHour emails an hour; comments the spam filter rejects and replies written from the Desk send none. Needs SMTP configured on the server.</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="CommentNotifyEmails" class="@labelCls"></label>
+                        <input asp-for="CommentNotifyEmails" class="@inputCls" placeholder="editor@example.com, owner@example.com" />
+                        <p class="@helpCls">Up to @Blog.Core.Services.CommentNotice.MaxRecipients addresses, separated by commas. Left blank, the email goes to the author of the post that was commented on.</p>
+                        <span asp-validation-for="CommentNotifyEmails" class="@errCls"></span>
                     </div>
                 </div>
             </section>
@@ -211,6 +289,17 @@
                         <div>
                             <label asp-for="CookieConsentEnabled" class="@labelCls"></label>
                             <p id="cookie-consent-help" class="@helpCls mt-1">On by default. Readers see a banner with equal Accept and Reject buttons, and Google Analytics loads only after they accept; the choice is remembered for @Blog.Core.Services.CookieConsent.RememberDays days and can be changed from the “Cookie settings” link at the foot of every page. With no Measurement ID set, the banner only says the site uses essential cookies. Turn it off only if no visitor is covered by consent rules such as the EU and UK GDPR and ePrivacy, Brazil’s LGPD or California’s CCPA.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-3 pt-6 border-t border-border">
+                    <h3 class="text-sm font-semibold text-foreground">AI assistants</h3>
+                    <div class="flex items-start gap-3">
+                        <input asp-for="McpEnabled" type="checkbox" class="@checkCls" />
+                        <div>
+                            <label asp-for="McpEnabled" class="@labelCls">Let AI assistants connect (MCP)</label>
+                            <p class="@helpCls mt-1">Opens <code>/mcp</code>, a Model Context Protocol endpoint. An assistant such as Claude or ChatGPT can then read your content and write drafts, using a personal key each person creates under <a href="/account/api-keys" class="underline">API keys</a>. A key acts as its owner and never beyond the access ticked for it; publishing needs a key with the publish scope held by someone who may publish. Every change is in the audit trail under the key's name. While this is off, the address answers "not found".</p>
                         </div>
                     </div>
                 </div>
@@ -540,6 +629,45 @@
                 </div>
             </section>
 
+            @* ────────────────────────────── Custom code (Admin only) ────────────────────────────── *@
+            @if (codeTab)
+            {
+                <section id="s-code" role="tabpanel" aria-labelledby="tab-code" x-show="tab === 'code'" x-cloak data-tab="code"
+                         class="desk-card p-6 space-y-6 scroll-mt-16">
+                    <header>
+                        <h2 class="desk-card-title">Custom code</h2>
+                        <p class="@helpCls mt-1">Your own CSS, and HTML added to every public page: a tag-manager or analytics snippet, a verification tag, a chat widget. Only Admins see this tab, and every change is recorded in the <a href="/admin/audit" class="underline">audit log</a> with the text before and after.</p>
+                    </header>
+                    <input type="hidden" name="CodePosted" value="true" />
+                    <p class="text-sm tone-warn" role="note">Code placed here runs in every visitor's browser with full access to the page. Paste only code from a source you trust, and remove what you no longer use. Inkwell does not check or change it.</p>
+                    <div class="space-y-2">
+                        <label asp-for="CustomCss" class="@labelCls"></label>
+                        <textarea asp-for="CustomCss" rows="8" spellcheck="false" maxlength="@Blog.Core.Services.CodeInjection.MaxLength" class="desk-textarea font-mono text-xs" placeholder=".ink-post-title { letter-spacing: -0.01em; }"></textarea>
+                        <p class="@helpCls">Loaded after the theme on every public page, so it wins over the theme's rules. Never shown in the Desk.</p>
+                        <span asp-validation-for="CustomCss" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="CodeInjectionHead" class="@labelCls"></label>
+                        <textarea asp-for="CodeInjectionHead" rows="8" spellcheck="false" maxlength="@Blog.Core.Services.CodeInjection.MaxLength" class="desk-textarea font-mono text-xs" placeholder="&lt;script async src=&quot;https://…&quot;&gt;&lt;/script&gt;"></textarea>
+                        <p class="@helpCls">Added at the end of <code>&lt;head&gt;</code>. Use <code>async</code> or <code>defer</code> on scripts so they do not hold up the page.</p>
+                        <span asp-validation-for="CodeInjectionHead" class="@errCls"></span>
+                    </div>
+                    <div class="space-y-2">
+                        <label asp-for="CodeInjectionFoot" class="@labelCls"></label>
+                        <textarea asp-for="CodeInjectionFoot" rows="8" spellcheck="false" maxlength="@Blog.Core.Services.CodeInjection.MaxLength" class="desk-textarea font-mono text-xs"></textarea>
+                        <p class="@helpCls">Added just before <code>&lt;/body&gt;</code>.</p>
+                        <span asp-validation-for="CodeInjectionFoot" class="@errCls"></span>
+                    </div>
+                    <div class="flex items-start gap-3 border-t border-border pt-6">
+                        <input asp-for="CodeInjectionNeedsConsent" type="checkbox" class="@checkCls" aria-describedby="code-consent-help" />
+                        <div>
+                            <label asp-for="CodeInjectionNeedsConsent" class="@labelCls"></label>
+                            <p id="code-consent-help" class="@helpCls mt-1">On by default. While the cookie-consent banner is on (Search &amp; analytics tab), the head and foot code is not in the page a visitor receives: it loads only after they accept, and a visitor who rejects, or whose browser runs no JavaScript, never gets it. Untick this only if the code sets no cookies and collects nothing about visitors, for example a verification tag. CSS is not affected. With the banner off, the code loads for everyone.</p>
+                        </div>
+                    </div>
+                </section>
+            }
+
             @* ── Sticky action bar: Save is visible on every tab, at every scroll position ── *@
             <div class="sticky bottom-0 z-10 mt-6 -mx-1 px-1 pb-[env(safe-area-inset-bottom,0px)]">
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 backdrop-blur px-4 py-3 shadow-lg">
@@ -580,7 +708,8 @@
                     { key: 'housekeeping', label: 'Notifications & housekeeping' },
                     { key: 'social',       label: 'Social' },
                     { key: 'identity',     label: 'Identity' },
-                    { key: 'fields',       label: 'Custom fields' }
+                    { key: 'fields',       label: 'Custom fields' }@(codeTab ? "," : "")
+                    @if (codeTab) { <text>{ key: 'code',         label: 'Custom code' }</text> }
                 ],
                 tab: 'general',
                 errors: {},

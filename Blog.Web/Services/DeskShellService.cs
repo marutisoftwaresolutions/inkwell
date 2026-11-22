@@ -21,9 +21,11 @@ public sealed class DeskShellService
     private readonly IPostRepository _posts;
     private readonly ITenantContext _tenant;
     private DeskShellModel? _cached;
+    private readonly bool _maintenanceAllowed;
 
-    public DeskShellService(IUserRepository users, ISettingRepository settings, ICommentRepository comments, IPostRepository posts, ITenantContext tenant)
+    public DeskShellService(IUserRepository users, ISettingRepository settings, ICommentRepository comments, IPostRepository posts, ITenantContext tenant, IConfiguration config)
     {
+        _maintenanceAllowed = HostSwitches.MaintenanceModeAllowed(config);
         _users = users;
         _settings = settings;
         _comments = comments;
@@ -38,6 +40,7 @@ public sealed class DeskShellService
         string siteName = "Inkwell", scheme = "system", favicon = "/favicon.ico";
         string avatar = "/avatar/" + Uri.EscapeDataString(user.Identity?.Name ?? "A");
         int pending = 0, review = 0;
+        bool maintenance = false;
         bool cloud = false;
         try { cloud = _tenant.IsCloudMode; } catch { /* no tenant: single-site defaults */ }
 
@@ -48,6 +51,7 @@ public sealed class DeskShellService
             if (!string.IsNullOrWhiteSpace(settings?.SiteName)) siteName = settings!.SiteName;
             if (!string.IsNullOrWhiteSpace(settings?.SiteFaviconUrl)) favicon = settings!.SiteFaviconUrl;
             if (settings?.Theme is "light" or "dark") scheme = settings!.Theme;
+            maintenance = settings?.MaintenanceModeEnabled == true && _maintenanceAllowed;
         }
         catch { /* settings unavailable: defaults */ }
 
@@ -84,6 +88,7 @@ public sealed class DeskShellService
             IsCloudMode = cloud,
             PendingComments = pending,
             ReviewQueue = review,
+            MaintenanceOn = maintenance,
             Items = DeskNavigation.Visible(user, cloud).ToList(),
             Commands = DeskNavigation.Commands.Where(c => !c.AdminOnly || admin).ToList(),
             Current = DeskNavigation.Current(controller, action),

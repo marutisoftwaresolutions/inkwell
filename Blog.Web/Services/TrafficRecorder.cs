@@ -44,7 +44,9 @@ public sealed class TrafficRecorder
     private readonly IServiceScopeFactory _scopes;
     private readonly IMemoryCache _cache;
     private readonly CrawlerVerifier _verifier;
+    private readonly GoalRecorder _goals;
     private readonly ILogger<TrafficRecorder> _log;
+    private readonly bool _geoLookupEnabled;
     private DateTime _lastFlushUtc = DateTime.UtcNow;
 
     /// <summary>A view waiting for its flush. The raw IP lives only in memory, for the geo lookup.</summary>
@@ -53,13 +55,24 @@ public sealed class TrafficRecorder
     /// <summary>A crawler visit waiting for its flush; the raw IP is kept only to verify the crawler.</summary>
     private sealed record PendingCrawler(CrawlerVisit Visit, string Ip);
 
-    public TrafficRecorder(IServiceScopeFactory scopes, IMemoryCache cache, CrawlerVerifier verifier, ILogger<TrafficRecorder> log)
+    public TrafficRecorder(IServiceScopeFactory scopes, IMemoryCache cache, CrawlerVerifier verifier, ILogger<TrafficRecorder> log, IConfiguration config, GoalRecorder goals)
     {
         _scopes = scopes;
         _cache = cache;
         _verifier = verifier;
+        _goals = goals;
         _log = log;
+        _geoLookupEnabled = GeoLookupEnabled(config);
     }
+
+    /// <summary>
+    /// Whether reader addresses may be sent to ip-api.com for a country and region. The free tier is
+    /// plain HTTP, so an operator who wants no reader data to leave the server sets
+    /// <c>Analytics:GeoIpLookup</c> to false; views are then stored without a country. Absent means on,
+    /// so an existing install keeps the reports it already has.
+    /// </summary>
+    public static bool GeoLookupEnabled(IConfiguration config) =>
+        config.GetValue("Analytics:GeoIpLookup", true);
 
     public void RecordPageView(PageView view, string ip)
     {
@@ -139,6 +152,9 @@ public sealed class TrafficRecorder
             // "Most read" counts the same beacons, added per post in one pass for the whole batch.
             try { await sp.GetRequiredService<IPostRepository>().AddViewCountsAsync(PostViewTally.Count(views.Select(v => (v.View.OwnerId, v.View.Path)))); }
             catch (Exception ex) { _log.LogDebug(ex, "Post view counts not updated (non-fatal)."); }
+
+            // Visit goals count the same beacons (Admin → Analytics → Goals). The goal recorder never throws.
+            await _goals.PageViewsAsync(views.Select(v => (v.View.OwnerId, v.View.Path)));
         }
 
         return written;
@@ -179,6 +195,8 @@ public sealed class TrafficRecorder
 
     private async Task ResolveGeoAsync(IReadOnlyList<PendingView> views)
     {
+        if (!_geoLookupEnabled) return;
+
         var lookups = 0;
         foreach (var group in views.GroupBy(v => v.Ip))
         {

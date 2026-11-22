@@ -4,6 +4,11 @@
  * script decides from the reader's own first-party cookie whether to show it and whether Google
  * Analytics may load. Nothing optional loads before a choice, and without JavaScript nothing loads
  * at all. Reject is exactly as easy as Accept, and "Cookie settings" reopens the banner at any time.
+ *
+ * The site's own custom code (Settings, Custom code) is handled the same way when it waits for
+ * consent: the server sends it as a JSON string in #ink-held-code, which the browser never parses as
+ * HTML, and it is added to the page only after "Accept". A reader who later rejects gets a reload,
+ * because code that has run cannot be taken back out of a page.
  */
 (function () {
     'use strict';
@@ -14,6 +19,26 @@
     var DAYS = parseInt(banner.getAttribute('data-days'), 10) || 180;
     var gaId = banner.getAttribute('data-ga-id') || '';
     var gaLoaded = false;
+    var held = document.getElementById('ink-held-code');
+    var codeLoaded = false;
+
+    function loadHeldCode() {
+        if (!held || codeLoaded) return;
+        codeLoaded = true;
+        var data;
+        try { data = JSON.parse(held.textContent || '{}'); } catch (e) { return; }
+        // A fragment made this way runs its scripts when it is inserted (innerHTML would not).
+        function add(html, parent) {
+            if (!html || !parent) return;
+            try {
+                var range = document.createRange();
+                range.selectNodeContents(parent);
+                parent.appendChild(range.createContextualFragment(html));
+            } catch (e) { /* the operator's code is broken: the page itself carries on */ }
+        }
+        add(data.head, document.head);
+        add(data.foot, document.body);
+    }
 
     function read() {
         var m = document.cookie.match(new RegExp('(?:^|; )' + NAME + '=([^;]*)'));
@@ -70,7 +95,11 @@
         if (!btn) return;
         var choice = btn.getAttribute('data-consent');      // granted | denied | ack
         write(choice);
-        if (choice === 'granted') loadAnalytics(); else stopAnalytics();
+        if (choice === 'granted') { loadAnalytics(); loadHeldCode(); }
+        else {
+            stopAnalytics();
+            if (codeLoaded) { location.reload(); return; }      // the choice is saved; the reload serves the page without the code
+        }
         hide();
     });
     banner.addEventListener('keydown', function (e) {
@@ -84,8 +113,8 @@
 
     // An "ack" of the essential-only notice is not consent to analytics added later: ask again then.
     var current = read();
-    var asking = !!gaId;
+    var asking = !!gaId || !!held;
     var decided = asking ? (current === 'granted' || current === 'denied') : current !== null;
-    if (asking && current === 'granted') loadAnalytics();
+    if (asking && current === 'granted') { loadAnalytics(); loadHeldCode(); }
     else if (!decided) { banner.hidden = false; }            // first visit: show without stealing focus
 })();

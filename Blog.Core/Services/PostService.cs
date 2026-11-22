@@ -33,8 +33,7 @@ public class PostService
         if (await _posts.SlugExistsAsync(post.Slug))
             post.Slug = $"{post.Slug}-{DateTime.UtcNow.Ticks % 10000}";
 
-        if (post.Status == PostStatus.Published && !post.PublishedAt.HasValue)
-            post.PublishedAt = DateTime.UtcNow;
+        post.PublishedAt = EditorialWorkflow.PublishDate(post.Status, post.ScheduledAt, post.PublishedAt, DateTime.UtcNow);
 
         var id = await _posts.CreateAsync(post);
 
@@ -66,8 +65,9 @@ public class PostService
         if (await _posts.SlugExistsAsync(post.Slug, post.Id))
             return "Slug already in use by another post.";
 
-        if (post.Status == PostStatus.Published && !post.PublishedAt.HasValue)
-            post.PublishedAt = existing.PublishedAt ?? DateTime.UtcNow;
+        // A published post keeps the date it already had when the form sends none; other states keep what the form sent.
+        post.PublishedAt = EditorialWorkflow.PublishDate(post.Status, post.ScheduledAt,
+            post.Status == PostStatus.Published ? post.PublishedAt ?? existing.PublishedAt : post.PublishedAt, DateTime.UtcNow);
 
         post.AuthorId = existing.AuthorId;
         post.CreatedAt = existing.CreatedAt;

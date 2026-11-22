@@ -1,0 +1,50 @@
+@model List<Blog.Core.Services.MailAuthCheck.Finding>
+@using Blog.Core.Services
+@{
+    ViewData["Title"] = "Sender Check";
+    Layout = "_AdminLayout";
+    ViewData["Description"] = "Whether mailbox providers will accept newsletters sent in your domain's name.";
+    var domain = ViewBag.Domain as string;
+    var from = ViewBag.From as string;
+    string Pill(MailAuthCheck.Level l) => l switch { MailAuthCheck.Level.Ok => "pill-ok", MailAuthCheck.Level.Warning => "pill-warn", _ => "pill-bad" };
+    string Word(MailAuthCheck.Level l) => l switch { MailAuthCheck.Level.Ok => "In place", MailAuthCheck.Level.Warning => "Check", _ => "Fix" };
+}
+@section PageActions {
+    <a href="/admin/newsletter" class="desk-btn desk-btn-outline">Back to newsletters</a>
+}
+<div class="max-w-3xl space-y-6">
+    @if (domain is null)
+    {
+        <p class="rounded-lg border p-4 pill-warn text-sm" role="note">
+            There is no sender address to check. Set <code>Smtp:FromEmail</code> on the server to an address at your own domain@(string.IsNullOrWhiteSpace(from) ? "." : $"; it is currently \"{from}\".")
+        </p>
+    }
+    else
+    {
+        var verdict = ((MailAuthCheck.Level Level, string Message))ViewBag.Verdict;
+        <div class="rounded-lg border p-4 @Pill(verdict.Level) text-sm" role="status">
+            <strong>@domain</strong>: @verdict.Message
+        </div>
+        <div class="desk-card">
+            <div class="table-scroll"><table class="desk-table">
+                <thead><tr><th>Record</th><th>State</th><th>What was found</th></tr></thead>
+                <tbody>
+                    @foreach (var f in Model)
+                    {
+                        <tr>
+                            <td class="font-medium text-foreground whitespace-nowrap">@f.Record</td>
+                            <td><span class="desk-pill @Pill(f.Level)">@Word(f.Level)</span></td>
+                            <td class="text-sm">@f.Message</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        </div>
+        <div class="desk-card p-5 text-sm text-muted-foreground space-y-2">
+            <h2 class="desk-card-title">What this does and does not tell you</h2>
+            <p>These are the records your domain publishes, read from DNS just now. Gmail, Yahoo and other large providers ask bulk senders for SPF or DKIM, and for DMARC.</p>
+            <p>It cannot see whether your mail service really signs each message, and it cannot see bounces that come back later by email. An address a mail server refuses outright while a newsletter is being sent is moved to Bounced under Subscribers and is not sent to again.</p>
+            <p>Records are changed at your domain's DNS provider, not in Inkwell. A change can take up to a day to be visible here.</p>
+        </div>
+    }
+</div>

@@ -45,6 +45,8 @@ builder.Services.AddInfrastructure(connStr);
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<Blog.Web.Services.StarterSiteService>();   // setup wizard: starter sites
+builder.Services.AddSingleton<Blog.Web.Services.DnsTxtLookup>();   // sender check (SPF, DKIM, DMARC), admin-started only
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Blog.Core.Interfaces.IEmailService, SmtpEmailService>();
 builder.Services.AddHttpClient<ReCaptchaService>();
@@ -92,6 +94,7 @@ builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PageViewRetentionJob>();       // PageViewRetentionDays; off by default
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.PasswordResetTokenPruneJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.OgCachePruneJob>();
+builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.WelcomeSequenceJob>();         // welcome emails after a reader confirms
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.WebhookDeliveryJob>();
 builder.Services.AddScoped<Blog.Web.Services.Jobs.WebhookDeliveryJob>();
 // Webhooks: publishing only queues (WebhookPublisher); the job above sends through the SSRF-guarded sender.
@@ -99,6 +102,8 @@ builder.Services.AddScoped<Blog.Web.Services.Webhooks.WebhookPublisher>();
 builder.Services.AddScoped<Blog.Web.Services.MenuService>();
 builder.Services.AddScoped<Blog.Web.Services.DeskShellService>(); // admin shell model (sidebar, topbar, command palette), once per request
 builder.Services.AddSingleton<Blog.Web.Services.Webhooks.IWebhookSender, Blog.Web.Services.Webhooks.WebhookSender>();
+// Bookmark block: fetches a linked page for its title and description, through the same public-addresses-only guard.
+builder.Services.AddSingleton<Blog.Web.Services.ILinkPreviewFetcher, Blog.Web.Services.LinkPreviewFetcher>();
 // Backups (ADR-0019): ZIPs outside the web root (Backups:Path, default App_Data/backups), made by the job.
 builder.Services.AddSingleton(sp =>
 {
@@ -150,6 +155,8 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.ScheduledScriptJob>();
 builder.Services.AddScoped<Blog.Core.Interfaces.IScheduledJob, Blog.Web.Services.Jobs.NewsletterSendJob>();   // queued newsletters, in batches (ADR-0028)
 builder.Services.AddScoped<Blog.Web.Services.Newsletter.NewsletterService>();
+// Called by WebhookPublisher when a post goes live; creates a newsletter draft when the site asked for one.
+builder.Services.AddScoped<Blog.Web.Services.Newsletter.PublishNewsletterDrafter>();
 
 // ── Search Console ───────────────────────────────────────────────────────────
 // Per-tenant service-account credentials (Data-Protection-encrypted), a two-endpoint HTTP client,
@@ -207,6 +214,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     // Only endpoints that name this scheme (the /api controllers) read a bearer token; the Desk never does.
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => ApiTokenService.Configure(options, builder.Configuration));
 builder.Services.AddSingleton<ApiTokenService>();
+// Per-account wait after repeated wrong passwords (in memory; the IP firewall covers per-address guessing).
+builder.Services.AddSingleton<Blog.Core.Services.SignInThrottle>();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -234,6 +243,12 @@ builder.Services.AddSingleton<Blog.Web.Services.CrawlerVerifier>();
 builder.Services.AddSingleton(sp => new Blog.Web.Services.IpHasher(keysPath,
     sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(),
     sp.GetRequiredService<ILogger<Blog.Web.Services.IpHasher>>()));
+// Goal counters: an in-memory tally written as daily rows at most every 30 seconds (same exception as TrafficRecorder).
+builder.Services.AddSingleton<Blog.Web.Services.GoalRecorder>();
+// Maintenance mode (the holding page readers get while it is on) and the email to moderators about a new comment.
+builder.Services.AddSingleton<Blog.Web.Services.MaintenanceGate>();
+builder.Services.AddSingleton<Blog.Web.Services.CommentNoticeThrottle>();
+builder.Services.AddScoped<Blog.Web.Services.CommentNotifier>();
 builder.Services.AddSingleton<Blog.Web.Services.TrafficRecorder>();
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddImageSharp();
@@ -266,10 +281,18 @@ var app = builder.Build();
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     try { app.Services.GetRequiredService<Blog.Web.Services.TrafficRecorder>().FlushAsync().Wait(TimeSpan.FromSeconds(5)); }
+    catch { /* shutting down */ }
+    try { app.Services.GetRequiredService<Blog.Web.Services.GoalRecorder>().FlushAsync().Wait(TimeSpan.FromSeconds(3)); }
     catch { /* analytics must never block shutdown */ }
 });
 
 var startupWarnings = app.Services.GetRequiredService<Blog.Web.Services.StartupWarnings>();
+// The .NET runtime carries its own security fixes; say so when this server is behind the level the release was tested on.
+if (Blog.Core.Services.RuntimeBaseline.Problem(Environment.Version) is { } runtimeProblem)
+{
+    app.Logger.LogWarning("{Problem}", runtimeProblem);
+    startupWarnings.Add(runtimeProblem);
+}
 if (keysPath is null)
     startupWarnings.Add("Data Protection keys could not be persisted to disk, so stored secrets and comment-form tokens will not survive a restart. Set DataProtection:KeysPath in appsettings to a writable folder outside the web root.");
 else
@@ -317,6 +340,14 @@ catch (Exception ex)
 using (var scope = app.Services.CreateScope())
 {
     try {
+        // First run: create the database and its schema when they are missing (README Quick Start).
+        var boot = scope.ServiceProvider.GetRequiredService<Blog.Infrastructure.Data.DatabaseBootstrapper>().EnsureAsync().GetAwaiter().GetResult();
+        if (boot.Problem is not null) startupWarnings.Add(boot.Problem);
+    } catch (Exception ex) {
+        app.Logger.LogError(ex, "First-run database setup error");
+    }
+
+    try {
         var migrator = scope.ServiceProvider.GetRequiredService<MigrationService>();
         migrator.RunAsync().Wait();
         foreach (var deferred in migrator.Deferred) startupWarnings.Add(deferred);
@@ -325,11 +356,11 @@ using (var scope = app.Services.CreateScope())
     }
 
     try {
-        var taxonomySeeder = scope.ServiceProvider.GetRequiredService<Blog.Infrastructure.Data.OptometryTaxonomySeeder>();
-        // Self-hosted: owner is Guid.Empty (site-wide). Cloud mode resolved per-tenant at runtime.
-        taxonomySeeder.SeedAsync(Guid.Empty).Wait();
+        // Default roles and permissions exist on every install, however the first admin was created.
+        scope.ServiceProvider.GetRequiredService<Blog.Infrastructure.Data.ApplicationDbSeeder>().SeedRolesAndPermissionsAsync().GetAwaiter().GetResult();
+        scope.ServiceProvider.GetRequiredService<Blog.Core.Interfaces.IRoleRepository>().AssignMissingAdminRolesAsync().GetAwaiter().GetResult();
     } catch (Exception ex) {
-        app.Logger.LogError(ex, "Taxonomy Seeder Error");
+        app.Logger.LogError(ex, "Role seeding error");
     }
 
     try {
@@ -403,6 +434,41 @@ else
 // requests on the way out so scanners block themselves. Fail-open: if it cannot reach the
 // database it lets traffic through rather than taking the site down.
 app.UseIpFirewall();
+// Defensive response headers (nosniff, referrer policy, framing, a content security policy). After the
+// firewall, before everything that produces a response, so static files and error pages carry them too.
+app.UseMiddleware<Blog.Web.Middleware.SecurityHeadersMiddleware>();
+
+// Health endpoints for a container platform or an uptime monitor, answered here, before anything that
+// needs the database, so they still answer when it is down. They say only "ok" or "unavailable": no
+// version, no detail. /health/live means the process serves requests; /health/ready also needs the
+// database to answer within two seconds.
+app.Use(async (ctx, next) =>
+{
+    var path = ctx.Request.Path.Value;
+    if (path is null || !path.StartsWith("/health/", StringComparison.OrdinalIgnoreCase)) { await next(); return; }
+    var ready = path.Equals("/health/ready", StringComparison.OrdinalIgnoreCase);
+    if (!ready && !path.Equals("/health/live", StringComparison.OrdinalIgnoreCase)) { await next(); return; }
+
+    var ok = true;
+    if (ready)
+    {
+        try
+        {
+            await using var conn = ctx.RequestServices.GetRequiredService<Blog.Infrastructure.Data.DapperContext>().CreateSqlConnection();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await conn.OpenAsync(cts.Token);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1";
+            cmd.CommandTimeout = 2;
+            await cmd.ExecuteScalarAsync(cts.Token);
+        }
+        catch { ok = false; }
+    }
+    ctx.Response.StatusCode = ok ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable;
+    ctx.Response.ContentType = "text/plain";
+    ctx.Response.Headers.CacheControl = "no-store";
+    await ctx.Response.WriteAsync(ok ? "ok" : "unavailable");
+});
 
 // Canonical host redirect — enforce https://www.opticalsoftware.org in production
 var canonicalHost = app.Configuration["CanonicalHost"];
@@ -469,13 +535,28 @@ app.UseAuthentication();
 app.UseAuthorization();
 // Two-factor requirement (ADR-0021): needs the signed-in user, so it sits right after authorization.
 app.UseMiddleware<Blog.Web.Middleware.TwoFactorEnforcementMiddleware>();
+// A brand-new self-hosted install opens the setup wizard from the home page (remembered once installed).
+app.UseMiddleware<Blog.Web.Middleware.FirstRunRedirectMiddleware>();
 app.UseTenantResolution();
+// Maintenance mode: needs the signed-in user (staff pass) and the tenant, so it sits after both. Fails open.
+app.UseMiddleware<Blog.Web.Middleware.MaintenanceModeMiddleware>();
 app.UseCrawlerVisitTracking();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // "/admin" on its own: every Desk screen lives under /admin/<area>, and people type the short form
 // (and docs say "sign in at /admin"). Without this it was a 404 that also fed the firewall's 404 score.
 app.MapGet("/admin", () => Results.Redirect("/admin/dashboard", permanent: true));
+
+// security.txt (RFC 9116): where to report a problem with this site. Generated, so Expires is never
+// stale; absent (404) until the operator sets Security:Contact. No database call.
+app.MapGet("/.well-known/security.txt", (HttpContext ctx, IConfiguration config) =>
+{
+    var host = config["CanonicalHost"];
+    var canonical = !string.IsNullOrWhiteSpace(host) ? $"https://{host.Trim()}/.well-known/security.txt"
+        : ctx.Request.IsHttps ? $"https://{ctx.Request.Host}/.well-known/security.txt" : null;
+    var text = Blog.Core.Services.SecurityTxt.Build(config["Security:Contact"], config["Security:PolicyUrl"], canonical, null, DateTime.UtcNow);
+    return text is null ? Results.NotFound() : Results.Text(text, "text/plain; charset=utf-8");
+});
 
 // Attribute-routed controllers (admin, API)
 app.MapControllers();

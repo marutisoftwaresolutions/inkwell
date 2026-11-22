@@ -102,6 +102,7 @@ public class PostsController : Controller
             "scheduled" => PostStatus.Scheduled,
             "review" => PostStatus.InReview,
             "changes" => PostStatus.NeedsChanges,
+            "trash" => PostStatus.Trashed,
             _ => null
         };
 
@@ -110,7 +111,8 @@ public class PostsController : Controller
         var workflowFilter = statusFilter is PostStatus.InReview or PostStatus.NeedsChanges;
         var result = await _posts.GetPostsAsync(new PostFilter
         {
-            Search = search, Status = statusFilter, AuthorId = workflowFilter && !CanPublish ? currentUserId : null, Page = page, PageSize = 20
+            Search = search, Status = statusFilter, AuthorId = workflowFilter && !CanPublish ? currentUserId : null, Page = page, PageSize = 20,
+            IncludeUnlisted = true,   // the Desk lists everything; only readers' lists leave unlisted posts out
         });
         ViewBag.CanPublish = CanPublish;
 
@@ -186,6 +188,7 @@ public class PostsController : Controller
         var tags = (tagNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
                                    .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
 
+        post.Visibility = Blog.Core.Services.PostVisibility.Normalize(post.Visibility);
         var (id, error) = await _postService.CreatePostAsync(post, categoryIds, tags, userId, userEmail);
         if (error != null)
         {
@@ -232,9 +235,11 @@ public class PostsController : Controller
         var before = new Post { Status = post.Status, ScheduledAt = post.ScheduledAt };
         var now = DateTime.UtcNow;
         var status = post.ScheduledAt > now ? PostStatus.Scheduled : PostStatus.Published;
-        await _posts.SetWorkflowAsync(id, status, null, null, status == PostStatus.Published ? now : null);
+        // A scheduled post carries its scheduled time as its publish date (EditorialWorkflow.PublishDate).
+        var publishDate = EditorialWorkflow.PublishDate(status, post.ScheduledAt, post.PublishedAt, now);
+        await _posts.SetWorkflowAsync(id, status, null, null, publishDate);
         post.Status = status;
-        post.PublishedAt ??= status == PostStatus.Published ? now : null;
+        post.PublishedAt = publishDate;
 
         await _audit.LogAsync(AuditActions.PostApproved, "Post", id.ToString(), post.Title);
         await _audit.LogAsync(status == PostStatus.Scheduled ? AuditActions.PostScheduled : AuditActions.PostPublished, "Post", id.ToString(), post.Title);
@@ -276,6 +281,38 @@ public class PostsController : Controller
         return RedirectToAction(nameof(Index), new { status = "review" });
     }
 
+    /// <summary>
+    /// Makes a draft copy of a post and opens it: text, blocks, images, categories, tags and search fields
+    /// come along; the address, dates, views and review state do not. Anyone who may edit the original may copy it.
+    /// </summary>
+    [HttpPost("{id:guid}/duplicate")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Duplicate(Guid id)
+    {
+        var source = await _posts.GetByIdAsync(id, null);
+        if (source is null) return NotFound();
+
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (source.AuthorId != userId && !(User.IsInRole("Admin") || User.IsInRole("Editor"))) return Forbid();
+
+        var copy = ContentCopy.Of(source, userId);
+        var (newId, error) = await _postService.CreatePostAsync(copy, source.Categories.Select(c => c.Id).ToList(),
+            source.Tags.Select(t => t.Name).ToList(), userId, User.FindFirstValue(ClaimTypes.Email) ?? "");
+        if (error is not null)
+        {
+            TempData["Error"] = $"The post was not copied: {error}";
+            return RedirectToAction(nameof(Index));
+        }
+
+        copy.Id = newId;
+        await _audit.LogAsync(AuditActions.PostDuplicated, "Post", newId.ToString(), $"{copy.Title} (from “{source.Title}”)");
+        await _revisions.RecordAsync(copy, "Created", User);
+        await _webhooks.PostSavedAsync(HttpContext, null, copy);
+
+        TempData["Success"] = "Copied as a draft. You are editing the copy.";
+        return RedirectToAction(nameof(Edit), new { id = newId });
+    }
+
     [HttpGet("edit/{id}")]
     public async Task<IActionResult> Edit(Guid id)
     {
@@ -293,6 +330,8 @@ public class PostsController : Controller
         ViewBag.Tags = await _tags.GetAllAsync(userId);
         ViewBag.SelectedCategoryIds = post.Categories.Select(c => c.Id).ToList();
         ViewBag.SelectedTagNames = string.Join(", ", post.Tags.Select(t => t.Name));
+        // Notes for the people working on this post; a problem reading them must not stop the editor opening.
+        try { ViewBag.PostNotes = await HttpContext.RequestServices.GetRequiredService<IPostNoteRepository>().ListAsync(id); } catch { ViewBag.PostNotes = null; }
         var displayZone = await DisplayTimeZoneAsync();
         ViewBag.DisplayTimeZone = displayZone;   // the review panel compares the schedule with "now" in the same zone
         if (post.ScheduledAt.HasValue) // the editor shows and reads the display zone; storage is UTC
@@ -337,6 +376,7 @@ public class PostsController : Controller
         var tags = (tagNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
                                    .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
 
+        post.Visibility = Blog.Core.Services.PostVisibility.Normalize(post.Visibility);
         var error = await _postService.UpdatePostAsync(post, categoryIds, tags, userId, userEmail);
         if (error != null)
         {
@@ -392,6 +432,14 @@ public class PostsController : Controller
             return Forbid();
         }
 
+        // Deleting moves a post to Trash, where it can be restored. Deleting it from Trash is permanent.
+        if (existingPost.Status != PostStatus.Trashed)
+        {
+            await MoveToTrashAsync(existingPost);
+            TempData["Success"] = "Post moved to Trash. Restore it from the Trash filter if that was a mistake.";
+            return RedirectToAction("Index", new { q, status, page });
+        }
+
         await _posts.DeleteAsync(id, isPrivileged ? null : userId);
         Blog.Web.Services.OgImageCache.Invalidate(_env, existingPost.Slug);
         await _audit.LogAsync(AuditActions.PostDeleted, "Post", id.ToString(), existingPost.Title);
@@ -399,6 +447,38 @@ public class PostsController : Controller
         TempData["Success"] = "Post permanently deleted.";
         // Back to the same filtered page, not page 1 of everything (UI/UX rule 10).
         return RedirectToAction("Index", new { q, status, page });
+    }
+
+    /// <summary>Takes a post out of readers' sight and into Trash, telling webhooks when it was live.</summary>
+    private async Task MoveToTrashAsync(Post post)
+    {
+        var before = new Post { Status = post.Status, ScheduledAt = post.ScheduledAt };
+        await _posts.SetWorkflowAsync(post.Id, PostStatus.Trashed, post.ReviewNote, post.ReviewRequestedAt, null);
+        Blog.Web.Services.OgImageCache.Invalidate(_env, post.Slug);
+        await _audit.LogAsync(AuditActions.PostTrashed, "Post", post.Id.ToString(), post.Title);
+        post.Status = PostStatus.Trashed;
+        await _webhooks.PostSavedAsync(HttpContext, before, post);
+    }
+
+    /// <summary>Brings a post back from Trash as a draft: nothing returns to the site until someone publishes it again.</summary>
+    [HttpPost("restore/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(Guid id, string? q, int page = 1)
+    {
+        var post = await _posts.GetByIdAsync(id, null);
+        if (post == null) return NotFound();
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (post.AuthorId != userId && !(User.IsInRole("Admin") || User.IsInRole("Editor"))) return Forbid();
+        if (post.Status != PostStatus.Trashed)
+        {
+            TempData["Error"] = "That post is not in Trash.";
+            return RedirectToAction("Index", new { q, status = "trash", page });
+        }
+
+        await _posts.SetWorkflowAsync(id, PostStatus.Draft, post.ReviewNote, post.ReviewRequestedAt, null);
+        await _audit.LogAsync(AuditActions.PostRestored, "Post", id.ToString(), post.Title);
+        TempData["Success"] = "Post restored as a draft. Publish it when it is ready to go back on the site.";
+        return RedirectToAction("Index", new { q, status = "trash", page });
     }
 
     // Markdown authoring (ADR-0022) ────────────────────────────────────────────────
@@ -533,6 +613,8 @@ public class PostsController : Controller
                     done++;
                     break;
                 case "delete":
+                    // The same rule as one post: to Trash first; only a post already in Trash is deleted for good.
+                    if (post.Status != PostStatus.Trashed) { await MoveToTrashAsync(post); done++; break; }
                     await _posts.DeleteAsync(id, null);
                     Blog.Web.Services.OgImageCache.Invalidate(_env, post.Slug);
                     await _audit.LogAsync(AuditActions.PostDeleted, "Post", id.ToString(), post.Title + " (bulk)");

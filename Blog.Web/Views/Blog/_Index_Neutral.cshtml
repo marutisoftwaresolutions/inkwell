@@ -1,6 +1,8 @@
 @using Blog.Core.Interfaces
 @model PagedResult<Blog.Core.Domain.Post>
 @{
+    // h1 on the home page; h2 when the page already carries its heading (search results, category and tag archives).
+    var heroHeading = (ViewData["PageHasHeading"] as bool? ?? false) ? "h2" : "h1";
     var searchTerm = ViewBag.SearchTerm as string;
     var selectedCategories = ViewBag.SelectedCategories as List<string> ?? new List<string>();
     var selectedTags = ViewBag.SelectedTags as List<string> ?? new List<string>();
@@ -31,7 +33,7 @@
                 <div class="relative my-8 max-w-[80%] lg:max-w-[60%] md:min-w-[60%] p-4 sm:p-6 text-center" style="background: var(--background);">
                     <div class="flex flex-col items-center justify-center gap-2 sm:gap-3">
                         <span class="uppercase text-sm" style="color: var(--muted-foreground);">@Dates.Medium(heroPost.PublishedAt)</span>
-                        <h1 class="text-2xl sm:text-3xl md:text-4xl font-medium">@heroPost.Title</h1>
+                        @Html.Raw("<" + heroHeading + @" class=""text-2xl sm:text-3xl md:text-4xl font-medium"">")@heroPost.Title@Html.Raw("</" + heroHeading + ">")
                         <p class="mb-2 line-clamp-3" style="color: var(--muted-foreground);">@(heroPost.MetaDescription ?? heroPost.Plaintext?.Substring(0, Math.Min(heroPost.Plaintext?.Length ?? 0, 200)))</p>
                         <a href="/@heroPost.Slug" class="inline-flex py-2 px-4 border border-dashed hover:opacity-80" style="background: var(--muted); border-color: var(--border);">Read More</a>
                     </div>

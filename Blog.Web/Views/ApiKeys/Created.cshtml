@@ -1,0 +1,39 @@
+@model Blog.Core.Domain.ApiKey
+@using Blog.Core.Services
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Key Created";
+    var key = (string)ViewBag.Key;
+}
+<div class="max-w-2xl flex flex-col gap-6">
+    <div class="rounded-lg border p-4 pill-ok text-sm" role="status">Key “@Model.Name” created.</div>
+    <div class="desk-card p-5 flex flex-col gap-3">
+        <h2 class="desk-card-title">Copy your key now</h2>
+        <p class="text-sm text-muted-foreground">
+            This is the only time the key is shown. Inkwell keeps a fingerprint of it, not the key, so it cannot be shown again.
+            If you lose it, revoke it and create another.
+        </p>
+        <label for="new-key" class="desk-label">API key</label>
+        <input id="new-key" readonly value="@key" class="desk-input font-mono text-xs" aria-describedby="new-key-hint" />
+        <p id="new-key-hint" class="desk-hint">
+            May: @string.Join(", ", ApiKeyFormat.ParseScopes(Model.Scopes)).
+            @(Model.ExpiresAt is null ? "Does not expire." : $"Expires {Dates.Medium(Model.ExpiresAt)}.")
+            Treat it like a password: anyone who has it can act as you within those limits.
+        </p>
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="button" id="copy-key" class="desk-btn desk-btn-outline">Copy key</button>
+            <a href="/account/api-keys" class="desk-btn desk-btn-primary">I have saved it, continue</a>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        // Copies the new key; falls back to selecting it so Ctrl+C works where the clipboard API is refused.
+        document.getElementById('copy-key').addEventListener('click', function () {
+            var input = document.getElementById('new-key');
+            var done = function () { if (window.InkwellDialog) InkwellDialog.toast('success', 'Key copied.'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(done, function () { input.select(); });
+            else input.select();
+        });
+    </script>
+}

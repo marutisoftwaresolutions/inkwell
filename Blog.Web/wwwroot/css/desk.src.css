@@ -138,7 +138,8 @@
   .desk-menu-sep { @apply my-1 h-px bg-border; }
 
   /* ── Tabs (links or buttons) ─────────────────────────────────────────────── */
-  .desk-tabs { @apply inline-flex items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground; }
+  /* Wraps onto a second line when the tabs are wider than a phone, so the page itself never scrolls sideways. */
+  .desk-tabs { @apply inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground; }
   .desk-tab { @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:text-foreground; }
   .desk-tab[aria-current="page"], .desk-tab[aria-selected="true"] { @apply bg-background text-foreground shadow-sm; }
 

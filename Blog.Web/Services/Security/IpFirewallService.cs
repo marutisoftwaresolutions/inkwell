@@ -199,6 +199,17 @@ public sealed class IpFirewallService
         }
     }
 
+    /// <summary>True when the caller's address is on the operator's allowlist (or is loopback or private). Never throws.</summary>
+    public async Task<bool> IsAllowlistedAsync(HttpContext ctx)
+    {
+        try
+        {
+            var ip = ResolveClientIp(ctx);
+            return !string.IsNullOrEmpty(ip) && (await GetSnapshotAsync()).Allowlist.Contains(ip);
+        }
+        catch { return false; }
+    }
+
     /// <summary>Record a rejected sign-in — brute-force attempts score even though they return 200.</summary>
     public async Task RegisterFailedLoginAsync(HttpContext ctx)
     {

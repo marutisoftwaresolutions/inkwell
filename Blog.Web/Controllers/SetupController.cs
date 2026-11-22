@@ -14,15 +14,21 @@ public class SetupController : Controller
     private readonly AuthService _auth;
     private readonly BackupService _backups;
     private readonly AuditService _audit;
+    private readonly IRoleRepository _roles;
+    private readonly Blog.Infrastructure.Data.ApplicationDbSeeder _seeder;
+    private readonly StarterSiteService _starters;
 
     public SetupController(ISettingRepository settings, IUserRepository users, AuthService auth,
-        BackupService backups, AuditService audit)
+        BackupService backups, AuditService audit, IRoleRepository roles, Blog.Infrastructure.Data.ApplicationDbSeeder seeder, StarterSiteService starters)
     {
         _settings = settings;
         _users = users;
         _auth = auth;
         _backups = backups;
         _audit = audit;
+        _roles = roles;
+        _seeder = seeder;
+        _starters = starters;
     }
 
     private async Task<IActionResult> GuardAsync()
@@ -34,6 +40,11 @@ public class SetupController : Controller
         return null!;
     }
 
+    // Named outright: "/setup" on its own was read as a post address (BlogController's "{slug}" route wins over this
+    // controller's conventional route), so the wizard a new install is sent to answered 404. Every other step keeps
+    // its conventional address (/setup/step2 ...).
+    [HttpGet("/setup")]
+    [HttpGet("/setup/index")]
     public async Task<IActionResult> Index()
     {
         var guard = await GuardAsync();
@@ -66,12 +77,13 @@ public class SetupController : Controller
         var email = TempData.Peek("AdminEmail")?.ToString() ?? "(not set)";
         ViewBag.BlogName = blogName;
         ViewBag.AdminEmail = email;
+        ViewBag.Starter = StarterSites.Find(TempData.Peek("Starter")?.ToString())?.Name ?? "Empty site";
         return View();
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveStep2(string blogName, string tagline)
+    public async Task<IActionResult> SaveStep2(string blogName, string tagline, string? starter = null)
     {
         // Errors are keyed by field name so Step2.cshtml can place them at the input.
         if (string.IsNullOrWhiteSpace(blogName))
@@ -81,6 +93,7 @@ public class SetupController : Controller
         }
         TempData["BlogName"] = blogName;
         TempData["Tagline"] = tagline;
+        TempData["Starter"] = StarterSites.Normalize(starter);
         return RedirectToAction("Step3");
     }
 
@@ -118,6 +131,7 @@ public class SetupController : Controller
         var tagline = TempData["Tagline"]?.ToString() ?? "";
         var email = TempData["AdminEmail"]?.ToString();
         var password = TempData["AdminPassword"]?.ToString();
+        var starterKey = TempData["Starter"]?.ToString();
 
         if (string.IsNullOrWhiteSpace(blogName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             return RedirectToAction("Index");
@@ -147,8 +161,26 @@ public class SetupController : Controller
         
         await _settings.SaveSettingsAsync(userId, settings);
 
-        // Also save a global settings row (UserId = Guid.Empty) for public view consistency
-        await _settings.SaveSettingsAsync(Guid.Empty, settings);
+        // The roles and their permissions, and the first admin's place in them. Without this a site
+        // installed through the wizard had no roles at all, so Author and Contributor accounts created
+        // later had no permissions. (A second settings row under Guid.Empty used to be written here;
+        // the Settings foreign key rejects it, which ended the wizard on an error page.)
+        await _seeder.SeedRolesAndPermissionsAsync();
+        var adminRole = await _roles.GetByNameAsync("Admin");
+        if (adminRole != null) await _roles.AssignRoleToUserAsync(userId, adminRole.Id);
+
+        // The starter site the owner picked: pages, layout and preset. It only adds; a failure here must
+        // not undo an install that is otherwise complete, so it is reported, not thrown.
+        try
+        {
+            var outcome = await _starters.ApplyAsync(userId, starterKey);
+            if (outcome.PagesCreated > 0) TempData["StarterPages"] = outcome.PagesCreated;
+        }
+        catch (Exception ex)
+        {
+            HttpContext.RequestServices.GetRequiredService<ILogger<SetupController>>().LogError(ex, "Starter site could not be applied");
+            TempData["StarterFailed"] = true;
+        }
 
         return RedirectToAction("Complete");
     }

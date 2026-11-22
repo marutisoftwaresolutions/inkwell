@@ -53,6 +53,6 @@ EXPOSE 8080
 # /robots.txt needs no authentication and is served for every tenant, including one with no DB
 # reachable (fail-open), so it is a reasonable liveness probe without depending on app state.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD ["curl", "-f", "http://localhost:8080/robots.txt"]
+    CMD ["curl", "-f", "http://localhost:8080/health/live"]
 
 ENTRYPOINT ["dotnet", "Blog.Web.dll"]

@@ -121,7 +121,7 @@ public class PagesController : Controller
             page.Id = id;
             await _webhooks.PageSavedAsync(HttpContext, page);
             if (page.IsPublished) await PingIndexNowAsync(id, userId);
-            TempData["Success"] = page.IsPublished ? "Page published!" : "Draft saved.";
+            TempData["Success"] = page.IsPublished ? "Page published." : "Draft saved.";
             return RedirectToAction("Edit", new { id });
         }
         catch (Exception ex)
@@ -129,6 +129,36 @@ public class PagesController : Controller
             TempData["Error"] = $"Failed to create page: {ex.Message}";
             return View(page);
         }
+    }
+
+    /// <summary>Makes an unpublished copy of a page, outside the navigation, at a free address, and opens it.</summary>
+    [HttpPost("{id:guid}/duplicate")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Duplicate(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var source = await _pages.GetByIdAsync(id, userId);
+        if (source is null) return NotFound();
+
+        string? slug = null;
+        for (var attempt = 1; attempt <= 50 && slug is null; attempt++)
+        {
+            var candidate = ContentCopy.CopySlug(source.Slug, attempt);
+            if (!await _pages.SlugExistsAsync(candidate, userId)) slug = candidate;
+        }
+        if (slug is null)
+        {
+            TempData["Error"] = "The page was not copied: it already has 50 copies. Rename or delete some first.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var copy = ContentCopy.Of(source, userId, slug);
+        copy.Id = await _pages.CreateAsync(copy);
+        await _audit.LogAsync(AuditActions.PageDuplicated, "Page", copy.Id.ToString(), $"{copy.Title} (from “{source.Title}”)");
+        await _webhooks.PageSavedAsync(HttpContext, copy);
+
+        TempData["Success"] = "Copied as a draft, outside the navigation. You are editing the copy.";
+        return RedirectToAction(nameof(Edit), new { id = copy.Id });
     }
 
     [HttpGet("edit/{id}")]

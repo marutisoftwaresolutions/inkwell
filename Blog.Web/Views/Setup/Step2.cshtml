@@ -48,6 +48,15 @@
                 <label for="tagline">Tagline</label>
                 <input type="text" id="tagline" name="tagline" class="form-control" value="@Attempted("tagline")" placeholder="Thoughts, stories and ideas." maxlength="500" />
             </div>
+            <fieldset class="form-group">
+                <legend>Start with</legend>
+                <p class="field-help">A starter gives the site a layout and a few pages to fill in. Their text is placeholder text and says so; the pages are published, so edit or unpublish them under Pages before you share the site. Nothing here is permanent.</p>
+                <label class="starter-option"><input type="radio" name="starter" value="none" checked="@(Attempted("starter") is "" or "none")" /> <span><strong>Empty site</strong> No pages; add your own later.</span></label>
+                @foreach (var s in Blog.Core.Services.StarterSites.All)
+                {
+                    <label class="starter-option"><input type="radio" name="starter" value="@s.Key" checked="@(Attempted("starter") == s.Key)" /> <span><strong>@s.Name</strong> @s.Description</span></label>
+                }
+            </fieldset>
             <div class="setup-steps-preview" aria-hidden="true">
                 <div class="step-dot done"></div>
                 <div class="step-dot active"></div>

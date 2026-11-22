@@ -1,4 +1,4 @@
-@model (Blog.Core.Services.CookieConsentMode Mode, string? AnalyticsId)
+@model (Blog.Core.Services.CookieConsentMode Mode, string? AnalyticsId, bool OptionalCode)
 @using Blog.Core.Services
 @*
     Cookie consent banner (v1.0.8). Always rendered hidden: inkwell-consent.js shows it only to a reader
@@ -8,23 +8,36 @@
 @if (Model.Mode != CookieConsentMode.Off)
 {
     var asking = Model.Mode == CookieConsentMode.AskForAnalytics;
+    // Custom code that waits for consent (Settings → Custom code): the wording then covers more than Google Analytics.
+    var code = asking && Model.OptionalCode;
     <button type="button" class="ink-consent-settings" data-cookie-settings hidden>Cookie settings</button>
 
     <section id="ink-consent" class="ink-consent" hidden
              role="region" aria-labelledby="ink-consent-title" aria-describedby="ink-consent-text"
              data-cookie="@CookieConsent.CookieName" data-days="@CookieConsent.RememberDays"
-             data-ga-id="@(asking ? Model.AnalyticsId : null)">
+             data-ga-id="@(asking ? Model.AnalyticsId : null)" data-optional-code="@(code ? "1" : null)">
         @if (asking)
         {
             <p id="ink-consent-title" class="ink-consent__title">Cookies on this site</p>
-            <p id="ink-consent-text" class="ink-consent__text">
-                Essential cookies keep the site working. With your permission, this site also uses Google Analytics cookies to learn
-                which articles are read. Nothing is set until you choose, and you can change your mind any time from
-                “Cookie settings” at the foot of the page.
-            </p>
+            @if (code)
+            {
+                <p id="ink-consent-text" class="ink-consent__text">
+                    Essential cookies keep the site working. With your permission, this site also loads optional tools from other
+                    services, such as analytics, which may set cookies. Nothing optional is loaded until you choose, and you can
+                    change your mind any time from “Cookie settings” at the foot of the page.
+                </p>
+            }
+            else
+            {
+                <p id="ink-consent-text" class="ink-consent__text">
+                    Essential cookies keep the site working. With your permission, this site also uses Google Analytics cookies to learn
+                    which articles are read. Nothing is set until you choose, and you can change your mind any time from
+                    “Cookie settings” at the foot of the page.
+                </p>
+            }
             <div class="ink-consent__actions">
-                <button type="button" class="ink-consent__btn" data-consent="granted">Accept analytics cookies</button>
-                <button type="button" class="ink-consent__btn" data-consent="denied">Reject analytics cookies</button>
+                <button type="button" class="ink-consent__btn" data-consent="granted">@(code ? "Accept optional cookies" : "Accept analytics cookies")</button>
+                <button type="button" class="ink-consent__btn" data-consent="denied">@(code ? "Reject optional cookies" : "Reject analytics cookies")</button>
             </div>
         }
         else

@@ -92,7 +92,11 @@ public class SmtpEmailService : IEmailService
             _logger.LogWarning(ex, "Email to {Email} not sent", m.ToEmail);
             // The reason, without the stack: it is shown to the operator in the send log.
             var reason = ex is SmtpException se ? $"{se.StatusCode}: {se.Message}" : ex.Message;
-            return EmailSendResult.Failed(reason.Length > 480 ? reason[..480] : reason);
+            if (reason.Length > 480) reason = reason[..480];
+            // A recipient the server refuses for good is a hard bounce: the caller stops sending to it.
+            return ex is SmtpException smtp && Blog.Core.Services.SmtpBounce.IsPermanent((int)smtp.StatusCode, smtp.Message)
+                ? EmailSendResult.Bounced(reason)
+                : EmailSendResult.Failed(reason);
         }
     }
 }

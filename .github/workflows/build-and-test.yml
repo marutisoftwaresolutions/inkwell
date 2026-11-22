@@ -1,0 +1,72 @@
+# Builds the solution and runs the whole test suite on every push, against a real SQL Server, so the
+# database-backed tests run instead of skipping. A second job runs the suite with no database at all,
+# which is what a contributor on a fresh clone sees: it must report zero failures too.
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  with-database:
+    runs-on: ubuntu-24.04   # pinned: the image this workflow was verified on
+    timeout-minutes: 30
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Ci-Build-Aa1!-not-a-secret"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Ci-Build-Aa1!-not-a-secret' -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+    env:
+      # A throwaway container, filled below with init.sql and a small sample site (Blog.Tests/Fixtures/ci-seed.sql).
+      ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=inkwell_ci;User Id=sa;Password=Ci-Build-Aa1!-not-a-secret;TrustServerCertificate=True;"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Create the database, apply the schema and the sample site
+        run: |
+          id=$(docker ps -q --filter ancestor=mcr.microsoft.com/mssql/server:2022-latest)
+          run() { docker exec -i "$id" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Ci-Build-Aa1!-not-a-secret' -C -b -I -f 65001 "$@"; }
+          run -Q "IF DB_ID(N'inkwell_ci') IS NULL CREATE DATABASE [inkwell_ci];"
+          run -d inkwell_ci -i /dev/stdin < DBScripts/init.sql
+          run -d inkwell_ci -i /dev/stdin < Blog.Tests/Fixtures/ci-seed.sql
+      - name: Restore with a vulnerability audit
+        run: dotnet restore Blog.Tests/Blog.Tests.csproj
+      - name: No package with a known vulnerability
+        run: |
+          dotnet list Blog.Tests/Blog.Tests.csproj package --vulnerable --include-transitive | tee audit.txt
+          if grep -qi "has the following vulnerable packages" audit.txt; then exit 1; fi
+      - name: Software bill of materials (CycloneDX)
+        run: |
+          dotnet tool install --global CycloneDX
+          dotnet-CycloneDX Blog.Web/Blog.Web.csproj --output sbom --json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom
+      - name: Build
+        run: dotnet build Blog.Tests/Blog.Tests.csproj --no-restore -c Release
+      - name: Test
+        run: dotnet test Blog.Tests/Blog.Tests.csproj --no-build -c Release --nologo
+
+  without-database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build Blog.Tests/Blog.Tests.csproj -c Release
+      - name: Test (database-backed tests skip)
+        run: dotnet test Blog.Tests/Blog.Tests.csproj --no-build -c Release --nologo

@@ -220,8 +220,24 @@ public class PostsApiController : ControllerBase
         var existing = await _posts.GetByIdAsync(id);
         if (existing == null) return NotFound(ApiError(404, "Post not found."));
         if (existing.AuthorId != userId && !Privileged) return StatusCode(403, ApiError(403, "You can delete only your own posts."));
+        // The "Write drafts" scope creates and edits drafts; removing a post, even to Trash, is the Publish scope's.
+        if (Blog.Web.Services.ApiKeyAuthenticator.IsKeyCaller(User) && !Blog.Web.Services.ApiKeyAuthenticator.HasScope(User, Blog.Core.Services.ApiKeyFormat.Publish))
+            return StatusCode(403, ApiError(403, "Deleting a post needs a key with the publish scope."));
         if (IsLiveOrScheduled(existing) && !CanPublish)
             return StatusCode(403, ApiError(403, "Deleting a published or scheduled post needs the publish permission."));
+
+        // Like the Desk: a delete moves the post to Trash, where a person can restore it. Deleting a post that is
+        // already in Trash removes it for good.
+        if (existing.Status != PostStatus.Trashed)
+        {
+            var before = new Post { Status = existing.Status, ScheduledAt = existing.ScheduledAt };
+            await _posts.SetWorkflowAsync(id, PostStatus.Trashed, existing.ReviewNote, existing.ReviewRequestedAt, null);
+            Blog.Web.Services.OgImageCache.Invalidate(_env, existing.Slug);
+            await _audit.LogAsync(AuditActions.PostTrashed, "Post", id.ToString(), existing.Title, newValues: "Moved to Trash through the API");
+            existing.Status = PostStatus.Trashed;
+            await _webhooks.PostSavedAsync(HttpContext, before, existing);
+            return Ok(new { data = "Moved to Trash. Delete it again to remove it permanently, or restore it in the Desk." });
+        }
 
         await _posts.DeleteAsync(id, Privileged ? null : userId);
         Blog.Web.Services.OgImageCache.Invalidate(_env, existing.Slug);

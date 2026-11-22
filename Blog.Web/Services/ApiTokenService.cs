@@ -39,7 +39,8 @@ public sealed class ApiTokenService
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
-            claims: [new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())],
+            claims: [new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                     new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)],
             expires: DateTime.UtcNow.AddMinutes(LifetimeMinutes),
             signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -73,6 +74,20 @@ public sealed class ApiTokenService
         };
         o.Events = new JwtBearerEvents
         {
+            // An API key (Profile → API keys) is accepted in the same header as a sign-in token. It has
+            // its own shape, so it is recognised without a database call and never reaches the JWT
+            // validator; a key that fails is refused here, with no fallback to token validation.
+            OnMessageReceived = async ctx =>
+            {
+                var header = ctx.Request.Headers.Authorization.ToString();
+                if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return;
+                var presented = header[7..].Trim();
+                if (!ApiKeyFormat.LooksLikeKey(presented)) return;
+
+                var caller = await ApiKeyAuthenticator.AuthenticateAsync(ctx.HttpContext.RequestServices, presented);
+                if (caller is null) ctx.Fail(new ApiKeyRefusedException());
+                else { ctx.Principal = caller; ctx.Success(); }
+            },
             OnTokenValidated = async ctx =>
             {
                 var principal = await CallerAsync(ctx.HttpContext.RequestServices, ctx.Principal);
@@ -89,7 +104,9 @@ public sealed class ApiTokenService
                 await ctx.Response.WriteAsJsonAsync(new
                 {
                     statusCode = 401,
-                    error = ctx.AuthenticateFailure is SecurityTokenExpiredException
+                    error = ctx.AuthenticateFailure is ApiKeyRefusedException
+                        ? "That API key is not valid: it is unknown, has expired, was revoked, or its account is disabled. Create a new key under Profile, API keys."
+                        : ctx.AuthenticateFailure is SecurityTokenExpiredException
                         ? "The token has expired. Sign in again with POST /api/v1/auth/login."
                         : "Sign in with POST /api/v1/auth/login and send the token as \"Authorization: Bearer <token>\".",
                 });
@@ -108,8 +125,18 @@ public sealed class ApiTokenService
         if (!Guid.TryParse(token?.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)) return null;
         var user = await services.GetRequiredService<IUserRepository>().GetByIdAsync(userId);
         if (user is null || !user.IsActive) return null;
+        // "Sign out everywhere" and a password change end tokens too: one issued before the cut-off is refused.
+        if (user.SessionsValidFrom is { } cutOff
+            && (!long.TryParse(token!.FindFirstValue(JwtRegisteredClaimNames.Iat), out var iat) || DateTimeOffset.FromUnixTimeSeconds(iat).UtcDateTime < cutOff))
+            return null;
 
         var claims = UserSignInService.Claims(user, await services.GetRequiredService<IRoleRepository>().GetPermissionNamesForUserAsync(user.Id));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, JwtBearerDefaults.AuthenticationScheme));
     }
+}
+
+/// <summary>Marks a 401 caused by an API key that was refused, so the response can say so.</summary>
+public sealed class ApiKeyRefusedException : Exception
+{
+    public ApiKeyRefusedException() : base("The API key was refused.") { }
 }

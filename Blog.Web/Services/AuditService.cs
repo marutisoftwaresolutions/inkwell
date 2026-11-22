@@ -46,6 +46,11 @@ public class AuditService
                 ?? ctx?.User.FindFirstValue(ClaimTypes.Email)
                 ?? "system";
 
+            // A change made with an API key names the key, so the trail shows which script or assistant acted.
+            var keyName = ctx?.User.FindFirstValue(ApiKeyAuthenticator.KeyNameClaim);
+            if (userNameOverride is null && !string.IsNullOrEmpty(keyName)) userName = $"{userName} (API key: {keyName})";
+            if (userName.Length > 200) userName = userName[..200];
+
             var ownerId = (_tenant.IsCloudMode && _tenant.IsResolved) ? _tenant.UserId : Guid.Empty;
 
             var ua = ctx?.Request.Headers.UserAgent.ToString() ?? "";

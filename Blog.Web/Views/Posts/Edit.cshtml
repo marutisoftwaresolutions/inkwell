@@ -17,8 +17,10 @@
 @* Editorial workflow: review banner and actions (their own forms, outside the tracked editor form). Above the
    fixed-height editor, so opening "Request changes" on a phone does not squeeze the canvas. *@
 <partial name="_ReviewPanel" model="Model" />
+<partial name="_PostNotes" model="Model" />
 <div class="md:h-[calc(100vh-7.5rem)] flex flex-col">
-    <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full">
+    <form method="post" action="@formAction" id="postForm" data-track-changes class="flex-1 flex flex-col h-full"
+          data-local-backup="post:@(Model.Id == Guid.Empty ? "new" : Model.Id.ToString("N"))" data-saved-at="@(Model.Id == Guid.Empty ? 0 : new DateTimeOffset(DateTime.SpecifyKind(Model.UpdatedAt, DateTimeKind.Utc)).ToUnixTimeMilliseconds())">
         @Html.AntiForgeryToken()
         <input type="hidden" name="Html" id="postContent" value="@Model.Html" />
         <input type="hidden" name="Plaintext" id="postPlaintext" value="@Model.Plaintext" />
@@ -31,7 +33,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                     Back
                 </a>
-                <span id="autosaveStatus" class="text-xs text-muted-foreground"></span> <span data-dirty-indicator hidden>Unsaved changes</span>
+                <span id="autosaveStatus" data-backup-status class="text-xs text-muted-foreground" role="status"></span> <span data-dirty-indicator hidden>Unsaved changes</span>
             </div>
             <div class="flex items-center gap-2">
                 <button type="submit" form="editorModeForm" data-editor-switch data-editor-draft-safe="@((Model.Status is Blog.Core.Domain.PostStatus.Draft or Blog.Core.Domain.PostStatus.NeedsChanges) ? "true" : "false")" class="hidden md:inline-flex px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
@@ -258,6 +260,15 @@
                     <div class="flex items-center justify-between">
                         <label class="text-sm font-medium">Allow Comments</label>
                         <input type="checkbox" name="AllowComments" value="true" @(Model.AllowComments ? "checked" : "") class="rounded border-input text-primary focus:ring-primary h-5 w-5" />
+                    </div>
+                    <!-- Listing: public, or published but left out of every list -->
+                    <div class="space-y-1">
+                        <label for="post-visibility" class="text-sm font-medium">Listing</label>
+                        <select id="post-visibility" name="Visibility" class="desk-select" aria-describedby="post-visibility-hint">
+                            <option value="public" selected="@(!Blog.Core.Services.PostVisibility.IsUnlisted(Model.Visibility))">Listed everywhere</option>
+                            <option value="unlisted" selected="@Blog.Core.Services.PostVisibility.IsUnlisted(Model.Visibility)">Unlisted: by link only</option>
+                        </select>
+                        <p id="post-visibility-hint" class="text-xs text-muted-foreground">An unlisted post opens for anyone who has its address, but is kept out of the home page, archives, search, the feed and the sitemap, and search engines are asked not to index it. It is not private.</p>
                     </div>
                     <!-- Revision history -->
                     <div x-data="{ revOpen: false }" class="border-t border-border pt-4 mt-4">
@@ -625,6 +636,7 @@
         }
     </script>
     <script src="~/js/inkwell-builder.js" asp-append-version="true"></script>
+    <script src="~/js/inkwell-autosave.js" asp-append-version="true"></script>
     <script>
         (function(){
             // The block builder is shared with the page editor (wwwroot/js/inkwell-builder.js); this view adds the

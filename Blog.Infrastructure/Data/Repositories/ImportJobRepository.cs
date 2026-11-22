@@ -48,7 +48,7 @@ public class ImportJobRepository : IImportJobRepository
             UPDATE ImportJobs SET
                 Status=@Status, OptionsJson=@OptionsJson, FilePath=@FilePath,
                 TotalItems=@TotalItems, ImportedItems=@ImportedItems, FailedItems=@FailedItems,
-                SkippedItems=@SkippedItems, CompletedAt=@CompletedAt, UpdatedAt=GETUTCDATE()
+                SkippedItems=@SkippedItems, CompletedAt=@CompletedAt, UpdatedAt=SYSUTCDATETIME()
             WHERE Id=@Id",
             new
             {
@@ -142,7 +142,7 @@ public class ImportJobRepository : IImportJobRepository
                 ImportedItems = (SELECT COUNT(*) FROM ImportItems WHERE JobId=@JobId AND Status='Imported'),
                 FailedItems   = (SELECT COUNT(*) FROM ImportItems WHERE JobId=@JobId AND Status='Failed'),
                 SkippedItems  = (SELECT COUNT(*) FROM ImportItems WHERE JobId=@JobId AND Status='Skipped'),
-                UpdatedAt     = GETUTCDATE()
+                UpdatedAt     = SYSUTCDATETIME()
             WHERE Id=@JobId", new { JobId = jobId });
     }
 

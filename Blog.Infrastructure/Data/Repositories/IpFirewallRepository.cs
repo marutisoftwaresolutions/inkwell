@@ -141,13 +141,13 @@ public class IpFirewallRepository : IIpFirewallRepository
         // fail to map onto the non-nullable counters on a fresh install with no rules yet.
         return await conn.QuerySingleAsync<FirewallStats>(@"
             SELECT
-                ISNULL(SUM(CASE WHEN Kind = 'Block' AND (ExpiresAt IS NULL OR ExpiresAt > @Now) THEN 1 ELSE 0 END), 0) AS ActiveBlocks,
-                ISNULL(SUM(CASE WHEN Kind = 'Block' AND ExpiresAt IS NULL THEN 1 ELSE 0 END), 0)                       AS PermanentBlocks,
-                ISNULL(SUM(CASE WHEN Kind = 'Block' AND Source = 'Auto'
+                COALESCE(SUM(CASE WHEN Kind = 'Block' AND (ExpiresAt IS NULL OR ExpiresAt > @Now) THEN 1 ELSE 0 END), 0) AS ActiveBlocks,
+                COALESCE(SUM(CASE WHEN Kind = 'Block' AND ExpiresAt IS NULL THEN 1 ELSE 0 END), 0)                       AS PermanentBlocks,
+                COALESCE(SUM(CASE WHEN Kind = 'Block' AND Source = 'Auto'
                                  AND (ExpiresAt IS NULL OR ExpiresAt > @Now) THEN 1 ELSE 0 END), 0)                    AS AutoBlocks,
-                ISNULL(SUM(CASE WHEN Kind = 'Block' AND CreatedAt > @DayAgo THEN 1 ELSE 0 END), 0)                     AS BlocksLast24h,
-                ISNULL(SUM(CASE WHEN Kind = 'Allow' THEN 1 ELSE 0 END), 0)                                             AS AllowRules,
-                ISNULL(SUM(CAST(HitCount AS BIGINT)), 0)                                                               AS RequestsDenied
+                COALESCE(SUM(CASE WHEN Kind = 'Block' AND CreatedAt > @DayAgo THEN 1 ELSE 0 END), 0)                     AS BlocksLast24h,
+                COALESCE(SUM(CASE WHEN Kind = 'Allow' THEN 1 ELSE 0 END), 0)                                             AS AllowRules,
+                COALESCE(SUM(CAST(HitCount AS BIGINT)), 0)                                                               AS RequestsDenied
             FROM IpFirewallRules;",
             new { Now = DateTime.UtcNow, DayAgo = DateTime.UtcNow.AddDays(-1) });
     }

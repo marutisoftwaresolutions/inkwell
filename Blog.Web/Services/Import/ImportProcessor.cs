@@ -104,7 +104,15 @@ public class ImportProcessor
                 var t = Deserialize<ParsedTerm>(item.DataJson);
                 var existing = await _categories.GetBySlugAsync(t.Slug, ownerId);
                 if (existing != null) return (ImportItemStatus.Imported, existing.Id, null);
-                var id = await _categories.CreateAsync(new Category { Name = t.Name, Slug = t.Slug, AuthorId = ownerId });
+                // Only a category this import creates is placed under its parent; one the site already had is never moved.
+                Guid? parentId = null;
+                if (!string.IsNullOrWhiteSpace(t.ParentSlug))
+                {
+                    var parent = await _categories.GetBySlugAsync(t.ParentSlug, ownerId);
+                    if (parent != null && Blog.Core.Services.CategoryTree.CanPlaceUnder(await _categories.GetAllAsync(ownerId), Guid.Empty, parent.Id))
+                        parentId = parent.Id;
+                }
+                var id = await _categories.CreateAsync(new Category { Name = t.Name, Slug = t.Slug, AuthorId = ownerId, ParentId = parentId });
                 return (ImportItemStatus.Imported, id, null);
             }
 

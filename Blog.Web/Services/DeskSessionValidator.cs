@@ -29,13 +29,23 @@ public static class DeskSessionValidator
         }
 
         var cache = ctx.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
-        if (cache.TryGetValue(Key(userId), out bool known) && known) return;
+        // What is cached is the account's cut-off, not a yes: each cookie is still compared with it, so a session
+        // ended by "Sign out everywhere" or a password change is refused even while another one is valid.
+        if (cache.TryGetValue(Key(userId), out DateTime cachedCutOff))
+        {
+            if (!IssuedBefore(ctx, cachedCutOff)) return;
+            ctx.RejectPrincipal();
+            await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return;
+        }
 
         bool canSignIn;
+        DateTime cutOff = DateTime.MinValue;
         try
         {
             var user = await ctx.HttpContext.RequestServices.GetRequiredService<IUserRepository>().GetByIdAsync(userId);
             canSignIn = user is { IsActive: true };
+            cutOff = user?.SessionsValidFrom ?? DateTime.MinValue;
         }
         catch
         {
@@ -45,10 +55,21 @@ public static class DeskSessionValidator
             return;
         }
 
-        if (canSignIn) { cache.Set(Key(userId), true, CacheFor); return; }
+        if (canSignIn)
+        {
+            cache.Set(Key(userId), cutOff, CacheFor);
+            if (!IssuedBefore(ctx, cutOff)) return;
+        }
         ctx.RejectPrincipal();
         await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     }
+
+    /// <summary>True when this cookie was issued before the account's cut-off (compared to the second, as the ticket stores it).</summary>
+    private static bool IssuedBefore(CookieValidatePrincipalContext ctx, DateTime cutOffUtc) =>
+        cutOffUtc != DateTime.MinValue && (ctx.Properties.IssuedUtc is not { } issued || issued.UtcDateTime < cutOffUtc);
+
+    /// <summary>The moment to store as a cut-off: now, to the whole second, so the session signed in right after it is kept.</summary>
+    public static DateTime CutOffNow() { var n = DateTime.UtcNow; return new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, n.Second, DateTimeKind.Utc); }
 
     /// <summary>Makes the next request re-check this user: called when an account is disabled or deleted.</summary>
     public static void Forget(IMemoryCache cache, Guid userId) => cache.Remove(Key(userId));

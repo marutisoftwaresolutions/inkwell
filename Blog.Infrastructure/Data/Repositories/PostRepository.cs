@@ -33,11 +33,14 @@ public class PostRepository : IPostRepository
         var where = new List<string> { "1=1" };
         var p = new DynamicParameters();
 
+        // A list of "everything" does not include the Trash; only asking for the Trash shows it.
+        if (!filter.Status.HasValue) where.Add("p.Status <> 'Trashed'");
         if (filter.Status.HasValue)
         {
             if (filter.Status.Value == PostStatus.Published)
             {
-                where.Add("(p.Status = 'Published' AND p.PublishedAt <= GETUTCDATE() OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETUTCDATE()))");
+                where.Add("(p.Status = 'Published' AND p.PublishedAt <= SYSUTCDATETIME() OR (p.Status = 'Scheduled' AND p.ScheduledAt <= SYSUTCDATETIME()))");
+                if (!filter.IncludeUnlisted) where.Add(Blog.Core.Services.PostVisibility.ListedSql("p"));
             }
             else
             {
@@ -50,10 +53,23 @@ public class PostRepository : IPostRepository
             where.Add("p.AuthorId = @AuthorId");
             p.Add("AuthorId", filter.AuthorId.Value);
         }
+        // Every word must be found in the title or the text; wildcards a reader typed are matched literally.
+        var orderBy = "COALESCE(p.PublishedAt, p.UpdatedAt, p.CreatedAt) DESC";
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            where.Add("(p.Title LIKE @Search OR p.Plaintext LIKE @Search)");
-            p.Add("Search", $"%{filter.Search}%");
+            var terms = Blog.Core.Services.SearchTerms.Parse(filter.Search);
+            var score = new List<string>();
+            for (var i = 0; i < terms.Count; i++)
+            {
+                where.Add($"(p.Title LIKE @s{i} ESCAPE '\\' OR p.Plaintext LIKE @s{i} ESCAPE '\\')");
+                p.Add($"s{i}", Blog.Core.Services.SearchTerms.Like(terms[i]));
+                score.Add($"CASE WHEN p.Title LIKE @s{i} ESCAPE '\\' THEN 20 ELSE 0 END + CASE WHEN p.MetaDescription LIKE @s{i} ESCAPE '\\' THEN 5 ELSE 0 END + CASE WHEN p.Plaintext LIKE @s{i} ESCAPE '\\' THEN 1 ELSE 0 END");
+            }
+            if (filter.RankBySearch)
+            {
+                p.Add("phrase", Blog.Core.Services.SearchTerms.Like(Blog.Core.Services.SearchTerms.Phrase(filter.Search)));
+                orderBy = $"(CASE WHEN p.Title LIKE @phrase ESCAPE '\\' THEN 100 ELSE 0 END + {string.Join(" + ", score)}) DESC, " + orderBy;
+            }
         }
         if (filter.CategoryId.HasValue)
         {
@@ -92,7 +108,7 @@ public class PostRepository : IPostRepository
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE {whereClause}
-            ORDER BY COALESCE(p.PublishedAt, p.UpdatedAt, p.CreatedAt) DESC
+            ORDER BY {orderBy}
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var posts = (await conn.QueryAsync<Post>(sql, p)).ToList();
@@ -176,7 +192,7 @@ public class PostRepository : IPostRepository
         // Status is stored as the enum's name. A published post sits on its publish date; anything else on its
         // scheduled (or planned) date.
         var rows = await conn.QueryAsync<(Guid Id, string Title, string Slug, string Status, DateTime? PublishedAt, DateTime? ScheduledAt)>(@"
-            SELECT Id, ISNULL(Title, '') AS Title, ISNULL(Slug, '') AS Slug, Status, PublishedAt, ScheduledAt
+            SELECT Id, COALESCE(Title, '') AS Title, COALESCE(Slug, '') AS Slug, Status, PublishedAt, ScheduledAt
               FROM Posts
              WHERE (@AuthorId IS NULL OR AuthorId = @AuthorId)
                AND ((Status = 'Published' AND PublishedAt >= @FromUtc AND PublishedAt < @ToUtc)
@@ -324,7 +340,7 @@ public class PostRepository : IPostRepository
         // Only posts readers can see (the public listing's rule), so a beacon from an anonymous preview
         // of a draft counts nothing.
         return await conn.ExecuteAsync(@"
-            UPDATE Posts SET ViewCount = ISNULL(ViewCount, 0) + @Views   -- posts inserted before DF_Posts_ViewCount started at NULL
+            UPDATE Posts SET ViewCount = COALESCE(ViewCount, 0) + @Views   -- posts inserted before DF_Posts_ViewCount started at NULL
             WHERE Slug = @Slug
               AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= SYSUTCDATETIME()))
               AND (@OwnerId = '00000000-0000-0000-0000-000000000000' OR AuthorId = @OwnerId)",
@@ -340,14 +356,28 @@ public class PostRepository : IPostRepository
         return await conn.ExecuteScalarAsync<int>(sql, new { Slug = slug, ExcludeId = excludeId }) > 0;
     }
 
+    public async Task<bool> TryMarkNewsletterDraftedAsync(Guid postId)
+    {
+        using var conn = _ctx.CreateConnection();
+        return await conn.ExecuteAsync(
+            "UPDATE Posts SET NewsletterDraftedAt = SYSUTCDATETIME() WHERE Id = @postId AND NewsletterDraftedAt IS NULL", new { postId }) == 1;
+    }
+
+    public async Task ClearNewsletterDraftedAsync(Guid postId)
+    {
+        using var conn = _ctx.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Posts SET NewsletterDraftedAt = NULL WHERE Id = @postId", new { postId });
+    }
+
     public async Task<int> GetTotalCountAsync(PostStatus? status = null, Guid? authorId = null)
     {
         using var conn = _ctx.CreateConnection();
         var sql = "SELECT COUNT(*) FROM Posts WHERE 1=1";
+        if (!status.HasValue) sql += " AND Status <> 'Trashed'";
         if (status.HasValue) 
         {
             if (status.Value == PostStatus.Published)
-                sql += " AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= GETUTCDATE()))";
+                sql += " AND (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= SYSUTCDATETIME()))";
             else
                 sql += " AND Status = @Status";
         }
@@ -364,7 +394,7 @@ public class PostRepository : IPostRepository
     public async Task<int> GetViewsTodayAsync(Guid? authorId = null)
     {
         using var conn = _ctx.CreateConnection();
-        var sql = "SELECT ISNULL(SUM(ViewCount), 0) FROM Posts WHERE CAST(UpdatedAt AS DATE) = CAST(GETUTCDATE() AS DATE)";
+        var sql = "SELECT COALESCE(SUM(ViewCount), 0) FROM Posts WHERE CAST(UpdatedAt AS DATE) = CAST(SYSUTCDATETIME() AS DATE)";
         if (authorId.HasValue) sql += " AND AuthorId = @AuthorId";
         
         return await conn.ExecuteScalarAsync<int>(sql, new { AuthorId = authorId });
@@ -454,7 +484,8 @@ public class PostRepository : IPostRepository
             FROM Posts p
             LEFT JOIN Users u ON u.Id = p.AuthorId
             WHERE p.Id != @PostId
-              AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= GETUTCDATE()))
+              AND (p.Status = 'Published' OR (p.Status = 'Scheduled' AND p.ScheduledAt <= SYSUTCDATETIME()))
+              AND (p.Visibility IS NULL OR p.Visibility <> 'unlisted')
             {orderBy}";
 
         return (await conn.QueryAsync<Post>(sql, p)).ToList();

@@ -8,7 +8,7 @@
     var page = ViewData[Blog.Web.Models.ListPaging.PageKey] as int? ?? 1;
     var total = ViewData[Blog.Web.Models.ListPaging.TotalKey] as int? ?? Model.TotalItems;
     ViewData["Description"] = total == 1 ? "1 post" : $"{total:N0} posts" + (string.IsNullOrEmpty(status) ? "" : $" · {status}");
-    var statuses = new (string Value, string Label)[] { ("", "All statuses"), ("published", "Published"), ("draft", "Draft"), ("scheduled", "Scheduled"), ("review", "In review"), ("changes", "Needs changes") };
+    var statuses = new (string Value, string Label)[] { ("", "All statuses"), ("published", "Published"), ("draft", "Draft"), ("scheduled", "Scheduled"), ("review", "In review"), ("changes", "Needs changes"), ("trash", "Trash") };
     string Keep(string? q, string? s) {
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(q)) parts.Add("q=" + Uri.EscapeDataString(q));
@@ -156,7 +156,8 @@
                                 @* Dark-safe tinted pills (admin.css); fixed palette classes did not follow the colour scheme. *@
                                 <span class="desk-pill @(displayStatus == Blog.Core.Domain.PostStatus.Published ? "pill-ok" :
                                       displayStatus == Blog.Core.Domain.PostStatus.Draft ? "pill-warn" :
-                                      displayStatus == Blog.Core.Domain.PostStatus.NeedsChanges ? "pill-bad" : "pill-info")">
+                                      displayStatus == Blog.Core.Domain.PostStatus.NeedsChanges ? "pill-bad" :
+                                      displayStatus == Blog.Core.Domain.PostStatus.Trashed ? "desk-pill-muted" : "pill-info")">
                                     @(displayStatus switch
                                     {
                                         Blog.Core.Domain.PostStatus.InReview => "In review",
@@ -164,6 +165,7 @@
                                         _ => displayStatus.ToString(),
                                     })
                                 </span>
+                                @if (Blog.Core.Services.PostVisibility.IsUnlisted(post.Visibility)) { <span class="desk-pill desk-pill-muted" title="Published, but left out of every list; readers need the link">Unlisted</span> }
                             </td>
                             <td class="text-muted-foreground hidden md:table-cell">
                                 <div class="flex items-center gap-2">
@@ -202,7 +204,29 @@
                                     }
                                     @if (canEdit)
                                     {
-                                        <form method="post" action="/admin/posts/delete/@post.Id" data-confirm-title="Delete this post?" data-confirm-body="“@post.Title” will be removed permanently and /@post.Slug will return 404. If the page has inbound links or search traffic, add a redirect under Growth → Redirects first." data-confirm-action="Delete post" data-confirm-tone="danger" class="inline">
+                                        var inTrash = post.Status == Blog.Core.Domain.PostStatus.Trashed;
+                                        @if (!inTrash)
+                                        {
+                                            <form method="post" action="/admin/posts/@post.Id/duplicate" class="inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm" aria-label="Duplicate “@post.Title” as a draft" title="Duplicate">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                </button>
+                                            </form>
+                                        }
+                                        @if (inTrash)
+                                        {
+                                            <form method="post" action="/admin/posts/restore/@post.Id" class="inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="q" value="@search" />
+                                                <input type="hidden" name="page" value="@(page)" />
+                                                <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm" aria-label="Restore “@post.Title” as a draft">Restore</button>
+                                            </form>
+                                        }
+                                        <form method="post" action="/admin/posts/delete/@post.Id"
+                                              data-confirm-title="@(inTrash ? "Delete this post for good?" : "Move this post to Trash?")"
+                                              data-confirm-body="@(inTrash ? $"“{post.Title}” is removed permanently, with its comments and revision history. This cannot be undone." : $"“{post.Title}” leaves the site and /{post.Slug} returns 404 until it is restored. It stays in Trash, where you can restore it or delete it for good. If the page has inbound links or search traffic, add a redirect under Growth → Redirects.")"
+                                              data-confirm-action="@(inTrash ? "Delete for good" : "Move to Trash")" data-confirm-tone="@(inTrash ? "danger" : "warning")" class="inline">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="q" value="@search" />
                                             <input type="hidden" name="status" value="@status" />

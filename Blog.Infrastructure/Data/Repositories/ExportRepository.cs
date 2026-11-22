@@ -54,8 +54,8 @@ public sealed class ExportRepository : IExportSource
     public async Task<ExportCatalog> LoadCatalogAsync(ExportOptions o)
     {
         using var conn = _ctx.CreateConnection();
-        var categories = (await conn.QueryAsync<ExportTerm>("SELECT Id, Name, Slug FROM Categories ORDER BY Name")).ToList();
-        var tags = (await conn.QueryAsync<ExportTerm>("SELECT Id, Name, Slug FROM Tags ORDER BY Name")).ToList();
+        var categories = (await conn.QueryAsync<ExportTerm>("SELECT Id, Name, Slug, ParentId FROM Categories ORDER BY Name")).ToList();
+        var tags = (await conn.QueryAsync<ExportTerm>("SELECT Id, Name, Slug, CAST(NULL AS UNIQUEIDENTIFIER) AS ParentId FROM Tags ORDER BY Name")).ToList();
         // Only people who authored something in the export: other staff never leave the site.
         var authors = (await conn.QueryAsync<AuthorRow>($@"
             SELECT u.Id, u.Username, u.DisplayName, u.Slug, u.Email, u.Bio, u.Website,

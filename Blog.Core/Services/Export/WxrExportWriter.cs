@@ -26,6 +26,24 @@ public static class WxrExportWriter
     private const string NsWfw = "http://wellformedweb.org/CommentAPI/";
     private const string NsDc = "http://purl.org/dc/elements/1.1/";
 
+    /// <summary>Every category once, each after the category it sits under. A parent that is missing, or a loop, leaves the category at the top level.</summary>
+    public static IReadOnlyList<ExportTerm> ParentsFirst(IReadOnlyList<ExportTerm> categories)
+    {
+        var byId = categories.GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First());
+        var ordered = new List<ExportTerm>(categories.Count);
+        var done = new HashSet<Guid>();
+
+        void Add(ExportTerm c, HashSet<Guid> walking)
+        {
+            if (done.Contains(c.Id) || !walking.Add(c.Id)) return;
+            if (c.ParentId is Guid p && p != c.Id && byId.TryGetValue(p, out var parent)) Add(parent, walking);
+            if (done.Add(c.Id)) ordered.Add(c);
+        }
+
+        foreach (var c in categories) Add(c, new HashSet<Guid>());
+        return ordered;
+    }
+
     public static async Task<ExportResult> WriteAsync(Stream output, ExportSite site, ExportCatalog catalog,
         IAsyncEnumerable<ExportPost> posts, IAsyncEnumerable<ExportPage>? pages, ExportOptions options, CancellationToken ct)
     {
@@ -80,12 +98,13 @@ public static class WxrExportWriter
             Cdata(w, "author_last_name", "");
             w.WriteEndElement();
         }
-        foreach (var c in catalog.Categories)
+        // A category names its parent by slug, and WordPress creates terms in file order, so parents go first.
+        foreach (var c in ParentsFirst(catalog.Categories))
         {
             w.WriteStartElement("wp", "category", NsWp);
             w.WriteElementString("term_id", NsWp, ids.For(c.Id).ToString(CultureInfo.InvariantCulture));
             Cdata(w, "category_nicename", c.Slug);
-            Cdata(w, "category_parent", "");
+            Cdata(w, "category_parent", c.ParentId is Guid parentId && categories.TryGetValue(parentId, out var parent) && parent.Id != c.Id ? parent.Slug : "");
             Cdata(w, "cat_name", c.Name);
             w.WriteEndElement();
         }

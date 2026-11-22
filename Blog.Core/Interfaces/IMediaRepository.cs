@@ -13,6 +13,8 @@ public interface IMediaRepository
     Task DeleteAsync(Guid id, Guid? uploadedBy = null);
     /// <summary>Sets the alt text and caption the editors copy into a post when the file is placed. False when not found or not the caller's.</summary>
     Task<bool> UpdateDetailsAsync(Guid id, Guid uploadedBy, string? altText, string? caption);
+    /// <summary>Records the new size and dimensions after the file behind a row was replaced. The address does not change.</summary>
+    Task<bool> UpdateFileAsync(Guid id, Guid uploadedBy, long fileSize, int? width, int? height);
     Task<int> GetTotalCountAsync(Guid? uploadedBy = null);
 
     /// <summary>
@@ -29,4 +31,10 @@ public interface IMediaRepository
     /// A file with no references has no entry.
     /// </summary>
     Task<Dictionary<Guid, List<MediaReference>>> FindReferencesAsync(IReadOnlyCollection<Media> items);
+
+    /// <summary>
+    /// Files nothing on the site points at: not in any post or page (body, feature and social images, blocks),
+    /// site setting, theme setting or profile photo. Oldest first, at most <paramref name="take"/>.
+    /// </summary>
+    Task<List<Media>> GetUnusedAsync(Guid uploadedBy, int take);
 }

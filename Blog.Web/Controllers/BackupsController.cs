@@ -84,6 +84,24 @@ public class BackupsController : Controller
         return File(_backups.OpenRead(name), "application/zip", name);
     }
 
+    /// <summary>Reads the whole backup without restoring it and says whether it is intact.</summary>
+    [HttpPost("check/{name}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Check(string name)
+    {
+        if (Unavailable) return NotFound();
+        if (_backups.Find(name) is null)
+        {
+            TempData["Error"] = "That backup is no longer in the backups folder.";
+            return RedirectToAction(nameof(Index));
+        }
+        var problems = await Task.Run(() => _backups.Verify(name));
+        await _audit.LogAsync(AuditActions.BackupChecked, "Backup", name, name, newValues: problems.Count == 0 ? "Intact" : string.Join(" ", problems));
+        if (problems.Count == 0) TempData["Success"] = "Backup checked: every table and media file it lists is present and readable.";
+        else TempData["Error"] = "This backup has problems, so do not rely on it. " + string.Join(" ", problems.Take(5));
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost("delete/{name}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string name)

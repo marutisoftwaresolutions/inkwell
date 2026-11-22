@@ -22,16 +22,18 @@ public sealed class PageViewBeaconController : Controller
 {
     private readonly PageViewBeaconService _beacon;
     private readonly TrafficRecorder _recorder;
+    private readonly GoalRecorder _goals;
     private readonly Blog.Web.Services.Security.IpFirewallService _firewall;
     private readonly IpHasher _ipHasher;
     private readonly ILogger<PageViewBeaconController> _log;
 
     public PageViewBeaconController(PageViewBeaconService beacon, TrafficRecorder recorder,
-        Blog.Web.Services.Security.IpFirewallService firewall, IpHasher ipHasher, ILogger<PageViewBeaconController> log)
+        Blog.Web.Services.Security.IpFirewallService firewall, IpHasher ipHasher, ILogger<PageViewBeaconController> log, GoalRecorder goals)
     {
         _ipHasher = ipHasher;
         _beacon = beacon;
         _recorder = recorder;
+        _goals = goals;
         _firewall = firewall;
         _log = log;
     }
@@ -78,6 +80,33 @@ public sealed class PageViewBeaconController : Controller
         catch (Exception ex)
         {
             _log.LogDebug(ex, "Page view beacon skipped (non-fatal).");
+        }
+        return NoContent();
+    }
+
+    /// <summary>
+    /// A reader followed a link the site watches as a goal (Admin → Analytics → Goals). The same gates as
+    /// a page view: not staff, not a known bot, from this site, with a page token this site signed, within
+    /// the per-address budget. The key is counted only when it is one of the site's click goals, so the
+    /// counts table cannot be filled with invented names. Always 204.
+    /// </summary>
+    [HttpPost("/pv/goal")]
+    [RequestSizeLimit(4 * 1024)]
+    public async Task<IActionResult> Goal([FromForm(Name = "t")] string? token, [FromForm(Name = "p")] string? path, [FromForm(Name = "g")] string? goal)
+    {
+        try
+        {
+            if (User.Identity?.IsAuthenticated == true) return NoContent();
+            if (BotUserAgent.IsBot(Request.Headers.UserAgent.ToString())) return NoContent();
+            if (!IsSameSite()) return NoContent();
+            if (_beacon.Validate(token, path) is null) return NoContent();
+            if (!_beacon.TryConsumeBudget(_firewall.ResolveClientIp(HttpContext))) return NoContent();
+
+            await _goals.ClickAsync(TrafficRecorder.OwnerOf(HttpContext), goal);
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "Goal beacon skipped (non-fatal).");
         }
         return NoContent();
     }

@@ -149,6 +149,62 @@
         prepare: function (el) { editable(el, 'blockquote,cite'); return el.outerHTML; }
     });
 
+    // A callout sets a short passage apart (a note, a tip, a warning). The kind is a data attribute, so the
+    // colour comes from the stylesheet's tokens and never from an inline style.
+    register('callout', {
+        title: 'Callout', order: 20,
+        template: function () { return '<div class="comp-callout" data-kind="note"><p contenteditable="true">A note worth setting apart from the text around it.</p></div>'; },
+        settings: function (b) {
+            var c = b.querySelector('.comp-callout'), kind = (c && c.getAttribute('data-kind')) || 'note';
+            return '<div class="setting-field"><label for="calloutKind">Kind</label><select id="calloutKind" onchange="updateCalloutKind(this.value)">' +
+                [['note', 'Note'], ['tip', 'Tip'], ['warning', 'Warning']].map(function (o) { return '<option value="' + o[0] + '"' + (kind === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+                '</select></div><p class="text-xs text-muted-foreground">Readers see the kind as a label before the text, so it does not depend on colour.</p>';
+        },
+        recognise: function (el) { return el.classList.contains('comp-callout'); },
+        prepare: function (el) { editable(el, 'p'); return el.outerHTML; }
+    });
+
+    // A toggle hides detail behind a question or a heading. It is a plain <details> element: it opens
+    // without JavaScript and its text is in the page for search engines either way.
+    register('toggle', {
+        title: 'Toggle', order: 20,
+        template: function () { return '<details class="comp-toggle" open><summary contenteditable="true" onclick="event.preventDefault()">A question or a heading</summary><p contenteditable="true">The detail a reader opens to see.</p></details>'; },
+        settings: function () { return '<p class="text-xs text-muted-foreground">Click the heading or the text on the canvas to edit them. Readers see it closed and open it themselves.</p>'; },
+        recognise: function (el) { return el.tagName === 'DETAILS' && el.classList.contains('comp-toggle'); },
+        prepare: function (el) {
+            el.setAttribute('open', '');
+            editable(el, 'summary,p');
+            var s = el.querySelector('summary'); if (s) s.setAttribute('onclick', 'event.preventDefault()');
+            return el.outerHTML;
+        }
+    });
+
+    // A bookmark is a link shown as a card: the linked page's title, description and site, as plain
+    // text the author can edit. The Desk fetches those details on request (POST /admin/link-preview);
+    // nothing is loaded from the other site when a reader opens the post, and no image is taken from it.
+    register('bookmark', {
+        title: 'Bookmark', order: 20,
+        template: function () {
+            return '<a class="comp-bookmark" href="#" rel="nofollow noopener" onclick="event.preventDefault()">' +
+                '<span class="comp-bookmark-title" contenteditable="true">Paste a link in the panel on the right</span>' +
+                '<span class="comp-bookmark-text" contenteditable="true">Then fetch its title and description, or type them here.</span>' +
+                '<span class="comp-bookmark-site" contenteditable="true">example.com</span></a>';
+        },
+        settings: function (b) {
+            var a = b.querySelector('.comp-bookmark'), href = a ? a.getAttribute('href') : '';
+            return '<div class="setting-field"><label for="bookmarkUrl">Link</label><input type="url" id="bookmarkUrl" value="' + esc(href === '#' ? '' : href) + '" placeholder="https://" onchange="updateBookmarkUrl(this.value)" /></div>' +
+                '<div class="setting-field"><button type="button" id="bookmarkFetch" onclick="fetchBookmark()" class="desk-btn desk-btn-secondary desk-btn-sm w-full">Fetch title and description</button>' +
+                '<p id="bookmarkStatus" role="status" class="text-xs text-muted-foreground mt-2"></p></div>' +
+                '<p class="text-xs text-muted-foreground">The card is plain text: click it on the canvas to change the wording. No image is loaded from the other site.</p>';
+        },
+        recognise: function (el) { return el.tagName === 'A' && el.classList.contains('comp-bookmark'); },
+        prepare: function (el) {
+            editable(el, 'span');
+            el.setAttribute('onclick', 'event.preventDefault()');
+            return el.outerHTML;
+        }
+    });
+
     register('divider', {
         title: 'Divider', order: 30,
         template: function () { return '<div class="comp-divider"><hr/></div>'; },
@@ -259,6 +315,54 @@
     window.changeBlockImage = function () { var img = q('img'); if (img) window.selectBlockImage(img); };
     window.updateHeroBtnLabel = function (v) { var a = q('.comp-hero a'); if (a) a.textContent = v; };
     window.updateHeroBtnUrl = function (v) { var a = q('.comp-hero a'); if (a) a.href = v; };
+    window.updateCalloutKind = function (v) { var c = q('.comp-callout'); if (c) c.setAttribute('data-kind', v); };
+    window.updateBookmarkUrl = function (v) {
+        var a = q('.comp-bookmark'); if (!a) return;
+        v = (v || '').trim();
+        var ok = /^https?:\/\//i.test(v), status = document.getElementById('bookmarkStatus');
+        // A card with no usable address would publish as a dead link: say so instead of failing quietly.
+        if (status) status.textContent = ok || v === '' ? '' : 'Enter the full address, starting with https://.';
+        a.setAttribute('href', ok ? v : '#');
+        document.dispatchEvent(new CustomEvent('inkwell:content-changed'));
+    };
+    // Asks the Desk for the linked page's details and writes them into the card as text (never as markup).
+    window.fetchBookmark = function () {
+        var a = q('.comp-bookmark'), input = document.getElementById('bookmarkUrl'), status = document.getElementById('bookmarkStatus');
+        if (!a || !input) return;
+        var say = function (text) { if (status) status.textContent = text; };
+        var url = (input.value || '').trim();
+        if (!/^https?:\/\//i.test(url)) { say('Enter the full address, starting with https://.'); input.focus(); return; }
+        var token = document.querySelector('input[name="__RequestVerificationToken"]');
+        var body = new URLSearchParams();
+        body.append('url', url);
+        body.append('__RequestVerificationToken', token ? token.value : '');
+        say('Fetching…');
+        var button = document.getElementById('bookmarkFetch');
+        if (button) button.disabled = true;                       // one request at a time
+        if (window.InkwellDesk && InkwellDesk.busy) InkwellDesk.busy(true);
+        fetch('/admin/link-preview', { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+            .then(function (res) {
+                if (!res.ok) { say((res.data && res.data.error) || 'The details could not be fetched. Fill in the card by hand.'); return; }
+                var set = function (cls, text) {
+                    var span = a.querySelector('.' + cls);
+                    if (!text) { if (span) span.remove(); return; }
+                    if (!span) {
+                        span = document.createElement('span'); span.className = cls; span.setAttribute('contenteditable', 'true');
+                        a.insertBefore(span, a.querySelector('.comp-bookmark-site'));
+                    }
+                    span.textContent = text;
+                };
+                a.setAttribute('href', res.data.url || url);
+                set('comp-bookmark-title', res.data.title || url);
+                set('comp-bookmark-text', res.data.description || '');
+                var site = a.querySelector('.comp-bookmark-site'); if (site) site.textContent = res.data.site || '';
+                say('Details filled in. Change any wording on the canvas.');
+                document.dispatchEvent(new CustomEvent('inkwell:content-changed'));
+            })
+            .catch(function () { say('The details could not be fetched. Fill in the card by hand.'); })
+            .then(function () { if (button) button.disabled = false; if (window.InkwellDesk && InkwellDesk.busy) InkwellDesk.busy(false); });
+    };
     window.updateSpacerHeight = function (v) { var s = q('.comp-spacer'); if (s) s.style.height = v + 'px'; };
     window.updateImgTextSize = function (v) { var img = q('.comp-imagetext img'); if (img) img.style.width = v; };
     window.updateVideoUrl = function (v) { var f = q('iframe'); if (f) f.src = v; };
@@ -293,6 +397,9 @@
             selected: null, dragSrc: null, dragFromPalette: null
         };
 
+        // Adding, moving, duplicating or deleting a block changes the document without any input event, so the
+        // unsaved-changes guard (inkwell-desk.js) and draft recovery are told explicitly.
+        function changed() { document.dispatchEvent(new CustomEvent('inkwell:content-changed')); }
         function updateEmpty() { if (s.empty) s.empty.style.display = s.canvas.querySelectorAll('.builder-block').length === 0 ? 'flex' : 'none'; }
         function deselect() { if (s.selected) s.selected.classList.remove('selected'); s.selected = null; }
         function showSettings() { deselect(); s.settingsView.classList.remove('hidden'); s.componentView.classList.add('hidden'); }
@@ -319,6 +426,7 @@
                 if (!s.dragSrc || s.dragSrc === this) return;
                 var r = this.getBoundingClientRect();
                 this.parentNode.insertBefore(s.dragSrc, e.clientY < r.top + r.height / 2 ? this : this.nextSibling);
+                changed();
             });
             block.addEventListener('click', function (e) { if (!e.target.closest('.block-toolbar')) select(block); });
             return block;
@@ -338,7 +446,7 @@
                 if (html === null || html === undefined) return;
                 var block = create(html, type);
                 if (before) s.canvas.insertBefore(block, before); else s.canvas.appendChild(block);
-                updateEmpty(); select(block);
+                updateEmpty(); select(block); changed();
             });
         }
 
@@ -348,9 +456,10 @@
             var b = btn.closest('.builder-block');
             if (dir === -1 && b.previousElementSibling && b.previousElementSibling.classList.contains('builder-block')) b.parentNode.insertBefore(b, b.previousElementSibling);
             else if (dir === 1 && b.nextElementSibling && b.nextElementSibling.classList.contains('builder-block')) b.parentNode.insertBefore(b.nextElementSibling, b);
+            changed();
         };
-        window.deleteBlock = function (btn) { var b = btn.closest('.builder-block'); if (b === s.selected) showSettings(); b.remove(); updateEmpty(); };
-        window.duplicateBlock = function (btn) { var b = btn.closest('.builder-block'); b.parentNode.insertBefore(wire(b.cloneNode(true)), b.nextSibling); };
+        window.deleteBlock = function (btn) { var b = btn.closest('.builder-block'); if (b === s.selected) showSettings(); b.remove(); updateEmpty(); changed(); };
+        window.duplicateBlock = function (btn) { var b = btn.closest('.builder-block'); b.parentNode.insertBefore(wire(b.cloneNode(true)), b.nextSibling); changed(); };
 
         document.querySelectorAll('.palette-item').forEach(function (btn) {
             btn.addEventListener('dragstart', function (e) { s.dragFromPalette = btn.dataset.component; e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', btn.dataset.component); });
@@ -383,6 +492,7 @@
                 clone.querySelectorAll('[contenteditable]').forEach(function (el) { el.removeAttribute('contenteditable'); });
                 clone.querySelectorAll('[onclick]').forEach(function (el) { el.removeAttribute('onclick'); });
                 clone.querySelectorAll('.img-placeholder, .comp-spacer span, [data-editor-only]').forEach(function (el) { el.remove(); });
+                clone.querySelectorAll('details.comp-toggle').forEach(function (el) { el.removeAttribute('open'); });   // readers get it closed
                 html += clone.innerHTML.trim() + '\n';
             });
             return html.trim();
@@ -414,8 +524,18 @@
             updateEmpty();
         }
 
+        // Replaces what is on the canvas with saved markup (draft recovery restores through this).
+        function load(html) {
+            showSettings();
+            s.canvas.querySelectorAll('.builder-block').forEach(function (b) { b.remove(); });
+            if (s.content) s.content.value = html || '';
+            hydrate();
+        }
+
         if (opts.hydrate) hydrate(); else updateEmpty();
-        return { extract: extract, extractText: extractText, hydrate: hydrate };
+        var api = { extract: extract, extractText: extractText, hydrate: hydrate, load: load };
+        window.InkwellBuilderInstance = api;   // one builder per page; inkwell-autosave.js reads and restores through it
+        return api;
     }
 
     window.InkwellBuilder = { register: register, init: init, parseVideoUrl: parseVideoUrl, escape: esc };

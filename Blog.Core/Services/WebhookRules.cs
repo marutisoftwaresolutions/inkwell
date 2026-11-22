@@ -69,7 +69,10 @@ public static class WebhookRules
         {
             var b = address.GetAddressBytes();
             return address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast
-                || (b[0] & 0xFE) == 0xFC;                           // unique-local fc00::/7
+                || (b[0] & 0xFE) == 0xFC                            // unique-local fc00::/7
+                || (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B)   // NAT64 64:ff9b::/96 wraps an IPv4 address
+                || (b[0] == 0x20 && b[1] == 0x02)                   // 6to4 2002::/16 wraps an IPv4 address
+                || (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x00 && b[3] == 0x00);  // Teredo 2001::/32
         }
 
         return true;   // anything else is not something a webhook should call

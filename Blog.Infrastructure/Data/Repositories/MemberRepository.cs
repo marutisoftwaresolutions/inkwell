@@ -35,8 +35,8 @@ public class MemberRepository : IMemberRepository
     {
         using var conn = _context.CreateConnection();
         await conn.ExecuteAsync(@"
-            INSERT INTO Members (Id, Uuid, Email, Name, Note, Status, Subscribed, ConfirmToken, UnsubscribeToken, ConfirmedAt, CreatedAt)
-            VALUES (@Id, @Uuid, @Email, @Name, @Note, @Status, @Subscribed, @ConfirmToken, @UnsubscribeToken, @ConfirmedAt, @CreatedAt)",
+            INSERT INTO Members (Id, Uuid, Email, Name, Note, Status, Subscribed, ConfirmToken, UnsubscribeToken, ConfirmedAt, CreatedAt, SourcePath)
+            VALUES (@Id, @Uuid, @Email, @Name, @Note, @Status, @Subscribed, @ConfirmToken, @UnsubscribeToken, @ConfirmedAt, @CreatedAt, @SourcePath)",
             member);
         return member.Id;
     }
@@ -55,6 +55,51 @@ public class MemberRepository : IMemberRepository
         await conn.ExecuteAsync(@"
             UPDATE Members SET Status = 'unsubscribed', Subscribed = 0 WHERE Id = @Id",
             new { Id = id });
+    }
+
+    public async Task<string> RestartAsync(Guid id)
+    {
+        var token = Guid.NewGuid().ToString("N");
+        using var conn = _context.CreateConnection();
+        await conn.ExecuteAsync(@"
+            UPDATE Members SET Status = 'pending', Subscribed = 0, ConfirmToken = @token, ConfirmedAt = NULL WHERE Id = @id",
+            new { id, token });
+        return token;
+    }
+
+    public async Task<List<(string Path, int Subscribers)>> GetTopSignupPagesAsync(int take)
+    {
+        using var conn = _context.CreateConnection();
+        return (await conn.QueryAsync<(string, int)>(@"
+            SELECT TOP (@take) SourcePath, COUNT(*) AS Subscribers
+            FROM Members
+            WHERE Status = 'confirmed' AND DeletedAt IS NULL AND SourcePath IS NOT NULL
+            GROUP BY SourcePath
+            ORDER BY COUNT(*) DESC, SourcePath", new { take })).ToList();
+    }
+
+    public async Task<List<Member>> GetWelcomeCandidatesAsync(int stepsSent, DateTime confirmedFromUtc, DateTime confirmedBeforeUtc, int take)
+    {
+        using var conn = _context.CreateConnection();
+        return (await conn.QueryAsync<Member>(@"
+            SELECT TOP (@take) * FROM Members
+            WHERE Status = 'confirmed' AND DeletedAt IS NULL AND WelcomeStepsSent = @stepsSent
+              AND ConfirmedAt >= @confirmedFromUtc AND ConfirmedAt <= @confirmedBeforeUtc
+            ORDER BY ConfirmedAt",
+            new { take, stepsSent, confirmedFromUtc, confirmedBeforeUtc })).ToList();
+    }
+
+    public async Task SetWelcomeStepsSentAsync(Guid id, int stepsSent)
+    {
+        using var conn = _context.CreateConnection();
+        // Only ever forwards: two runs racing can never send a step twice or move a reader back.
+        await conn.ExecuteAsync("UPDATE Members SET WelcomeStepsSent = @stepsSent WHERE Id = @id AND WelcomeStepsSent < @stepsSent", new { id, stepsSent });
+    }
+
+    public async Task MarkBouncedAsync(Guid id)
+    {
+        using var conn = _context.CreateConnection();
+        await conn.ExecuteAsync("UPDATE Members SET Status = 'bounced', Subscribed = 0 WHERE Id = @id AND Status = 'confirmed'", new { id });
     }
 
     public async Task<List<Member>> GetConfirmedAsync(int page = 1, int pageSize = 100)

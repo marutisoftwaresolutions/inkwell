@@ -51,7 +51,7 @@ public class RevisionRepository : IRevisionRepository
         INSERT INTO Revisions (Id, EntityType, EntityId, Number, Title, Slug, Html, MetaTitle, MetaDescription,
                                StructuredJson, Status, Reason, AuthorId, AuthorName, CreatedAt)
         OUTPUT INSERTED.Number
-        SELECT @Id, @EntityType, @EntityId, ISNULL(MAX(Number), 0) + 1, @Title, @Slug, @Html, @MetaTitle, @MetaDescription,
+        SELECT @Id, @EntityType, @EntityId, COALESCE(MAX(Number), 0) + 1, @Title, @Slug, @Html, @MetaTitle, @MetaDescription,
                @StructuredJson, @Status, @Reason, @AuthorId, @AuthorName, @CreatedAt
         FROM Revisions WITH (UPDLOCK, HOLDLOCK)
         WHERE EntityType = @EntityType AND EntityId = @EntityId;";

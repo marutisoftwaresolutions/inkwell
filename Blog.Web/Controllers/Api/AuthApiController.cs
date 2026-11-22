@@ -39,12 +39,24 @@ public class AuthApiController : ControllerBase
         if (_tokens.Problem is not null)
             return StatusCode(503, ApiError(503, "The API is not configured on this site. The site administrator needs to set Jwt:Key."));
 
+        // Same per-account wait as the Desk sign-in (SignInThrottle): five wrong passwords, then fifteen minutes.
+        var throttle = HttpContext.RequestServices.GetRequiredService<Blog.Core.Services.SignInThrottle>();
+        var exempt = await _firewall.IsAllowlistedAsync(HttpContext);
+        if (!exempt && throttle.LockedFor(req.Email, DateTime.UtcNow) is { } wait)
+        {
+            Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString();
+            return StatusCode(429, ApiError(429, $"Too many wrong passwords for this account. Try again in {Blog.Core.Services.SignInThrottle.MinutesToWait(wait)} minutes."));
+        }
+
         var (user, error) = await _auth.ValidateLoginAsync(req.Email, req.Password);
         if (user == null)
         {
+            if (!exempt) throttle.RecordFailure(req.Email, DateTime.UtcNow);
             await _firewall.RegisterFailedLoginAsync(HttpContext);
             return Unauthorized(ApiError(401, error ?? "Invalid credentials."));
         }
+
+        throttle.Clear(req.Email);
 
         // Two-factor (ADR-0021): a token is a sign-in too, so it needs the same second step as the Desk.
         // App codes only; recovery codes are for getting back into the Desk after losing a phone.

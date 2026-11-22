@@ -62,6 +62,45 @@
 <script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(collData, collOpts))</script>
 
 
+@{
+    // Exactly one h1 on every listing page. Search results and category / tag archives get theirs here; a layout whose
+    // hero prints a post title steps that down to h2 because ViewData["PageHasHeading"] is set. The home page's h1 is
+    // always the site's own name and tagline, never the newest post's title: a heading that changes with every post
+    // tells a search engine nothing stable about the site (2026-11-21: the live home page drew its impressions at
+    // position 70 with a post title as its only h1). Only Magazine prints that heading visibly, in its masthead; every
+    // other layout carries it visually hidden.
+    var archiveHeading = ViewBag.ArchiveHeading as string;
+    var archiveKind = ViewBag.ArchiveKind as string;
+    var hasArchiveHeading = string.IsNullOrWhiteSpace(searchQuery) && !string.IsNullOrWhiteSpace(archiveHeading);
+    var layoutsWithHomeHeading = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Magazine" };
+    var isHomeListing = string.IsNullOrWhiteSpace(searchQuery) && !hasArchiveHeading
+        && !((ViewBag.SelectedCategories as List<string>)?.Any() ?? false) && !((ViewBag.SelectedTags as List<string>)?.Any() ?? false);
+    var needsHiddenHeading = isHomeListing && (!layoutsWithHomeHeading.Contains(blogLayout) || Model.Page > 1 || !Model.Items.Any());
+    if (!string.IsNullOrWhiteSpace(searchQuery) || hasArchiveHeading || needsHiddenHeading || !isHomeListing)
+    {
+        ViewData["PageHasHeading"] = true;
+    }
+}
+@if (needsHiddenHeading || (!isHomeListing && string.IsNullOrWhiteSpace(searchQuery) && !hasArchiveHeading))
+{
+    // Site name, then the tagline on the first page of the home listing (the same words as the <title>).
+    var homeHeadingTagline = isHomeListing && Model.Page <= 1 ? ((string?)ViewBag.Tagline ?? "").Trim() : "";
+    <h1 class="ink-visually-hidden">@((string)ViewBag.SiteName)@(homeHeadingTagline.Length > 0 ? ": " + homeHeadingTagline : "")@(Model.Page > 1 ? $", page {Model.Page}" : "")</h1>
+}
+@if (hasArchiveHeading)
+{
+    <header class="ink-search-head ink-archive-head">
+        <p class="ink-archive-head__kind">@archiveKind</p>
+        <h1>@archiveHeading</h1>
+        @if (ViewBag.ArchiveIntroHtml is string archiveIntro && archiveIntro.Length > 0)
+        {
+            @* Encoded and link-checked by ArchiveIntro.ToHtml; no author markup reaches this point. *@
+            <div class="ink-archive-head__intro">@Html.Raw(archiveIntro)</div>
+        }
+        <p>@(Model.TotalItems == 0 ? "Nothing published here yet." : Model.TotalItems == 1 ? "1 article" : $"{Model.TotalItems} articles")@(Model.TotalPages > 1 ? $", page {Model.Page} of {Model.TotalPages}" : "")</p>
+    </header>
+}
+
 @if (!string.IsNullOrWhiteSpace(searchQuery))
 {
     <section class="ink-search-head" aria-labelledby="search-results-heading">
@@ -73,6 +112,50 @@
             <a href="/">Clear</a>
         </form>
     </section>
+}
+
+@{
+    // Nested categories: where this category sits and what lies beneath it. Plain links, shown by every layout.
+    var categoryPath = ViewBag.CategoryPath as List<Blog.Core.Domain.Category>;
+    var subcategories = ViewBag.Subcategories as List<Blog.Core.Domain.Category>;
+
+    // BreadcrumbList for a category archive: Home, each category above this one, then this one. The same trail readers see.
+    string? categoryBreadcrumb = null;
+    if (categoryPath is { Count: > 0 })
+    {
+        var crumbs = new List<object> { new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "Home", ["item"] = collBase + "/" } };
+        for (var i = 0; i < categoryPath.Count; i++)
+            crumbs.Add(new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = i + 2, ["name"] = categoryPath[i].Name, ["item"] = collBase + "/category/" + categoryPath[i].Slug });
+        categoryBreadcrumb = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object> { ["@context"] = "https://schema.org", ["@type"] = "BreadcrumbList", ["itemListElement"] = crumbs }, collOpts);
+    }
+}
+@if (categoryBreadcrumb is not null)
+{
+    <script type="application/ld+json">@Html.Raw(categoryBreadcrumb)</script>
+}
+@if ((categoryPath?.Count ?? 0) > 1 || (subcategories?.Count ?? 0) > 0)
+{
+    <nav class="ink-category-trail" aria-label="Category">
+        @if (categoryPath is { Count: > 1 })
+        {
+            <ol>
+                @for (var i = 0; i < categoryPath.Count; i++)
+                {
+                    if (i < categoryPath.Count - 1) { <li><a href="/category/@categoryPath[i].Slug">@categoryPath[i].Name</a></li> }
+                    else { <li aria-current="page">@categoryPath[i].Name</li> }
+                }
+            </ol>
+        }
+        @if (subcategories is { Count: > 0 })
+        {
+            <ul aria-label="Subcategories">
+                @foreach (var sub in subcategories)
+                {
+                    <li><a href="/category/@sub.Slug">@sub.Name</a></li>
+                }
+            </ul>
+        }
+    </nav>
 }
 
 @if (blogLayout == "Magazine")

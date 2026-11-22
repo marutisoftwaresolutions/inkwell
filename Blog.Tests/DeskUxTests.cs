@@ -213,6 +213,10 @@ public class DeskUxSourceTests
         Assert.Contains("querySelectorAll('.toast-model-error').forEach(t => t.remove())", File.ReadAllText(Path.Combine(Root(), "Blog.Web", "wwwroot", "js", "inkwell-desk.js")));
         var css = File.ReadAllText(Path.Combine(Root(), "Blog.Web", "wwwroot", "css", "admin.css"));
         Assert.Contains(".table-scroll", css);
+        // The scroller is the positioning context: a visually-hidden header label inside a wide table must not widen the page (found at 400 px, 2026-11-13).
+        Assert.Contains(".table-scroll { position: relative; overflow-x: auto;", css);
         Assert.Contains("#desk-busy", css);
+        // The "Unsaved changes" pill stays out of sight until a form is actually dirty (it was drawn on every untouched editor, 2026-11-13).
+        Assert.Contains("[data-dirty-indicator][hidden] { display: none !important; }", css);
     }
 }

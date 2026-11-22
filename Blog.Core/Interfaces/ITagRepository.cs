@@ -10,6 +10,8 @@ public interface ITagRepository
     Task<Tag?> GetBySlugAsync(string slug, Guid authorId);
     Task<Tag> GetOrCreateAsync(string name, Guid authorId);
     Task<Guid> CreateAsync(Tag tag);
+    /// <summary>Sets or clears (null) the tag's description. The caller has normalised it with ArchiveIntro.</summary>
+    Task SetDescriptionAsync(Guid id, Guid authorId, string? description);
     Task DeleteAsync(Guid id, Guid authorId);
     
     // Note: Used heavily in Public views where posts are queried universally, keep universal

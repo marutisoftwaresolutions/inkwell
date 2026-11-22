@@ -1,0 +1,57 @@
+@model Blog.Core.Domain.Post
+@* Notes for the people working on this post. Its own forms, outside the tracked editor form, like the
+   review panel: adding a note is an action, not an edit, and must not be lost with or mixed into a save.
+   Readers never see notes. Shown only for a saved post (a note needs a post to belong to). *@
+@{
+    var notes = ViewBag.PostNotes as List<Blog.Core.Domain.PostNote> ?? new List<Blog.Core.Domain.PostNote>();
+    var open = notes.Count(n => n.IsOpen);
+}
+@if (Model.Id != Guid.Empty)
+{
+    <details id="post-notes" class="mb-3 rounded-lg border border-border bg-card text-sm" open="@(open > 0)">
+        <summary class="cursor-pointer px-3 py-2 font-medium">
+            Notes
+            @if (open > 0) { <span class="desk-pill pill-warn ml-1">@open open</span> }
+            else if (notes.Count > 0) { <span class="desk-pill desk-pill-muted ml-1">all resolved</span> }
+        </summary>
+        <div class="px-3 pb-3 space-y-3">
+            <p class="text-xs text-muted-foreground">For the people working on this post: a question, a figure to check, a remark for the author. Readers never see them.</p>
+            @if (notes.Count == 0)
+            {
+                <p class="text-muted-foreground">No notes yet. Add the first one below.</p>
+            }
+            else
+            {
+                <ul class="space-y-2">
+                    @foreach (var note in notes)
+                    {
+                        <li class="rounded-md border border-border p-2 @(note.IsOpen ? "" : "opacity-70")">
+                            <p class="whitespace-pre-line text-foreground">@note.Body</p>
+                            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span>@note.UserName, @Dates.DateTime(note.CreatedAt)</span>
+                                @if (note.IsOpen)
+                                {
+                                    <form method="post" action="/admin/posts/@Model.Id/notes/@note.Id/resolve" class="inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm" aria-label="Resolve the note from @note.UserName">Resolve</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span>Resolved by @note.ResolvedByName, @Dates.DateTime(note.ResolvedAt)</span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            <form method="post" action="/admin/posts/@Model.Id/notes" class="space-y-2">
+                @Html.AntiForgeryToken()
+                <label for="post-note-body" class="desk-label">Add a note</label>
+                <textarea id="post-note-body" name="body" rows="2" maxlength="@Blog.Core.Domain.PostNote.MaxLength" required class="desk-textarea" aria-describedby="post-note-hint"></textarea>
+                <p id="post-note-hint" class="desk-hint">Save the post first if you have unsaved changes: adding a note reloads this page.</p>
+                <button type="submit" class="desk-btn desk-btn-outline desk-btn-sm">Add note</button>
+            </form>
+        </div>
+    </details>
+}

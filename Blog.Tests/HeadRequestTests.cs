@@ -47,6 +47,7 @@ public class HeadRequestTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Head_returns_headers_without_a_body()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         var response = await Client().SendAsync(Head("/"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -57,6 +58,7 @@ public class HeadRequestTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Head_on_a_missing_page_is_404_not_405()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         // The old behaviour returned 405 here, which tells a crawler nothing about the URL.
         var response = await Client().SendAsync(Head("/definitely-not-a-real-page-xyz"));
 
@@ -66,6 +68,7 @@ public class HeadRequestTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Get_still_returns_a_body()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         // Guard against the body-discarding middleware leaking into normal requests.
         var response = await Client().GetAsync("/");
 
@@ -76,6 +79,7 @@ public class HeadRequestTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task A_second_get_after_a_head_is_unaffected()
     {
+        if (!TestDatabase.Available(_factory)) return;   // no database on this machine: skip
         var client = Client();
 
         await client.SendAsync(Head("/"));

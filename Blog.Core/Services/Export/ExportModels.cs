@@ -23,7 +23,8 @@ public sealed record ExportOptions
 /// <summary>The site an export comes from.</summary>
 public sealed record ExportSite(string Title, string Description, string BaseUrl, string Language, TimeZoneInfo TimeZone);
 
-public sealed record ExportTerm(Guid Id, string Name, string Slug);
+/// <summary>A category or a tag. <paramref name="ParentId"/> is the category a category sits under; always null for a tag.</summary>
+public sealed record ExportTerm(Guid Id, string Name, string Slug, Guid? ParentId = null);
 
 public sealed record ExportAuthor(Guid Id, string Login, string DisplayName, string Slug, string? Email, string? Bio,
     string? Website, string? ProfileImage, string Role);

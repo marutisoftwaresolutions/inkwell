@@ -29,6 +29,18 @@ public static class EditorialWorkflow
     public static bool IsLive(PostStatus status, DateTime? scheduledAtUtc, DateTime nowUtc) =>
         status == PostStatus.Published || (status == PostStatus.Scheduled && scheduledAtUtc <= nowUtc);
 
+    /// <summary>
+    /// The date a post carries as "published". A published post keeps the date it has, or gets now. A scheduled post
+    /// goes live by the clock with no further save, so its date is the time it is scheduled for: without this it went
+    /// live with no date at all, and readers, the feed and the structured data showed an empty one.
+    /// </summary>
+    public static DateTime? PublishDate(PostStatus status, DateTime? scheduledAtUtc, DateTime? currentUtc, DateTime nowUtc) => status switch
+    {
+        PostStatus.Published => currentUtc ?? nowUtc,
+        PostStatus.Scheduled when scheduledAtUtc is DateTime at => at > nowUtc ? at : currentUtc ?? at,
+        _ => currentUtc,
+    };
+
     public static bool IsInWorkflow(PostStatus status) => status is PostStatus.InReview or PostStatus.NeedsChanges;
 
     /// <summary>The outcome of a save: the status to store, and a message for the user when it differs from what they asked.</summary>

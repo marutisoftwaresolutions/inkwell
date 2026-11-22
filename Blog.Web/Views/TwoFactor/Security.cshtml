@@ -37,6 +37,16 @@
         }
     </div>
 
+    <form method="post" action="/account/sign-out-everywhere" class="desk-card p-5 flex flex-col gap-3"
+          data-confirm-title="Sign out everywhere else?"
+          data-confirm-body="Every other browser and device signed in to your account is signed out, and sign-in tokens issued by the API stop working. This browser stays signed in. API keys keep working; revoke those under API keys."
+          data-confirm-action="Sign out everywhere else" data-confirm-tone="warning">
+        @Html.AntiForgeryToken()
+        <h2 class="desk-card-title">Other sessions</h2>
+        <p class="text-sm text-muted-foreground">Signed in on a shared or lost device? End every session but this one. Changing your password does the same.</p>
+        <div><button type="submit" class="desk-btn desk-btn-outline">Sign out everywhere else</button></div>
+    </form>
+
     @if (on)
     {
         <form method="post" action="/account/two-factor/recovery-codes" class="desk-card p-5 flex flex-col gap-3"

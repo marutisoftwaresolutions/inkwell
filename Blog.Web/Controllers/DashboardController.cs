@@ -272,21 +272,34 @@ public class DashboardController : Controller
         return Ok(new { success = true });
     }
 
-    // ── Manual Seed Endpoint ─────────────────────────────────────────────────
+    // ── Restore the default roles and permissions ───────────────────────────
 
-    [HttpGet("seed")]
+    /// <summary>
+    /// Adds any default role or permission that is missing (Admin → Users offers it when none exist).
+    /// It only adds; nothing a site has changed is touched. The same check runs at every start, so this
+    /// is for the rare case where the tables were emptied while the site was running.
+    /// </summary>
+    [HttpPost("restore-roles")]
+    [ValidateAntiForgeryToken]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> Seed()
+    public async Task<IActionResult> RestoreRoles([FromServices] Blog.Web.Services.AuditService audit)
     {
         try
         {
-            await _seeder.SeedAsync();
-            TempData["Success"] = "Sample data seeded.";
+            var added = await _seeder.SeedRolesAndPermissionsAsync();
+            if (added > 0)
+            {
+                // Only a change is recorded: a click that found everything in place writes nothing to the trail.
+                await audit.LogAsync(Blog.Core.Domain.AuditActions.RoleDefaultsRestored, "Role", null, "Default roles and permissions", newValues: $"{added} missing row(s) added");
+                TempData["Success"] = "The missing default roles and permissions were added.";
+            }
+            else TempData["Success"] = "Nothing was missing: the default roles and permissions were already in place.";
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            TempData["Error"] = $"Seed failed: {ex.Message}";
+            TempData["Error"] = "The default roles could not be restored. The Error Monitor has the details.";
+            throw;
         }
-        return RedirectToAction("Index");
+        return Redirect("/admin/users");
     }
 }

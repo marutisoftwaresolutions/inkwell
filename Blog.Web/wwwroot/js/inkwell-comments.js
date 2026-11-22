@@ -55,6 +55,17 @@
         });
     });
 
+    // A comment that was published at once: the page was reloaded to show it, and the outcome is repeated here.
+    try {
+        var note = sessionStorage.getItem('ink-comment-note');
+        if (note) {
+            sessionStorage.removeItem('ink-comment-note');
+            // The main form, not a reply form: those sit folded away under each comment.
+            var main = document.querySelector('form[data-comment-form][aria-describedby="comment-status"]');
+            if (main) show(main, note, true);
+        }
+    } catch (_) { }
+
     document.querySelectorAll('form[data-comment-form]').forEach(function (form) {
         var button = form.querySelector('button[type="submit"]');
         form.addEventListener('submit', function (e) {
@@ -83,6 +94,11 @@
                         if (text) text.value = '';
                         if (window.grecaptcha && window.grecaptcha.reset) { try { window.grecaptcha.reset(); } catch (_) { } }
                         show(form, r.data.message, true);
+                        if (r.data.posted) {
+                            // Already public (the site does not hold comments): reload so the reader sees it in the thread.
+                            try { sessionStorage.setItem('ink-comment-note', r.data.message); } catch (_) { }
+                            location.reload();
+                        }
                         return;
                     }
                     // Fresh tokens for the next press. They are stamped when they arrive, and a send sooner than the
@@ -101,4 +117,21 @@
                 });
         });
     });
+})();
+
+/* Comment permalinks: each comment's date links to the comment; this adds "Copy link" where the
+   browser can copy. Without it the date link still works. */
+(function () {
+	document.querySelectorAll('[data-comment-link]').forEach(function (button) {
+		if (!(navigator.clipboard && navigator.clipboard.writeText)) return;
+		button.hidden = false;
+		button.addEventListener('click', function () {
+			var address = location.origin + location.pathname + '#' + button.getAttribute('data-comment-link');
+			var original = button.textContent;
+			navigator.clipboard.writeText(address).then(function () {
+				button.textContent = 'Link copied';
+				setTimeout(function () { button.textContent = original; }, 2500);
+			}, function () { /* the date beside it is still a link to the comment */ });
+		});
+	});
 })();

@@ -144,6 +144,7 @@
                         <div class="desk-menu-sep"></div>
                         <a href="/account/profile" class="desk-menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile</a>
                         <a href="/account/security" class="desk-menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Two-factor sign-in</a>
+                        <a href="/account/api-keys" class="desk-menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m16 7 3 3"/></svg>API keys</a>
                         <a href="/admin/settings#s-general" class="desk-menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg> Colour scheme: @shell.ColorScheme</a>
                         <a href="/" target="_blank" rel="noopener" class="desk-menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">@Html.Raw(DeskNavigation.IcExternal)</svg> View site</a>
                         <div class="desk-menu-sep"></div>
@@ -257,6 +258,11 @@
             @* Busy bar for form posts, htmx requests and uploads; unsaved-changes guard for editors. *@
             <div id="desk-busy" role="progressbar" aria-hidden="true"></div>
             <script src="~/js/inkwell-desk.js" asp-append-version="true"></script>
+
+            @if (shell.MaintenanceOn)
+            {
+                <p class="desk-maintenance" role="status">Maintenance mode is on. Visitors see the holding page; you see the site because you are signed in. <a href="/admin/settings#s-general">Switch it off in Settings</a></p>
+            }
 
             @* ── Page header: every screen gets the same title block; a view adds ViewData["Description"] and an optional PageActions section ── *@
             @if (ViewData["HideHeader"] as bool? != true)

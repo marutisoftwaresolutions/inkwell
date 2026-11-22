@@ -23,8 +23,10 @@ public sealed record EmailMessage(string ToEmail, string? ToName, string Subject
     IReadOnlyDictionary<string, string>? Headers = null);
 
 /// <summary>What happened to a send: <see cref="Sent"/>, or the reason it was not.</summary>
-public sealed record EmailSendResult(bool Sent, string? Error)
+public sealed record EmailSendResult(bool Sent, string? Error, bool Permanent = false)
 {
     public static readonly EmailSendResult Ok = new(true, null);
     public static EmailSendResult Failed(string error) => new(false, error);
+    /// <summary>The mail server refused this recipient for good (a hard bounce): do not send to it again.</summary>
+    public static EmailSendResult Bounced(string error) => new(false, error, true);
 }

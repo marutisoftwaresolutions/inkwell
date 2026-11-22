@@ -134,6 +134,8 @@ public class ParsedTerm
     public string Name { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public bool IsTag { get; set; }
+    /// <summary>For a category: the slug of the category it sat under in the source, or null at the top level.</summary>
+    public string? ParentSlug { get; set; }
 }
 
 public class ParsedAuthor

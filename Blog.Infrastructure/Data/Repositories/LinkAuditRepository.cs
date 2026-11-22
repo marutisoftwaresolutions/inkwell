@@ -19,14 +19,14 @@ public class LinkAuditRepository : ILinkAuditRepository
         // passed. A scheduled post never flips to Published, so counting Published alone reported every link to a
         // post that went live on schedule as broken.
         var posts = (await conn.QueryAsync<(string Slug, string Title, string Html)>(@"
-            SELECT Slug, Title, ISNULL(Html, '') AS Html
+            SELECT Slug, Title, COALESCE(Html, '') AS Html
               FROM Posts
              WHERE (Status = 'Published' OR (Status = 'Scheduled' AND ScheduledAt <= SYSUTCDATETIME()))
                AND (@OwnerId IS NULL OR AuthorId = @OwnerId);",
             new { OwnerId = ownerId })).ToList();
 
         var pages = (await conn.QueryAsync<(string Slug, string Title, string Html)>(@"
-            SELECT Slug, Title, ISNULL(Content, '') AS Html
+            SELECT Slug, Title, COALESCE(Content, '') AS Html
               FROM Pages
              WHERE IsPublished = 1;")).ToList();
 

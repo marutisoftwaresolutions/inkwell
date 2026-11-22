@@ -1,0 +1,115 @@
+@model List<Blog.Web.Controllers.GoalsController.Row>
+@* Desk screen: Admin → Analytics → Goals. Daily counters for what the site wants readers to do. *@
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Goals";
+    ViewData["Description"] = "What you want readers to do, counted per day. Only totals are kept: no visitor, session or address is stored with a goal.";
+    var canAdd = ViewBag.CanAdd is true;
+    var name = TempData["GoalName"] as string ?? "";
+    var kind = TempData["GoalKind"] as string ?? Blog.Core.Services.Goals.Visit;
+    var target = TempData["GoalTarget"] as string ?? "";
+    var errorField = TempData["GoalErrorField"] as string ?? "";
+    var errorText = TempData["GoalErrorText"] as string ?? "";
+    var rangeFrom = ViewBag.RangeFrom as string;
+    var rangeTo = ViewBag.RangeTo as string;
+    var hasRange = rangeFrom is not null && rangeTo is not null;
+    var exportHref = hasRange ? $"/admin/analytics/goals/export?from={rangeFrom}&to={rangeTo}" : "/admin/analytics/goals/export";
+}
+
+@section PageActions {
+    <a href="@exportHref" class="desk-btn desk-btn-outline">Download CSV</a>
+    <a href="/admin/analytics" class="desk-btn desk-btn-outline">Back to Analytics</a>
+}
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="md:col-span-2 space-y-4 min-w-0">
+        <form method="get" action="/admin/analytics/goals" class="flex flex-wrap items-end gap-3">
+            <div><label for="goalFrom" class="desk-label">From</label><input type="date" id="goalFrom" name="from" value="@rangeFrom" max="@ViewBag.Today" class="desk-input" /></div>
+            <div><label for="goalTo" class="desk-label">To</label><input type="date" id="goalTo" name="to" value="@rangeTo" max="@ViewBag.Today" class="desk-input" /></div>
+            <button type="submit" class="desk-btn desk-btn-outline">Show range</button>
+            @if (hasRange) { <a href="/admin/analytics/goals" class="desk-btn desk-btn-link">Clear</a> }
+        </form>
+        <div class="desk-card overflow-hidden">
+<div class="table-scroll"><table class="desk-table">
+                <thead>
+                    <tr>
+                        <th>Goal</th>
+                        <th class="text-right">Last 7 days</th>
+                        <th class="text-right">Last 30 days</th>
+                        @if (hasRange) { <th class="text-right">@rangeFrom to @rangeTo</th> }
+                        <th class="w-[100px]"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="font-medium">@row.Name @if (row.BuiltIn) { <span class="desk-pill desk-pill-muted ml-1">always counted</span> }</div>
+                                <div class="text-xs text-muted-foreground break-all">@row.What</div>
+                            </td>
+                            <td class="text-right tabular-nums">@row.Last7.ToString("N0")</td>
+                            <td class="text-right tabular-nums">@row.Last30.ToString("N0")</td>
+                            @if (hasRange) { <td class="text-right tabular-nums">@((row.InRange ?? 0).ToString("N0"))</td> }
+                            <td>
+                                @if (!row.BuiltIn)
+                                {
+                                    <form method="post" action="/admin/analytics/goals/delete/@row.Key" class="desk-row-actions" data-confirm-title="Remove this goal?" data-confirm-body="“@row.Name” stops being counted and its past counts are deleted. Your pages and links are untouched." data-confirm-action="Remove goal" data-confirm-tone="danger">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" aria-label="Remove goal “@row.Name”" class="desk-btn desk-btn-ghost desk-btn-icon desk-btn-sm text-destructive hover:text-destructive hover:bg-destructive/10">
+                                            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        </div>
+        @if (Model.All(r => r.BuiltIn))
+        {
+            <p class="desk-hint">No goals of your own yet. Add the first one on the right: for example the page a reader lands on after signing up, or the link to your booking tool.</p>
+        }
+        <p class="desk-hint">Days are counted in UTC. A range of your own covers up to a year; the download holds one line per day and goal, for the chosen range or the last 30 days. A page visit is counted the way Analytics counts a view: once the page has loaded in a browser, never for signed-in staff or known bots. A link click is counted when a reader follows a matching link on any page of this site.</p>
+    </div>
+
+    <div class="md:col-span-1">
+        <div class="desk-card sticky top-6">
+            <div class="desk-card-header">
+                <h2 class="desk-card-title">Add a goal</h2>
+            </div>
+            @if (canAdd)
+            {
+                <form method="post" action="/admin/analytics/goals" class="desk-card-body space-y-4">
+                    @Html.AntiForgeryToken()
+                    <div>
+                        <label for="goalName" class="desk-label">Name</label>
+                        <input type="text" name="name" id="goalName" value="@name" required maxlength="@Blog.Core.Services.Goals.MaxNameLength" class="desk-input" placeholder="e.g. Reached the pricing page"
+                               aria-invalid="@(errorField == "goalName" ? "true" : null)" aria-describedby="@(errorField == "goalName" ? "goalName-error" : null)" autofocus="@(errorField == "goalName")" />
+                        @if (errorField == "goalName") { <p id="goalName-error" class="desk-error">@errorText</p> }
+                    </div>
+                    <div>
+                        <label for="goalKind" class="desk-label">Counts</label>
+                        <select name="kind" id="goalKind" class="desk-select">
+                            <option value="@Blog.Core.Services.Goals.Visit" selected="@(kind == Blog.Core.Services.Goals.Visit)">A visit to a page</option>
+                            <option value="@Blog.Core.Services.Goals.Click" selected="@(kind == Blog.Core.Services.Goals.Click)">A click on a link</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="goalTarget" class="desk-label">Page or link</label>
+                        <input type="text" name="target" id="goalTarget" value="@target" required maxlength="@Blog.Core.Services.Goals.MaxTargetLength" class="desk-input" placeholder="/pricing"
+                               aria-invalid="@(errorField == "goalTarget" ? "true" : null)" aria-describedby="@(errorField == "goalTarget" ? "goalTarget-error goalTargetHint" : "goalTargetHint")" autofocus="@(errorField == "goalTarget")" />
+                        @if (errorField == "goalTarget") { <p id="goalTarget-error" class="desk-error">@errorText</p> }
+                        <p id="goalTargetHint" class="desk-hint">For a visit: the address of the home page, a post or a page on this site, such as /pricing. For a click: the start of the link, such as https://book.example.com/ or mailto:.</p>
+                    </div>
+                    <button type="submit" class="desk-btn desk-btn-primary w-full">Add goal</button>
+                </form>
+            }
+            else
+            {
+                <p class="desk-card-body text-sm text-muted-foreground">This site has @Blog.Core.Services.Goals.Max goals, the most it can watch. Remove one you no longer need to add another.</p>
+            }
+        </div>
+    </div>
+</div>

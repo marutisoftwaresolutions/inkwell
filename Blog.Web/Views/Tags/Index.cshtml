@@ -2,7 +2,7 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Tags";
-    ViewData["Description"] = "Free-form labels readers can browse at /tag/{slug}.";
+    ViewData["Description"] = "Free-form labels readers can browse at /tag/{slug}. A description gives that page an introduction and its search result text.";
     var listQuery = ViewData[Blog.Web.Models.ListPaging.QueryKey] as string ?? "";
 }
 
@@ -30,6 +30,7 @@
                         <tr>
                             <th>Name</th>
                             <th>Slug</th>
+                            <th>Description</th>
                             <th class="w-[100px] text-right">Actions</th>
                         </tr>
                     </thead>
@@ -39,6 +40,9 @@
                             <tr>
                                 <td class="font-medium">@tag.Name</td>
                                 <td class="text-muted-foreground">@tag.Slug</td>
+                                <td>
+                                    <a href="/admin/tags/describe/@tag.Id?q=@Uri.EscapeDataString(listQuery)&page=@(ViewData[Blog.Web.Models.ListPaging.PageKey] as int? ?? 1)" class="desk-btn desk-btn-link desk-btn-sm" aria-label="@(string.IsNullOrWhiteSpace(tag.Description) ? "Add" : "Edit") description for “@tag.Name”">@(string.IsNullOrWhiteSpace(tag.Description) ? "Add" : "Edit")</a>
+                                </td>
                                 <td>
                                     <form method="post" action="/admin/tags/delete/@tag.Id" class="desk-row-actions" data-confirm-title="Delete this tag?" data-confirm-body="“@tag.Name” is removed from every post that carries it and /tag/@tag.Slug will return 404. The posts themselves are untouched." data-confirm-action="Delete tag" data-confirm-tone="danger">
                                         @Html.AntiForgeryToken()

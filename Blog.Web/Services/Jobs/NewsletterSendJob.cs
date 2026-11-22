@@ -50,7 +50,7 @@ public sealed class NewsletterSendJob : IScheduledJob
 
         var started = DateTime.UtcNow;
         var budget = BatchSize;
-        int sent = 0, retried = 0, failed = 0, skipped = 0, finished = 0;
+        int sent = 0, retried = 0, failed = 0, skipped = 0, finished = 0, bounced = 0;
 
         foreach (var issue in active)
         {
@@ -91,6 +91,14 @@ public sealed class NewsletterSendJob : IScheduledJob
                         await _repo.MarkDeliveryAsync(d.Id, NewsletterDeliveryStatus.Sent, attempts, DateTime.UtcNow, DateTime.UtcNow, null);
                         sent++;
                     }
+                    else if (result.Permanent)
+                    {
+                        // Hard bounce: no retry, and the address leaves the list so the next issue skips it.
+                        await _repo.MarkDeliveryAsync(d.Id, NewsletterDeliveryStatus.Failed, attempts, DateTime.UtcNow, null, "Address refused by its mail server; removed from the list. " + result.Error);
+                        await _repo.MarkMemberBouncedAsync(d.MemberId);
+                        failed++;
+                        bounced++;
+                    }
                     else if (attempts >= MaxAttempts)
                     {
                         await _repo.MarkDeliveryAsync(d.Id, NewsletterDeliveryStatus.Failed, attempts, DateTime.UtcNow, null, result.Error);
@@ -114,6 +122,6 @@ public sealed class NewsletterSendJob : IScheduledJob
             }
             if (budget <= 0 || DateTime.UtcNow - started >= TimeBudget) break;
         }
-        return $"Newsletter: sent {sent}, will retry {retried}, failed {failed}, skipped {skipped}; {finished} issue(s) finished.";
+        return $"Newsletter: sent {sent}, will retry {retried}, failed {failed} ({bounced} bounced and removed), skipped {skipped}; {finished} issue(s) finished.";
     }
 }
